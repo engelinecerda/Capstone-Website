@@ -1,0 +1,111 @@
+
+
+.about {
+    position: relative;
+    width: 100%;
+    height: 400px;       /* adjust to the landscape height you want */
+    overflow: hidden;    /* hides anything outside the box */
+}
+
+.about img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;   /* crops the image to fill the box */
+    object-position: center; /* keeps the crop centered */
+}
+.about-title{
+    margin-top: 0;
+    padding-top: 50px;
+    padding-bottom: 50px;
+    background-color: white;
+}
+.about-title h1 {
+       text-align: center;
+    font-size: 36px;
+    color: #6B3A1F;
+    padding: 20px 0;
+}
+
+.about-title p {
+      text-align: center;
+    font-size: 18px;
+    color: #241208;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
+    line-height: 2;
+}
+
+.values {
+  text-align: center;
+  padding: 50px 20px;
+  margin: 0;
+  background-color: #f9f5f0; /* light beige background */
+  color: #333;
+}
+
+.values h2 {
+  font-size: 2rem;
+  margin-bottom: 40px;
+  color: #4b2e2e; /* coffee-inspired dark brown */
+}
+
+.values-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* force 4 equal columns */
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.value-card {
+  background: #fff;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
+}
+
+.value-card:hover {
+  transform: translateY(-5px);
+}
+
+.icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: #a0522d; /* coffee brown accent */
+}
+
+.value-card h3 {
+  font-size: 1.3rem;
+  margin-bottom: 10px;
+  color: #4b2e2e;
+}
+
+.value-card p {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #555;
+}
+
+.mission-section {
+    background-color: white;
+    padding: 50px 20px;
+}
+
+.mission-section h1 {
+    text-align: center;
+    font-size: 36px;
+    color: #6B3A1F;
+    padding: 20px 0;
+}
+
+.mission-section p {
+    text-align: center;
+    font-size: 18px;
+    color: #241208;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
+    line-height: 2;
+}

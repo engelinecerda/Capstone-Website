@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ELI Coffee Events Cafe</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/modals.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    
 </head>
 <body>
     <nav class="navbar">
@@ -22,37 +26,33 @@
         
         <ul class="navbar__menu">
             <li class="navbar__item">
-                <a href="/" class="navbar__links">
+                <a href="index.html" class="navbar__links">
                     Home
                 </a>
             </li>
             <li class="navbar__item">
-                <a href="/" class="navbar__links">
+                <a href="pages/packages.html" class="navbar__links">
                     Packages
                 </a>
             </li>
             <li class="navbar__item">
-                <a href="/" class="navbar__links">
+                <a href="pages/reservations.html" class="navbar__links">
                     Reservations
                 </a>
             </li>
             <li class="navbar__item">
-                <a href="/" class="navbar__links">
+                <a href="pages/faqs.html" class="navbar__links">
                     FAQs
                 </a>
             </li>
             <li class="navbar__item">
-                <a href="/" class="navbar__links">
+                <a href="pages/about.html" class="navbar__links">
                     About
                 </a>
             </li>
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    Contact
-                </a>
-            </li>
+            
             <li class="navbar__btn">
-                <a href="/" class="button">
+                <a href="pages/login_signup.html" class="button">
                     Login / Sign Up
                 </a>
             </li>
@@ -67,6 +67,126 @@
         <p>PERFECT FOR SMALL GATHERING, BIRTHDAY, BRIDAL SHOWER, TEAM MEETING, AND ETC.</p>
     </div>
     <button class="reserve-btn">Reserve Your Event</button>
-    <script src="app.js"></script>
+    
+    <!--welcome section-->
+    <div class="welcome-section">
+        <h1>Welcome to ELI Coffee Events Cafe</h1>
+        <p>ELI Coffee Binangonan is a Filipino-owned café and event lounge located in Darangan, Binangonan, Rizal. The café offers specialty coffee, artisanal beverages, desserts, and light meals in a cozy and aesthetic setting that is popular for casual meetups, study sessions, and coffee dates. In addition to serving drinks and food, the café also provides lounge spaces that can be reserved for private gatherings, meetings, and small celebrations.</p>
+    </div>
+
+    <!-- SERVICES SECTION -->
+<div class="services-section" id="services">
+    <h1>Our Services</h1>
+    <p>Discover ELI’s services — from our welcoming café experience, to catering for your gatherings, and private event hosting designed to make every occasion memorable.</p>
+    <div class="cards-container">
+
+        <!-- Card 1 -->
+        <div class="card" data-modal="cafe">
+            <img src="images/coffee.jpg" class="card-img" alt="Cafe">
+            <div class="card-body">
+                <div class="card-title">
+                    <h3>Cafe</h3>
+                </div>
+                <p>Our cafe offers a cozy atmosphere designed for relaxation, conversation, or simply savoring the perfect cup.</p>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="card" data-modal="private-event">
+            <img src="images/private event.jpg" class="card-img" alt="Private Event">
+            <div class="card-body">
+                <div class="card-title">
+                    <h3>Private Event</h3>
+                </div>
+                <p>Host your special moments with us. Eli Coffee offers cozy private event packages with great food and coffee — your go-to events cafe in Binangonan.</p>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="card" data-modal="catering">
+            <img src="images/catering img.jpg" class="card-img" alt="Catering">
+            <div class="card-body">
+                <div class="card-title">
+                    <h3>Catering</h3>
+                </div>
+                <p>Fully customizable catering services for weddings, birthdays, baptisms, and corporate events.</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="store-locations-section">
+    <h1>Store Locations</h1>
+    <div class="location-row">
+
+        <div class="location-info">
+            <div class="location-card">
+                <div class="location-icon">📍</div>
+                <div class="location-details">
+                    <h3>ELI Coffee Events Café — Binangonan</h3>
+                    <p>2nd Flr Pearl Bldg. National Rd., Calumpang, Binangonan, Rizal (Across BDO Binangonan)</p>
+                    <p>Open Monday - Sunday, 1:00 PM - 10: 00 PM</p>
+                    
+                </div>
+            </div>
+        </div>
+
+        <div class="location-info">
+            <div class="location-card">
+                <div class="location-icon">📍</div>
+                <div class="location-details">
+                    <h3>ELI Coffee Events Café — Antipolo</h3>
+                    <p>2nd Flr Pobel Building, M.L. Quezon Ave. Extension, Barangay Dalig, Antipolo City</p>
+                    <p><em>near Shopwise Antipolo</em></p>
+                    <p>Open Daily - 1:00 PM - 2:00 AM </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+<footer class="footer">
+    <div class="footer-top">
+        <div class="footer-brand">
+            <img src="images/eli coffee binangonan logo.png" alt="ELI Coffee Logo" class="footer-logo">
+            <p>Your go-to events cafe in Binangonan, Rizal.</p>
+        </div>
+
+        <div class="footer-contact">
+            <h3>Contact Us</h3>
+            <p> 
+                <i class="fa-solid fa-phone"></i>
+                0917 562 0306 | 0917 562 0308
+            </p>
+            <p>
+                <i class="fa-solid fa-at"></i>
+                elicoffeetea@gmail.com
+            </p>
+        </div>
+
+        <div class="footer-social">
+            <h3>Follow Us</h3>
+            <p>
+                <i class="fa-brands fa-square-facebook"></i>
+                Facebook: @elicoffeeph
+            </p>
+            <p>
+                <i class="fa-brands fa-instagram"></i>
+                 Instagram: @elicoffeeph</p>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <p>&copy; 2024 ELI Coffee Events Cafe. All rights reserved.</p>
+    </div>
+</footer>
+
+
+    
+<script src="js/app.js"></script>
+<script type="module" src="./js/navbar.js"></script>
 </body>
 </html>

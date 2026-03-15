@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/reservations.css">
+    <title>ELI Coffee Reservations</title>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar__container">
+            <a href="#">
+                <img class="logo" src="../images/logo.png" alt="ELI Coffee Events Cafe Logo">
+            </a>
+            <div class="navbar__toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="navbar__menu">
+                <li class="navbar__item"><a href="../index.html" class="navbar__links">Home</a></li>
+                <li class="navbar__item"><a href="../pages/packages.html" class="navbar__links">Packages</a></li>
+                <li class="navbar__item"><a href="../pages/reservations.html" class="navbar__links">Reservations</a></li>
+                <li class="navbar__item"><a href="../pages/faqs.html" class="navbar__links">FAQs</a></li>
+                <li class="navbar__item"><a href="../pages/about.html" class="navbar__links">About</a></li>
+                <li class="navbar__btn"></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="reservation-section">
+        <h1>Make a Reservation</h1>
+        <p>Follow the steps below to book your event</p>
+
+        <div class="reservation-container">
+
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress"></div>
+                </div>
+                <span id="step-text">Step 1: Select Package Type</span>
+            </div>
+
+            <!-- Step 1: Onsite or Offsite -->
+            <div class="step active" id="step1">
+                <h2>Package Type</h2>
+                <p>Choose whether your event is onsite or offsite</p>
+                <div class="location-options">
+                    <div class="location-select-card" data-value="onsite">
+                        <div class="location-select-icon"></div>
+                        <h4>Onsite</h4>
+                        <p>Hold your event at ELI Coffee Events Café</p>
+                    </div>
+                    <div class="location-select-card" data-value="offsite">
+                        <div class="location-select-icon"></div>
+                        <h4>Offsite</h4>
+                        <p>We bring the service to your venue</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Package Category -->
+            <div class="step" id="step2">
+                <h2>Package Category</h2>
+                <p>Select the type of service you need for your event</p>
+                <div class="package-options" id="category-options"></div>
+            </div>
+
+            <!-- Step 3: Specific Package -->
+            <div class="step" id="step3">
+                <h2>Specific Package</h2>
+                <p>Choose your specific package</p>
+                <div class="package-options" id="specific-package-options"></div>
+            </div>
+
+            <!-- Step 4: Food Tray Details (only if Food Tray selected) -->
+            <div class="step" id="step4">
+                <h2>Food Tray Selection</h2>
+                <p>Select your preferred dish and number of pax per tray</p>
+                <div class="package-options" id="foodtray-options"></div>
+            </div>
+
+            <!-- Step 5: Event Date -->
+            <div class="step" id="step5">
+                <h2>Event Date</h2>
+                <p>Select the date of your event</p>
+                <input type="date" id="event-date">
+            </div>
+
+            <!-- Step 6: Time Slot -->
+            <div class="step" id="step6">
+                <h2>Time Slot</h2>
+                <p>Select your preferred event time</p>
+                <div id="time-options" class="time-grid"></div>
+            </div>
+
+            <!-- Step 7: Reservation Details -->
+            <div class="step" id="step7">
+                <h2>Reservation Details</h2>
+                <p>Fill in your event and contact information</p>
+                <input type="text" placeholder="Full Name *" id="name">
+                <input type="email" placeholder="Email Address *" id="email">
+                <input type="tel" placeholder="Phone Number *" id="phone">
+                <input type="text" placeholder="Event Type (e.g. Birthday, Wedding) *" id="event-type">
+                <input type="number" placeholder="Number of Guests *" id="guest-count" min="1">
+                <div id="venue-location-wrapper" style="display:none;">
+                    <input type="text" placeholder="Venue Location (for offsite events) *" id="venue-location">
+                </div>
+                <textarea placeholder="Notes & Special Requests (Optional)" id="requests"></textarea>
+            </div>
+
+            <!-- Step 8: Order Summary -->
+            <div class="step" id="step8">
+                <h2>Order Summary</h2>
+                <p>Review your selected packages and total price</p>
+                <div class="summary-box" id="order-summary-content"></div>
+            </div>
+
+            <!-- Step 9: Reservation Summary -->
+            <div class="step" id="step9">
+                <h2>Reservation Summary</h2>
+                <p>Please review all your details before proceeding</p>
+                <div class="summary-box" id="reservation-summary-content"></div>
+
+                <div class="summary-actions">
+                    <div class="guest-warning" id="guest-warning" style="display:none;">
+                        <span>⚠️</span>
+                        <p>You must <a href="../pages/login_signup.html">sign up or log in</a> to complete your booking.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 10: Contract -->
+            <div class="step" id="step10">
+                <h2>Sign the Contract</h2>
+                <p>Download, sign, and upload the contract to complete your booking</p>
+                <div class="contract-box">
+                    <div class="contract-download">
+                        <div class="contract-icon">📄</div>
+                        <div class="contract-info">
+                            <h4>ELI Coffee Events Reservation Contract</h4>
+                            <p>Read the full terms and conditions before signing</p>
+                        </div>
+                        <a href="../files/eli-coffee-contract.pdf" download class="contract-download-btn">
+                            ⬇ Download Contract
+                        </a>
+                    </div>
+                    <div class="contract-steps">
+                        <div class="contract-step-item">
+                            <span class="contract-step-number">1</span>
+                            <span>Download the contract above</span>
+                        </div>
+                        <div class="contract-step-item">
+                            <span class="contract-step-number">2</span>
+                            <span>Print and sign <strong>or</strong> use an e-signature tool</span>
+                        </div>
+                        <div class="contract-step-item">
+                            <span class="contract-step-number">3</span>
+                            <span>Upload the signed contract below</span>
+                        </div>
+                    </div>
+                    <div class="contract-upload">
+                        <label for="contract">Upload Signed Contract</label>
+                        <input type="file" id="contract" accept=".pdf,.jpg,.jpeg,.png">
+                        <p class="contract-note">Accepted formats: PDF, JPG, PNG</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="reservation-buttons">
+                <button id="prevBtn" style="display:none;">Back</button>
+                <button id="nextBtn">Next</button>
+            </div>
+
+        </div>
+    </section>
+
+    <script src="../js/reservations.js"></script>
+    <script type="module" src="../js/navbar.js"></script>
+</body>
+</html>

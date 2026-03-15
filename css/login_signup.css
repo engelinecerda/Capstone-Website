@@ -1,0 +1,274 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Kumbh Sans', sans-serif;
+}
+
+body {
+    font-family: 'Kumbh Sans', sans-serif;
+    background-color: #FFF8F0;
+    margin: 0;
+}
+
+/* ========================
+   Login Page Wrapper
+======================== */
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 70px);
+    padding: 40px 20px;
+}
+
+.login-container {
+    background: #fff;
+    padding: 50px 60px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    width: 520px;
+    text-align: center;
+}
+
+/* ========================
+   Logo
+======================== */
+.login-logo img {
+    width: 150px;
+    height: auto;
+    margin-bottom: 16px;
+}
+
+.coffee-icon {
+    font-size: 2.5rem;
+    color: #6B3A1F;
+}
+
+.login-logo h1 {
+    font-size: 1.6rem;
+    color: #2A1408;
+    margin: 10px 0 0;
+    font-weight: 700;
+}
+
+.welcome {
+    font-size: 0.95rem;
+    color: #555;
+    margin-bottom: 28px;
+    line-height: 1.6;
+}
+
+.welcome span {
+    font-size: 0.85rem;
+    color: #777;
+}
+
+/* ========================
+   Tabs
+======================== */
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 28px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e0d0c0;
+}
+
+.tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: #f5f0eb;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+    color: #888;
+    font-family: 'Kumbh Sans', sans-serif;
+    transition: all 0.3s ease;
+}
+
+.tab.active {
+    background: #6B3A1F;
+    color: #fff;
+}
+
+/* ========================
+   Forms
+======================== */
+.login-form,
+.signup-form {
+    text-align: left;
+    display: none;
+}
+
+.login-form.active,
+.signup-form.active {
+    display: block;
+}
+
+.login-form h2,
+.signup-form h2 {
+    font-size: 1.3rem;
+    color: #2A1408;
+    margin-bottom: 6px;
+    font-weight: 700;
+}
+
+.subtitle {
+    font-size: 0.875rem;
+    color: #777;
+    margin-bottom: 24px;
+}
+
+/* ========================
+   Name Row (2 or 3 columns)
+======================== */
+.name-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.name-row-three {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+}
+
+/* ========================
+   Form Groups
+======================== */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #2A1408;
+    margin-bottom: 6px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Kumbh Sans', sans-serif;
+    color: #2A1408;
+    background-color: #fff;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #6B3A1F;
+}
+
+/* ========================
+   Options Row
+======================== */
+.options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.options label {
+    font-size: 0.875rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.options input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.forgot {
+    font-size: 0.875rem;
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.forgot:hover {
+    text-decoration: underline;
+}
+
+/* ========================
+   Buttons
+======================== */
+.login-btn,
+.signup-btn {
+    width: 100%;
+    padding: 14px;
+    background: #6B3A1F;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Kumbh Sans', sans-serif;
+    transition: background 0.3s ease;
+}
+
+.login-btn:hover,
+.signup-btn:hover {
+    background: #2A1408;
+}
+
+/* ========================
+   Admin Link
+======================== */
+.admin-link {
+    text-align: center;
+    margin-top: 18px;
+    font-size: 0.875rem;
+    color: #555;
+}
+
+.admin-link a {
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.admin-link a:hover {
+    text-decoration: underline;
+}
+
+/* ========================
+   Password Hint
+======================== */
+.password-hint {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: -12px;
+    margin-bottom: 18px;
+}
+
+/* ========================
+   Responsive
+======================== */
+@media (max-width: 600px) {
+    .login-container {
+        padding: 32px 24px;
+        width: 100%;
+    }
+
+    .name-row,
+    .name-row-three {
+        grid-template-columns: 1fr;
+    }
+}
