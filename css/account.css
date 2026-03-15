@@ -1,6 +1,9 @@
 /* ========================
    Account Page Layout
 ======================== */
+body{
+    background-color: #FDF8F2;
+}
 .account-page {
     display: flex;
     min-height: calc(100vh - 70px);

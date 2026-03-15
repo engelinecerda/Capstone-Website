@@ -4,13 +4,557 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../css/styles.css">
-    <link rel="stylesheet" href="../css/reservations.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <title>ELI Coffee Reservations</title>
+    
+    <style>
+        /* ========================
+           Reservation Section
+        ======================== */
+        .reservation-section {
+            padding: 60px 20px 80px;
+            text-align: center;
+            background-color: #FFF8F0;
+            min-height: 100vh;
+        }
+
+        .reservation-section > h1 {
+            color: #6B3A1F;
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .reservation-section > p {
+            color: #2A1408;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        /* ========================
+           Container
+        ======================== */
+        .reservation-container {
+            margin: 0 auto;
+            padding: 40px;
+            max-width: 700px;
+            background-color: #fff;
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            text-align: left;
+        }
+
+        /* ========================
+           Progress Bar
+        ======================== */
+        .progress-container {
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background-color: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        #progress {
+            height: 10px;
+            width: 0%;
+            background-color: #6B3A1F;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        #step-text {
+            font-size: 14px;
+            color: #6B3A1F;
+            font-weight: 600;
+        }
+
+        /* ========================
+           Steps — CRITICAL
+        ======================== */
+        .res-step {
+            display: none;
+        }
+
+        .res-step.active {
+            display: block;
+        }
+
+        .res-step h2 {
+            color: #2A1408;
+            font-size: 22px;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .res-step > p {
+            color: #777;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* ========================
+           Inputs
+        ======================== */
+        .res-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            color: #2A1408;
+            background-color: #fff;
+            margin-bottom: 14px;
+            display: block;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .res-input:focus {
+            outline: none;
+            border-color: #6B3A1F;
+        }
+
+        textarea.res-input {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* ========================
+           Location Cards
+        ======================== */
+        .location-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .location-card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 28px 20px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .location-card:hover   { border-color: #6B3A1F; background: #FFF8F0; }
+        .location-card.active  { border-color: #6B3A1F; background: #FFEDE0; }
+
+        .location-card .loc-icon { font-size: 36px; margin-bottom: 10px; }
+        .location-card h4        { font-size: 16px; font-weight: 700; color: #2A1408; margin-bottom: 4px; }
+        .location-card p         { font-size: 13px; color: #777; margin: 0; }
+
+        /* ========================
+           Package Cards
+        ======================== */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 6px;
+        }
+
+        .pkg-card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fff;
+        }
+
+        .pkg-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
+        .pkg-card.active { border-color: #6B3A1F; background: #FFEDE0; }
+
+        .pkg-card h4         { font-size: 14px; font-weight: 700; color: #2A1408; margin: 0 0 5px; }
+        .pkg-card .pkg-price { font-size: 15px; font-weight: 700; color: #6B3A1F; margin: 4px 0; }
+        .pkg-card .pkg-desc  { font-size: 12px; color: #777; margin: 0; line-height: 1.5; }
+
+        /* ========================
+           Section Label
+        ======================== */
+        .section-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #6B3A1F;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 20px 0 10px;
+        }
+
+        /* ========================
+           Add-on Banner
+        ======================== */
+        .addon-banner {
+            border-top: 1px dashed #e0d0c0;
+            margin-top: 24px;
+            padding-top: 20px;
+        }
+
+        /* ========================
+           Option Pills
+        ======================== */
+        .pills-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .pill {
+            padding: 7px 14px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background: #fafafa;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .pill:hover  { border-color: #6B3A1F; background: #FFF8F0; }
+        .pill.active { border-color: #6B3A1F; background: #FFEDE0; color: #6B3A1F; font-weight: 600; }
+
+        /* ========================
+           Food Tray
+        ======================== */
+        .tray-section {
+            margin-bottom: 4px;
+        }
+
+        .tray-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .tray-header h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #2A1408;
+        }
+
+        .pax-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .pax-row .pax-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B3A1F;
+        }
+
+        .tray-divider {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 12px 0 16px;
+        }
+
+        /* ========================
+           Tray Cart
+        ======================== */
+        .tray-cart {
+            background: #FFF8F0;
+            border: 1px solid #e0d0c0;
+            border-radius: 12px;
+            padding: 18px;
+            margin-top: 20px;
+        }
+
+        .tray-cart h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #2A1408;
+            margin-bottom: 12px;
+        }
+
+        .tray-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #2A1408;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0d0c0;
+        }
+
+        .tray-row:last-of-type { border-bottom: none; }
+
+        .tray-total {
+            font-size: 15px;
+            font-weight: 700;
+            color: #6B3A1F;
+            text-align: right;
+            margin-top: 10px;
+        }
+
+        /* ========================
+           Time Grid
+        ======================== */
+        .time-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .time-card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2A1408;
+            transition: all 0.2s;
+        }
+
+        .time-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
+        .time-card.active { border-color: #6B3A1F; background: #FFEDE0; }
+
+        /* ========================
+           Summary Box
+        ======================== */
+        .summary-box {
+            background: #FFF8F0;
+            border: 1px solid #e0d0c0;
+            border-radius: 12px;
+            padding: 22px 24px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-size: 14px;
+            color: #2A1408;
+            padding: 6px 0;
+            border-bottom: 1px solid #e8ddd5;
+        }
+
+        .summary-row:last-child { border-bottom: none; }
+
+        .summary-row .s-label {
+            font-weight: 600;
+            color: #6B3A1F;
+            flex-shrink: 0;
+            margin-right: 16px;
+        }
+
+        .summary-row .s-value { text-align: right; }
+
+        .summary-divider {
+            border: none;
+            border-top: 1px solid #e0d0c0;
+            margin: 10px 0;
+        }
+
+        .summary-total {
+            font-size: 17px;
+            font-weight: 700;
+            color: #6B3A1F;
+            display: flex;
+            justify-content: space-between;
+            padding-top: 10px;
+        }
+
+        .summary-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #aaa;
+            margin: 12px 0 6px;
+        }
+
+        /* ========================
+           Guest Warning
+        ======================== */
+        .guest-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: #FFF3CD;
+            border: 1px solid #FFD966;
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-top: 16px;
+            font-size: 14px;
+            color: #6B4C00;
+        }
+
+        .guest-warning a { color: #6B3A1F; font-weight: 700; }
+
+        /* ========================
+           Contract
+        ======================== */
+        .contract-box { width: 100%; }
+
+        .contract-download {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #FFF8F0;
+            border: 1px solid #e0d0c0;
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .contract-icon { font-size: 32px; flex-shrink: 0; }
+        .contract-info { flex: 1; }
+        .contract-info h4 { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 3px; }
+        .contract-info p  { font-size: 13px; color: #777; margin: 0; }
+
+        .dl-btn {
+            background: #6B3A1F;
+            color: #fff;
+            text-decoration: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+        .dl-btn:hover { background: #2A1408; }
+
+        .contract-steps { margin-bottom: 16px; }
+
+        .c-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #444;
+            margin-bottom: 10px;
+        }
+
+        .c-num {
+            background: #6B3A1F;
+            color: #fff;
+            border-radius: 50%;
+            width: 26px; height: 26px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .contract-upload label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2A1408;
+            margin-bottom: 8px;
+        }
+
+        .contract-upload input[type="file"] {
+            width: 100%;
+            border: 2px dashed #e0d0c0;
+            border-radius: 10px;
+            padding: 16px;
+            background: #FFF8F0;
+            cursor: pointer;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .contract-note {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 6px;
+        }
+
+        /* ========================
+           Buttons
+        ======================== */
+        .reservation-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .btn-back {
+            background: #f5f5f5;
+            color: #6B3A1F;
+            border: 1px solid #ddd;
+            padding: 12px 28px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .btn-back:hover { background: #e8e8e8; }
+
+        .btn-next {
+            background: #6B3A1F;
+            color: #fff;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        .fa-square-check {
+            color: #2ecc71;   /* Change to any color you like */
+            font-size: 100px; /* Optional: adjust size */
+        }
+
+
+
+
+        
+
+        .btn-next:hover { background: #2A1408; }
+
+        /* ========================
+           Utility
+        ======================== */
+        .hidden { display: none !important; }
+
+        @media (max-width: 600px) {
+            .reservation-container { padding: 24px 16px; }
+            .location-options { grid-template-columns: 1fr; }
+            .cards-grid       { grid-template-columns: 1fr; }
+            .input-row        { grid-template-columns: 1fr; }
+            .time-grid        { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
 </head>
 <body>
+
     <nav class="navbar">
         <div class="navbar__container">
-            <a href="#">
+            <a href="../index.html">
                 <img class="logo" src="../images/logo.png" alt="ELI Coffee Events Cafe Logo">
             </a>
             <div class="navbar__toggle" id="mobile-menu">
@@ -35,105 +579,111 @@
 
         <div class="reservation-container">
 
-            <!-- Progress Bar -->
+            <!-- Progress -->
             <div class="progress-container">
-                <div class="progress-bar">
-                    <div id="progress"></div>
-                </div>
-                <span id="step-text">Step 1: Select Package Type</span>
+                <div class="progress-bar"><div id="progress"></div></div>
+                <span id="step-text"></span>
             </div>
 
-            <!-- Step 1: Onsite or Offsite -->
-            <div class="step active" id="step1">
-                <h2>Package Type</h2>
-                <p>Choose whether your event is onsite or offsite</p>
+            <!-- STEP 1: Event Info -->
+            <div class="res-step active" id="rs1">
+                <h2>Event Information</h2>
+                <p>Tell us about your event</p>
+                <div class="input-row">
+                    <input class="res-input" type="text"   id="event-type"  placeholder="Event Type (e.g. Birthday, Wedding) *">
+                    <input class="res-input" type="number" id="guest-count" placeholder="Number of Guests *" min="1">
+                </div>
+                <input class="res-input" type="date" id="event-date">
+            </div>
+
+            <!-- STEP 2: Location -->
+            <div class="res-step" id="rs2">
+                <h2>Location Type</h2>
+                <p>Will your event be held at ELI Coffee or at your own venue?</p>
                 <div class="location-options">
-                    <div class="location-select-card" data-value="onsite">
-                        <div class="location-select-icon"></div>
+                    <div class="location-card" data-val="onsite">
+                        <div class="loc-icon">🏠</div>
                         <h4>Onsite</h4>
                         <p>Hold your event at ELI Coffee Events Café</p>
                     </div>
-                    <div class="location-select-card" data-value="offsite">
-                        <div class="location-select-icon"></div>
+                    <div class="location-card" data-val="offsite">
+                        <div class="loc-icon">🚗</div>
                         <h4>Offsite</h4>
                         <p>We bring the service to your venue</p>
                     </div>
                 </div>
-            </div>
-
-            <!-- Step 2: Package Category -->
-            <div class="step" id="step2">
-                <h2>Package Category</h2>
-                <p>Select the type of service you need for your event</p>
-                <div class="package-options" id="category-options"></div>
-            </div>
-
-            <!-- Step 3: Specific Package -->
-            <div class="step" id="step3">
-                <h2>Specific Package</h2>
-                <p>Choose your specific package</p>
-                <div class="package-options" id="specific-package-options"></div>
-            </div>
-
-            <!-- Step 4: Food Tray Details (only if Food Tray selected) -->
-            <div class="step" id="step4">
-                <h2>Food Tray Selection</h2>
-                <p>Select your preferred dish and number of pax per tray</p>
-                <div class="package-options" id="foodtray-options"></div>
-            </div>
-
-            <!-- Step 5: Event Date -->
-            <div class="step" id="step5">
-                <h2>Event Date</h2>
-                <p>Select the date of your event</p>
-                <input type="date" id="event-date">
-            </div>
-
-            <!-- Step 6: Time Slot -->
-            <div class="step" id="step6">
-                <h2>Time Slot</h2>
-                <p>Select your preferred event time</p>
-                <div id="time-options" class="time-grid"></div>
-            </div>
-
-            <!-- Step 7: Reservation Details -->
-            <div class="step" id="step7">
-                <h2>Reservation Details</h2>
-                <p>Fill in your event and contact information</p>
-                <input type="text" placeholder="Full Name *" id="name">
-                <input type="email" placeholder="Email Address *" id="email">
-                <input type="tel" placeholder="Phone Number *" id="phone">
-                <input type="text" placeholder="Event Type (e.g. Birthday, Wedding) *" id="event-type">
-                <input type="number" placeholder="Number of Guests *" id="guest-count" min="1">
-                <div id="venue-location-wrapper" style="display:none;">
-                    <input type="text" placeholder="Venue Location (for offsite events) *" id="venue-location">
+                <div id="venue-wrapper" class="hidden">
+                    <input class="res-input" type="text" id="venue-location" placeholder="Venue Location *">
                 </div>
-                <textarea placeholder="Notes & Special Requests (Optional)" id="requests"></textarea>
             </div>
 
-            <!-- Step 8: Order Summary -->
-            <div class="step" id="step8">
-                <h2>Order Summary</h2>
-                <p>Review your selected packages and total price</p>
-                <div class="summary-box" id="order-summary-content"></div>
-            </div>
+            <!-- STEP 3: Package -->
+            <div class="res-step" id="rs3">
+                <h2>Select Your Package</h2>
+                <p id="rs3-desc">Choose a package for your event</p>
 
-            <!-- Step 9: Reservation Summary -->
-            <div class="step" id="step9">
-                <h2>Reservation Summary</h2>
-                <p>Please review all your details before proceeding</p>
-                <div class="summary-box" id="reservation-summary-content"></div>
+                <!-- Onsite -->
+                <div id="onsite-section" class="hidden">
+                    <div class="section-label">Mini Gathering Packages</div>
+                    <div class="cards-grid" id="mini-grid"></div>
+                    <div id="snack-addon" class="addon-banner hidden">
+                        <div class="section-label">🍪 Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
+                        <div class="cards-grid" id="snack-grid"></div>
+                    </div>
+                </div>
 
-                <div class="summary-actions">
-                    <div class="guest-warning" id="guest-warning" style="display:none;">
-                        <span>⚠️</span>
-                        <p>You must <a href="../pages/login_signup.html">sign up or log in</a> to complete your booking.</p>
+                <!-- Offsite -->
+                <div id="offsite-section" class="hidden">
+                    <div class="cards-grid" id="offsite-cat-grid"></div>
+                    <div id="offsite-sub" class="hidden">
+                        <div class="section-label" id="offsite-sub-label">Choose a Package</div>
+                        <div class="cards-grid" id="offsite-sub-grid"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Step 10: Contract -->
-            <div class="step" id="step10">
+            <!-- STEP 4: Food Tray (only for offsite + foodtray) -->
+            <div class="res-step" id="rs4">
+                <h2>Food Tray Selection</h2>
+                <p>Select your dishes and number of pax per tray</p>
+                <div id="tray-builder"></div>
+                <div class="tray-cart hidden" id="tray-cart">
+                    <h4>🛒 Your Tray Order</h4>
+                    <div id="tray-cart-rows"></div>
+                    <div class="tray-total" id="tray-total"></div>
+                </div>
+            </div>
+
+            <!-- STEP 5: Contact -->
+            <div class="res-step" id="rs5">
+                <h2>Your Details</h2>
+                <p>Fill in your contact information</p>
+                <input class="res-input" type="text"  id="name"     placeholder="Full Name *">
+                <input class="res-input" type="tel"   id="phone"    placeholder="Phone Number *">
+                <input class="res-input" type="email" id="email"    placeholder="Email Address *">
+                <textarea class="res-input"            id="requests" placeholder="Notes & Special Requests (Optional)"></textarea>
+            </div>
+
+            <!-- STEP 6: Time -->
+            <div class="res-step" id="rs6">
+                <h2>Time Slot</h2>
+                <p>Select your preferred event start time</p>
+                <div class="time-grid" id="time-grid"></div>
+            </div>
+
+            <!-- STEP 7: Summary -->
+            <div class="res-step" id="rs7">
+                <h2>Reservation Summary</h2>
+                <p>Please review all your details before proceeding</p>
+                <div class="summary-box" id="summary-content"></div>
+                <div id="guest-warning" class="guest-warning hidden">
+                    <span>⚠️</span>
+                    <p>You must <a href="../pages/login_signup.html">sign up or log in</a> to complete your booking.</p>
+                </div>
+            </div>
+
+            <!-- STEP 8: Contract -->
+            <div class="res-step" id="rs8">
                 <h2>Sign the Contract</h2>
                 <p>Download, sign, and upload the contract to complete your booking</p>
                 <div class="contract-box">
@@ -143,42 +693,667 @@
                             <h4>ELI Coffee Events Reservation Contract</h4>
                             <p>Read the full terms and conditions before signing</p>
                         </div>
-                        <a href="../files/eli-coffee-contract.pdf" download class="contract-download-btn">
-                            ⬇ Download Contract
-                        </a>
+                        <a href="../files/eli-coffee-contract.pdf" download class="dl-btn">⬇ Download Contract</a>
                     </div>
                     <div class="contract-steps">
-                        <div class="contract-step-item">
-                            <span class="contract-step-number">1</span>
-                            <span>Download the contract above</span>
-                        </div>
-                        <div class="contract-step-item">
-                            <span class="contract-step-number">2</span>
-                            <span>Print and sign <strong>or</strong> use an e-signature tool</span>
-                        </div>
-                        <div class="contract-step-item">
-                            <span class="contract-step-number">3</span>
-                            <span>Upload the signed contract below</span>
-                        </div>
+                        <div class="c-step"><span class="c-num">1</span><span>Download the contract above</span></div>
+                        <div class="c-step"><span class="c-num">2</span><span>Print and sign <strong>or</strong> use an e-signature tool</span></div>
+                        <div class="c-step"><span class="c-num">3</span><span>Upload the signed contract below</span></div>
                     </div>
                     <div class="contract-upload">
-                        <label for="contract">Upload Signed Contract</label>
+                        <label for="contract">Upload Signed Contract *</label>
                         <input type="file" id="contract" accept=".pdf,.jpg,.jpeg,.png">
                         <p class="contract-note">Accepted formats: PDF, JPG, PNG</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Navigation Buttons -->
+            <!-- Nav Buttons -->
             <div class="reservation-buttons">
-                <button id="prevBtn" style="display:none;">Back</button>
-                <button id="nextBtn">Next</button>
+                <button class="btn-back hidden" id="prevBtn">← Back</button>
+                <button class="btn-next" id="nextBtn">Next →</button>
             </div>
 
         </div>
     </section>
 
-    <script src="../js/reservations.js"></script>
     <script type="module" src="../js/navbar.js"></script>
+
+    <!-- =====================================================
+         ONE single module script — Supabase session is
+         checked FIRST with await before anything else runs.
+    ====================================================== -->
+    <script type="module">
+    import { supabase } from '../js/supabase.js';
+
+    // ========================
+    // 1. Auth check — MUST be first
+    //    await guarantees isLoggedIn is set before
+    //    any step logic or event listeners run.
+    // ========================
+    const { data: { session } } = await supabase.auth.getSession();
+    const isLoggedIn = !!session;
+
+    // ========================
+    // 2. State
+    // ========================
+    const S = {
+        eventType: '', guestCount: '', eventDate: '',
+        locationType: '', venueLocation: '',
+        miniPackage: null, snackAddon: null,
+        offsiteCategory: '', offsitePackage: null,
+        trayCart: [],
+        name: '', phone: '', email: '', requests: '',
+        time: ''
+    };
+
+    // ========================
+    // 3. Data
+    // ========================
+    const MINI = [
+        { label:'VIP Lite',        price:2999,  pax:'15–18 pax', hours:'2 hours', credit:'₱2,000 food credit' },
+        { label:'VIP Plus',        price:3999,  pax:'15–18 pax', hours:'3 hours', credit:'₱2,499 food credit' },
+        { label:'VIP Max',         price:4999,  pax:'15–18 pax', hours:'4 hours', credit:'₱3,000 food credit' },
+        { label:'Main Hall Basic', price:9999,  pax:'Up to 25 pax', hours:'2 hours', credit:'₱8,000 food credit' },
+        { label:'Main Hall Plus',  price:11999, pax:'Up to 25 pax', hours:'3 hours', credit:'₱9,000 food credit' }
+    ];
+
+    const SNACK = [
+        { label:'Biscuits & Candies',         price:3500, desc:'Chocolate fountain, biscuits, candies, marshmallow, brownies, 20 donuts' },
+        { label:'Biscuits, Candies & Fruits', price:4000, desc:'Chocolate fountain, biscuits, candies, marshmallow, 4 seasonal fruits' },
+        { label:'Biscuits, Chips & Drinks',   price:5000, desc:'Chocolate fountain, biscuits, chips, cupcakes, marshmallow, 2 drinks' }
+    ];
+
+    const OFFSITE_CATS = [
+        { label:'Eli Coffee Bar',   val:'coffee',   icon:'☕', desc:'Professional coffee bar service for your event' },
+        { label:'Snack Bar Corner', val:'snack',    icon:'🍪', desc:'Mobile snack bar with chocolate fountain' },
+        { label:'Catering',         val:'catering', icon:'🍽️', desc:'Fully customizable catering for any event' },
+        { label:'Food Tray',        val:'foodtray', icon:'🍱', desc:'Ready to serve meal trays for any gathering' }
+    ];
+
+    const OFFSITE_PKGS = {
+        coffee: [
+            { label:'30 pax',  price:3990,  desc:'2–3 baristas • 3 hours service • 1:1 coffee serving' },
+            { label:'50 pax',  price:5990,  desc:'2–3 baristas • 3 hours service • 1:1 coffee serving' },
+            { label:'100 pax', price:10990, desc:'2–3 baristas • 3 hours service • 1:1 coffee serving' },
+            { label:'150 pax', price:14990, desc:'2–3 baristas • 3 hours service • 1:1 coffee serving' }
+        ],
+        snack: SNACK,
+        catering: [
+            { label:'Custom Catering', price:0, desc:'Buffet setup, table & chair setup, uniformed waiters • Price varies by guest count' }
+        ]
+    };
+
+    const TRAYS = [
+        { cat:'Chicken',    icon:'🍗', items:['Chicken ala King','Chicken Fillet w/ White Sauce','Garlic Butter Chicken'] },
+        { cat:'Pork',       icon:'🥩', items:['Pork with Mushroom','Crunchy Pork','Pork Caldereta'] },
+        { cat:'Beef',       icon:'🥩', items:['Beef Teriyaki','Beef Salpicao','Beef and Broccoli'] },
+        { cat:'Fish',       icon:'🐟', items:['Fish Fillet with Tartar Sauce','Sweet and Sour Fish Fillet'] },
+        { cat:'Vegetables', icon:'🥦', items:['Mixed Vegetables in Butter Corn and Carrots','Potato Marble'] },
+        { cat:'Pasta',      icon:'🍝', items:['Spaghetti','Carbonara','Baked Macaroni','Tuna Pesto','Pancit Canton'] },
+        { cat:'Dessert',    icon:'🍮', items:['Coffee Jelly','Buko Pandan','Mango Sago','Chocolate Mousse'] }
+    ];
+
+    const PRICES = {
+        Chicken:    {20:2700,30:3800,40:4800,50:5900},
+        Pork:       {20:2700,30:3800,40:4800,50:5900},
+        Beef:       {20:2700,30:3800,40:4800,50:5900},
+        Fish:       {20:2400,30:3400,40:4500,50:5600},
+        Vegetables: {20:2400,30:3400,40:4500,50:5600},
+        Pasta:      {20:2000,30:2900,40:3800,50:4600},
+        Dessert:    {20:1400,30:2900,40:2600,50:3200},
+        Rice:       {20:600, 30:900, 40:1200,50:1500}
+    };
+
+    const TIMES = ['1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
+                   '6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM'];
+
+    // ========================
+    // 4. Step routing
+    // ========================
+    function stepIds() {
+        const ft = S.locationType === 'offsite' && S.offsiteCategory === 'foodtray';
+        return ft
+            ? ['rs1','rs2','rs3','rs4','rs5','rs6','rs7','rs8']
+            : ['rs1','rs2','rs3',      'rs5','rs6','rs7','rs8'];
+    }
+
+    let cur = 1;
+    function total() { return stepIds().length; }
+    function sid(n)  { return stepIds()[n - 1]; }
+
+    // ========================
+    // 5. Navigation
+    // ========================
+    function showStep(n) {
+        document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
+        document.getElementById(sid(n)).classList.add('active');
+
+        document.getElementById('progress').style.width = (n / total() * 100) + '%';
+        document.getElementById('step-text').textContent =
+            `Step ${n} of ${total()}: ${document.getElementById(sid(n)).querySelector('h2').textContent}`;
+
+        document.getElementById('prevBtn').classList.toggle('hidden', n === 1);
+        document.getElementById('nextBtn').textContent = n === total() ? 'Submit' : 'Next →';
+
+        populate(sid(n));
+    }
+
+    function populate(id) {
+        if (id === 'rs3') buildStep3();
+        if (id === 'rs4') buildTrayStep();
+        if (id === 'rs6') buildTimeGrid();
+        if (id === 'rs7') buildSummary();
+    }
+
+    // ========================
+    // 6. Step 3 builders
+    // ========================
+    function buildStep3() {
+        const onEl  = document.getElementById('onsite-section');
+        const offEl = document.getElementById('offsite-section');
+        if (S.locationType === 'onsite') {
+            onEl.classList.remove('hidden');
+            offEl.classList.add('hidden');
+            document.getElementById('rs3-desc').textContent = 'Select a gathering package for your event';
+            buildMiniGrid();
+        } else {
+            onEl.classList.add('hidden');
+            offEl.classList.remove('hidden');
+            document.getElementById('rs3-desc').textContent = 'Choose the type of service you need';
+            buildOffsiteCats();
+        }
+    }
+
+    function buildMiniGrid() {
+        const g = document.getElementById('mini-grid');
+        g.innerHTML = '';
+        MINI.forEach(p => {
+            const c = card(
+                `<h4>${p.label}</h4>
+                 <div class="pkg-price">₱${p.price.toLocaleString()}</div>
+                 <p class="pkg-desc">${p.pax} • ${p.hours}<br>${p.credit}</p>`,
+                S.miniPackage?.label === p.label
+            );
+            c.onclick = () => {
+                S.miniPackage = p;
+                activate(g, c);
+                document.getElementById('snack-addon').classList.remove('hidden');
+                buildSnackGrid();
+            };
+            g.appendChild(c);
+        });
+    }
+
+    function buildSnackGrid() {
+        const g = document.getElementById('snack-grid');
+        g.innerHTML = '';
+        const none = card(`<h4>No Add-on</h4><p class="pkg-desc">Skip the snack bar</p>`, S.snackAddon === null);
+        none.onclick = () => { S.snackAddon = null; activate(g, none); };
+        g.appendChild(none);
+
+        SNACK.forEach(p => {
+            const c = card(
+                `<h4>${p.label}</h4>
+                 <div class="pkg-price">₱${p.price.toLocaleString()}</div>
+                 <p class="pkg-desc">${p.desc}</p>`,
+                S.snackAddon?.label === p.label
+            );
+            c.onclick = () => { S.snackAddon = p; activate(g, c); };
+            g.appendChild(c);
+        });
+    }
+
+    function buildOffsiteCats() {
+        const g = document.getElementById('offsite-cat-grid');
+        g.innerHTML = '';
+        OFFSITE_CATS.forEach(p => {
+            const c = card(
+                `<h4>${p.icon} ${p.label}</h4><p class="pkg-desc">${p.desc}</p>`,
+                S.offsiteCategory === p.val
+            );
+            c.onclick = () => {
+                S.offsiteCategory = p.val;
+                S.offsitePackage = null;
+                S.trayCart = [];
+                activate(g, c);
+                const sub = document.getElementById('offsite-sub');
+                if (p.val === 'foodtray') {
+                    sub.classList.add('hidden');
+                } else {
+                    sub.classList.remove('hidden');
+                    document.getElementById('offsite-sub-label').textContent = `Choose a ${p.label} Package`;
+                    buildOffsiteSub(p.val);
+                }
+            };
+            g.appendChild(c);
+        });
+    }
+
+    function buildOffsiteSub(val) {
+        const g = document.getElementById('offsite-sub-grid');
+        g.innerHTML = '';
+        (OFFSITE_PKGS[val] || []).forEach(p => {
+            const c = card(
+                `<h4>${p.label}</h4>
+                 <div class="pkg-price">${p.price > 0 ? '₱' + p.price.toLocaleString() : 'Contact for quote'}</div>
+                 <p class="pkg-desc">${p.desc}</p>`,
+                S.offsitePackage?.label === p.label
+            );
+            c.onclick = () => { S.offsitePackage = p; activate(g, c); };
+            g.appendChild(c);
+        });
+    }
+
+    // ========================
+    // 7. Step 4: Food Tray
+    // ========================
+    function buildTrayStep() {
+        const builder = document.getElementById('tray-builder');
+        builder.innerHTML = '';
+
+        TRAYS.forEach(group => {
+            const sec = document.createElement('div');
+            sec.className = 'tray-section';
+
+            const header = document.createElement('div');
+            header.className = 'tray-header';
+            header.innerHTML = `<span style="font-size:20px;">${group.icon}</span><h4>${group.cat}</h4>`;
+            sec.appendChild(header);
+
+            const dishRow = document.createElement('div');
+            dishRow.className = 'pills-row';
+            group.items.forEach(item => {
+                const p = pill(item);
+                p.onclick = () => {
+                    activatePill(dishRow, p);
+                    sec.dataset.dish = item;
+                    tryCart(group.cat, sec);
+                };
+                dishRow.appendChild(p);
+            });
+            sec.appendChild(dishRow);
+
+            const paxRow = document.createElement('div');
+            paxRow.className = 'pax-row';
+            paxRow.innerHTML = '<span class="pax-label">Pax:</span>';
+            [20, 30, 40, 50].forEach(n => {
+                const p = pill(`${n} pax`);
+                p.onclick = () => {
+                    activatePill(paxRow, p);
+                    sec.dataset.pax = n;
+                    tryCart(group.cat, sec);
+                };
+                paxRow.appendChild(p);
+            });
+            sec.appendChild(paxRow);
+
+            const hr = document.createElement('hr');
+            hr.className = 'tray-divider';
+            sec.appendChild(hr);
+            builder.appendChild(sec);
+        });
+
+        // Rice add-on
+        const riceSec = document.createElement('div');
+        riceSec.className = 'tray-section';
+        riceSec.innerHTML = `<div class="tray-header"><span style="font-size:20px;">🍚</span><h4>Rice <small style="font-weight:400;color:#aaa;">(Add-on)</small></h4></div>`;
+        const ricePax = document.createElement('div');
+        ricePax.className = 'pax-row';
+        ricePax.innerHTML = '<span class="pax-label">Pax:</span>';
+        [20, 30, 40, 50].forEach(n => {
+            const p = pill(`${n} pax`);
+            p.onclick = () => {
+                activatePill(ricePax, p);
+                S.trayCart = S.trayCart.filter(i => i.cat !== 'Rice');
+                S.trayCart.push({ cat: 'Rice', dish: 'Steamed Rice', pax: n, price: PRICES.Rice[n] });
+                renderCart();
+            };
+            ricePax.appendChild(p);
+        });
+        riceSec.appendChild(ricePax);
+        builder.appendChild(riceSec);
+
+        renderCart();
+    }
+
+    function tryCart(cat, sec) {
+        const dish = sec.dataset.dish;
+        const pax  = parseInt(sec.dataset.pax);
+        if (!dish || !pax) return;
+        const price = PRICES[cat]?.[pax];
+        if (!price) return;
+        S.trayCart = S.trayCart.filter(i => i.cat !== cat);
+        S.trayCart.push({ cat, dish, pax, price });
+        renderCart();
+    }
+
+    function renderCart() {
+        const cartEl = document.getElementById('tray-cart');
+        const rows   = document.getElementById('tray-cart-rows');
+        const tot    = document.getElementById('tray-total');
+        if (!S.trayCart.length) { cartEl.classList.add('hidden'); return; }
+        cartEl.classList.remove('hidden');
+        rows.innerHTML = '';
+        let sum = 0;
+        S.trayCart.forEach(i => {
+            sum += i.price;
+            const r = document.createElement('div');
+            r.className = 'tray-row';
+            r.innerHTML = `<span>${i.cat} — ${i.dish} (${i.pax} pax)</span><span>₱${i.price.toLocaleString()}</span>`;
+            rows.appendChild(r);
+        });
+        tot.textContent = `Total: ₱${sum.toLocaleString()}`;
+    }
+
+    // ========================
+    // 8. Step 6: Time
+    // ========================
+    function buildTimeGrid() {
+        const g = document.getElementById('time-grid');
+        g.innerHTML = '';
+        TIMES.forEach(t => {
+            const c = document.createElement('div');
+            c.className = 'time-card' + (S.time === t ? ' active' : '');
+            c.textContent = t;
+            c.onclick = () => {
+                S.time = t;
+                g.querySelectorAll('.time-card').forEach(x => x.classList.remove('active'));
+                c.classList.add('active');
+            };
+            g.appendChild(c);
+        });
+    }
+
+    // ========================
+    // 9. Step 7: Summary
+    // ========================
+    function buildSummary() {
+        const box = document.getElementById('summary-content');
+        let pkgRows = '';
+        let total = 0;
+        const isFT = S.locationType === 'offsite' && S.offsiteCategory === 'foodtray';
+
+        if (S.locationType === 'onsite') {
+            if (S.miniPackage) {
+                total += S.miniPackage.price;
+                pkgRows += sr('Package', `${S.miniPackage.label} — ₱${S.miniPackage.price.toLocaleString()}`);
+                pkgRows += sr('Inclusions', `${S.miniPackage.pax} • ${S.miniPackage.hours} • ${S.miniPackage.credit}`);
+            }
+            if (S.snackAddon) {
+                total += S.snackAddon.price;
+                pkgRows += sr('Snack Bar Add-on', `${S.snackAddon.label} — ₱${S.snackAddon.price.toLocaleString()}`);
+            }
+        } else if (isFT) {
+            S.trayCart.forEach(i => {
+                total += i.price;
+                pkgRows += sr(`${i.cat} Tray (${i.pax} pax)`, `${i.dish} — ₱${i.price.toLocaleString()}`);
+            });
+        } else if (S.offsitePackage) {
+            const catLabel = OFFSITE_CATS.find(c => c.val === S.offsiteCategory)?.label || '';
+            total = S.offsitePackage.price;
+            pkgRows += sr('Service', catLabel);
+            pkgRows += sr('Package', S.offsitePackage.label);
+            if (S.offsitePackage.price > 0) pkgRows += sr('Price', `₱${S.offsitePackage.price.toLocaleString()}`);
+        }
+
+        const totalStr = total > 0 ? `₱${total.toLocaleString()}` : 'Contact for quote';
+        const locStr   = S.locationType === 'onsite' ? '🏠 Onsite — ELI Coffee' : `🚗 Offsite — ${S.venueLocation}`;
+
+        box.innerHTML = `
+            <div class="summary-section-title">Event</div>
+            ${sr('Event Type', S.eventType)}
+            ${sr('Date', S.eventDate)}
+            ${sr('Time', S.time)}
+            ${sr('Guests', S.guestCount)}
+            ${sr('Location', locStr)}
+            <hr class="summary-divider">
+            <div class="summary-section-title">Package</div>
+            ${pkgRows}
+            <hr class="summary-divider">
+            <div class="summary-section-title">Contact</div>
+            ${sr('Name', S.name)}
+            ${sr('Email', S.email)}
+            ${sr('Phone', S.phone)}
+            ${S.requests ? sr('Requests', S.requests) : ''}
+            <hr class="summary-divider">
+            <div class="summary-total"><span>Total</span><span>${totalStr}</span></div>
+        `;
+
+        // Show warning only if NOT logged in
+        document.getElementById('guest-warning').classList.toggle('hidden', isLoggedIn);
+    }
+
+    function sr(label, value) {
+        return `<div class="summary-row"><span class="s-label">${label}</span><span class="s-value">${value}</span></div>`;
+    }
+
+    // ========================
+    // 10. Validation
+    // ========================
+    function validate(n) {
+        const id = sid(n);
+        if (id === 'rs1') {
+            const et = document.getElementById('event-type').value.trim();
+            const gc = document.getElementById('guest-count').value.trim();
+            const ed = document.getElementById('event-date').value;
+            if (!et || !gc || !ed) { alert('Please fill in all event details.'); return false; }
+            const d = new Date(ed), today = new Date(); today.setHours(0, 0, 0, 0);
+            if (d < today) { alert('Please select a future date.'); return false; }
+            S.eventType = et; S.guestCount = gc; S.eventDate = ed;
+        }
+        if (id === 'rs2') {
+            if (!S.locationType) { alert('Please select Onsite or Offsite.'); return false; }
+            if (S.locationType === 'offsite') {
+                const v = document.getElementById('venue-location').value.trim();
+                if (!v) { alert('Please enter your venue location.'); return false; }
+                S.venueLocation = v;
+            }
+        }
+        if (id === 'rs3') {
+            if (S.locationType === 'onsite') {
+                if (!S.miniPackage) { alert('Please select a gathering package.'); return false; }
+            } else {
+                if (!S.offsiteCategory) { alert('Please select a service category.'); return false; }
+                if (S.offsiteCategory !== 'foodtray' && !S.offsitePackage) { alert('Please select a specific package.'); return false; }
+            }
+        }
+        if (id === 'rs4') {
+            if (!S.trayCart.length) { alert('Please select at least one food tray.'); return false; }
+        }
+        if (id === 'rs5') {
+            const name  = document.getElementById('name').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const email = document.getElementById('email').value.trim();
+            if (!name || !phone || !email) { alert('Please fill in all contact details.'); return false; }
+            if (!/^\S+@\S+\.\S+$/.test(email)) { alert('Please enter a valid email.'); return false; }
+            S.name = name; S.phone = phone; S.email = email;
+            S.requests = document.getElementById('requests').value.trim();
+        }
+        if (id === 'rs6') {
+            if (!S.time) { alert('Please select a time slot.'); return false; }
+        }
+        if (id === 'rs7') {
+            // Block progression if not logged in and show the warning
+            if (!isLoggedIn) {
+                document.getElementById('guest-warning').classList.remove('hidden');
+                return false;
+            }
+        }
+        if (id === 'rs8') {
+            if (!document.getElementById('contract').files.length) {
+                alert('Please upload your signed contract.'); return false;
+            }
+        }
+        return true;
+    }
+
+    // ========================
+    // 11. Button events
+    // ========================
+    document.getElementById('nextBtn').onclick = () => {
+        if (!validate(cur)) return;
+        if (cur < total()) { cur++; showStep(cur); }
+        else { submitDone(); }
+    };
+
+    document.getElementById('prevBtn').onclick = () => {
+        if (cur > 1) { cur--; showStep(cur); }
+    };
+
+    // Location cards
+    document.querySelectorAll('.location-card').forEach(c => {
+        c.onclick = () => {
+            document.querySelectorAll('.location-card').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            S.locationType    = c.dataset.val;
+            S.miniPackage     = null;
+            S.snackAddon      = null;
+            S.offsiteCategory = '';
+            S.offsitePackage  = null;
+            S.trayCart        = [];
+            document.getElementById('venue-wrapper').classList.toggle('hidden', S.locationType !== 'offsite');
+        };
+    });
+
+    // ========================
+    // 12. Submit
+    // ========================
+    async function submitDone() {
+    const nextBtn = document.getElementById('nextBtn');
+    nextBtn.disabled = true;
+    nextBtn.textContent = 'Submitting...';
+
+    try {
+        // --- 1. Get the logged-in user's ID ---
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session.user.id;
+
+        // --- 2. Upload contract to Cloudinary ---
+        const contractFile = document.getElementById('contract').files[0];
+        const formData     = new FormData();
+
+        formData.append('file',          contractFile);
+        formData.append('upload_preset', 'eli_contracts');  // must match your preset name
+        formData.append('folder',        'contracts');
+
+        const cloudName = 'dtt707f1w'; // ← replace with your actual cloud name
+
+        const cloudRes = await fetch(
+            `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+            { method: 'POST', body: formData }
+        );
+
+        if (!cloudRes.ok) throw new Error('Contract upload failed. Please try again.');
+
+        const cloudData   = await cloudRes.json();
+        const contractUrl = cloudData.secure_url;
+
+        // --- 3. Build the package summary ---
+        const isFT = S.locationType === 'offsite' && S.offsiteCategory === 'foodtray';
+        let packageName    = '';
+        let packageDetails = {};
+        let totalPrice     = 0;
+
+        if (S.locationType === 'onsite') {
+            packageName    = S.miniPackage?.label || '';
+            packageDetails = { mini: S.miniPackage, snack: S.snackAddon };
+            totalPrice     = (S.miniPackage?.price || 0) + (S.snackAddon?.price || 0);
+
+        } else if (isFT) {
+            packageName    = 'Food Tray';
+            packageDetails = { trays: S.trayCart };
+            totalPrice     = S.trayCart.reduce((sum, i) => sum + i.price, 0);
+
+        } else {
+            const catLabel = OFFSITE_CATS.find(c => c.val === S.offsiteCategory)?.label || '';
+            packageName    = `${catLabel} — ${S.offsitePackage?.label || ''}`;
+            packageDetails = { category: S.offsiteCategory, package: S.offsitePackage };
+            totalPrice     = S.offsitePackage?.price || 0;
+        }
+
+        // --- 4. Insert reservation row into Supabase ---
+        const { error: insertError } = await supabase
+            .from('reservations')
+            .insert({
+                user_id:          userId,
+                event_type:       S.eventType,
+                event_date:       S.eventDate,
+                time_slot:        S.time,
+                guest_count:      parseInt(S.guestCount),
+                location_type:    S.locationType,
+                venue_location:   S.venueLocation || null,
+                package_name:     packageName,
+                package_details:  packageDetails,
+                total_price:      totalPrice,
+                contact_name:     S.name,
+                contact_email:    S.email,
+                contact_phone:    S.phone,
+                special_requests: S.requests || null,
+                contract_url:     contractUrl,
+                status:           'pending'
+            });
+
+        if (insertError) throw new Error('Reservation save failed: ' + insertError.message);
+
+        // --- 5. Show success screen ---
+        document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
+        document.querySelector('.reservation-buttons').style.display = 'none';
+        document.querySelector('.progress-container').style.display  = 'none';
+
+        const msg = document.createElement('div');
+        msg.className = 'summary-box';
+        msg.style.cssText = 'text-align:center;padding:48px 20px;';
+        msg.innerHTML = `
+            <div style="font-size:52px;margin-bottom:16px;">✅</div>
+            <h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>
+            <p style="color:#777;line-height:1.8;font-size:15px;">
+                Thank you, <strong>${S.name}</strong>!<br>
+                Your reservation is <strong style="color:#6B3A1F;">under verification</strong>.<br>
+                We'll contact you at <strong>${S.email}</strong> to confirm.
+            </p>
+        `;
+        document.querySelector('.reservation-container').appendChild(msg);
+
+    } catch (err) {
+        alert(err.message);
+        nextBtn.disabled = false;
+        nextBtn.textContent = 'Submit';
+    }
+}
+
+    // ========================
+    // 13. Helpers
+    // ========================
+    function card(html, isActive = false) {
+        const d = document.createElement('div');
+        d.className = 'pkg-card' + (isActive ? ' active' : '');
+        d.innerHTML = html;
+        return d;
+    }
+
+    function pill(text, isActive = false) {
+        const d = document.createElement('div');
+        d.className = 'pill' + (isActive ? ' active' : '');
+        d.textContent = text;
+        return d;
+    }
+
+    function activate(container, el) {
+        container.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function activatePill(container, el) {
+        container.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // ========================
+    // 14. Init
+    // ========================
+    showStep(1);
+    </script>
+
 </body>
 </html>

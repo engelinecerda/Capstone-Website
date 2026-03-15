@@ -1,605 +1,154 @@
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'Kumbh Sans', sans-serif;
-    }
-
-    body {
-      background-color: #FFF8F0;
-    }
-
 /* ========================
-   Reservation Section
+   Utility
 ======================== */
-.reservation-section {
-    padding: 80px 20px;
-    text-align: center;
+.hidden {
+    display: none !important;
 }
 
-.reservation-section h1 {
-    color: #6B3A1F;
-    font-size: 36px;
-    margin-bottom: 10px;
-}
-
-.reservation-section > p {
-    color: #2A1408;
-    font-size: 16px;
-    margin-bottom: 30px;
-}
-
-/* ========================
-   Reservation Container
-======================== */
-.reservation-container {
-    margin: 0 auto;
-    padding: 40px;
-    max-width: 700px;
-    background-color: #fff;
-    border-radius: 16px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-}
-
-/* ========================
-   Progress Bar
-======================== */
-.progress-container {
-    margin-bottom: 24px;
-    text-align: center;
-}
-
-.progress-bar {
+.full-width {
     width: 100%;
-    height: 10px;
-    background-color: #eee;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 10px;
 }
-
-#progress {
-    height: 10px;
-    width: 0%;
-    background-color: #6B3A1F;
-    transition: width 0.3s ease;
-    border-radius: 10px;
-}
-
-#step-text {
-    font-size: 14px;
-    color: #6B3A1F;
-    font-weight: 600;
-}
-
-/* ========================
-   Steps
-======================== */
 .step {
-    display: none;
-    flex-direction: column;
-    gap: 16px;
-    align-items: center;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-    width: 100%;
+    display: none !important;
 }
 
 .step.active {
-    display: flex;
-    opacity: 1;
+    display: flex !important;
 }
-
-.step h2 {
-    color: #2A1408;
-    font-size: 22px;
-    margin-bottom: 4px;
-}
-
-.step > p {
-    color: #2A1408;
-    font-size: 14px;
-    margin-top: -10px;
-}
-
 /* ========================
-   Inputs
+   Section Labels
 ======================== */
-input,
-textarea,
-select {
-    width: 100%;
-    padding: 12px 16px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
-    font-size: 14px;
-    font-family: 'Kumbh Sans', sans-serif;
-    color: #2A1408;
-    background-color: #fff;
-    transition: border-color 0.3s ease;
-    box-sizing: border-box;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-    outline: none;
-    border-color: #6B3A1F;
-}
-
-textarea {
-    height: 100px;
-    resize: none;
-}
-
-/* ========================
-   Location Select Cards (Step 1)
-   — renamed from .location-card / .location-icon
-     to avoid collision with styles.css
-======================== */
-.location-options {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    width: 100%;
-}
-
-.location-select-card {
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 30px 20px;
-    cursor: pointer;
-    background-color: #fff;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.location-select-card:hover {
-    border-color: #6B3A1F;
-    background-color: #FFF8F0;
-}
-
-.location-select-card.selected {
-    border-color: #6B3A1F;
-    background-color: #FFEDE0;
-}
-
-.location-select-card .location-select-icon {
-    font-size: 40px;
+.section-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #6B3A1F;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     margin-bottom: 12px;
 }
 
-.location-select-card h4 {
-    color: #2A1408;
-    font-size: 16px;
-    font-weight: 700;
-    margin: 0 0 6px 0;
-}
-
-.location-select-card p {
-    color: #2A1408;
-    font-size: 13px;
-    margin: 0;
+.section-label-optional {
+    font-weight: 400;
+    color: #aaa;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 12px;
 }
 
 /* ========================
-   Package Options Grid
+   Venue Wrapper (Step 2)
 ======================== */
-.package-options {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+.venue-wrapper {
     width: 100%;
-    align-items: stretch;
-}
-
-/* Center last odd card */
-.package-options .package-card:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-    max-width: 50%;
-    margin: 0 auto;
-    width: 100%;
+    margin-top: 16px;
 }
 
 /* ========================
-   Package Cards
+   Snack Add-on Banner (Step 3)
 ======================== */
-.package-card {
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 20px;
-    cursor: pointer;
-    background-color: #fff;
-    text-align: left;
-    transition: all 0.3s ease;
+.addon-banner {
+    width: 100%;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px dashed #e0d0c0;
 }
 
-.package-card:hover {
-    border-color: #6B3A1F;
-    background-color: #FFF8F0;
+/* ========================
+   Offsite Sub-section (Step 3)
+======================== */
+.offsite-sub-section {
+    margin-top: 24px;
 }
 
-.package-card.selected {
-    border-color: #6B3A1F;
-    background-color: #FFEDE0;
+/* ========================
+   Food Tray Builder (Step 4)
+======================== */
+.tray-section {
+    width: 100%;
+    margin-bottom: 8px;
 }
 
-.package-card h4 {
-    margin: 0 0 6px 0;
+.tray-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.tray-header h4 {
     font-size: 15px;
     font-weight: 700;
     color: #2A1408;
 }
 
-.package-card p {
-    margin: 0;
-    font-size: 13px;
-    color: #2A1408;
+.tray-icon {
+    font-size: 20px;
 }
 
-.package-card .card-price {
-    color: #6B3A1F;
-    font-weight: 600;
-    font-size: 13px;
-    margin: 4px 0;
-}
-
-.package-card .card-desc {
-    color: #2A1408;
-    font-size: 12px;
-}
-
-/* ========================
-   Food Tray Cards
-======================== */
-.package-card.foodtray {
+.dish-grid {
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.dish-section {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
-.pax-section {
-    border-top: 1px solid #eee;
-    padding-top: 16px;
-    margin-top: auto;
+.pax-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
 }
 
 .pax-label {
     font-size: 13px;
     font-weight: 600;
     color: #6B3A1F;
-    margin-bottom: 10px;
-    text-align: center;
 }
 
-.pax-group {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-}
-
-/* ========================
-   Option Pills
-======================== */
-.option-pill {
-    padding: 8px 14px;
-    border: 1px solid #ddd;
-    border-radius: 20px;
-    background-color: #fafafa;
-    cursor: pointer;
-    font-size: 13px;
-    font-family: 'Kumbh Sans', sans-serif;
-    transition: all 0.3s ease;
-    text-align: center;
-}
-
-.option-pill:hover {
-    background-color: #FFF8F0;
-    border-color: #6B3A1F;
-}
-
-.option-pill.selected {
-    background-color: #FFEDE0;
-    border-color: #6B3A1F;
-    color: #6B3A1F;
-    font-weight: 600;
-}
-
-/* ========================
-   Price Display
-======================== */
-.price-display {
-    margin-top: 12px;
-    font-weight: 700;
-    color: #6B3A1F;
-    font-size: 16px;
-    text-align: center;
-}
-
-/* ========================
-   Time Options Grid
-======================== */
-.time-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    width: 100%;
-}
-
-.time-grid .package-card {
-    text-align: center;
-    padding: 14px;
-    font-size: 14px;
-}
-
-/* ========================
-   Summary Boxes
-======================== */
-.summary-box {
-    background-color: #FFF8F0;
-    border: 1px solid #e0d0c0;
-    border-radius: 12px;
-    padding: 20px 24px;
-    width: 100%;
-    text-align: left;
-    box-sizing: border-box;
-}
-
-.summary-box p {
-    font-size: 14px;
-    color: #2A1408;
-    margin-bottom: 10px;
-    line-height: 1.6;
-}
-
-.summary-box p span {
-    font-weight: 700;
-    color: #6B3A1F;
-}
-
-.summary-box .summary-divider {
+.tray-divider {
     border: none;
-    border-top: 1px solid #e0d0c0;
-    margin: 12px 0;
-}
-
-.summary-box .summary-total {
-    font-size: 16px;
-    font-weight: 700;
-    color: #6B3A1F;
-    margin-top: 6px;
+    border-top: 1px solid #eee;
+    margin: 12px 0 16px;
 }
 
 /* ========================
-   Guest Warning (Step 9)
+   Tray Cart (Step 4)
 ======================== */
-.summary-actions {
+.tray-cart {
     width: 100%;
-}
-
-.guest-warning {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    background-color: #FFF3CD;
-    border: 1px solid #FFD966;
-    border-radius: 12px;
-    padding: 16px 20px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.guest-warning span {
-    font-size: 20px;
-    flex-shrink: 0;
-}
-
-.guest-warning p {
-    font-size: 14px;
-    color: #6B4C00;
-    margin: 0;
-    line-height: 1.6;
-}
-
-.guest-warning a {
-    color: #6B3A1F;
-    font-weight: 700;
-    text-decoration: underline;
-}
-
-/* ========================
-   Contract Step
-======================== */
-.contract-box {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.contract-download {
-    display: flex;
-    align-items: center;
-    gap: 16px;
     background-color: #FFF8F0;
     border: 1px solid #e0d0c0;
     border-radius: 12px;
     padding: 20px;
+    margin-top: 20px;
 }
 
-.contract-icon {
-    font-size: 36px;
-    flex-shrink: 0;
-}
-
-.contract-info {
-    flex: 1;
-}
-
-.contract-info h4 {
-    color: #2A1408;
-    font-size: 15px;
-    margin-bottom: 4px;
-}
-
-.contract-info p {
-    color: #2A1408;
-    font-size: 13px;
-    margin: 0;
-}
-
-.contract-download-btn {
-    background-color: #6B3A1F;
-    color: #fff;
-    text-decoration: none;
-    padding: 10px 18px;
-    border-radius: 8px;
+.tray-cart h4 {
     font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-    transition: background-color 0.3s ease;
-    flex-shrink: 0;
-}
-
-.contract-download-btn:hover {
-    background-color: #2A1408;
-}
-
-.contract-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 4px 0;
-}
-
-.contract-step-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 14px;
-    color: #444;
-}
-
-.contract-step-number {
-    background-color: #6B3A1F;
-    color: #fff;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
     font-weight: 700;
-    flex-shrink: 0;
-}
-
-.contract-upload {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.contract-upload label {
-    font-size: 14px;
-    font-weight: 600;
     color: #2A1408;
-    text-align: left;
+    margin-bottom: 12px;
 }
 
-.contract-upload input[type="file"] {
-    border: 2px dashed #e0d0c0;
-    border-radius: 10px;
-    padding: 16px;
-    background-color: #FFF8F0;
-    cursor: pointer;
-}
-
-.contract-upload input[type="file"]:hover {
-    border-color: #6B3A1F;
-}
-
-.contract-note {
-    font-size: 12px;
-    color: #aaa;
-    margin: 0;
-    text-align: left;
-}
-
-/* ========================
-   Navigation Buttons
-======================== */
-.reservation-buttons {
+.tray-cart-row {
     display: flex;
-    justify-content: center;
-    gap: 16px;
-    margin-top: 30px;
-    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #2A1408;
+    padding: 6px 0;
+    border-bottom: 1px solid #e0d0c0;
 }
 
-.reservation-buttons button {
-    background-color: #6B3A1F;
-    color: #fff;
-    border: none;
-    padding: 12px 32px;
-    border-radius: 10px;
-    cursor: pointer;
+.tray-cart-row:last-of-type {
+    border-bottom: none;
+}
+
+.tray-cart-total {
     font-size: 15px;
-    font-family: 'Kumbh Sans', sans-serif;
-    font-weight: 600;
-    transition: background-color 0.3s ease;
-}
-
-.reservation-buttons button:hover {
-    background-color: #2A1408;
-}
-
-/* ========================
-   Responsive
-======================== */
-@media (max-width: 600px) {
-    .reservation-container {
-        padding: 24px 16px;
-    }
-
-    .location-options {
-        grid-template-columns: 1fr;
-    }
-
-    .package-options {
-        grid-template-columns: 1fr;
-    }
-
-    .package-options .package-card:last-child:nth-child(odd) {
-        grid-column: auto;
-        max-width: 100%;
-    }
-
-    .time-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .pax-group {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .contract-download {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .contract-download-btn {
-        width: 100%;
-        text-align: center;
-    }
+    font-weight: 700;
+    color: #6B3A1F;
+    text-align: right;
+    margin-top: 10px;
 }
