@@ -25,6 +25,9 @@
     animation: fadeIn 0.3s ease;
     word-wrap: break-word;
     line-height: 1.6;
+    overflow-y: auto;
+    max-height: 85vh;
+    box-sizing: border-box;
 }
 
 

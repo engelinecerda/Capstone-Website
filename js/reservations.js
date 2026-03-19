@@ -140,6 +140,15 @@ function populateStep(stepId) {
     if (stepId === 'step4') populateStep4();
     if (stepId === 'step6') populateTimeSlots();
     if (stepId === 'step7') populateSummary();
+    if (id === 'rs8') buildContractStep();
+}
+
+function buildContractStep() {
+    const url = getContractUrl();
+    const btn = document.querySelector('.dl-btn');
+    if (btn && url) {
+        btn.href = url;
+    }
 }
 
 // --- Step 3 ---
@@ -621,3 +630,37 @@ function hide(el) { if (el) el.classList.add('hidden'); }
 // Initialize
 // ========================
 showStep(currentStep);
+
+
+const MINI = [
+    { label:'VIP Lite',        price:2999,  pax:'15–18 pax', hours:'2 hours', credit:'₱2,000 food credit', contract:'../files/contracts/contract-vip-lounge.pdf' },
+    { label:'VIP Plus',        price:3999,  pax:'15–18 pax', hours:'3 hours', credit:'₱2,499 food credit', contract:'../files/contracts/contract-vip-lounge.pdf' },
+    { label:'VIP Max',         price:4999,  pax:'15–18 pax', hours:'4 hours', credit:'₱3,000 food credit', contract:'../files/contracts/contract-vip-lounge.pdf' },
+    { label:'Main Hall Basic', price:9999,  pax:'Up to 25 pax', hours:'2 hours', credit:'₱8,000 food credit', contract:'../files/contracts/contract-main-hall.pdf' },
+    { label:'Main Hall Plus',  price:11999, pax:'Up to 25 pax', hours:'3 hours', credit:'₱9,000 food credit', contract:'../files/contracts/contract-main-hall.pdf' }
+];
+
+const OFFSITE_PKGS = {
+    coffee: [
+        { label:'30 pax',  price:3990,  desc:'...', contract:'../files/contracts/contract-coffee-bar.pdf' },
+        { label:'50 pax',  price:5990,  desc:'...', contract:'../files/contracts/contract-coffee-bar.pdf' },
+        { label:'100 pax', price:10990, desc:'...', contract:'../files/contracts/contract-coffee-bar.pdf' },
+        { label:'150 pax', price:14990, desc:'...', contract:'../files/contracts/contract-coffee-bar.pdf' },
+        { label:'Food Tray', val:'foodtray', icon:'🍱', desc:'...', contract:'../files/contracts/contract-food-tray.pdf' }
+    ],
+    snack:    [{ label:'...', price:3500, desc:'...', contract:'../files/contracts/contract-snack-bar.pdf' }],
+    catering: [{ label:'...', price:0,    desc:'...', contract:'../files/contracts/contract-catering.pdf'  }]
+};
+
+
+function getContractUrl() {
+    if (S.locationType === 'onsite') {
+        return S.miniPackage?.contract || '';
+    } else {
+        if (S.offsiteCategory === 'foodtray') {
+            const cat = OFFSITE_CATS.find(c => c.val === 'foodtray');
+            return cat?.contract || '';
+        }
+        return S.offsitePackage?.contract || '';
+    }
+}
