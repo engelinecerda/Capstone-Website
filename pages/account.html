@@ -48,7 +48,7 @@
           <span>👤</span> My Profile
         </button>
         <button class="account-nav-item" data-section="reservations">
-          <span>📅</span> My Reservations
+          <span>📅</span> My Reservation
         </button>
         <button class="account-nav-item" data-section="password">
           <span>🔒</span> Change Password
@@ -88,7 +88,7 @@
           <div class="form-group">
             <label>Email Address</label>
             <input type="email" id="profile-email" placeholder="Email" disabled>
-            <p class="field-note">Email cannot be changed here</p>
+            <p class="field-note"></p>
           </div>
 
           <div class="form-group">
@@ -109,7 +109,7 @@
       <!-- Reservations Section -->
       <section class="account-section" id="section-reservations">
         <div class="section-header">
-          <h2>My Reservations</h2>
+          <h2>My Reservation</h2>
           <p>Track all your event bookings</p>
         </div>
         <div id="reservations-list">
@@ -129,6 +129,13 @@
         </div>
 
         <form class="account-form" id="password-form">
+
+          <!-- ✅ NEW: Current Password field -->
+          <div class="form-group">
+            <label>Current Password</label>
+            <input type="password" id="current-password" placeholder="••••••••" required>
+          </div>
+
           <div class="form-group">
             <label>New Password</label>
             <input type="password" id="new-password" placeholder="••••••••" required>

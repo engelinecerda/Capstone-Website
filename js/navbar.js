@@ -19,18 +19,10 @@ async function updateNavbar() {
 
         const displayName = profile ? profile.first_name : 'Account';
 
+        // Show only the account link — logout is handled in account.js
         navBtn.innerHTML = `
-            <div class="nav-account-wrapper">
-                <a href="../pages/account.html" class="button"> ${displayName}</a>
-                <button class="logout-btn" id="logout-btn">Logout</button>
-            </div>
+            <a href="../pages/account.html" class="button"> ${displayName}</a>
         `;
-
-        // Logout button
-        document.getElementById('logout-btn').addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            window.location.reload();
-        });
 
     } else {
         // User is not logged in — show default Login / Sign Up
