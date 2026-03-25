@@ -382,35 +382,52 @@
         time: ''
     };
 
-    const MINI = [
-        { label:'VIP Lite',        price:2999,  pax:'15-18 pax', hours:'2 hours', credit:'P2,000 food credit' },
-        { label:'VIP Plus',        price:3999,  pax:'15-18 pax', hours:'3 hours', credit:'P2,499 food credit' },
-        { label:'VIP Max',         price:4999,  pax:'15-18 pax', hours:'4 hours', credit:'P3,000 food credit' },
-        { label:'Main Hall Basic', price:9999,  pax:'Up to 25 pax', hours:'2 hours', credit:'P8,000 food credit' },
-        { label:'Main Hall Plus',  price:11999, pax:'Up to 25 pax', hours:'3 hours', credit:'P9,000 food credit' }
-    ];
-
-    const SNACK = [
-        { label:'Biscuits & Candies',         price:3500, desc:'Chocolate fountain, biscuits, candies, marshmallow, brownies, 20 donuts' },
-        { label:'Biscuits, Candies & Fruits', price:4000, desc:'Chocolate fountain, biscuits, candies, marshmallow, 4 seasonal fruits' },
-        { label:'Biscuits, Chips & Drinks',   price:5000, desc:'Chocolate fountain, biscuits, chips, cupcakes, marshmallow, 2 drinks' }
-    ];
+    // These are populated from the Supabase `package` table
+    let MINI        = [];
+    let SNACK       = [];
+    let OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
 
     const OFFSITE_CATS = [
-        { label:'Eli Coffee Bar',   val:'coffee',   icon:'coffee', desc:'Professional coffee bar service for your event' },
-        { label:'Snack Bar Corner', val:'snack',    icon:'snack',  desc:'Mobile snack bar with chocolate fountain' },
-        { label:'Catering',         val:'catering', icon:'food',   desc:'Full catering service with buffet setup, styled tables & more' }
+        { label:'Eli Coffee Bar',   val:'coffee',   icon:'&#9749;',   desc:'Professional coffee bar service for your event' },
+        { label:'Snack Bar Corner', val:'snack',    icon:'&#127850;', desc:'Mobile snack bar with chocolate fountain' },
+        { label:'Catering',         val:'catering', icon:'&#127869;&#65039;', desc:'Full catering service with buffet setup, styled tables &amp; more' }
     ];
 
-    const OFFSITE_PKGS = {
-        coffee: [
-            { label:'30 pax',  price:3990,  desc:'2-3 baristas - 3 hours service - 1:1 coffee serving' },
-            { label:'50 pax',  price:5990,  desc:'2-3 baristas - 3 hours service - 1:1 coffee serving' },
-            { label:'100 pax', price:10990, desc:'2-3 baristas - 3 hours service - 1:1 coffee serving' },
-            { label:'150 pax', price:14990, desc:'2-3 baristas - 3 hours service - 1:1 coffee serving' }
-        ],
-        snack: SNACK
-    };
+    // ── Load packages from Supabase ──
+    async function loadPackages() {
+        const { data: pkgs, error } = await supabase
+            .from('package')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type')
+            .eq('is_active', true)
+            .order('price', { ascending: true });
+
+        if (error || !pkgs) { console.error('Failed to load packages:', error); return; }
+
+        MINI  = [];
+        SNACK = [];
+        OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+
+        pkgs.forEach(p => {
+            const base   = { id: p.package_id, label: p.package_name, price: p.price, desc: p.description || '' };
+            const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
+
+            if (p.location_type === 'onsite') {
+                if (isAddon) {
+                    SNACK.push(base);
+                } else {
+                    // main onsite package
+                    MINI.push({ ...base, pax: p.guest_capacity ? p.guest_capacity + ' pax' : '' });
+                }
+            } else if (p.location_type === 'offsite') {
+                // Infer offsite category from package name since package_type is only 'main'/'add on'
+                const name = p.package_name.toLowerCase();
+                if (name.includes('coffee'))   OFFSITE_PKGS.coffee.push(base);
+                else if (name.includes('snack') || name.includes('biscuit')) OFFSITE_PKGS.snack.push(base);
+                else if (name.includes('catering')) OFFSITE_PKGS.catering.push(base);
+                else OFFSITE_PKGS.catering.push(base); // fallback
+            }
+        });
+    }
 
     const DISHES = [
         { cat:'Chicken',    icon:'&#127831;', items:['Chicken ala King','Chicken Fillet w/ White Sauce','Garlic Butter Chicken'] },
@@ -871,24 +888,23 @@
             const cloudData   = await cloudRes.json();
             const contractUrl = cloudData.secure_url;
 
-            let packageName    = '';
-            let packageDetails = {};
-            let totalPrice     = 0;
+            let packageId  = null;
+            let addOnId    = null;
+            let totalPrice = 0;
 
             if (S.locationType === 'onsite') {
-                packageName    = S.miniPackage ? S.miniPackage.label : '';
-                packageDetails = { mini: S.miniPackage, snack: S.snackAddon };
-                totalPrice     = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
+                packageId  = S.miniPackage ? S.miniPackage.id : null;
+                addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
+                totalPrice = (S.miniPackage ? S.miniPackage.price : 0)
+                           + (S.snackAddon  ? S.snackAddon.price  : 0);
             } else if (S.offsiteCategory === 'catering') {
-                packageName    = 'Catering';
-                packageDetails = { dishes: S.cateringCart };
-                totalPrice     = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
+                // Catering package row in the package table
+                const cateringPkg = OFFSITE_PKGS.catering[0];
+                packageId  = cateringPkg ? cateringPkg.id : null;
+                totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
             } else {
-                const catObj   = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
-                const catLabel = catObj ? catObj.label : '';
-                packageName    = catLabel + ' - ' + (S.offsitePackage ? S.offsitePackage.label : '');
-                packageDetails = { category: S.offsiteCategory, package: S.offsitePackage };
-                totalPrice     = S.offsitePackage ? S.offsitePackage.price : 0;
+                packageId  = S.offsitePackage ? S.offsitePackage.id    : null;
+                totalPrice = S.offsitePackage ? S.offsitePackage.price : 0;
             }
 
             const { error: insertError } = await supabase
@@ -897,18 +913,17 @@
                     user_id:          userId,
                     event_type:       S.eventType,
                     event_date:       S.eventDate,
-                    time_slot:        S.time,
+                    event_time:       S.time,
                     guest_count:      parseInt(S.guestCount),
                     location_type:    S.locationType,
                     venue_location:   S.venueLocation || null,
-                    package_name:     packageName,
-                    package_details:  packageDetails,
+                    package_id:       packageId,
+                    add_on_id:        addOnId,
                     total_price:      totalPrice,
                     contact_name:     S.name,
                     contact_email:    S.email,
                     contact_phone:    S.phone,
                     special_requests: S.requests || null,
-                    contract_url:     contractUrl,
                     status:           'pending'
                 });
 
@@ -962,6 +977,8 @@
         el.classList.add('active');
     }
 
+    // Load packages from DB first, then start the form
+    await loadPackages();
     showStep(1);
     </script>
 

@@ -281,43 +281,135 @@ body{
 ======================== */
 .reservation-card {
     border: 1px solid #e0d0c0;
-    border-radius: 12px;
-    padding: 20px 24px;
+    border-radius: 14px;
     margin-bottom: 16px;
+    background-color: #fff;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s;
+}
+
+.reservation-card:hover {
+    box-shadow: 0 4px 16px rgba(107,58,31,0.1);
+}
+
+.res-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid #f0e8e0;
     background-color: #FFF8F0;
 }
 
-.reservation-card h4 {
+.res-card-header h4 {
     font-size: 16px;
     font-weight: 700;
     color: #2A1408;
-    margin-bottom: 8px;
+    margin: 0 0 4px;
 }
 
-.reservation-card p {
+.res-submitted {
+    font-size: 12px;
+    color: #aaa;
+    margin: 0;
+}
+
+.res-card-body {
+    padding: 16px 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+}
+
+.res-detail {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: #444;
+    line-height: 1.5;
+}
+
+.res-icon {
+    flex-shrink: 0;
     font-size: 14px;
-    color: #666;
-    margin-bottom: 4px;
-    line-height: 1.6;
+    margin-top: 1px;
+}
+
+.res-card-footer {
+    padding: 12px 22px;
+    border-top: 1px solid #f0e8e0;
+    background-color: #fafaf8;
+}
+
+.res-contract-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6B3A1F;
+    text-decoration: none;
+}
+
+.res-contract-link:hover {
+    text-decoration: underline;
 }
 
 .reservation-card .res-status {
-    display: inline-block;
-    margin-top: 8px;
-    padding: 4px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .res-status.pending {
     background-color: #FFF3CD;
     color: #856404;
+    border: 1px solid #ffe08a;
 }
 
 .res-status.confirmed {
     background-color: #d4edda;
     color: #155724;
+    border: 1px solid #b8dfc4;
+}
+
+.res-status.cancelled {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f1aeb5;
+}
+
+.res-book-btn {
+    display: inline-block;
+    margin-top: 16px;
+    background-color: #6B3A1F;
+    color: #fff;
+    text-decoration: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.res-book-btn:hover {
+    background-color: #2A1408;
+}
+
+@media (max-width: 600px) {
+    .res-card-body {
+        grid-template-columns: 1fr;
+    }
+    .res-card-header {
+        flex-direction: column;
+        gap: 8px;
+    }
 }
 
 /* ========================
