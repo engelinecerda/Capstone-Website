@@ -239,25 +239,25 @@ html {
     -webkit-text-stroke: 1px #6B3A1F;
     pointer-events: auto;
 }
-.reserve-btn{
-    position: absolute;
-    top: 70%;          
-    left: 50%;
-    transform: translateX(-50%);
-    text-align: center;
-    width: 20%;
-    background-color: #6B3A1F;
-    border-radius: 8px;
-    color: #fff;
-    padding: 12px 20px;           
-    border: none;                
-    cursor: pointer;
-    font-size: 24px;
-    font-weight: bold;   
-    transition: background-color 0.3s ease;
+.hero-text-link {
+    margin-top: 18px;
+    color: #fff7ef;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 247, 239, 0.8);
+    padding-bottom: 6px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.45);
+    pointer-events: auto;
+    transition: color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
 }
-.reserve-btn:hover {
-    background-color: #5A2E17;   
+
+.hero-text-link:hover {
+    color: #ffffff;
+    border-color: #ffffff;
+    transform: translateY(-2px);
 }
 
 /* ========================
