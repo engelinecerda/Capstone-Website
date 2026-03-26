@@ -258,6 +258,20 @@ body {
     margin-bottom: 18px;
 }
 
+.form-msg {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.form-msg.success {
+    color: #1e8449;
+}
+
+.form-msg.error {
+    color: #c0392b;
+}
+
 /* ========================
    Responsive
 ======================== */
