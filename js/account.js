@@ -196,8 +196,18 @@ document.getElementById('password-form').addEventListener('submit', async functi
     e.preventDefault();
     const msg = document.getElementById('password-msg');
 
+    const currentPassword = document.getElementById('current-password').value;
     const newPassword = document.getElementById('new-password').value;
     const confirmPassword = document.getElementById('confirm-new-password').value;
+
+    msg.className = 'form-msg';
+    msg.innerText = '';
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        msg.className = 'form-msg error';
+        msg.innerText = 'Please fill in all password fields.';
+        return;
+    }
 
     if (newPassword !== confirmPassword) {
         msg.className = 'form-msg error';
@@ -208,6 +218,31 @@ document.getElementById('password-form').addEventListener('submit', async functi
     if (newPassword.length < 8) {
         msg.className = 'form-msg error';
         msg.innerText = 'Password must be at least 8 characters.';
+        return;
+    }
+
+    if (currentPassword === newPassword) {
+        msg.className = 'form-msg error';
+        msg.innerText = 'New password must be different from current password.';
+        return;
+    }
+
+    const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !currentUser?.email) {
+        msg.className = 'form-msg error';
+        msg.innerText = 'Unable to verify your account. Please log in again.';
+        return;
+    }
+
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: currentPassword
+    });
+
+    if (reauthError) {
+        msg.className = 'form-msg error';
+        msg.innerText = 'Current password is incorrect.';
         return;
     }
 
