@@ -344,6 +344,12 @@ body{
     background-color: #fafaf8;
 }
 
+.res-contract-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
 .res-contract-link {
     font-size: 13px;
     font-weight: 600;
@@ -353,6 +359,22 @@ body{
 
 .res-contract-link:hover {
     text-decoration: underline;
+}
+
+.res-contract-link.disabled {
+    color: #999;
+    cursor: default;
+    text-decoration: none;
+}
+
+.res-contract-link.secondary {
+    color: #8a5a3c;
+}
+
+.res-contract-meta {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #888;
 }
 
 .reservation-card .res-status {

@@ -168,7 +168,105 @@ create policy "insert own reservations"
 
 ---
 
-## Step 6 - Populate `package` table with your packages
+## Step 6 - Create the `contracts` table
+
+```sql
+create table if not exists public.contracts (
+  contract_id   uuid primary key default gen_random_uuid(),
+  reservation_id uuid not null references public.reservations(reservation_id) on delete cascade,
+  contract_type text not null,
+  description   text,
+  contract_url  text not null,
+  verified_date timestamptz
+);
+
+alter table public.contracts enable row level security;
+
+create policy "select own contracts"
+  on public.contracts for select
+  using (
+    exists (
+      select 1
+      from public.reservations r
+      where r.reservation_id = contracts.reservation_id
+        and r.user_id = auth.uid()
+    )
+  );
+
+create policy "insert own contracts"
+  on public.contracts for insert
+  with check (
+    exists (
+      select 1
+      from public.reservations r
+      where r.reservation_id = contracts.reservation_id
+        and r.user_id = auth.uid()
+    )
+  );
+```
+
+---
+
+### Step-by-step in Supabase Dashboard
+
+1. Open your Supabase project.
+2. In the left sidebar, click `SQL Editor`.
+3. Click `New query`.
+4. Copy the full SQL block from `Step 6 - Create the contracts table`.
+5. Click `Run`.
+6. Wait for the success message at the bottom of the SQL Editor.
+7. In the left sidebar, open `Table Editor`.
+8. Confirm that a new table named `contracts` now exists.
+9. Open the `contracts` table and check that these columns were created:
+   `contract_id`, `reservation_id`, `contract_type`, `description`, `contract_url`, `verified_date`
+10. Open `Authentication` or `Database` policy view if needed and confirm RLS is enabled for `contracts`.
+
+### What each column is for
+
+- `contract_id`: unique ID for each uploaded contract
+- `reservation_id`: links the uploaded contract to the reservation it belongs to
+- `contract_type`: lets you label the kind of contract, such as `package_contract`
+- `description`: short note like `Signed contract upload for VIP Lite Contract`
+- `contract_url`: Cloudinary URL of the uploaded signed contract
+- `verified_date`: stays `null` until you or an admin verify the uploaded contract
+
+### How your app will store uploaded contracts
+
+1. The user picks a package.
+2. The user downloads that package's contract PDF.
+3. The user signs it and uploads it in the reservation form.
+4. Your code uploads the signed file to Cloudinary.
+5. Cloudinary returns a `secure_url`.
+6. Your code inserts the reservation into `public.reservations`.
+7. After that succeeds, your code inserts one row into `public.contracts` using:
+   `reservation_id` from the reservation row and `contract_url` from Cloudinary.
+
+### Quick test query
+
+After submitting one reservation with an uploaded contract, run this in `SQL Editor`:
+
+```sql
+select
+  c.contract_id,
+  c.reservation_id,
+  c.contract_type,
+  c.description,
+  c.contract_url,
+  c.verified_date,
+  r.user_id,
+  r.event_type,
+  r.created_at
+from public.contracts c
+join public.reservations r
+  on r.reservation_id = c.reservation_id
+order by r.created_at desc;
+```
+
+If everything is working, you should see one `contracts` row connected to the reservation the user just submitted.
+
+---
+
+## Step 7 - Populate `package` table with your packages
 
 ```sql
 insert into public.package (package_name, package_type, price, guest_capacity, location_type, description) values

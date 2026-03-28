@@ -510,6 +510,18 @@ html {
     color: #f5d9c8;
 }
 
+p a,
+p a:visited {
+  color: #f5d9c8;
+  text-decoration: none;
+}
+
+p a:hover {
+  color: #e9d9c4;
+}
+
+
+
 @media (max-width: 768px) {
     .footer-top {
         flex-direction: column;

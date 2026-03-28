@@ -1,731 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../css/styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <title>ELI Coffee Reservations</title>
-    
-    <style>
-        .reservation-section {
-            padding: 60px 20px 80px;
-            text-align: center;
-            background-color: #FFF8F0;
-            min-height: 100vh;
-        }
-        .reservation-section > h1 { color: #6B3A1F; font-size: 36px; margin-bottom: 10px; }
-        .reservation-section > p  { color: #2A1408; font-size: 16px; margin-bottom: 30px; }
 
-        .reservation-container {
-            margin: 0 auto;
-            padding: 40px;
-            max-width: 700px;
-            background-color: #fff;
-            border-radius: 16px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-            text-align: left;
-        }
-
-        /* Progress */
-        .progress-container { margin-bottom: 28px; text-align: center; }
-        .progress-bar { width: 100%; height: 10px; background-color: #eee; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
-        #progress { height: 10px; width: 0%; background-color: #6B3A1F; transition: width 0.3s ease; border-radius: 10px; }
-        #step-text { font-size: 14px; color: #6B3A1F; font-weight: 600; }
-
-        /* Steps */
-        .res-step { display: none; }
-        .res-step.active { display: block; }
-        .res-step h2 { color: #2A1408; font-size: 22px; margin-bottom: 6px; font-weight: 700; }
-        .res-step > p { color: #777; font-size: 14px; margin-bottom: 20px; }
-
-        /* Inputs */
-        .res-input {
-            width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #ddd;
-            font-size: 14px; color: #2A1408; background-color: #fff; margin-bottom: 14px;
-            display: block; box-sizing: border-box; font-family: inherit;
-        }
-        .res-input:focus { outline: none; border-color: #6B3A1F; }
-        textarea.res-input { height: 100px; resize: vertical; }
-        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-        /* Location Cards */
-        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
-        .location-card { border: 1px solid #ddd; border-radius: 12px; padding: 28px 20px; cursor: pointer; text-align: center; transition: all 0.2s; }
-        .location-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .location-card.active { border-color: #6B3A1F; background: #FFEDE0; }
-        .location-card .loc-icon { font-size: 36px; margin-bottom: 10px; }
-        .location-card h4 { font-size: 16px; font-weight: 700; color: #2A1408; margin-bottom: 4px; }
-        .location-card p  { font-size: 13px; color: #777; margin: 0; }
-
-        /* Package Cards */
-        .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
-        .pkg-card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; cursor: pointer; transition: all 0.2s; background: #fff; }
-        .pkg-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .pkg-card.active { border-color: #6B3A1F; background: #FFEDE0; }
-        .pkg-card h4         { font-size: 14px; font-weight: 700; color: #2A1408; margin: 0 0 5px; }
-        .pkg-card .pkg-price { font-size: 15px; font-weight: 700; color: #6B3A1F; margin: 4px 0; }
-        .pkg-card .pkg-desc  { font-size: 12px; color: #777; margin: 0; line-height: 1.5; }
-
-        /* Section Label */
-        .section-label {
-            font-size: 12px; font-weight: 700; color: #6B3A1F;
-            text-transform: uppercase; letter-spacing: 0.5px; margin: 20px 0 10px;
-        }
-
-        /* Add-on Banner */
-        .addon-banner { border-top: 1px dashed #e0d0c0; margin-top: 24px; padding-top: 20px; }
-
-        /* Catering Inclusions Banner */
-        .catering-inclusions {
-            background: #FFF8F0;
-            border: 1px solid #e0d0c0;
-            border-radius: 12px;
-            padding: 18px 20px;
-            margin-bottom: 20px;
-        }
-        .catering-inclusions h4 {
-            font-size: 14px; font-weight: 700; color: #2A1408; margin: 0 0 10px;
-        }
-        .catering-inclusions ul {
-            margin: 0; padding-left: 18px; color: #555; font-size: 13px; line-height: 1.9;
-        }
-        .catering-inclusions .special-offer {
-            margin-top: 12px;
-            padding: 10px 14px;
-            background: #6B3A1F;
-            color: #fff;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        .catering-inclusions .special-offer span {
-            display: block;
-            font-weight: 400;
-            margin-top: 2px;
-            opacity: 0.9;
-        }
-
-        .progress-tracker {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #FFF8F0;
-            border: 1px solid #e8d8cc;
-            border-radius: 12px;
-            padding: 14px 20px;
-            margin: 20px 0 28px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .pt-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #aaa;
-        }
-        .pt-item.done { color: #0F6E56; }
-        .pt-item.pending { color: #2A1408; font-weight: 600; }
-        .pt-dot {
-            width: 20px; height: 20px;
-            border-radius: 50%;
-            border: 1.5px solid #ddd;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px;
-            flex-shrink: 0;
-            background: #fff;
-            color: #bbb;
-        }
-        .pt-item.done .pt-dot {
-            background: #E1F5EE;
-            border-color: #1D9E75;
-            color: #0F6E56;
-        }
-        .pt-item.pending .pt-dot {
-            background: #6B3A1F;
-            border-color: #6B3A1F;
-            color: #fff;
-        }
-        .pt-divider {
-            flex: 1;
-            height: 1px;
-            background: #e8d8cc;
-            min-width: 16px;
-        }
-
-        .builder-label {
-            font-size: 12px;
-            font-weight: 700;
-            color: #6B3A1F;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 6px;
-        }
-        .builder-hint {
-            font-size: 13px;
-            color: #888;
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
-
-        /* Pills */
-        .pills-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-        .pill { padding: 7px 14px; border: 1px solid #ddd; border-radius: 20px; background: #fafafa; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-        .pill:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .pill.active { border-color: #6B3A1F; background: #FFEDE0; color: #6B3A1F; font-weight: 600; }
-
-        .cat-section { margin-bottom: 4px; }
-        .cat-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .cat-icon-wrap {
-            width: 32px; height: 32px;
-            background: #FFF8F0;
-            border: 1px solid #e8d8cc;
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 16px;
-            flex-shrink: 0;
-        }
-        .cat-title {
-            font-size: 15px;
-            font-weight: 700;
-            color: #2A1408;
-        }
-        .cat-tag {
-            font-size: 11px;
-            color: #aaa;
-            font-weight: 400;
-            margin-left: 2px;
-        }
-        .cat-done-badge {
-            margin-left: auto;
-            font-size: 11px;
-            color: #0F6E56;
-            background: #E1F5EE;
-            border: 1px solid #9FE1CB;
-            border-radius: 20px;
-            padding: 2px 10px;
-            font-weight: 600;
-            display: none;
-        }
-        .cat-done-badge.visible { display: inline-block; }
-
-        .dish-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 8px;
-            margin-bottom: 0;
-        }
-        .dish-card {
-            border: 1px solid #e4d5c9;
-            border-radius: 10px;
-            padding: 11px 14px;
-            cursor: pointer;
-            background: #fff;
-            transition: border-color 0.15s, background 0.15s;
-            user-select: none;
-            position: relative;
-        }
-        .dish-card:hover {
-            border-color: #6B3A1F;
-            background: #FFF8F0;
-        }
-        .dish-card.selected {
-            border: 1.5px solid #1D9E75;
-            background: #E1F5EE;
-        }
-        .dish-card.selected:hover {
-            background: #c5eedd;
-        }
-        .dish-name {
-            font-size: 13px;
-            color: #2A1408;
-            line-height: 1.4;
-            font-weight: 500;
-        }
-        .dish-status {
-            font-size: 11px;
-            margin-top: 5px;
-            font-weight: 600;
-            display: none;
-        }
-        .dish-card.selected .dish-status.checked { display: block; color: #0F6E56; }
-        .dish-card.selected:hover .dish-status.checked { display: none; }
-        .dish-card.selected:hover .dish-status.remove  { display: block; color: #0F6E56; }
-
-        .pax-wrapper {
-            margin-top: 12px;
-            padding: 12px 14px;
-            background: #FFFCF9;
-            border: 1px dashed #d4bfb0;
-            border-radius: 10px;
-            display: none;
-        }
-        .pax-wrapper.visible { display: block; }
-        .pax-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        .pax-top-label {
-            font-size: 12px;
-            font-weight: 700;
-            color: #6B3A1F;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .pax-selected-price {
-            font-size: 13px;
-            font-weight: 700;
-            color: #0F6E56;
-        }
-        .pax-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .pax-btn {
-            border: 1px solid #e4d5c9;
-            border-radius: 8px;
-            padding: 7px 16px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            background: #fff;
-            color: #2A1408;
-            font-family: inherit;
-            transition: all 0.15s;
-        }
-        .pax-btn:hover {
-            border-color: #6B3A1F;
-            background: #FFF8F0;
-        }
-        .pax-btn.selected {
-            border: 1.5px solid #1D9E75;
-            background: #E1F5EE;
-            color: #085041;
-            font-weight: 700;
-        }
-        .pax-hint {
-            font-size: 11px;
-            color: #aaa;
-            margin-top: 8px;
-        }
-        .cat-divider {
-            border: none;
-            border-top: 1px solid #f0e8e0;
-            margin: 16px 0 20px;
-        }
-
-        .cart-section { margin-top: 28px; }
-        .cart-box {
-            border: 1px solid #e4d5c9;
-            border-radius: 14px;
-            overflow: hidden;
-        }
-        .cart-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 18px;
-            background: #FFF8F0;
-            border-bottom: 1px solid #e8d8cc;
-        }
-        .cart-header-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 700;
-            color: #2A1408;
-        }
-        .cart-count-badge {
-            background: #6B3A1F;
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 20px;
-            padding: 2px 8px;
-            min-width: 22px;
-            text-align: center;
-        }
-        .cart-running-total {
-            font-size: 15px;
-            font-weight: 700;
-            color: #6B3A1F;
-        }
-        .cart-empty-state {
-            padding: 24px 18px;
-            text-align: center;
-            font-size: 13px;
-            color: #bbb;
-        }
-        .cart-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 11px 18px;
-            border-bottom: 1px solid #f0e8e0;
-            transition: background 0.15s;
-        }
-        .cart-item:last-child { border-bottom: none; }
-        .cart-item:hover { background: #FFFCF9; }
-        .ci-indicator {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: #1D9E75;
-            flex-shrink: 0;
-        }
-        .ci-cat {
-            font-size: 11px;
-            font-weight: 700;
-            color: #6B3A1F;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 2px;
-        }
-        .ci-dish {
-            font-size: 13px;
-            color: #2A1408;
-        }
-        .ci-pax {
-            font-size: 11px;
-            color: #888;
-            margin-top: 1px;
-        }
-        .ci-right {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .ci-price {
-            font-size: 13px;
-            font-weight: 700;
-            color: #2A1408;
-        }
-        .ci-remove-btn {
-            background: none;
-            border: 1px solid #e4d5c9;
-            border-radius: 6px;
-            padding: 3px 8px;
-            font-size: 11px;
-            color: #aaa;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.15s;
-        }
-        .ci-remove-btn:hover {
-            border-color: #c0392b;
-            color: #c0392b;
-            background: #fdf2f2;
-        }
-        .cart-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 18px;
-            background: #FFF8F0;
-            border-top: 1px solid #e8d8cc;
-        }
-        .cart-footer-left {
-            font-size: 12px;
-            color: #888;
-        }
-        .cart-footer-right {
-            font-size: 16px;
-            font-weight: 700;
-            color: #6B3A1F;
-        }
-        .validation-notice {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            background: #FFF3CD;
-            border: 1px solid #FFD966;
-            border-radius: 10px;
-            padding: 12px 16px;
-            margin-top: 16px;
-            font-size: 13px;
-            color: #6B4C00;
-        }
-        .validation-notice.success {
-            background: #E1F5EE;
-            border-color: #1D9E75;
-            color: #085041;
-        }
-        .vn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-
-        /* Time Grid */
-        .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .time-card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; color: #2A1408; transition: all 0.2s; }
-        .time-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .time-card.active { border-color: #6B3A1F; background: #FFEDE0; }
-
-        /* Summary */
-        .summary-box { background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 22px 24px; width: 100%; box-sizing: border-box; }
-        .summary-row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 14px; color: #2A1408; padding: 6px 0; border-bottom: 1px solid #e8ddd5; }
-        .summary-row:last-child { border-bottom: none; }
-        .summary-row .s-label { font-weight: 600; color: #6B3A1F; flex-shrink: 0; margin-right: 16px; }
-        .summary-row .s-value { text-align: right; }
-        .summary-divider { border: none; border-top: 1px solid #e0d0c0; margin: 10px 0; }
-        .summary-total { font-size: 17px; font-weight: 700; color: #6B3A1F; display: flex; justify-content: space-between; padding-top: 10px; }
-        .summary-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #aaa; margin: 12px 0 6px; }
-
-        /* Guest Warning */
-        .guest-warning { display: flex; align-items: flex-start; gap: 12px; background: #FFF3CD; border: 1px solid #FFD966; border-radius: 12px; padding: 14px 18px; margin-top: 16px; font-size: 14px; color: #6B4C00; }
-        .guest-warning a { color: #6B3A1F; font-weight: 700; }
-
-        /* Contract */
-        .contract-box { width: 100%; }
-        .contract-download { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
-        .contract-icon { font-size: 32px; flex-shrink: 0; }
-        .contract-info { flex: 1; }
-        .contract-info h4 { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 3px; }
-        .contract-info p  { font-size: 13px; color: #777; margin: 0; }
-        .dl-btn { background: #6B3A1F; color: #fff; text-decoration: none; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background 0.2s; }
-        .dl-btn:hover { background: #2A1408; }
-        .contract-steps { margin-bottom: 16px; }
-        .c-step { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #444; margin-bottom: 10px; }
-        .c-num { background: #6B3A1F; color: #fff; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-        .contract-upload label { display: block; font-size: 14px; font-weight: 600; color: #2A1408; margin-bottom: 8px; }
-        .contract-upload input[type="file"] { width: 100%; border: 2px dashed #e0d0c0; border-radius: 10px; padding: 16px; background: #FFF8F0; cursor: pointer; box-sizing: border-box; font-family: inherit; }
-        .contract-note { font-size: 12px; color: #aaa; margin-top: 6px; }
-
-        /* Buttons */
-        .reservation-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
-        .btn-back { background: #f5f5f5; color: #6B3A1F; border: 1px solid #ddd; padding: 12px 28px; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 600; font-family: inherit; transition: background 0.2s; }
-        .btn-back:hover { background: #e8e8e8; }
-        .btn-next { background: #6B3A1F; color: #fff; border: none; padding: 12px 32px; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 600; font-family: inherit; transition: background 0.2s; }
-        .btn-next:hover { background: #2A1408; }
-
-        .hidden { display: none !important; }
-
-        @media (max-width: 600px) {
-            .reservation-container { padding: 24px 16px; }
-            .location-options { grid-template-columns: 1fr; }
-            .cards-grid       { grid-template-columns: 1fr; }
-            .input-row        { grid-template-columns: 1fr; }
-            .time-grid        { grid-template-columns: repeat(2, 1fr); }
-            .dish-grid { grid-template-columns: 1fr 1fr; }
-            .progress-tracker { gap: 6px; }
-            .pt-divider { display: none; }
-        }
-    </style>
-</head>
-<body>
-
-    <nav class="navbar">
-        <div class="navbar__container">
-            <a href="../index.html">
-                <img class="logo" src="../images/logo.png" alt="ELI Coffee Events Cafe Logo">
-            </a>
-            <div class="navbar__toggle" id="mobile-menu">
-                <span class="bar"></span><span class="bar"></span><span class="bar"></span>
-            </div>
-            <ul class="navbar__menu">
-                <li class="navbar__item"><a href="../index.html"              class="navbar__links">Home</a></li>
-                <li class="navbar__item"><a href="../pages/packages.html"     class="navbar__links">Packages</a></li>
-                <li class="navbar__item"><a href="../pages/reservations.html" class="navbar__links">Reservations</a></li>
-                <li class="navbar__item"><a href="../pages/faqs.html"         class="navbar__links">FAQs</a></li>
-                <li class="navbar__item"><a href="../pages/about.html"        class="navbar__links">About</a></li>
-                <li class="navbar__btn"></li>
-            </ul>
-        </div>
-    </nav>
-
-    <section class="reservation-section">
-        <h1>Make a Reservation</h1>
-        <p>Follow the steps below to book your event</p>
-
-        <div class="reservation-container">
-
-            <!-- Progress -->
-            <div class="progress-container">
-                <div class="progress-bar"><div id="progress"></div></div>
-                <span id="step-text"></span>
-            </div>
-
-            <!-- STEP 1: Event Info -->
-            <div class="res-step active" id="rs1">
-                <h2>Event Information</h2>
-                <p>Tell us about your event</p>
-                <div class="input-row">
-                    <input class="res-input" type="text"   id="event-type"  placeholder="Event Type (e.g. Birthday, Wedding) *">
-                    <input class="res-input" type="number" id="guest-count" placeholder="Number of Guests *" min="1">
-                </div>
-                <input class="res-input" type="date" id="event-date">
-            </div>
-
-            <!-- STEP 2: Location -->
-            <div class="res-step" id="rs2">
-                <h2>Location Type</h2>
-                <p>Will your event be held at ELI Coffee or at your own venue?</p>
-                <div class="location-options">
-                    <div class="location-card" data-val="onsite">
-                        <div class="loc-icon">&#127968;</div>
-                        <h4>Onsite</h4>
-                        <p>Hold your event at ELI Coffee Events Caf&eacute;</p>
-                    </div>
-                    <div class="location-card" data-val="offsite">
-                        <div class="loc-icon">&#128663;</div>
-                        <h4>Offsite</h4>
-                        <p>We bring the service to your venue</p>
-                    </div>
-                </div>
-                <div id="venue-wrapper" class="hidden">
-                    <input class="res-input" type="text" id="venue-location" placeholder="Venue Location *">
-                </div>
-            </div>
-
-            <!-- STEP 3: Package -->
-            <div class="res-step" id="rs3">
-                <h2>Select Your Package</h2>
-                <p id="rs3-desc">Choose a package for your event</p>
-
-                <!-- Onsite -->
-                <div id="onsite-section" class="hidden">
-                    <div class="section-label">Mini Gathering Packages</div>
-                    <div class="cards-grid" id="mini-grid"></div>
-                    <div id="snack-addon" class="addon-banner hidden">
-                        <div class="section-label">&#127850; Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
-                        <div class="cards-grid" id="snack-grid"></div>
-                    </div>
-                </div>
-
-                <!-- Offsite -->
-                <div id="offsite-section" class="hidden">
-                    <div class="cards-grid" id="offsite-cat-grid"></div>
-
-                    <div id="offsite-sub" class="hidden">
-                        <div class="section-label" id="offsite-sub-label">Choose a Package</div>
-                        <div class="cards-grid" id="offsite-sub-grid"></div>
-                    </div>
-
-                    <div id="catering-section" class="hidden">
-                        <div class="catering-inclusions">
-                            <h4>&#128203; Catering Package Inclusions</h4>
-                            <ul>
-                                <li>Catering Buffet Set Up (3 Dishes, 1 Pasta, Rice, Dessert &amp; Drink)</li>
-                                <li>Set of Utensils</li>
-                                <li>Uniformed Waiters &amp; Servers</li>
-                                <li>Dressed Tables &amp; Chairs</li>
-                                <li>Basic Backdrop Stage Set Up</li>
-                                <li>Table Centerpiece</li>
-                                <li>3&ndash;4 Hours of Service</li>
-                                <li>Crew meal and transportation fee applies</li>
-                            </ul>
-                            <div class="special-offer">
-                                &#127873; Special Offer
-                                <span>FREE Overflowing Coffee &amp; 1 Appetizer/Dessert</span>
-                            </div>
-                        </div>
-
-                        <div class="progress-tracker" id="catering-progress-tracker"></div>
-
-                        <div class="builder-label">&#127869;&#65039; Choose Your Dishes</div>
-                        <p class="builder-hint">Select one dish per category, then pick the pax count for that tray. You need at least 1 main dish, 1 pasta, and 1 dessert.</p>
-
-                        <div id="catering-tray-builder"></div>
-
-                        <div class="cart-section">
-                            <div class="cart-box" id="catering-tray-cart">
-                                <div class="cart-header">
-                                    <div class="cart-header-left">
-                                        &#128722; Your Selections
-                                        <span class="cart-count-badge" id="catering-cart-badge">0</span>
-                                    </div>
-                                    <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
-                                </div>
-                                <div class="cart-empty-state" id="catering-cart-empty">No dishes selected yet</div>
-                                <div id="catering-tray-rows"></div>
-                                <div class="cart-footer" id="catering-cart-footer" style="display:none">
-                                    <span class="cart-footer-left" id="catering-cart-footer-count">0 dishes selected</span>
-                                    <span class="cart-footer-right" id="catering-tray-total">&#8369;0</span>
-                                </div>
-                            </div>
-
-                            <div class="validation-notice" id="catering-validation-notice">
-                                <span class="vn-icon">&#9888;&#65039;</span>
-                                <span id="catering-validation-text">Select at least 1 main dish, 1 pasta, and 1 dessert to continue.</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STEP 4: Time Slot (moved before Your Details) -->
-            <div class="res-step" id="rs5">
-                <h2>Time Slot</h2>
-                <p>Select your preferred event start time</p>
-                <div class="time-grid" id="time-grid"></div>
-            </div>
-
-            <!-- STEP 5: Contact (moved after Time Slot) -->
-            <div class="res-step" id="rs4">
-                <h2>Your Details</h2>
-                <p>Fill in your contact information</p>
-                <input class="res-input" type="text"  id="name"     placeholder="Full Name *">
-                <input class="res-input" type="tel"   id="phone"    placeholder="Phone Number *">
-                <input class="res-input" type="email" id="email"    placeholder="Email Address *">
-                <textarea class="res-input"            id="requests" placeholder="Notes &amp; Special Requests (Optional)"></textarea>
-            </div>
-
-            <!-- STEP 6: Summary -->
-            <div class="res-step" id="rs6">
-                <h2>Reservation Summary</h2>
-                <p>Please review all your details before proceeding</p>
-                <div class="summary-box" id="summary-content"></div>
-                <div id="guest-warning" class="guest-warning hidden">
-                    <span>&#9888;&#65039;</span>
-                    <p>You must <a href="../pages/login_signup.html">sign up or log in</a> to complete your booking.</p>
-                </div>
-            </div>
-
-            <!-- STEP 7: Contract -->
-            <div class="res-step" id="rs7">
-                <h2>Sign the Contract</h2>
-                <p>Download, sign, and upload the contract to complete your booking</p>
-                <div class="contract-box">
-                    <div class="contract-download">
-                        <div class="contract-icon">&#128196;</div>
-                        <div class="contract-info">
-                            <h4 id="contract-title">ELI Coffee Events Reservation Contract</h4>
-                            <p id="contract-description">Read the full terms and conditions before signing</p>
-                        </div>
-                        <a href="#" class="dl-btn" id="contract-download-btn" aria-disabled="true">&#11015; Download Contract</a>
-                    </div>
-                    <div class="contract-steps">
-                        <div class="c-step"><span class="c-num">1</span><span>Download the contract above</span></div>
-                        <div class="c-step"><span class="c-num">2</span><span>Print and sign <strong>or</strong> use an e-signature tool</span></div>
-                        <div class="c-step"><span class="c-num">3</span><span>Upload the signed contract below</span></div>
-                    </div>
-                    <div class="contract-upload">
-                        <label for="contract">Upload Signed Contract *</label>
-                        <input type="file" id="contract" accept=".pdf,.jpg,.jpeg,.png">
-                        <p class="contract-note">Accepted formats: PDF, JPG, PNG</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Nav Buttons -->
-            <div class="reservation-buttons">
-                <button class="btn-back hidden" id="prevBtn">&larr; Back</button>
-                <button class="btn-next" id="nextBtn">Next &rarr;</button>
-            </div>
-
-        </div>
-    </section>
-
-    <script type="module" src="../js/navbar.js"></script>
-
-    <script type="module">
     import { supabase } from '../js/supabase.js';
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -1074,8 +347,8 @@
         builder.innerHTML = '';
 
         DISHES.forEach(group => {
-            const sel = S.cateringCart.find(item => item.cat === group.cat) || null;
-            const done = !!(sel && sel.pax);
+            const selection = S.cateringCart.find(item => item.cat === group.cat);
+            const done = selection && selection.pax;
 
             const section = document.createElement('div');
             section.className = 'cat-section';
@@ -1086,20 +359,20 @@
                 '<div class="cat-icon-wrap">' + group.icon + '</div>' +
                 '<span class="cat-title">' + group.cat + '</span>' +
                 '<span class="cat-tag">' + (group.required ? '(required)' : '(optional add-on)') + '</span>' +
-                '<span class="cat-done-badge' + (done ? ' visible' : '') + '">✓ Added</span>';
+                '<span class="cat-done-badge' + (done ? ' visible' : '') + '">&#10003; Added</span>';
             section.appendChild(header);
 
             const grid = document.createElement('div');
             grid.className = 'dish-grid';
 
             group.items.forEach(item => {
-                const isSelected = sel && sel.dish === item;
+                const isSelected = selection && selection.dish === item;
                 const card = document.createElement('div');
                 card.className = 'dish-card' + (isSelected ? ' selected' : '');
                 card.innerHTML =
                     '<div class="dish-name">' + item + '</div>' +
-                    '<div class="dish-status checked">✓ Selected</div>' +
-                    '<div class="dish-status remove">✕ Click to remove</div>';
+                    '<div class="dish-status checked">&#10003; Selected</div>' +
+                    '<div class="dish-status remove">&#10005; Click to remove</div>';
 
                 card.onclick = () => {
                     if (isSelected) {
@@ -1114,7 +387,7 @@
             });
             section.appendChild(grid);
 
-            if (sel && sel.dish) {
+            if (selection && selection.dish) {
                 const paxWrap = document.createElement('div');
                 paxWrap.className = 'pax-wrapper visible';
 
@@ -1122,7 +395,7 @@
                 paxTop.className = 'pax-top';
                 paxTop.innerHTML =
                     '<span class="pax-top-label">Pax per tray</span>' +
-                    (sel.pax ? '<span class="pax-selected-price">' + fmtPeso(PRICES[group.cat][sel.pax]) + '</span>' : '');
+                    (selection.pax ? '<span class="pax-selected-price">' + fmtPeso(PRICES[group.cat][selection.pax]) + '</span>' : '');
                 paxWrap.appendChild(paxTop);
 
                 const paxBtns = document.createElement('div');
@@ -1131,19 +404,19 @@
                 [20, 30, 40, 50].forEach(n => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'pax-btn' + (sel.pax === n ? ' selected' : '');
+                    btn.className = 'pax-btn' + (selection.pax === n ? ' selected' : '');
                     btn.textContent = n + ' pax';
                     btn.onclick = () => {
                         const price = PRICES[group.cat][n] || 0;
                         S.cateringCart = S.cateringCart.filter(entry => entry.cat !== group.cat);
-                        S.cateringCart.push({ cat: group.cat, dish: sel.dish, pax: n, price });
+                        S.cateringCart.push({ cat: group.cat, dish: selection.dish, pax: n, price });
                         rebuildCateringUI();
                     };
                     paxBtns.appendChild(btn);
                 });
                 paxWrap.appendChild(paxBtns);
 
-                if (!sel.pax) {
+                if (!selection.pax) {
                     const hint = document.createElement('p');
                     hint.className = 'pax-hint';
                     hint.textContent = 'Choose the number of pax to add this dish to your cart.';
@@ -1172,7 +445,10 @@
         if (!tracker) return;
 
         const steps = [
-            { label: 'Main Dish', check: () => DISHES.filter(g => g.tag === 'main').some(g => S.cateringCart.some(item => item.cat === g.cat && item.pax)) },
+            {
+                label: 'Main Dish',
+                check: () => DISHES.filter(group => group.tag === 'main').some(group => S.cateringCart.some(item => item.cat === group.cat && item.pax))
+            },
             { label: 'Pasta', check: () => hasCateringTag('pasta') },
             { label: 'Dessert', check: () => hasCateringTag('dessert') },
             { label: 'Rice', check: () => hasCateringTag('rice'), optional: true }
@@ -1184,7 +460,7 @@
             const item = document.createElement('div');
             item.className = 'pt-item' + (done ? ' done' : ' pending');
             item.innerHTML =
-                '<div class="pt-dot">' + (done ? '✓' : (index + 1)) + '</div>' +
+                '<div class="pt-dot">' + (done ? '&#10003;' : (index + 1)) + '</div>' +
                 '<span>' + step.label + (step.optional ? ' <em style="font-weight:400;font-style:normal;opacity:0.6">(optional)</em>' : '') + '</span>';
             tracker.appendChild(item);
 
@@ -1223,20 +499,20 @@
             countEl.textContent = count + ' dish' + (count !== 1 ? 'es' : '') + ' selected';
             totalEl.textContent = fmtPeso(total);
 
-            S.cateringCart.forEach(item => {
-                if (!item || !item.pax) return;
+            S.cateringCart.forEach(i => {
+                if (!i || !i.pax) return;
                 const row = document.createElement('div');
                 row.className = 'cart-item';
                 row.innerHTML =
                     '<div class="ci-indicator"></div>' +
                     '<div>' +
-                        '<div class="ci-cat">' + item.cat + '</div>' +
-                        '<div class="ci-dish">' + item.dish + '</div>' +
-                        '<div class="ci-pax">' + item.pax + ' pax</div>' +
+                        '<div class="ci-cat">' + i.cat + '</div>' +
+                        '<div class="ci-dish">' + i.dish + '</div>' +
+                        '<div class="ci-pax">' + i.pax + ' pax</div>' +
                     '</div>' +
                     '<div class="ci-right">' +
-                        '<span class="ci-price">' + fmtPeso(item.price) + '</span>' +
-                        '<button type="button" class="ci-remove-btn" data-cat="' + item.cat + '">Remove</button>' +
+                        '<span class="ci-price">' + fmtPeso(i.price) + '</span>' +
+                        '<button type="button" class="ci-remove-btn" data-cat="' + i.cat + '">Remove</button>' +
                     '</div>';
                 rows.appendChild(row);
             });
@@ -1372,7 +648,10 @@
             } else {
                 if (!S.offsiteCategory) { alert('Please select a service category.'); return false; }
                 if (S.offsiteCategory === 'catering') {
-                    if (!S.cateringCart.length) { alert('Please select at least one dish for your catering package.'); return false; }
+                    if (!isCateringSelectionValid()) {
+                        alert('Please select at least 1 main dish, 1 pasta, and 1 dessert for your catering package.');
+                        return false;
+                    }
                 } else {
                     if (!S.offsitePackage) { alert('Please select a specific package.'); return false; }
                 }
@@ -1570,7 +849,4 @@
     // Load packages from DB first, then start the form
     await loadPackages();
     showStep(1);
-    </script>
-
-</body>
-</html>
+    
