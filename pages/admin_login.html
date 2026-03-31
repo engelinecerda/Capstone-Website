@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal – ELI Coffee Events Management System</title>
+    <link rel="stylesheet" href="../css/admin_login.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    
+</head>
+<body>
+
+    <div class="top-bar">ELI Coffee Events Management System &mdash; Admin Portal</div>
+
+    <div class="admin-page">
+        <div class="admin-wrapper">
+
+            <!-- Portal Header -->
+            <div class="portal-header">
+                <div class="portal-icon">
+                    <!-- Shield Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l6 2.67V11c0 3.88-2.62 7.5-6 8.93C8.62 18.5 6 14.88 6 11V7.67L12 5z"/>
+                    </svg>
+                </div>
+                <h1>Admin Portal</h1>
+                <p>ELI Coffee Events Management System</p>
+            </div>
+
+            <!-- Login Card -->
+            <div class="admin-card">
+                <h2>Administrator Login</h2>
+                <p class="subtitle">Enter your credentials to access the admin panel</p>
+
+                <form id="adminLoginForm">
+
+                    <!-- Role -->
+                    <div class="form-group">
+                        <label for="role">Role</label>
+                        <div class="select-wrapper">
+                            <select id="role" name="role" required>
+                                <option value="super_admin">Super Admin</option>
+                                <option value="admin">Admin</option>
+                                <option value="staff">Staff</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="elicoffeeadmin@gmail.com"
+                            required
+                        />
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="password-wrapper">
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="••••••••"
+                                required
+                            />
+                            <button type="button" class="toggle-password" onclick="togglePassword()" title="Show/hide password">
+                                <!-- Eye Icon -->
+                                <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Remember Me & Forgot Password -->
+                    <div class="options">
+                        <label>
+                            <input type="checkbox" name="remember" />
+                            Remember me
+                        </label>
+                        <a href="forgot_password.html" class="forgot">Forgot password?</a>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="login-btn">Login to Admin Panel</button>
+
+                    <div class="form-msg" id="formMsg"></div>
+                </form>
+
+                <hr class="divider">
+
+                <div class="security-note">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                    </svg>
+                    Secured connection &mdash; authorized personnel only
+                </div>
+            </div>
+
+            <!-- Back to Customer Site -->
+            <div class="back-link">
+                <a href="login_signup.html">← Back to Customer Site</a>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.innerHTML = `
+                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                `;
+            } else {
+                input.type = 'password';
+                icon.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                `;
+            }
+        }
+
+    </script>
+    <script type="module" src="../js/admin_login.js"></script>
+
+</body>
+</html>

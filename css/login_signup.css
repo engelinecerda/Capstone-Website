@@ -235,16 +235,21 @@ body {
     text-align: center;
     margin-top: 18px;
     font-size: 0.875rem;
-    color: #555;
+    color: #4A2B16;
 }
 
 .admin-link a {
-    color: #6B3A1F;
+    color: #4A2B16;
     text-decoration: none;
-    font-weight: 600;
+    font-weight: 700;
+}
+
+.admin-link a:visited {
+    color: #4A2B16;
 }
 
 .admin-link a:hover {
+    color: #2A1408;
     text-decoration: underline;
 }
 
@@ -262,6 +267,7 @@ body {
     margin-top: 16px;
     font-size: 0.9rem;
     text-align: center;
+    min-height: 1.2em;
 }
 
 .form-msg.success {

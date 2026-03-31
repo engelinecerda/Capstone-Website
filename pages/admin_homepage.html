@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - ELI Coffee Events</title>
+    <link rel="stylesheet" href="../css/admin_login.css">
+    <style>
+        .dashboard-shell {
+            min-height: calc(100vh - 44px);
+            display: grid;
+            place-items: center;
+            padding: 32px 20px;
+        }
+
+        .dashboard-card {
+            width: min(680px, 100%);
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.18);
+        }
+
+        .dashboard-card h1 {
+            margin-bottom: 12px;
+            color: #2f1d15;
+        }
+
+        .dashboard-card p {
+            color: #5c4335;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .dashboard-meta {
+            display: grid;
+            gap: 10px;
+            margin: 24px 0;
+            padding: 18px;
+            border-radius: 16px;
+            background: #f8f2ec;
+        }
+
+        .dashboard-meta strong {
+            color: #2f1d15;
+        }
+
+        .dashboard-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .dashboard-actions a,
+        .dashboard-actions button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font: inherit;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .primary-action {
+            background: #6f4e37;
+            color: #fff;
+        }
+
+        .secondary-action {
+            background: #ead8c9;
+            color: #4b3124;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">ELI Coffee Events Management System &mdash; Admin Portal</div>
+
+    <main class="dashboard-shell">
+        <section class="dashboard-card">
+            <h1>Admin Dashboard</h1>
+            <p>This page is only available to the authorized admin account linked to Supabase Auth.</p>
+
+            <div class="dashboard-meta">
+                <div><strong>Authorized email:</strong> <span id="adminEmail">Checking session...</span></div>
+                <div><strong>Status:</strong> <span id="adminStatus">Validating access...</span></div>
+            </div>
+
+            <p>You can now build out your reservations management, approvals, reports, and other admin tools here.</p>
+
+            <div class="dashboard-actions">
+                <a class="primary-action" href="../index.html">Go to Main Site</a>
+                <button class="secondary-action" id="logoutBtn" type="button">Log Out</button>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="../js/admin_homepage.js"></script>
+</body>
+</html>

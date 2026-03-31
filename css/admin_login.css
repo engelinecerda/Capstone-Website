@@ -1,0 +1,329 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Kumbh Sans', sans-serif;
+}
+
+body {
+    font-family: 'Kumbh Sans', sans-serif;
+    background-color: #FFF8F0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========================
+   Top Bar
+======================== */
+.top-bar {
+    background-color: #2A1408;
+    color: #fff;
+    text-align: center;
+    padding: 10px;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+/* ========================
+   Page Wrapper
+======================== */
+.admin-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    padding: 40px 20px;
+}
+
+.admin-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 420px;
+}
+
+/* ========================
+   Portal Header
+======================== */
+.portal-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.portal-icon {
+    width: 72px;
+    height: 72px;
+    background-color: #2A1408;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.portal-icon svg {
+    width: 36px;
+    height: 36px;
+    fill: #fff;
+}
+
+.portal-header h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #2A1408;
+    margin-bottom: 4px;
+}
+
+.portal-header p {
+    font-size: 0.9rem;
+    color: #6B3A1F;
+    font-weight: 400;
+}
+
+/* ========================
+   Login Card
+======================== */
+.admin-card {
+    background: #fff;
+    padding: 40px 44px;
+    border-radius: 16px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.09);
+    width: 100%;
+}
+
+.admin-card h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #2A1408;
+    margin-bottom: 4px;
+}
+
+.admin-card .subtitle {
+    font-size: 0.875rem;
+    color: #777;
+    margin-bottom: 28px;
+}
+
+/* ========================
+   Form Groups
+======================== */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #2A1408;
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Kumbh Sans', sans-serif;
+    color: #2A1408;
+    background-color: #fff;
+    transition: border-color 0.3s ease;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #6B3A1F;
+}
+
+/* Select wrapper for custom arrow */
+.select-wrapper {
+    position: relative;
+}
+
+.select-wrapper select {
+    width: 100%;
+    cursor: pointer;
+}
+
+.select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #6B3A1F;
+    pointer-events: none;
+}
+
+/* ========================
+   Password Wrapper
+======================== */
+.password-wrapper {
+    position: relative;
+}
+
+.password-wrapper input {
+    padding-right: 44px;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.toggle-password:hover {
+    color: #6B3A1F;
+}
+
+.toggle-password svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ========================
+   Options Row
+======================== */
+.options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.options label {
+    font-size: 0.875rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.options input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: #6B3A1F;
+    cursor: pointer;
+}
+
+.forgot {
+    font-size: 0.875rem;
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.forgot:hover {
+    text-decoration: underline;
+}
+
+/* ========================
+   Login Button
+======================== */
+.login-btn {
+    width: 100%;
+    padding: 14px;
+    background: #6B3A1F;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Kumbh Sans', sans-serif;
+    transition: background 0.3s ease;
+    letter-spacing: 0.3px;
+}
+
+.login-btn:hover {
+    background: #2A1408;
+}
+
+/* ========================
+   Back Link
+======================== */
+.back-link {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.875rem;
+}
+
+.back-link a {
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.back-link a:hover {
+    text-decoration: underline;
+    color: #2A1408;
+}
+
+/* ========================
+   Form Message
+======================== */
+.form-msg {
+    margin-top: 16px;
+    font-size: 0.875rem;
+    text-align: center;
+    min-height: 1.2em;
+}
+
+.form-msg.success { color: #1e8449; }
+.form-msg.error   { color: #c0392b; }
+
+/* ========================
+   Divider
+======================== */
+.divider {
+    border: none;
+    border-top: 1px solid #f0e8e0;
+    margin: 20px 0;
+}
+
+.security-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: #aaa;
+    justify-content: center;
+}
+
+.security-note svg {
+    width: 14px;
+    height: 14px;
+    fill: #bbb;
+    flex-shrink: 0;
+}
+
+/* ========================
+   Responsive
+======================== */
+@media (max-width: 480px) {
+    .admin-card {
+        padding: 32px 24px;
+    }
+}

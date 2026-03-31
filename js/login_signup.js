@@ -17,6 +17,13 @@ const loginTab = document.getElementById('login-tab');
 const signupTab = document.getElementById('signup-tab');
 const loginForm = document.getElementById('login-form');
 const signupForm = document.getElementById('signup-form');
+const signupMessage = document.getElementById('signup-message');
+
+function setSignupMessage(message, type = '') {
+    if (!signupMessage) return;
+    signupMessage.textContent = message;
+    signupMessage.className = 'form-msg' + (type ? ' ' + type : '');
+}
 
 function showLoginTab() {
     loginTab.classList.add('active');
@@ -30,6 +37,7 @@ function showSignupTab() {
     loginTab.classList.remove('active');
     signupForm.classList.add('active');
     loginForm.classList.remove('active');
+    setSignupMessage('');
 }
 
 loginTab.addEventListener('click', showLoginTab);
@@ -66,6 +74,7 @@ loginForm.addEventListener('submit', async function (e) {
 // ========================
 signupForm.addEventListener('submit', async function (e) {
     e.preventDefault();
+    setSignupMessage('');
 
     const firstName = document.getElementById('first-name').value.trim();
     const middleName = document.getElementById('middle-name').value.trim();
@@ -76,12 +85,12 @@ signupForm.addEventListener('submit', async function (e) {
     const confirm = document.getElementById('confirm-password').value;
 
     if (password !== confirm) {
-        alert('Passwords do not match. Please try again.');
+        setSignupMessage('Passwords do not match. Please try again.', 'error');
         return;
     }
 
     if (password.length < 8) {
-        alert('Password must be at least 8 characters long.');
+        setSignupMessage('Password must be at least 8 characters long.', 'error');
         return;
     }
 
@@ -90,7 +99,7 @@ signupForm.addEventListener('submit', async function (e) {
     submitBtn.textContent = 'Creating account...';
 
     const emailRedirectTo = new URL('../pages/login_signup.html', window.location.href).href;
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -109,11 +118,33 @@ signupForm.addEventListener('submit', async function (e) {
     submitBtn.textContent = 'Create Account';
 
     if (error) {
-        alert('Sign up failed: ' + error.message);
+        const normalized = error.message.toLowerCase();
+        if (
+            normalized.includes('already registered') ||
+            normalized.includes('already been registered') ||
+            normalized.includes('already in use') ||
+            normalized.includes('user already registered')
+        ) {
+            setSignupMessage('This email is already in use. Please log in or use Forgot password instead.', 'error');
+            return;
+        }
+
+        setSignupMessage('Sign up failed: ' + error.message, 'error');
+        return;
+    }
+
+    const looksLikeExistingUser =
+        data?.user &&
+        Array.isArray(data.user.identities) &&
+        data.user.identities.length === 0;
+
+    if (looksLikeExistingUser) {
+        setSignupMessage('This email is already in use. Please log in or use Forgot password instead.', 'error');
         return;
     }
 
     alert('Account created. Please check your email and click the confirmation link before logging in.');
+    setSignupMessage('');
     signupForm.reset();
     showLoginTab();
 });
