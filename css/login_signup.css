@@ -165,6 +165,20 @@ body {
     transition: border-color 0.3s ease;
 }
 
+#login-password,
+#signup-password,
+#confirm-password {
+    font-size: 16px;
+    letter-spacing: 0.08em;
+}
+
+#login-password::placeholder,
+#signup-password::placeholder,
+#confirm-password::placeholder {
+    font-size: 16px;
+    letter-spacing: 0.08em;
+}
+
 .form-group input:focus {
     outline: none;
     border-color: #6B3A1F;

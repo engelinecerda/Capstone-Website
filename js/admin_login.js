@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-const ADMIN_EMAIL = 'elicoffeeadmin@gmail.com';
+const ADMIN_EMAIL = 'adminelicoffee@gmail.com';
 const adminLoginForm = document.getElementById('adminLoginForm');
 const formMsg = document.getElementById('formMsg');
 const emailInput = document.getElementById('email');

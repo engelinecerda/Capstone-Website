@@ -41,7 +41,7 @@ body {
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 420px;
+    max-width: 520px;
 }
 
 /* ========================
@@ -87,7 +87,7 @@ body {
 ======================== */
 .admin-card {
     background: #fff;
-    padding: 40px 44px;
+    padding: 50px 60px;
     border-radius: 16px;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.09);
     width: 100%;
@@ -176,6 +176,13 @@ body {
 
 .password-wrapper input {
     padding-right: 44px;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+}
+
+.password-wrapper input::placeholder {
+    font-size: 16px;
+    letter-spacing: 0.08em;
 }
 
 .toggle-password {
