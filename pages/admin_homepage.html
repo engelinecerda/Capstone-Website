@@ -5,97 +5,191 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - ELI Coffee Events</title>
     <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../css/admin_login.css">
-    <style>
-        .dashboard-shell {
-            min-height: calc(100vh - 44px);
-            display: grid;
-            place-items: center;
-            padding: 32px 20px;
-        }
-
-        .dashboard-card {
-            width: min(680px, 100%);
-            background: rgba(255, 255, 255, 0.96);
-            border-radius: 24px;
-            padding: 32px;
-            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.18);
-        }
-
-        .dashboard-card h1 {
-            margin-bottom: 12px;
-            color: #2f1d15;
-        }
-
-        .dashboard-card p {
-            color: #5c4335;
-            line-height: 1.6;
-            margin-bottom: 16px;
-        }
-
-        .dashboard-meta {
-            display: grid;
-            gap: 10px;
-            margin: 24px 0;
-            padding: 18px;
-            border-radius: 16px;
-            background: #f8f2ec;
-        }
-
-        .dashboard-meta strong {
-            color: #2f1d15;
-        }
-
-        .dashboard-actions {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-top: 24px;
-        }
-
-        .dashboard-actions a,
-        .dashboard-actions button {
-            border: 0;
-            border-radius: 999px;
-            padding: 12px 18px;
-            font: inherit;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .primary-action {
-            background: #6f4e37;
-            color: #fff;
-        }
-
-        .secondary-action {
-            background: #ead8c9;
-            color: #4b3124;
-        }
-    </style>
+    <link rel="stylesheet" href="../css/admin_homepage.css">
 </head>
 <body>
-    <div class="top-bar">ELI Coffee Events Management System &mdash; Admin Portal</div>
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-header">
+        <p class="sidebar-title">Admin Panel</p>
+        <p class="sidebar-sub">ELI Coffee Events</p>
+      </div>
+      <span class="sidebar-role-badge">Admin</span>
+    </div>
 
-    <main class="dashboard-shell">
-        <section class="dashboard-card">
-            <h1>Admin Dashboard</h1>
-            <p>This page is only available to the authorized admin account linked to Supabase Auth.</p>
+    <div class="sidebar-content">
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </span>
+          Dashboard
+        </a>
+        <a href="./admin_reservations.html" class="nav-item">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </span>
+          Reservations
+          <span class="nav-badge" id="navReservationCount">0</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          </span>
+          Payments
+        </a>
+        <a href="#" class="nav-item">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </span>
+          Contracts
+        </a>
+        <a href="#" class="nav-item">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          ELITE (Customers)
+        </a>
+        <a href="#" class="nav-item">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </span>
+          Packages
+        </a>
+      </nav>
 
-            <div class="dashboard-meta">
-                <div><strong>Authorized email:</strong> <span id="adminEmail">Checking session...</span></div>
-                <div><strong>Status:</strong> <span id="adminStatus">Validating access...</span></div>
-            </div>
+      <div class="sidebar-bottom">
+        <p class="sidebar-admin-label">Signed in as</p>
+        <p class="sidebar-admin-email" id="adminEmail">Loading...</p>
+        <p class="sidebar-admin-status" id="adminStatus">Checking session...</p>
+        <button type="button" class="logout-btn" id="logoutBtn">Log Out</button>
+      </div>
+    </div>
+  </aside>
 
-            <p>You can now build out your reservations management, approvals, reports, and other admin tools here.</p>
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Dashboard <span class="admin-badge">Admin</span></h1>
+        <p class="page-sub">Operational access and reservation overview</p>
+      </div>
+    </div>
 
-            <div class="dashboard-actions">
-                <a class="primary-action" href="../index.html">Go to Main Site</a>
-                <button class="secondary-action" id="logoutBtn" type="button">Log Out</button>
-            </div>
-        </section>
-    </main>
+    <section class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-label">Pending Reservations</span>
+          <span class="stat-icon" style="color:#d97706;">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </span>
+        </div>
+        <div class="stat-value" id="pendingReservationsValue">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-label">Approved Reservations</span>
+          <span class="stat-icon" style="color:#16a34a;">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </span>
+        </div>
+        <div class="stat-value" id="approvedReservationsValue">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-label">Completed Events</span>
+          <span class="stat-icon" style="color:#2563eb;">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </span>
+        </div>
+        <div class="stat-value" id="completedEventsValue">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-label">Total Customers</span>
+          <span class="stat-icon" style="color:#7c3aed;">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+        </div>
+        <div class="stat-value" id="totalCustomersValue">0</div>
+      </div>
+    </section>
 
-    <script type="module" src="../js/admin_homepage.js"></script>
+    <section class="card status-section">
+      <h2 class="card-title">Reservation Status Overview</h2>
+      <p class="card-sub">Current status distribution of all reservations</p>
+      <div class="status-chips">
+        <div class="chip chip-pending"><span class="chip-val" id="chipPending">0</span><span class="chip-label">Pending</span></div>
+        <div class="chip chip-approved"><span class="chip-val" id="chipApproved">0</span><span class="chip-label">Approved</span></div>
+        <div class="chip chip-declined"><span class="chip-val" id="chipDeclined">0</span><span class="chip-label">Declined</span></div>
+        <div class="chip chip-completed"><span class="chip-val" id="chipCompleted">0</span><span class="chip-label">Completed</span></div>
+        <div class="chip chip-cancelled"><span class="chip-val" id="chipCancelled">0</span><span class="chip-label">Cancelled</span></div>
+        <div class="chip chip-rescheduled"><span class="chip-val" id="chipRescheduled">0</span><span class="chip-label">Rescheduled</span></div>
+      </div>
+    </section>
+
+    <section class="charts-row">
+      <div class="card chart-card">
+        <h2 class="card-title">Monthly Reservations</h2>
+        <p class="card-sub">Reservation submissions over the last 6 months</p>
+        <div class="chart-wrap">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+      <div class="card chart-card">
+        <h2 class="card-title">Package Distribution</h2>
+        <p class="card-sub">Reservation mix based on selected package type</p>
+        <div class="chart-wrap">
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="card chart-card demand-card">
+      <div class="demand-head">
+        <div>
+          <h2 class="card-title">Demand Forecasting</h2>
+          <p class="card-sub">Demo forecast preview with sample data</p>
+        </div>
+        <select id="demandYear" class="demand-select">
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+        </select>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="demandChart"></canvas>
+      </div>
+    </section>
+
+    <section class="card recent-section" id="recentReservations">
+      <div class="section-head">
+        <div>
+          <h2 class="card-title">Recent Reservations</h2>
+          <p class="card-sub">Newest customer bookings pulled from Supabase</p>
+        </div>
+        <button type="button" class="refresh-btn" id="refreshDashboardBtn">Refresh</button>
+      </div>
+
+      <p class="dashboard-message" id="dashboardMessage">Loading reservations...</p>
+
+      <div class="table-wrap">
+        <table class="reservation-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Event</th>
+              <th>Date</th>
+              <th>Package</th>
+              <th>Location</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="recentReservationsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/admin_homepage.js"></script>
 </body>
 </html>

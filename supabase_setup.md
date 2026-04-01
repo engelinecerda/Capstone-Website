@@ -78,6 +78,14 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 ```
 
+If your admin account already exists, set its role once:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'adminelicoffee@gmail.com';
+```
+
 ---
 
 ## Step 3 - Create the `package` table
@@ -101,6 +109,17 @@ alter table public.package enable row level security;
 create policy "public read active packages"
   on public.package for select
   using (is_active = true);
+
+create policy "admin read all packages"
+  on public.package for select
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
 ```
 
 ---
@@ -164,6 +183,17 @@ create policy "select own reservations"
 create policy "insert own reservations"
   on public.reservations for insert
   with check (auth.uid() = user_id);
+
+create policy "admin read all reservations"
+  on public.reservations for select
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
 ```
 
 ---
@@ -203,6 +233,55 @@ create policy "insert own contracts"
         and r.user_id = auth.uid()
     )
   );
+
+create policy "admin read all contracts"
+  on public.contracts for select
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
+```
+
+---
+
+## Step 7 - Create the `calendar_blackouts` table (for admin date closures)
+
+```sql
+create table if not exists public.calendar_blackouts (
+  date       date primary key,
+  note       text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now()
+);
+
+alter table public.calendar_blackouts enable row level security;
+
+create policy "admin manage blackouts"
+  on public.calendar_blackouts
+  for all
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid()
+        and p.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
+
+create policy "customers read blackouts"
+  on public.calendar_blackouts
+  for select
+  using (true);
 ```
 
 ---
