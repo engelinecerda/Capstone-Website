@@ -1,9 +1,22 @@
 import { supabase } from './supabase.js';
-import { ADMIN_EMAIL, verifyAdminSession } from './admin_auth.js';
+import { verifyPortalSession } from './admin_auth.js';
 
 const adminLoginForm = document.getElementById('adminLoginForm');
 const formMsg = document.getElementById('formMsg');
 const emailInput = document.getElementById('email');
+const roleSelect = document.getElementById('role');
+const PORTAL_ROUTES = {
+    admin: './admin_homepage.html',
+    staff: './staff_dashboard.html'
+};
+
+function normalizeRole(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function getPortalRoute(role) {
+    return PORTAL_ROUTES[normalizeRole(role)] || '';
+}
 
 function setMessage(message, type = '') {
     if (!formMsg) return;
@@ -11,21 +24,50 @@ function setMessage(message, type = '') {
     formMsg.className = 'form-msg' + (type ? ' ' + type : '');
 }
 
-async function redirectIfAdminSessionExists() {
-    const { session } = await verifyAdminSession(supabase);
+async function redirectIfPortalSessionExists() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) return;
+
+    const { session, profile } = await verifyPortalSession(supabase, {
+        requiredRole: normalizeRole(data.session.user?.user_metadata?.role || '')
+    });
+
     if (session) {
-        window.location.replace('./admin_homepage.html');
+        const route = getPortalRoute(profile?.role);
+        if (route) {
+            window.location.replace(route);
+            return;
+        }
+    }
+
+    const profileLookup = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', data.session.user.id)
+        .maybeSingle();
+
+    const route = getPortalRoute(profileLookup.data?.role);
+    if (route) {
+        window.location.replace(route);
     }
 }
 
 adminLoginForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
+    const selectedRole = normalizeRole(roleSelect?.value);
     const email = emailInput?.value.trim().toLowerCase() || '';
     const password = document.getElementById('password')?.value || '';
+    const targetRoute = getPortalRoute(selectedRole);
 
-    if (email !== ADMIN_EMAIL) {
-        setMessage('Only the authorized admin email can access this portal.', 'error');
+    if (!targetRoute) {
+        setMessage('This portal currently supports Admin and Staff roles only.', 'error');
+        roleSelect?.focus();
+        return;
+    }
+
+    if (!email) {
+        setMessage('Enter your email before continuing.', 'error');
         return;
     }
 
@@ -38,7 +80,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
 
     if (error) {
         if (error.message.toLowerCase().includes('email not confirmed')) {
-            setMessage('Confirm the admin email first, or manually mark it confirmed in Supabase.', 'error');
+            setMessage('Confirm this email first, or manually mark it confirmed in Supabase.', 'error');
             return;
         }
 
@@ -46,26 +88,15 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         return;
     }
 
-    const signedInEmail = data.user?.email?.toLowerCase();
-    if (signedInEmail !== ADMIN_EMAIL) {
-        await supabase.auth.signOut();
-        setMessage('This account is not allowed to use the admin portal.', 'error');
-        return;
-    }
-
-    const { session, message } = await verifyAdminSession(supabase);
+    const { session, profile, message } = await verifyPortalSession(supabase, { requiredRole: selectedRole });
     if (!session) {
         await supabase.auth.signOut();
-        setMessage(message, 'error');
+        setMessage(message || 'This account is not allowed to use this portal role.', 'error');
         return;
     }
 
     setMessage('Login successful. Redirecting...');
-    window.location.replace('./admin_homepage.html');
+    window.location.replace(getPortalRoute(profile?.role) || targetRoute);
 });
 
-if (emailInput) {
-    emailInput.value = ADMIN_EMAIL;
-}
-
-redirectIfAdminSessionExists();
+redirectIfPortalSessionExists();

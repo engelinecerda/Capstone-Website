@@ -454,6 +454,32 @@ limit 20;
 
 ---
 
+## Step 9 - Allow staff to read assigned reservations
+
+Run the SQL from `supabase/staff_dashboard_access.sql`, or paste this directly into the SQL Editor:
+
+```sql
+drop policy if exists "assigned staff can read assigned reservations" on public.reservations;
+
+create policy "assigned staff can read assigned reservations"
+  on public.reservations for select
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      join public.reservation_staff_assignments rsa
+        on rsa.staff_user_id = p.user_id
+      where p.user_id = auth.uid()
+        and p.role = 'staff'
+        and rsa.reservation_id = reservations.reservation_id
+    )
+  );
+```
+
+This policy keeps the staff dashboard view-only and limits each staff account to reservations that were explicitly assigned to that same staff user.
+
+---
+
 ### Step-by-step in Supabase Dashboard
 
 1. Open your Supabase project.

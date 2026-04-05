@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Portal – ELI Coffee Events Management System</title>
+    <title>Staff and Admin Portal - ELI Coffee Events Management System</title>
     <link rel="stylesheet" href="../css/admin_login.css">
     <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     
 </head>
 <body>
 
-    <div class="top-bar">ELI Coffee Events Management System &mdash; Admin Portal</div>
+    <div class="top-bar">ELI Coffee Events Management System &mdash; Staff and Admin Portal</div>
 
     <div class="admin-page">
         <div class="admin-wrapper">
@@ -23,14 +23,14 @@
                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l6 2.67V11c0 3.88-2.62 7.5-6 8.93C8.62 18.5 6 14.88 6 11V7.67L12 5z"/>
                     </svg>
                 </div>
-                <h1>Admin Portal</h1>
+                <h1>Portal Access</h1>
                 <p>ELI Coffee Events Management System</p>
             </div>
 
             <!-- Login Card -->
             <div class="admin-card">
-                <h2>Administrator Login</h2>
-                <p class="subtitle">Enter your credentials to access the admin panel</p>
+                <h2>Portal Login</h2>
+                <p class="subtitle">Enter your credentials to access the correct staff or admin workspace</p>
 
                 <form id="adminLoginForm">
 
@@ -39,8 +39,7 @@
                         <label for="role">Role</label>
                         <div class="select-wrapper">
                             <select id="role" name="role" required>
-                                <option value="super_admin">Super Admin</option>
-                                <option value="admin">Admin</option>
+                                <option value="admin" selected>Admin</option>
                                 <option value="staff">Staff</option>
                             </select>
                         </div>
@@ -53,7 +52,7 @@
                             type="email"
                             id="email"
                             name="email"
-                            placeholder="elicoffeeadmin@gmail.com"
+                            placeholder="your.email@example.com"
                             required
                         />
                     </div>
@@ -79,17 +78,13 @@
                         </div>
                     </div>
 
-                    <!-- Remember Me & Forgot Password -->
-                    <div class="options">
-                        <label>
-                            <input type="checkbox" name="remember" />
-                            Remember me
-                        </label>
+                    <!-- Forgot Password -->
+                    <div class="options options-forgot-only">
                         <a href="forgot_password.html" class="forgot">Forgot password?</a>
                     </div>
 
                     <!-- Submit -->
-                    <button type="submit" class="login-btn">Login to Admin Panel</button>
+                    <button type="submit" class="login-btn">Login to Portal</button>
 
                     <div class="form-msg" id="formMsg"></div>
                 </form>

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Submissions - Admin</title>
+  <title>Contract Review - Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/admin_payments.css">
+  <link rel="stylesheet" href="../css/admin_contracts.css">
 </head>
 <body>
   <aside class="sidebar">
@@ -38,14 +38,13 @@
           <span class="nav-label">Reservations</span>
           <span class="nav-badge" id="navReservationCount">0</span>
         </a>
-        <a href="./admin_payments.html" class="nav-item active">
+        <a href="./admin_payments.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
           </span>
           <span class="nav-label">Payments</span>
-          <span class="nav-badge" id="navPaymentCount">0</span>
         </a>
-        <a href="./admin_contracts.html" class="nav-item">
+        <a href="./admin_contracts.html" class="nav-item active">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </span>
@@ -79,27 +78,31 @@
     <section class="page-shell">
       <header class="page-header">
         <div>
-          <h1 class="page-title">Payment Submissions <span class="admin-badge">Admin</span></h1>
-          <p class="page-sub">Scan pending submissions quickly, then review proof and make approval decisions from one focused modal.</p>
+          <h1 class="page-title">Contract Review <span class="admin-badge">Admin</span></h1>
+          <p class="page-sub">A dedicated review queue for uploaded reservation contracts, replacement submissions, and approval decisions.</p>
         </div>
       </header>
 
       <section class="stat-row">
-        <div class="stat-card stat-card-pending">
+        <div class="stat-card">
           <p class="stat-label">Pending Review</p>
-          <div class="stat-value" id="stat-pending">0</div>
+          <div class="stat-value" id="statPendingContracts">0</div>
         </div>
-        <div class="stat-card stat-card-approved">
-          <p class="stat-label">Approved</p>
-          <div class="stat-value" id="stat-approved">0</div>
+        <div class="stat-card">
+          <p class="stat-label">Replacement Submitted</p>
+          <div class="stat-value" id="statReplacementContracts">0</div>
         </div>
-        <div class="stat-card stat-card-declined">
-          <p class="stat-label">Rejected</p>
-          <div class="stat-value" id="stat-rejected">0</div>
+        <div class="stat-card">
+          <p class="stat-label">Resubmission Requested</p>
+          <div class="stat-value" id="statRequestedContracts">0</div>
         </div>
-        <div class="stat-card stat-card-total">
-          <p class="stat-label">Total</p>
-          <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-card">
+          <p class="stat-label">Verified</p>
+          <div class="stat-value" id="statVerifiedContracts">0</div>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Total Submitted</p>
+          <div class="stat-value" id="statTotalContracts">0</div>
         </div>
       </section>
 
@@ -109,18 +112,21 @@
             <span class="search-icon">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </span>
-            <input id="searchInput" type="text" placeholder="Search by customer, package, payment type, or method..." />
+            <input id="searchInput" type="text" placeholder="Search by customer, email, package, or event..." />
           </label>
+
           <div class="filter-select-wrap">
             <span class="filter-icon">Status</span>
             <select id="statusDropdown">
-              <option value="all">All Payments</option>
-              <option value="pending_review">Pending Review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="all">All Contracts</option>
+              <option value="pending">Pending Review</option>
+              <option value="resubmitted">Replacement Submitted</option>
+              <option value="resubmission_requested">Resubmission Requested</option>
+              <option value="approved">Verified</option>
             </select>
           </div>
         </div>
+
         <div class="toolbar-actions">
           <button type="button" class="refresh-btn refresh-panel-btn" id="refreshBtn">
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
@@ -129,74 +135,83 @@
         </div>
       </section>
 
+      <section class="chips-row" id="chipsRow">
+        <button class="chip active" data-status="all">All (0)</button>
+        <button class="chip" data-status="pending">Pending (0)</button>
+        <button class="chip" data-status="resubmitted">Replacement (0)</button>
+        <button class="chip" data-status="resubmission_requested">Requested (0)</button>
+        <button class="chip" data-status="approved">Verified (0)</button>
+      </section>
+
       <section class="card table-card">
         <div class="table-head">
           <div>
-            <h2 class="card-title">Payment Queue</h2>
-            <p class="card-sub">A lighter scan table for payment review. Open one review view to inspect proof and approve or reject.</p>
+            <h2 class="card-title">Submitted Contracts</h2>
+            <p class="card-sub">Open one contract at a time to review the file, note corrections, and update the linked reservation.</p>
           </div>
         </div>
-        <p class="dashboard-message" id="tableMessage">Loading payment submissions...</p>
+        <p class="dashboard-message" id="tableMessage">Loading contracts...</p>
         <div class="table-wrap">
-          <table class="payments-table">
+          <table class="reservation-table">
             <thead>
               <tr>
-                <th>Reservation</th>
-                <th>Customer</th>
-                <th>Amount</th>
-                <th>Payment Info</th>
-                <th>Status</th>
+                <th>Customer / Package</th>
+                <th>Event Schedule</th>
+                <th>Reservation Status</th>
+                <th>Contract Status</th>
+                <th>Review Activity</th>
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody id="paymentsBody"></tbody>
+            <tbody id="contractsBody"></tbody>
           </table>
         </div>
       </section>
     </section>
   </main>
 
-  <div class="modal-backdrop hidden" id="paymentDetailsModal" aria-hidden="true">
-    <div class="modal-card payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="paymentDetailsTitle">
-      <button type="button" class="modal-close" id="paymentDetailsClose" aria-label="Close payment details">x</button>
-      <p class="modal-eyebrow">Payment Review</p>
-      <h2 class="modal-title" id="paymentDetailsTitle">Review Payment</h2>
-      <p class="modal-copy">Review the submission details and proof of payment before taking action.</p>
-      <div class="payment-review-layout">
-        <section class="payment-review-pane">
-          <div class="payment-review-pane-head">
-            <h3>Submission Summary</h3>
-          </div>
-          <div class="payment-review-summary" id="paymentDetailsGrid"></div>
-        </section>
-        <section class="payment-review-pane proof-pane">
-          <div class="payment-review-pane-head">
-            <h3>Proof of Payment</h3>
-          </div>
-          <div class="payment-proof-preview" id="paymentProofPreview"></div>
-          <div class="proof-preview-actions" id="paymentProofActions"></div>
-        </section>
-      </div>
-      <p class="modal-message" id="paymentDetailsMessage"></p>
-      <div class="modal-actions review-modal-actions" id="paymentReviewActions">
-        <button type="button" class="modal-btn modal-btn-secondary" id="paymentDetailsDismiss">Close</button>
-      </div>
-    </div>
-  </div>
+  <div class="modal-backdrop hidden" id="contractDetailsModal" aria-hidden="true">
+    <div class="modal-card reservation-details-modal-card contract-details-modal-card" role="dialog" aria-modal="true" aria-labelledby="contractDetailsTitle">
+      <button type="button" class="modal-close" id="contractDetailsClose" aria-label="Close contract details">x</button>
+      <p class="modal-eyebrow">Contract Review</p>
+      <h2 class="modal-title" id="contractDetailsTitle">Contract Overview</h2>
+      <p class="modal-copy">Review the uploaded file here, then continue with contract review or reservation approval without leaving the page.</p>
 
-  <div class="modal-backdrop hidden" id="receiptModal" aria-hidden="true">
-    <div class="modal-card payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="receiptModalTitle">
-      <button type="button" class="modal-close" id="receiptModalClose" aria-label="Close receipt">x</button>
-      <p class="modal-eyebrow">Receipt</p>
-      <h2 class="modal-title" id="receiptModalTitle">Payment Receipt</h2>
-      <p class="modal-copy">Issued automatically after an admin-approved payment.</p>
-      <div class="details-grid receipt-grid" id="receiptDetailsGrid"></div>
+      <div class="reservation-details-hero" id="contractDetailsHero"></div>
+      <div class="reservation-details-meta" id="contractDetailsMeta"></div>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Reservation Summary</h3>
+          <p class="details-section-copy">The customer and event context tied to this submitted contract.</p>
+        </div>
+        <div class="details-grid" id="contractSummaryGrid"></div>
+      </section>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Contract Review</h3>
+          <p class="details-section-copy">Track the current contract state, review note, and replacement activity.</p>
+        </div>
+        <div id="contractReviewSection"></div>
+      </section>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Actions</h3>
+          <p class="details-section-copy">Use the contract review actions first, then update the linked reservation when the file is ready.</p>
+        </div>
+        <div id="contractActionsSection"></div>
+      </section>
+
+      <p class="modal-message" id="contractDetailsMessage"></p>
+
       <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn-secondary" id="receiptModalDismiss">Close</button>
+        <button type="button" class="modal-btn modal-btn-secondary" id="contractDetailsDismiss">Close</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="../js/admin_payments.js"></script>
+  <script type="module" src="../js/admin_contracts.js"></script>
 </body>
 </html>

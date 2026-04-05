@@ -219,6 +219,10 @@ body {
     margin-bottom: 24px;
 }
 
+.options-forgot-only {
+    justify-content: flex-end;
+}
+
 .options label {
     font-size: 0.875rem;
     color: #555;

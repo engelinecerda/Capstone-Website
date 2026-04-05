@@ -1,8 +1,9 @@
 import { supabase } from './supabase.js';
-import { verifyAdminSession } from './admin_auth.js';
+import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
-const adminEmailEl = document.getElementById('adminEmail');
-const adminStatusEl = document.getElementById('adminStatus');
+const sidebarNameEl = document.getElementById('sidebarName');
+const sidebarEmailEl = document.getElementById('sidebarEmail');
+const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
@@ -79,14 +80,20 @@ function redirectLogin() {
 }
 
 async function validateAdmin() {
-  const { session } = await verifyAdminSession(supabase);
+  const { session, profile } = await verifyAdminSession(supabase);
   if (!session) {
     await supabase.auth.signOut();
     return redirectLogin();
   }
   adminSession = session;
-  adminEmailEl.textContent = session.user.email;
-  adminStatusEl.textContent = 'Admin verified';
+  populatePortalIdentity({
+    profile,
+    session,
+    nameEl: sidebarNameEl,
+    emailEl: sidebarEmailEl,
+    roleEl: sidebarRolePillEl,
+    fallbackLabel: 'Admin'
+  });
   return session;
 }
 

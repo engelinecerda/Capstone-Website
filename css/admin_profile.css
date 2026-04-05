@@ -1,0 +1,285 @@
+@import url('./admin_reservations.css');
+
+.page-header {
+  margin-bottom: 22px;
+}
+
+.page-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a6a41;
+}
+
+.page-title {
+  margin-top: 8px;
+}
+
+.page-subtitle {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.page-message {
+  min-height: 18px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.page-message.error {
+  color: #b42318;
+}
+
+.profile-shell {
+  max-width: 1240px;
+}
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.profile-side {
+  min-width: 0;
+}
+
+.profile-panel {
+  background: #fffdfa;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(70, 43, 19, 0.05);
+  overflow: hidden;
+}
+
+.profile-panel-password {
+  margin-top: 18px;
+}
+
+.panel-head {
+  padding: 18px 20px;
+  border-bottom: 1px solid #efe4d8;
+}
+
+.panel-head-inline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.panel-icon-badge,
+.detail-icon-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #f6ece1;
+  border: 1px solid #ead8c7;
+  color: #6b4f3a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.detail-icon-badge {
+  width: 28px;
+  height: 28px;
+}
+
+.panel-edit-btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid #ead8c7;
+  background: #f8efe5;
+  color: #6b4f3a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-eyebrow,
+.field-label,
+.detail-label,
+.inline-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.section-head {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.section-copy {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.profile-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.form-row {
+  display: grid;
+  gap: 14px;
+}
+
+.form-row-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-row-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field-input {
+  min-height: 42px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #d8d3cd;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.field-input:focus {
+  border-color: #d9c2aa;
+  box-shadow: 0 0 0 3px rgba(107, 79, 58, 0.12);
+}
+
+.field-input:disabled {
+  background: #f7f3ee;
+  color: #6f665e;
+}
+
+.field-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.form-message {
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.form-message.error {
+  color: #b42318;
+}
+
+.form-message.success {
+  color: #25643d;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.primary-btn,
+.secondary-btn {
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-btn {
+  border: none;
+  background: #6b4f3a;
+  color: #fff;
+}
+
+.secondary-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+}
+
+.detail-card-grid {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.detail-card {
+  border: 1px solid #efe4d8;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px 16px;
+}
+
+.detail-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.detail-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.password-grid {
+  align-items: start;
+}
+
+@media (max-width: 1120px) {
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .form-row-two,
+  .form-row-three {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .panel-head-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

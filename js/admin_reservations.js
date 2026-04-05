@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { verifyAdminSession } from './admin_auth.js';
+import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -16,8 +16,9 @@ const calendarMonthLabel = document.getElementById('calendarMonthLabel');
 const prevMonthBtn = document.getElementById('prevMonth');
 const nextMonthBtn = document.getElementById('nextMonth');
 const calendarMessage = document.getElementById('calendarMessage');
-const adminEmailEl = document.getElementById('adminEmail');
-const adminStatusEl = document.getElementById('adminStatus');
+const sidebarNameEl = document.getElementById('sidebarName');
+const sidebarEmailEl = document.getElementById('sidebarEmail');
+const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const blackoutModal = document.getElementById('blackoutModal');
 const blackoutModalClose = document.getElementById('blackoutModalClose');
@@ -268,6 +269,17 @@ function getStaffDisplayName(profile) {
   return nameParts.join(' ') || profile?.email || 'Unnamed staff';
 }
 
+function formatStaffRole(staffRole) {
+  const normalized = String(staffRole || '').trim().toLowerCase();
+  if (!normalized) return 'Staff';
+
+  return normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function getAssignedStaff(reservationId) {
   return assignmentMapByReservationId[reservationId] || [];
 }
@@ -407,14 +419,20 @@ async function confirmBlackout() {
 }
 
 async function validateAdmin() {
-  const { session } = await verifyAdminSession(supabase);
+  const { session, profile } = await verifyAdminSession(supabase);
   if (!session) {
     await supabase.auth.signOut();
     return redirectLogin();
   }
   adminSession = session;
-  adminEmailEl.textContent = session.user.email;
-  adminStatusEl.textContent = 'Admin verified';
+  populatePortalIdentity({
+    profile,
+    session,
+    nameEl: sidebarNameEl,
+    emailEl: sidebarEmailEl,
+    roleEl: sidebarRolePillEl,
+    fallbackLabel: 'Admin'
+  });
   return session;
 }
 
@@ -935,13 +953,13 @@ function renderReservationDetailsModal() {
 
   if (reservationStaffSection) {
     reservationStaffSection.innerHTML = `
-      <div class="assigned-staff-list">
-        ${assignedStaff.length
-          ? assignedStaff.map((staff) => `
-            <span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))}</span>
+        <div class="assigned-staff-list">
+          ${assignedStaff.length
+            ? assignedStaff.map((staff) => `
+            <span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))} · ${escapeHtml(formatStaffRole(staff.staff_role))}</span>
           `).join('')
           : '<span class="staff-pill unassigned">Not assigned yet</span>'}
-      </div>
+        </div>
       <div class="details-action-row">
         <button
           class="action-btn assign"
@@ -1157,7 +1175,8 @@ async function fetchStaffProfiles() {
       middle_name,
       last_name,
       email,
-      role
+      role,
+      staff_role
     `)
     .eq('role', 'staff')
     .order('first_name', { ascending: true });
@@ -1439,7 +1458,8 @@ function renderAssignmentStaffList() {
     if (!assignmentSearchTerm) return true;
     const haystacks = [
       getStaffDisplayName(staff),
-      staff.email
+      staff.email,
+      formatStaffRole(staff.staff_role)
     ]
       .filter(Boolean)
       .map((value) => value.toLowerCase());
@@ -1467,6 +1487,7 @@ function renderAssignmentStaffList() {
       />
       <span class="assignment-staff-copy">
         <span class="assignment-staff-name">${escapeHtml(getStaffDisplayName(staff))}</span>
+        <span class="assignment-staff-role">${escapeHtml(formatStaffRole(staff.staff_role))}</span>
         <span class="assignment-staff-email">${escapeHtml(staff.email || 'No email on file')}</span>
       </span>
     </label>
