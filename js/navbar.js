@@ -10,7 +10,7 @@ async function updateNavbar() {
         const { data: profile } = await supabase
             .from('profiles')
             .select('first_name')
-            .eq('id', session.user.id)
+            .eq('user_id', session.user.id)
             .single();
 
         const displayName = profile ? profile.first_name : 'Account';

@@ -42,7 +42,7 @@
 ======================== */
 .venue-wrapper {
     width: 100%;
-    margin-top: 16px;
+    margin-top: 30px;
 }
 
 /* ========================
@@ -201,17 +201,224 @@
             display: block; box-sizing: border-box; font-family: inherit;
         }
         .res-input:focus { outline: none; border-color: #6B3A1F; }
+        .res-input-readonly {
+            cursor: default;
+            background: #fffdf9;
+            color: #6B3A1F;
+            font-weight: 600;
+        }
+        .res-input-readonly::placeholder {
+            color: #9b8a7d;
+            font-weight: 500;
+        }
         textarea.res-input { height: 100px; resize: vertical; }
         .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+        .availability-panel {
+            margin-top: 8px;
+            padding: 20px 22px;
+            background: #fffaf4;
+            border: 1px solid #e7d8c8;
+            border-radius: 16px;
+        }
+        .availability-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .availability-head h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2A1408;
+            margin-bottom: 4px;
+        }
+        .availability-head p {
+            font-size: 13px;
+            color: #7b6a5d;
+            margin: 0;
+        }
+        .availability-nav {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .availability-nav-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid #e0d0c0;
+            background: #fff;
+            color: #6B3A1F;
+            font: inherit;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.2s;
+        }
+        .availability-nav-btn:hover {
+            background: #fff2e4;
+            border-color: #c8aa93;
+            transform: translateY(-1px);
+        }
+        .availability-nav-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+            background: #fff;
+            border-color: #e0d0c0;
+        }
+        .availability-month {
+            min-width: 132px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: #2A1408;
+        }
+        .availability-weekdays,
+        .availability-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .availability-weekdays {
+            margin-bottom: 10px;
+        }
+        .availability-weekdays span {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #8b7766;
+            text-transform: uppercase;
+        }
+        .availability-day {
+            min-height: 46px;
+            border: 1px solid #eadfd5;
+            border-radius: 12px;
+            background: #fff;
+            color: #5b4636;
+            font: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+        }
+        .availability-day:hover {
+            transform: translateY(-1px);
+            border-color: #cfb7a2;
+            box-shadow: 0 8px 18px rgba(104, 67, 37, 0.08);
+        }
+        .availability-day.outside-month {
+            background: transparent;
+            color: #b5a89a;
+            cursor: default;
+            box-shadow: none;
+        }
+        .availability-day.outside-month:hover {
+            transform: none;
+            border-color: #eadfd5;
+        }
+        .availability-day.past,
+        .availability-day.booked,
+        .availability-day.closed {
+            cursor: not-allowed;
+        }
+        .availability-day.available {
+            background: #e4f3e3;
+            border-color: #cae2c8;
+            color: #0f7a32;
+        }
+        .availability-day.booked {
+            background: #ffeded;
+            border-color: #f4cccc;
+            color: #d62828;
+        }
+        .availability-day.closed {
+            background: #f3e5d7;
+            border-color: #dcc6b2;
+            color: #8b5e3c;
+        }
+        .availability-day.past {
+            background: #f8f5f1;
+            color: #c3b5a7;
+        }
+        .availability-day.selected {
+            border-color: #6B3A1F;
+            box-shadow: 0 0 0 2px rgba(107, 58, 31, 0.16);
+        }
+        .availability-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .availability-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid #eadfd5;
+            font-size: 12px;
+            font-weight: 600;
+            color: #5f5144;
+        }
+        .availability-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+        .availability-swatch.available { background: #73b96b; }
+        .availability-swatch.booked { background: #ef6b6b; }
+        .availability-swatch.closed { background: #b08968; }
+        .availability-message {
+            margin-top: 14px;
+            font-size: 12px;
+            color: #7b6a5d;
+            line-height: 1.5;
+        }
+        .availability-message.error {
+            color: #b42318;
+        }
+
         /* Location Cards */
-        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
-        .location-card { border: 1px solid #ddd; border-radius: 12px; padding: 28px 20px; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+        .location-card {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 30px 24px;
+            min-height: 150px;
+            cursor: pointer;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        .loc-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 14px;
+            border-radius: 14px;
+            background: #fff8f0;
+            border: 1px solid #ead8ca;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6B3A1F;
+            font-size: 20px;
+        }
         .location-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
         .location-card.active { border-color: #6B3A1F; background: #FFEDE0; }
-        .location-card .loc-icon { font-size: 36px; margin-bottom: 10px; }
-        .location-card h4 { font-size: 16px; font-weight: 700; color: #2A1408; margin-bottom: 4px; }
-        .location-card p  { font-size: 13px; color: #777; margin: 0; }
+        .location-card h4 { font-size: 16px; font-weight: 700; color: #2A1408; margin-bottom: 8px; }
+        .location-card p  { font-size: 13px; color: #777; margin: 0; line-height: 1.6; max-width: 250px; text-align: center; }
 
         /* Package Cards */
         .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
@@ -221,6 +428,32 @@
         .pkg-card h4         { font-size: 14px; font-weight: 700; color: #2A1408; margin: 0 0 5px; }
         .pkg-card .pkg-price { font-size: 15px; font-weight: 700; color: #6B3A1F; margin: 4px 0; }
         .pkg-card .pkg-desc  { font-size: 12px; color: #777; margin: 0; line-height: 1.5; }
+        .service-card {
+            min-height: 132px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .service-card-icon {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            background: #fff8f0;
+            border: 1px solid #ead8ca;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6B3A1F;
+            font-size: 17px;
+        }
+        .service-card h4 {
+            margin-bottom: 10px;
+        }
+        .service-card .pkg-desc {
+            font-size: 13px;
+            line-height: 1.7;
+        }
 
         /* Section Label */
         .section-label {
@@ -671,4 +904,11 @@
             .dish-grid { grid-template-columns: 1fr 1fr; }
             .progress-tracker { gap: 6px; }
             .pt-divider { display: none; }
+            .availability-panel { padding: 18px 14px; }
+            .availability-head { flex-direction: column; }
+            .availability-nav { width: 100%; justify-content: space-between; }
+            .availability-month { min-width: 0; flex: 1; }
+            .availability-weekdays,
+            .availability-grid { gap: 6px; }
+            .availability-day { min-height: 40px; font-size: 14px; }
         }

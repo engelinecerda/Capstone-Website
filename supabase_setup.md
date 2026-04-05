@@ -8,7 +8,7 @@ Run these in your Supabase SQL Editor in order.
 
 ```sql
 create table if not exists public.profiles (
-  id              uuid primary key references auth.users(id) on delete cascade,
+  user_id         uuid primary key references auth.users(id) on delete cascade,
   first_name      text not null,
   middle_name     text,
   last_name       text not null,
@@ -22,15 +22,26 @@ alter table public.profiles enable row level security;
 
 create policy "select own profile"
   on public.profiles for select
-  using (auth.uid() = id);
+  using (auth.uid() = user_id);
 
 create policy "insert own profile"
   on public.profiles for insert
-  with check (auth.uid() = id);
+  with check (auth.uid() = user_id);
 
 create policy "update own profile"
   on public.profiles for update
-  using (auth.uid() = id);
+  using (auth.uid() = user_id);
+
+create policy "admin read all profiles"
+  on public.profiles for select
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
 ```
 
 ---
@@ -46,7 +57,7 @@ set search_path = public
 as $$
 begin
   insert into public.profiles (
-    id,
+    user_id,
     first_name,
     middle_name,
     last_name,
@@ -65,7 +76,7 @@ begin
     coalesce(new.raw_user_meta_data->>'role', 'customer'),
     now()
   )
-  on conflict (id) do nothing;
+  on conflict (user_id) do nothing;
 
   return new;
 end;
@@ -84,6 +95,31 @@ If your admin account already exists, set its role once:
 update public.profiles
 set role = 'admin'
 where email = 'adminelicoffee@gmail.com';
+```
+
+If that update affects `0 rows`, the admin user exists in `auth.users` but does not have a matching `public.profiles` row yet. Repair it with:
+
+```sql
+insert into public.profiles (
+  user_id,
+  first_name,
+  last_name,
+  email,
+  role,
+  date_registered
+)
+select
+  id,
+  'Admin',
+  'User',
+  email,
+  'admin',
+  now()
+from auth.users
+where email = 'adminelicoffee@gmail.com'
+on conflict (user_id) do update
+set role = excluded.role,
+    email = excluded.email;
 ```
 
 ---
@@ -116,7 +152,7 @@ create policy "admin read all packages"
     exists (
       select 1
       from public.profiles p
-      where p.id = auth.uid()
+      where p.user_id = auth.uid()
         and p.role = 'admin'
     )
   );
@@ -190,7 +226,7 @@ create policy "admin read all reservations"
     exists (
       select 1
       from public.profiles p
-      where p.id = auth.uid()
+      where p.user_id = auth.uid()
         and p.role = 'admin'
     )
   );
@@ -240,7 +276,7 @@ create policy "admin read all contracts"
     exists (
       select 1
       from public.profiles p
-      where p.id = auth.uid()
+      where p.user_id = auth.uid()
         and p.role = 'admin'
     )
   );
@@ -266,14 +302,14 @@ create policy "admin manage blackouts"
   using (
     exists (
       select 1 from public.profiles p
-      where p.id = auth.uid()
+      where p.user_id = auth.uid()
         and p.role = 'admin'
     )
   )
   with check (
     exists (
       select 1 from public.profiles p
-      where p.id = auth.uid()
+      where p.user_id = auth.uid()
         and p.role = 'admin'
     )
   );
@@ -284,6 +320,138 @@ create policy "customers read blackouts"
   using (true);
 ```
 
+If `profiles` was changed from `id` to `user_id` after you already created the blackout policy, recreate that policy so it points at the new column:
+
+```sql
+drop policy if exists "admin manage blackouts" on public.calendar_blackouts;
+
+create policy "admin manage blackouts"
+  on public.calendar_blackouts
+  for all
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
+```
+
+If you already created `calendar_blackouts` in the dashboard and the app shows `Could not find the 'date' column of 'calendar_blackouts' in the schema cache`, that is not because the table is empty. It means the live table does not currently expose a column literally named `date` to Supabase's REST API.
+
+Run this repair SQL in the Supabase SQL Editor:
+
+```sql
+alter table public.calendar_blackouts
+  add column if not exists date date;
+
+create unique index if not exists calendar_blackouts_date_key
+  on public.calendar_blackouts (date);
+
+notify pgrst, 'reload schema';
+```
+
+If the table was created incorrectly and it is still empty, the cleanest fix is to recreate it:
+
+```sql
+drop table if exists public.calendar_blackouts;
+
+create table public.calendar_blackouts (
+  date       date primary key,
+  note       text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now()
+);
+
+alter table public.calendar_blackouts enable row level security;
+
+create policy "admin manage blackouts"
+  on public.calendar_blackouts
+  for all
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
+
+create policy "customers read blackouts"
+  on public.calendar_blackouts
+  for select
+  using (true);
+
+notify pgrst, 'reload schema';
+```
+
+---
+
+## Step 8 - Create the `reservation_staff_assignments` table
+
+```sql
+create table if not exists public.reservation_staff_assignments (
+  assignment_id   bigint generated always as identity primary key,
+  reservation_id  uuid not null references public.reservations(reservation_id) on delete cascade,
+  staff_user_id   uuid not null references public.profiles(user_id) on delete cascade,
+  assigned_at     timestamptz not null default now(),
+  assigned_by     uuid references public.profiles(user_id),
+  unique (reservation_id, staff_user_id)
+);
+
+alter table public.reservation_staff_assignments enable row level security;
+
+create policy "admin manage reservation staff assignments"
+  on public.reservation_staff_assignments
+  for all
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles p
+      where p.user_id = auth.uid()
+        and p.role = 'admin'
+    )
+  );
+
+create policy "assigned staff can read own assignments"
+  on public.reservation_staff_assignments
+  for select
+  using (staff_user_id = auth.uid());
+
+notify pgrst, 'reload schema';
+```
+
+Quick test query:
+
+```sql
+select *
+from public.reservation_staff_assignments
+limit 20;
+```
+
 ---
 
 ### Step-by-step in Supabase Dashboard
@@ -291,23 +459,21 @@ create policy "customers read blackouts"
 1. Open your Supabase project.
 2. In the left sidebar, click `SQL Editor`.
 3. Click `New query`.
-4. Copy the full SQL block from `Step 6 - Create the contracts table`.
+4. Copy the full SQL block from `Step 7 - Create the calendar_blackouts table`.
 5. Click `Run`.
 6. Wait for the success message at the bottom of the SQL Editor.
 7. In the left sidebar, open `Table Editor`.
-8. Confirm that a new table named `contracts` now exists.
-9. Open the `contracts` table and check that these columns were created:
-   `contract_id`, `reservation_id`, `contract_type`, `description`, `contract_url`, `verified_date`
-10. Open `Authentication` or `Database` policy view if needed and confirm RLS is enabled for `contracts`.
+8. Confirm that a new table named `calendar_blackouts` now exists and includes a `date` column.
+9. Open the `calendar_blackouts` table and check that these columns were created:
+   `date`, `note`, `created_by`, `created_at`
+10. Open `Authentication` or `Database` policy view if needed and confirm RLS is enabled for `calendar_blackouts`.
 
 ### What each column is for
 
-- `contract_id`: unique ID for each uploaded contract
-- `reservation_id`: links the uploaded contract to the reservation it belongs to
-- `contract_type`: lets you label the kind of contract, such as `package_contract`
-- `description`: short note like `Signed contract upload for VIP Lite Contract`
-- `contract_url`: Cloudinary URL of the uploaded signed contract
-- `verified_date`: stays `null` until you or an admin verify the uploaded contract
+- `date`: the specific calendar date the admin wants to close
+- `note`: optional reason for the closure
+- `created_by`: the admin user who created the blackout
+- `created_at`: when the blackout was added
 
 ### How your app will store uploaded contracts
 

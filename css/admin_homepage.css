@@ -18,7 +18,7 @@
   --border:      #ece7df;
   --text:        #1a1209;
   --muted:       #6b7280;
-  --font:        'Inter', sans-serif;
+  --font:        'Kumbh Sans', sans-serif;
 
   --pending:     #f5e47a;
   --pending-txt: #92700a;
@@ -32,6 +32,10 @@
   --cancelled-txt:#374151;
   --rescheduled: #e9d5ff;
   --rescheduled-txt:#6d28d9;
+  --requested:   #ffedd5;
+  --requested-txt:#9a3412;
+  --resubmitted:#e0f2fe;
+  --resubmitted-txt:#0f5f8f;
 }
 
 html, body { height: 100%; }
@@ -60,9 +64,9 @@ body {
 }
 
 .sidebar-top {
-  padding: 22px 18px 18px;
+  padding: 24px 18px 22px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  margin-bottom: 14px;
 }
 
 .sidebar-title {
@@ -94,16 +98,16 @@ body {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  padding: 0 10px;
-  gap: 2px;
+  padding: 0 12px;
+  gap: 8px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 13px 14px;
+  border-radius: 12px;
   color: var(--nav-text);
   text-decoration: none;
   font-size: 13.5px;
@@ -154,7 +158,7 @@ body {
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: 14px 16px 10px;
+  padding: 18px 16px 12px;
   border-top: 1px solid var(--border);
 }
 
@@ -267,7 +271,7 @@ body {
 /* ── STAT CARDS ──────────────────────────── */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -381,11 +385,8 @@ body {
   position: relative;
 }
 
-.demand-card {
-  margin-top: 20px;
-}
-
 .demand-card .chart-wrap {
+
   height: 260px;
 }
 
@@ -505,6 +506,16 @@ body {
 .status-pill.cancelled {
   background: var(--cancelled);
   color: var(--cancelled-txt);
+}
+
+.status-pill.resubmission_requested {
+  background: var(--requested);
+  color: var(--requested-txt);
+}
+
+.status-pill.resubmitted {
+  background: var(--resubmitted);
+  color: var(--resubmitted-txt);
 }
 
 .status-pill.rescheduled {

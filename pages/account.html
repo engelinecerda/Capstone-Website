@@ -51,6 +51,9 @@
         <button class="account-nav-item" data-section="reservations">
           <span>📅</span> My Reservations
         </button>
+        <button class="account-nav-item" data-section="payments">
+          <span>&#x1F4B3;</span> Payments
+        </button>
         <button class="account-nav-item" data-section="password">
           <span>🔒</span> Change Password
         </button>
@@ -122,6 +125,20 @@
         </div>
       </section>
 
+      <section class="account-section" id="section-payments">
+        <div class="section-header">
+          <h2>Payments</h2>
+          <p>Submit payment details, track admin review, and view acknowledgement receipts for approved reservations.</p>
+        </div>
+        <div id="payments-list">
+          <div class="empty-state">
+            <div class="empty-icon">Payments</div>
+            <h3>No payments yet</h3>
+            <p>Approved reservations that need payment will appear here.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- Change Password Section -->
       <section class="account-section" id="section-password">
         <div class="section-header">
@@ -152,6 +169,93 @@
       </section>
 
     </main>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="receipt-modal-backdrop" aria-hidden="true">
+    <div class="account-modal-card receipt-modal-card" role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
+      <button type="button" class="account-modal-close" id="receipt-modal-close" aria-label="Close receipt view">x</button>
+      <p class="account-modal-eyebrow">Acknowledgement Receipt</p>
+      <h2 class="account-modal-title" id="receipt-modal-title">Receipt Details</h2>
+      <div class="receipt-view" id="receipt-view"></div>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="receipt-modal-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="reservation-details-backdrop" aria-hidden="true">
+    <div class="account-modal-card reservation-details-modal-card" role="dialog" aria-modal="true" aria-labelledby="reservation-details-title">
+      <button type="button" class="account-modal-close" id="reservation-details-close" aria-label="Close reservation details">x</button>
+      <p class="account-modal-eyebrow">Reservation Details</p>
+      <h2 class="account-modal-title" id="reservation-details-title">Booking Overview</h2>
+      <p class="account-modal-copy">Review your booking information, payment progress, and uploaded contract in one place.</p>
+      <div class="reservation-details-view" id="reservation-details-view"></div>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="reservation-details-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="reschedule-modal-backdrop" aria-hidden="true">
+    <div class="account-modal-card reschedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title">
+      <button type="button" class="account-modal-close" id="reschedule-modal-close" aria-label="Close reschedule dialog">x</button>
+      <p class="account-modal-eyebrow">Reschedule Request</p>
+      <h2 class="account-modal-title" id="reschedule-modal-title">Choose a New Date and Time</h2>
+      <p class="account-modal-copy">Pick an available date first, then select a new start time for your event.</p>
+
+      <div class="reschedule-current-block">
+        <span class="reschedule-current-label">Current booking</span>
+        <strong class="reschedule-current-value" id="reschedule-current-value">Loading...</strong>
+      </div>
+
+      <div class="reschedule-calendar-panel">
+        <div class="reschedule-calendar-head">
+          <button type="button" class="reschedule-nav-btn" id="reschedule-prev-month" aria-label="Previous month">&lsaquo;</button>
+          <span class="reschedule-month-label" id="reschedule-month-label">Loading...</span>
+          <button type="button" class="reschedule-nav-btn" id="reschedule-next-month" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <div class="reschedule-weekdays" aria-hidden="true">
+          <span>Su</span>
+          <span>Mo</span>
+          <span>Tu</span>
+          <span>We</span>
+          <span>Th</span>
+          <span>Fr</span>
+          <span>Sa</span>
+        </div>
+        <div class="reschedule-calendar-grid" id="reschedule-calendar-grid"></div>
+        <div class="reschedule-legend">
+          <span class="reschedule-legend-item"><span class="reschedule-swatch available"></span>Available</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch booked"></span>Fully Booked</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch closed"></span>Closed</span>
+        </div>
+      </div>
+
+      <div class="reschedule-time-section">
+        <label class="reschedule-section-label">New time</label>
+        <div class="reschedule-time-grid" id="reschedule-time-grid"></div>
+      </div>
+
+      <p class="account-modal-message" id="reschedule-modal-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="reschedule-modal-cancel">Cancel</button>
+        <button type="button" class="account-modal-btn primary" id="reschedule-modal-submit">Submit Reschedule Request</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
+    <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
+      <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
+      <div class="submission-feedback-icon" aria-hidden="true">&#10003;</div>
+      <p class="account-modal-eyebrow" id="submission-feedback-eyebrow">Contract Resubmitted</p>
+      <h2 class="account-modal-title" id="submission-feedback-title">Replacement Contract Submitted</h2>
+      <p class="account-modal-copy" id="submission-feedback-copy">Your corrected signed contract was sent to the admin for review.</p>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn primary" id="submission-feedback-dismiss">Okay</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="../js/navbar.js"></script>

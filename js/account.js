@@ -1,15 +1,77 @@
 import { supabase } from './supabase.js';
 
-const CONTRACT_FILES = {
-    onsite_vip: '../files/contracts/contract-vip-lounge.pdf',
-    onsite_main_hall: '../files/contracts/contract-main-hall.pdf',
-    onsite_default: '',
-    add_on_snack: '../files/contracts/contract-snack-bar.pdf',
-    offsite_coffee: '../files/contracts/contract-coffee-bar.pdf',
-    offsite_snack: '../files/contracts/contract-snack-bar.pdf',
-    offsite_catering: '../files/contracts/contract-catering.pdf',
-    default: ''
+const CLOUDINARY_CONFIG = {
+    cloudName: 'dtt707f1w',
+    uploadPreset: 'eli_contracts',
+    paymentFolder: 'payments',
+    contractFolder: 'contracts',
+    maxFileSize: 10 * 1024 * 1024
 };
+
+const PAYMENT_METHODS = {
+    card: {
+        label: 'Card',
+        helper: 'Use the owner-provided debit or credit card payment arrangement, then submit the payment reference and proof here for review.',
+        channel: {
+            title: 'Owner Card Arrangement',
+            lines: ['Account Holder: ELI Coffee Events', 'Channel: Card terminal or payment link', 'Reference: Use the reference number given by the owner/admin']
+        }
+    },
+    bancnet: {
+        label: 'BancNet',
+        helper: 'Submit your transfer reference number and upload a clear screenshot or receipt.',
+        channel: {
+            title: 'Owner Bank Account',
+            lines: ['Bank: BDO Unibank', 'Account Name: ELI Coffee Events', 'Account Number: 1234 5678 9012']
+        }
+    },
+    gcash_maya: {
+        label: 'GCash/Maya',
+        helper: 'Use your e-wallet reference number and upload your payment proof for admin review.',
+        channel: {
+            title: 'Owner E-Wallet Channel',
+            lines: ['GCash Name: ELI Coffee Events', 'GCash Number: 0917 123 4567', 'Maya Username: elicoffeeevents']
+        }
+    },
+    cash: {
+        label: 'Cash',
+        helper: 'Schedule the date you will visit the cafe to pay in person. Admin will still confirm the payment manually.'
+    }
+};
+
+const PAYMENT_TYPE_META = {
+    reservation_fee: { label: 'Reservation Fee', description: 'Fixed reservation fee' },
+    down_payment: { label: 'Down Payment', description: '50% of your total amount' },
+    full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
+    reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' }
+};
+const ONSITE_RESERVATION_FEE = 999;
+
+const PAYMENT_STATUS_META = {
+    pending_review: { label: 'Pending Review', key: 'pending' },
+    approved: { label: 'Approved', key: 'approved' },
+    rejected: { label: 'Rejected', key: 'rejected' }
+};
+
+const RESCHEDULE_STATUS_META = {
+    pending: { label: 'Pending Admin Review', key: 'pending' },
+    approved_pending_payment: { label: 'Approved - Waiting for Fee', key: 'info' },
+    rejected: { label: 'Rejected', key: 'rejected' },
+    completed: { label: 'Completed', key: 'approved' }
+};
+
+const BOOKING_LIMITS = {
+    onsite_vip: 1,
+    onsite_main_hall: 1,
+    offsite: 1
+};
+
+const TIMES = [
+    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
+    '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM'
+];
+
+const BLACKOUT_DATE_COLUMNS = ['closed_date', 'date'];
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -17,279 +79,2622 @@ if (!session) {
 }
 
 const user = session.user;
+const reservationsList = document.getElementById('reservations-list');
+const paymentsList = document.getElementById('payments-list');
+const receiptModalBackdrop = document.getElementById('receipt-modal-backdrop');
+const receiptModalClose = document.getElementById('receipt-modal-close');
+const receiptModalDismiss = document.getElementById('receipt-modal-dismiss');
+const receiptView = document.getElementById('receipt-view');
+const reservationDetailsBackdrop = document.getElementById('reservation-details-backdrop');
+const reservationDetailsClose = document.getElementById('reservation-details-close');
+const reservationDetailsDismiss = document.getElementById('reservation-details-dismiss');
+const reservationDetailsView = document.getElementById('reservation-details-view');
+const rescheduleModalBackdrop = document.getElementById('reschedule-modal-backdrop');
+const rescheduleModalClose = document.getElementById('reschedule-modal-close');
+const rescheduleModalCancel = document.getElementById('reschedule-modal-cancel');
+const rescheduleModalSubmit = document.getElementById('reschedule-modal-submit');
+const rescheduleModalMessage = document.getElementById('reschedule-modal-message');
+const rescheduleCurrentValue = document.getElementById('reschedule-current-value');
+const rescheduleMonthLabel = document.getElementById('reschedule-month-label');
+const rescheduleCalendarGrid = document.getElementById('reschedule-calendar-grid');
+const rescheduleTimeGrid = document.getElementById('reschedule-time-grid');
+const reschedulePrevMonth = document.getElementById('reschedule-prev-month');
+const rescheduleNextMonth = document.getElementById('reschedule-next-month');
+const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
+const submissionFeedbackClose = document.getElementById('submission-feedback-close');
+const submissionFeedbackDismiss = document.getElementById('submission-feedback-dismiss');
+const submissionFeedbackEyebrow = document.getElementById('submission-feedback-eyebrow');
+const submissionFeedbackTitle = document.getElementById('submission-feedback-title');
+const submissionFeedbackCopy = document.getElementById('submission-feedback-copy');
 
-async function loadReservations() {
-    const list = document.getElementById('reservations-list');
-    list.innerHTML = '<p style="color:#aaa;text-align:center;padding:40px 0;">Loading...</p>';
+const state = {
+    reservations: [],
+    contractsByReservationId: {},
+    paymentsByReservationId: {},
+    receiptsByPaymentId: {},
+    reschedulesByReservationId: {},
+    profile: null,
+    reservationView: 'active',
+    reservationDetailsReservationId: null,
+    receiptModalPaymentId: null,
+    rescheduleModal: {
+        reservationId: null,
+        month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        selectedDate: '',
+        selectedTime: '',
+        bookedReservations: [],
+        closedDates: new Set(),
+        blackoutDateColumn: null
+    }
+};
 
-    const { data: reservations, error } = await supabase
-        .from('reservations')
-        .select(`
-            *,
-            package:package_id ( package_name, package_type ),
-            add_on:add_on_id   ( package_name, package_type )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
-    if (error) {
-        list.innerHTML = '<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations.</p>';
+function formatCurrency(value) {
+    return `P${Number(value || 0).toLocaleString()}`;
+}
+
+function formatDate(value) {
+    if (!value) return 'No date';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'No date';
+    return date.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+function formatDateTime(value) {
+    if (!value) return 'Not available';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Not available';
+    return date.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+}
+
+function formatShortDate(value) {
+    if (!value) return 'No date';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'No date';
+    return date.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+function formatDateKey(value) {
+    return String(value || '').split('T')[0];
+}
+
+function isDateBeforeToday(value) {
+    const dateKey = formatDateKey(value);
+    if (!dateKey) return false;
+
+    const today = new Date();
+    const todayKey = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0')
+    ].join('-');
+
+    return dateKey < todayKey;
+}
+
+function parseEventTimeToParts(value) {
+    const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return null;
+
+    let hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const meridiem = match[3].toUpperCase();
+
+    if (hours === 12) {
+        hours = meridiem === 'AM' ? 0 : 12;
+    } else if (meridiem === 'PM') {
+        hours += 12;
+    }
+
+    return { hours, minutes };
+}
+
+function getReservationEventDateTime(reservation) {
+    const dateKey = formatDateKey(reservation?.event_date);
+    if (!dateKey) return null;
+
+    const timeParts = parseEventTimeToParts(reservation?.event_time);
+    const date = new Date(`${dateKey}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+
+    if (timeParts) {
+        date.setHours(timeParts.hours, timeParts.minutes, 0, 0);
+    }
+
+    return date;
+}
+
+function getEffectiveReservationStatus(reservation) {
+    const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
+    if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
+        return normalizedStatus;
+    }
+
+    const eventDateTime = getReservationEventDateTime(reservation);
+    if (!eventDateTime) return normalizedStatus;
+
+    if (eventDateTime.getTime() < Date.now() && normalizedStatus === 'approved') {
+        return 'completed';
+    }
+
+    return normalizedStatus;
+}
+
+function getReservationStatusMeta(status) {
+    const normalizedStatus = String(status || 'pending').toLowerCase();
+    const labelMap = {
+        pending: 'Pending Verification',
+        approved: 'Approved',
+        confirmed: 'Approved',
+        cancelled: 'Cancelled',
+        declined: 'Declined',
+        completed: 'Completed',
+        rescheduled: 'Rescheduled',
+        resubmission_requested: 'Resubmission Requested'
+    };
+
+    return {
+        key: normalizedStatus,
+        label: labelMap[normalizedStatus] || (normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1))
+    };
+}
+
+function getPaymentLabel(paymentType) {
+    return PAYMENT_TYPE_META[paymentType]?.label || (paymentType || 'Payment');
+}
+
+function getPaymentStatusMeta(status) {
+    return PAYMENT_STATUS_META[String(status || 'pending_review').toLowerCase()] || PAYMENT_STATUS_META.pending_review;
+}
+
+function getRescheduleStatusMeta(status) {
+    return RESCHEDULE_STATUS_META[String(status || 'pending').toLowerCase()] || RESCHEDULE_STATUS_META.pending;
+}
+
+function getReservationPayments(reservationId) {
+    return state.paymentsByReservationId[reservationId] || [];
+}
+
+function getReservationReceipts(reservationId) {
+    return getReservationPayments(reservationId)
+        .map((payment) => ({
+            payment,
+            receipt: state.receiptsByPaymentId[payment.payment_id] || null
+        }))
+        .filter((entry) => entry.receipt && String(entry.payment.payment_status || '').toLowerCase() === 'approved')
+        .sort((left, right) => new Date(right.receipt.issued_at || 0) - new Date(left.receipt.issued_at || 0));
+}
+
+function getReservationRescheduleRequests(reservationId) {
+    return state.reschedulesByReservationId[reservationId] || [];
+}
+
+function getReservationContract(reservationId) {
+    return state.contractsByReservationId[reservationId] || null;
+}
+
+function getReservationPackageName(reservation) {
+    return reservation.package?.package_name || reservation.package_id || 'No package selected';
+}
+
+function getReservationAddOnName(reservation) {
+    return reservation.add_on?.package_name || '';
+}
+
+function getReservationLocationLabel(reservation) {
+    return String(reservation.location_type || '').toLowerCase() === 'onsite'
+        ? 'Onsite - ELI Coffee'
+        : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
+}
+
+function isReservationContractsColumnMissing(error, columnName) {
+    const message = error?.message || '';
+    return message.includes(`Could not find the '${columnName}' column`)
+        || message.includes(`column reservation_contracts.${columnName} does not exist`);
+}
+
+function getReservationContractMeta(reservationId) {
+    const contract = getReservationContract(reservationId);
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    const reviewStatus = String(contract?.review_status || '').toLowerCase();
+    const legacyReservationStatus = String(reservation?.status || '').toLowerCase();
+    const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
+
+    if (reviewStatus === 'verified' || contract?.verified_date) {
+        return {
+            label: 'Verified contract',
+            key: 'approved',
+            statusKey: 'verified',
+            verification: `Verified ${formatDateTime(contract.verified_date)}`,
+            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
+            resubmittedAt,
+            note: '',
+            hasFile: Boolean(contract?.contract_url),
+            contract
+        };
+    }
+
+    if (reviewStatus === 'resubmission_requested' || (!reviewStatus && legacyReservationStatus === 'resubmission_requested')) {
+        return {
+            label: 'Resubmission requested',
+            key: 'resubmission_requested',
+            statusKey: 'resubmission_requested',
+            verification: 'Please upload a corrected signed contract.',
+            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
+            resubmittedAt,
+            note: contract?.review_notes || 'Admin requested a corrected signed contract.',
+            hasFile: Boolean(contract?.contract_url),
+            contract
+        };
+    }
+
+    if (reviewStatus === 'pending_review' && contract?.resubmitted_at) {
+        return {
+            label: 'Replacement submitted',
+            key: 'pending',
+            statusKey: 'replacement_submitted',
+            verification: 'Your corrected contract is waiting for admin review.',
+            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
+            resubmittedAt,
+            note: '',
+            hasFile: Boolean(contract?.contract_url),
+            contract
+        };
+    }
+
+    if (reviewStatus === 'pending_review' || contract?.contract_url) {
+        return {
+            label: 'Pending review',
+            key: 'pending',
+            statusKey: 'pending_review',
+            verification: 'Pending admin verification',
+            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
+            resubmittedAt,
+            note: contract?.review_notes || '',
+            hasFile: Boolean(contract?.contract_url),
+            contract
+        };
+    }
+
+    return {
+        label: 'No contract uploaded',
+        key: 'neutral',
+        statusKey: 'missing',
+        verification: 'No signed contract uploaded yet',
+        reviewedAt: '',
+        resubmittedAt: '',
+        note: '',
+        hasFile: false,
+        contract
+    };
+}
+
+function getCompactPaymentSummaryLabel(paymentSummary) {
+    const label = String(paymentSummary?.label || '').toLowerCase();
+
+    if (label.includes('complete')) return 'Completed';
+    if (label.includes('partially paid')) return 'Partially Paid';
+    if (label.includes('pending review')) return 'Pending Review';
+    if (label.includes('reschedule fee')) return 'Reschedule Fee Pending';
+    if (label.includes('pending')) return 'Pending';
+    return paymentSummary?.label || 'Pending';
+}
+
+function getCompactContractLabel(contractMeta) {
+    const label = String(contractMeta?.label || '').toLowerCase();
+
+    if (label.includes('verified')) return 'Verified';
+    if (label.includes('resubmission')) return 'Resubmit';
+    if (label.includes('submitted')) return 'Submitted';
+    if (label.includes('pending review')) return 'Pending Review';
+    if (label.includes('no contract')) return 'No Contract';
+    return contractMeta?.label || 'Pending';
+}
+
+function isPastReservation(reservation) {
+    const normalizedStatus = getEffectiveReservationStatus(reservation);
+
+    if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
+        return true;
+    }
+
+    const eventDateTime = getReservationEventDateTime(reservation);
+    return eventDateTime ? eventDateTime.getTime() < Date.now() : isDateBeforeToday(reservation?.event_date);
+}
+
+function getReservationBuckets() {
+    return state.reservations.reduce((groups, reservation) => {
+        if (isPastReservation(reservation)) {
+            groups.past.push(reservation);
+        } else {
+            groups.active.push(reservation);
+        }
+        return groups;
+    }, { active: [], past: [] });
+}
+
+function getBookingScope(reservation) {
+    const locationType = String(reservation?.location_type || '').toLowerCase();
+    const packageName = String(reservation?.package?.package_name || '').toLowerCase();
+
+    if (locationType === 'offsite') return 'offsite';
+    if (locationType === 'onsite' && packageName.includes('main hall')) return 'onsite_main_hall';
+    if (locationType === 'onsite' && packageName.includes('vip')) return 'onsite_vip';
+    return null;
+}
+
+function getBookedCountForScope(dateKey, scope, reservationIdToExclude = null) {
+    return state.rescheduleModal.bookedReservations.filter((reservation) => {
+        const reservationDateKey = formatDateKey(reservation.event_date);
+        return reservationDateKey === dateKey
+            && getBookingScope(reservation) === scope
+            && String(reservation.reservation_id) !== String(reservationIdToExclude);
+    }).length;
+}
+
+function getReservationName(profile) {
+    const parts = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean);
+    return parts.join(' ') || profile.email || 'Customer';
+}
+
+function roundCurrency(value) {
+    return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function getNormalPayments(reservationId) {
+    return getReservationPayments(reservationId).filter((payment) => !payment.reschedule_request_id);
+}
+
+function getApprovedBasePaymentsTotal(reservationId) {
+    return getNormalPayments(reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
+        .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+}
+
+function hasPendingOrApprovedPayment(reservationId, paymentType) {
+    return getNormalPayments(reservationId).some((payment) => (
+        payment.payment_type === paymentType
+        && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+    ));
+}
+
+function isReservationPaymentEnabled(reservation) {
+    return ['approved', 'confirmed', 'rescheduled', 'completed'].includes(String(reservation?.status || '').toLowerCase());
+}
+
+function getReservationFeeAmount(reservation, remainingBalance) {
+    const locationType = String(reservation?.location_type || '').toLowerCase();
+
+    if (locationType === 'onsite') {
+        return roundCurrency(Math.min(ONSITE_RESERVATION_FEE, remainingBalance));
+    }
+
+    // Keep the current fallback for offsite packages until the client confirms the exact fee rule.
+    return roundCurrency(Math.min(5000, remainingBalance));
+}
+
+function getAvailablePaymentOptions(reservation) {
+    if (!isReservationPaymentEnabled(reservation)) {
+        return [];
+    }
+
+    const reservationId = reservation.reservation_id;
+    const totalPrice = Number(reservation.total_price || 0);
+    const approvedBasePayments = getApprovedBasePaymentsTotal(reservationId);
+    const remainingBalance = roundCurrency(Math.max(totalPrice - approvedBasePayments, 0));
+    const options = [];
+
+    if (remainingBalance > 0 && !hasPendingOrApprovedPayment(reservationId, 'reservation_fee')) {
+        options.push({
+            paymentType: 'reservation_fee',
+            amount: getReservationFeeAmount(reservation, remainingBalance),
+            label: PAYMENT_TYPE_META.reservation_fee.label,
+            description: PAYMENT_TYPE_META.reservation_fee.description,
+            rescheduleRequestId: ''
+        });
+    }
+
+    const downPaymentAmount = roundCurrency(Math.min(totalPrice * 0.5, remainingBalance));
+    if (
+        remainingBalance > 0
+        && downPaymentAmount > 0
+        && downPaymentAmount < remainingBalance
+        && !hasPendingOrApprovedPayment(reservationId, 'down_payment')
+    ) {
+        options.push({
+            paymentType: 'down_payment',
+            amount: downPaymentAmount,
+            label: PAYMENT_TYPE_META.down_payment.label,
+            description: PAYMENT_TYPE_META.down_payment.description,
+            rescheduleRequestId: ''
+        });
+    }
+
+    if (remainingBalance > 0 && !hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
+        options.push({
+            paymentType: 'full_payment',
+            amount: remainingBalance,
+            label: PAYMENT_TYPE_META.full_payment.label,
+            description: PAYMENT_TYPE_META.full_payment.description,
+            rescheduleRequestId: ''
+        });
+    }
+
+    getReservationRescheduleRequests(reservationId)
+        .filter((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment')
+        .forEach((request) => {
+            const hasExistingRescheduleFee = getReservationPayments(reservationId).some((payment) => (
+                String(payment.reschedule_request_id || '') === String(request.reschedule_request_id)
+                && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+            ));
+
+            if (!hasExistingRescheduleFee) {
+                options.push({
+                    paymentType: 'reschedule_fee',
+                    amount: 3000,
+                    label: PAYMENT_TYPE_META.reschedule_fee.label,
+                    description: `${PAYMENT_TYPE_META.reschedule_fee.description} for ${formatDate(request.requested_date)}`,
+                    rescheduleRequestId: request.reschedule_request_id
+                });
+            }
+        });
+
+    return options.filter((option) => option.amount > 0);
+}
+
+function getPaymentSummary(reservation) {
+    const reservationId = reservation.reservation_id;
+    const totalPrice = Number(reservation.total_price || 0);
+    const approvedBaseTotal = getApprovedBasePaymentsTotal(reservationId);
+    const pendingPayment = getReservationPayments(reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
+        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0];
+
+    if (pendingPayment) {
+        return {
+            label: `${getPaymentLabel(pendingPayment.payment_type)} pending review`,
+            key: 'pending'
+        };
+    }
+
+    if (totalPrice > 0 && approvedBaseTotal >= totalPrice) {
+        return { label: 'Payment complete', key: 'approved' };
+    }
+
+    if (approvedBaseTotal > 0) {
+        return { label: `Partially paid (${formatCurrency(approvedBaseTotal)})`, key: 'approved' };
+    }
+
+    const approvedRescheduleRequest = getReservationRescheduleRequests(reservationId)
+        .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
+
+    if (approvedRescheduleRequest) {
+        return { label: 'Reschedule fee pending', key: 'info' };
+    }
+
+    return { label: 'Payment pending', key: 'pending' };
+}
+
+function getLatestReservationPayment(reservationId) {
+    return getReservationPayments(reservationId)
+        .slice()
+        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+}
+
+function getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnabled, hasPayments) {
+    const summaryKey = String(paymentSummary?.key || '').toLowerCase();
+    const summaryLabel = String(paymentSummary?.label || '').toLowerCase();
+
+    if (!paymentModuleEnabled) {
+        return 'Wait for admin approval. The payment step will unlock here once your reservation is approved.';
+    }
+
+    if (summaryKey === 'approved' && summaryLabel.includes('complete')) {
+        return 'Payment is complete. Open the Payments module if you want to review the submitted details or receipt.';
+    }
+
+    if (summaryKey === 'pending' && hasPayments) {
+        return 'Your latest payment submission is under review. Open the Payments module to track the current status.';
+    }
+
+    if (summaryLabel.includes('partially paid')) {
+        return 'You still have a remaining payment step. Open the Payments module to continue the process.';
+    }
+
+    if (summaryKey === 'info') {
+        return 'The next step is paying the approved reschedule fee. Open the Payments module to submit it.';
+    }
+
+    return hasPayments
+        ? 'Open the Payments module to continue the next payment step and review your submitted entries.'
+        : 'The next step is payment submission. Open the Payments module to continue the process.';
+}
+
+function canRescheduleReservation(reservation) {
+    const normalizedStatus = String(reservation.status || '').toLowerCase();
+    const latestOpenRequest = getReservationRescheduleRequests(reservation.reservation_id)
+        .find((request) => ['pending', 'approved_pending_payment'].includes(String(request.status || '').toLowerCase()));
+
+    return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !latestOpenRequest;
+}
+
+function renderPaymentComposer(reservation) {
+    const options = getAvailablePaymentOptions(reservation);
+    if (!options.length) {
+        if (!isReservationPaymentEnabled(reservation)) {
+            return '<div class="payment-empty">Payment submission becomes available after admin approves this reservation.</div>';
+        }
+        return '<div class="payment-empty">No new payment actions are available right now.</div>';
+    }
+
+    const defaultMethod = 'card';
+    const canUseCash = options.some((option) => option.paymentType === 'full_payment');
+    const methodChips = Object.entries(PAYMENT_METHODS).map(([method, meta]) => `
+        <button
+            type="button"
+            class="res-choice-chip payment-choice-card res-payment-method ${method === defaultMethod ? 'active' : ''}"
+            data-method="${escapeHtml(method)}"
+            ${method === 'cash' && !canUseCash ? 'disabled' : ''}
+        >
+            <span class="payment-method-main">
+                <strong>${escapeHtml(meta.label)}</strong>
+            </span>
+            ${method === 'cash' ? '<span class="payment-method-subcopy">Pay in person</span>' : ''}
+            <span class="payment-choice-check" aria-hidden="true"></span>
+        </button>
+    `).join('');
+
+    const optionChips = options.map((option, index) => `
+        <button
+            type="button"
+            class="res-choice-chip payment-choice-card payment-type-card res-payment-type ${index === 0 ? 'active' : ''}"
+            data-payment-option="${index}"
+            data-payment-type="${escapeHtml(option.paymentType)}"
+            data-amount="${escapeHtml(option.amount)}"
+            data-reschedule-request-id="${escapeHtml(option.rescheduleRequestId || '')}"
+        >
+            <div class="payment-type-head">
+                <strong>${escapeHtml(option.label)}</strong>
+            </div>
+            <span class="payment-choice-amount">${escapeHtml(formatCurrency(option.amount))}</span>
+            <span class="payment-choice-copy">${escapeHtml(option.description)}</span>
+        </button>
+    `).join('');
+
+    return `
+        <div class="payment-composer" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-cash-enabled="${canUseCash ? 'true' : 'false'}">
+            <div class="payment-flow-intro">Finish the payment action here, then let the admin review your submission.</div>
+            <section class="payment-action-card payment-selection-card">
+                <div class="payment-panel-minihead">
+                    <div class="payment-step-head">
+                        <span class="payment-step-number">1</span>
+                        <div class="payment-step-body">
+                            <div class="payment-step-title">Payment Selection</div>
+                            <div class="payment-step-copy">Choose how you will pay and what you are paying for.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="payment-selection-stack">
+                    <div class="payment-selection-group">
+                        <div class="payment-selection-label">Payment Method</div>
+                        <div class="payment-card-grid payment-method-grid">${methodChips}</div>
+                    </div>
+                    <div class="payment-selection-group">
+                        <div class="payment-selection-label">Payment Type</div>
+                        <div class="payment-card-grid payment-type-grid">${optionChips}</div>
+                    </div>
+                </div>
+                <div class="payment-selection-summary">
+                    <div class="payment-selection-summary-title" data-selection-summary>
+                        Selected: ${escapeHtml(PAYMENT_METHODS[defaultMethod].label)} &bull; ${escapeHtml(options[0].label)} &bull; ${escapeHtml(formatCurrency(options[0].amount))}
+                    </div>
+                    <div class="payment-selection-summary-note">
+                        <span class="payment-selection-summary-icon" aria-hidden="true">&#9432;</span>
+                        <span>Amounts are system-defined so customers cannot submit mismatched payment totals.</span>
+                    </div>
+                </div>
+                <div class="payment-method-copy" data-method-helper>${escapeHtml(PAYMENT_METHODS[defaultMethod].helper)}</div>
+                <div class="payment-channel-box" data-payment-channel></div>
+            </section>
+            <section class="payment-action-card payment-details-card">
+                <div class="payment-panel-minihead">
+                    <div class="payment-step-head">
+                        <span class="payment-step-number">2</span>
+                        <div class="payment-step-body">
+                            <div class="payment-step-title">Payment Details</div>
+                            <div class="payment-step-copy">Enter the details that match the payment method you selected.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="payment-form-grid">
+                    <div class="payment-form-row">
+                        <div class="payment-field payment-reference-field">
+                            <label>Reference / transaction number</label>
+                            <input type="text" data-field="reference_number" placeholder="e.g. 1234567890">
+                        </div>
+                        <div class="payment-field payment-amount-field">
+                            <label>Amount paid</label>
+                            <input type="text" data-field="amount" readonly value="${escapeHtml(formatCurrency(options[0].amount))}">
+                        </div>
+                    </div>
+                    <div class="payment-form-row">
+                        <div class="payment-field payment-payment-date-field">
+                            <label>Date of payment</label>
+                            <input type="date" data-field="payment_date">
+                        </div>
+                        <div class="payment-field payment-cash-date-field" hidden>
+                            <label>Date of arrival at the cafe</label>
+                            <input type="date" data-field="cash_payment_date">
+                        </div>
+                    </div>
+                    <div class="payment-field full">
+                        <label>Notes (optional)</label>
+                        <textarea data-field="notes" placeholder="Add any note for the admin..."></textarea>
+                    </div>
+                </div>
+            </section>
+            <section class="payment-submit-dock">
+                <div class="payment-step-head payment-step-head-compact payment-submit-head">
+                    <span class="payment-step-number">3</span>
+                    <div class="payment-step-body">
+                        <div class="payment-step-title">Upload &amp; Submit</div>
+                        <div class="payment-step-copy">Upload your proof if needed, then send the payment details for review.</div>
+                    </div>
+                </div>
+                <div class="payment-submit-layout">
+                    <div class="payment-proof-field">
+                        <div class="payment-proof-box payment-proof-dock">
+                            <label>Upload proof of payment</label>
+                            <label class="payment-upload-control">
+                                <input type="file" data-field="proof_file" accept="image/png,image/jpeg,image/jpg,image/webp" hidden>
+                                <span class="payment-upload-button">Choose File</span>
+                                <span class="payment-upload-name" data-proof-filename>No file chosen</span>
+                            </label>
+                            <p class="payment-proof-note">Preferred proof: screenshot or image file. Accepted formats: JPG, JPEG, PNG, WEBP. Maximum 10MB.</p>
+                        </div>
+                    </div>
+                    <div class="payment-submit-column">
+                        <div class="payment-submit-copy" data-submit-step-copy>Upload your proof if needed, then send the payment details for review.</div>
+                        <div class="payment-actions">
+                            <button type="button" class="res-primary-btn submit-payment-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Submit Payment</button>
+                        </div>
+                        <p class="res-form-message" data-form-message></p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    `;
+}
+
+function renderPaymentStatusContext(reservation) {
+    const paymentSummary = getPaymentSummary(reservation);
+    const paymentEntries = getReservationPayments(reservation.reservation_id);
+    const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
+    const nextStepCopy = getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnabled, paymentEntries.length > 0);
+    const availableOptions = getAvailablePaymentOptions(reservation);
+    const nextPayment = availableOptions[0] || null;
+    const latestPayment = getLatestReservationPayment(reservation.reservation_id);
+    const latestReceipt = getReservationReceipts(reservation.reservation_id)[0] || null;
+
+    const amountTitle = nextPayment ? formatCurrency(nextPayment.amount) : 'No payment due right now';
+    const amountCopy = nextPayment
+        ? `${nextPayment.label} is the next payment you can submit.`
+        : (paymentSummary.key === 'approved' ? 'All required payments are already recorded.' : 'No payment action is available yet.');
+
+    const latestSubmissionTitle = latestPayment
+        ? getPaymentLabel(latestPayment.payment_type)
+        : 'No payment submitted yet';
+    const latestSubmissionCopy = latestPayment
+        ? `${formatCurrency(latestPayment.amount)}${latestPayment.submitted_at ? ` submitted ${formatShortDate(latestPayment.submitted_at)}` : ''}`
+        : 'Your first submission will appear here after you send a payment.';
+
+    const receiptTitle = latestReceipt
+        ? formatShortDate(latestReceipt.receipt?.issued_at)
+        : 'No receipt yet';
+    const receiptCopy = latestReceipt
+        ? `${formatCurrency(latestReceipt.payment?.amount)} acknowledgement receipt available`
+        : 'Receipts appear after admin approves a payment.';
+
+    return `
+        <div class="payment-status-header">
+            <div class="payment-status-heading">
+                <div class="res-section-title">Payment Status</div>
+                <div class="res-section-copy">Current state and the next step for this reservation.</div>
+            </div>
+            <span class="res-section-status ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
+        </div>
+        <p class="payment-status-explainer">${escapeHtml(nextStepCopy)}</p>
+        <div class="payment-status-grid">
+            <div class="payment-status-card">
+                <span class="payment-status-label">Amount to pay now</span>
+                <strong class="payment-status-value">${escapeHtml(amountTitle)}</strong>
+                <span class="payment-status-note">${escapeHtml(amountCopy)}</span>
+            </div>
+            <div class="payment-status-card">
+                <span class="payment-status-label">Latest submission</span>
+                <strong class="payment-status-value">${escapeHtml(latestSubmissionTitle)}</strong>
+                <span class="payment-status-note">${escapeHtml(latestSubmissionCopy)}</span>
+            </div>
+            <div class="payment-status-card">
+                <span class="payment-status-label">Latest receipt</span>
+                <strong class="payment-status-value">${escapeHtml(receiptTitle)}</strong>
+                <span class="payment-status-note">${escapeHtml(receiptCopy)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderPaymentHistory(reservation) {
+    const payments = getReservationPayments(reservation.reservation_id)
+        .slice()
+        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0));
+
+    if (!payments.length) {
+        return '<div class="payment-empty">No payment submissions yet.</div>';
+    }
+
+    return `
+        <div class="payment-history-list">
+            ${payments.map((payment) => {
+                const paymentStatus = getPaymentStatusMeta(payment.payment_status);
+                const metadata = [
+                    formatCurrency(payment.amount),
+                    PAYMENT_METHODS[payment.payment_method]?.label || payment.payment_method,
+                    payment.submitted_at ? `Submitted ${formatShortDate(payment.submitted_at)}` : 'Submitted'
+                ].filter(Boolean).join(' / ');
+
+                const proofLink = payment.proof_url
+                    ? `<a class="res-link-btn" href="${escapeHtml(payment.proof_url)}" target="_blank" rel="noopener noreferrer">View Proof</a>`
+                    : '';
+
+                return `
+                    <div class="payment-history-item">
+                        <div class="payment-history-main">
+                            <div class="payment-history-title">${escapeHtml(getPaymentLabel(payment.payment_type))}</div>
+                            <div class="payment-history-meta">${escapeHtml(metadata)}</div>
+                        </div>
+                        <div class="payment-history-actions">
+                            <span class="res-section-status ${escapeHtml(paymentStatus.key)}">${escapeHtml(paymentStatus.label)}</span>
+                            ${proofLink}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function renderReceiptHistory(reservation) {
+    const receipts = getReservationReceipts(reservation.reservation_id);
+    if (!receipts.length) {
+        return '<div class="receipt-empty">No receipts yet.</div>';
+    }
+
+    return `
+        <div class="receipt-history-list">
+            ${receipts.map(({ payment, receipt }) => `
+                <div class="receipt-history-item">
+                        <div class="receipt-history-main">
+                            <div class="receipt-history-title">${escapeHtml(getPaymentLabel(payment.payment_type))}</div>
+                            <div class="receipt-history-meta">${escapeHtml(formatShortDate(receipt.issued_at))} / ${escapeHtml(formatCurrency(payment.amount))}</div>
+                        </div>
+                    <div class="receipt-history-actions">
+                        <button
+                            type="button"
+                            class="res-link-btn view-receipt-btn"
+                            data-reservation-id="${escapeHtml(reservation.reservation_id)}"
+                            data-payment-id="${escapeHtml(payment.payment_id)}"
+                        >
+                            View Receipt
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderPaymentReferenceTabs(reservation) {
+    const paymentCount = getReservationPayments(reservation.reservation_id).length;
+    const receiptCount = getReservationReceipts(reservation.reservation_id).length;
+
+    return `
+        <div class="payment-reference-shell">
+            <div class="payment-reference-tabs" role="tablist" aria-label="Payment reference sections">
+                <button
+                    type="button"
+                    class="payment-reference-tab active"
+                    data-payment-panel-tab="history"
+                    aria-selected="true"
+                >
+                    Payment History <span>${escapeHtml(String(paymentCount))}</span>
+                </button>
+                <button
+                    type="button"
+                    class="payment-reference-tab"
+                    data-payment-panel-tab="receipts"
+                    aria-selected="false"
+                >
+                    Receipts <span>${escapeHtml(String(receiptCount))}</span>
+                </button>
+            </div>
+            <div class="payment-reference-panel active" data-payment-panel="history">
+                ${renderPaymentHistory(reservation)}
+            </div>
+            <div class="payment-reference-panel" data-payment-panel="receipts" hidden>
+                ${renderReceiptHistory(reservation)}
+            </div>
+        </div>
+    `;
+}
+
+function renderRescheduleSection(reservation) {
+    const latestRequest = getReservationRescheduleRequests(reservation.reservation_id)[0] || null;
+    const canReschedule = canRescheduleReservation(reservation);
+
+    if (!latestRequest && !canReschedule) {
+        return '<div class="payment-empty">Reschedule is not available for this reservation right now.</div>';
+    }
+
+    const summaryRows = latestRequest ? `
+        <div class="reschedule-summary">
+            <div class="reschedule-summary-row"><strong>Current:</strong> ${escapeHtml(formatDate(latestRequest.original_date))} at ${escapeHtml(latestRequest.original_time || 'No time')}</div>
+            <div class="reschedule-summary-row"><strong>Requested:</strong> ${escapeHtml(formatDate(latestRequest.requested_date))} at ${escapeHtml(latestRequest.requested_time || 'No time')}</div>
+        </div>
+    ` : '';
+
+    const statusMeta = latestRequest ? getRescheduleStatusMeta(latestRequest.status) : null;
+    const statusBadge = statusMeta
+        ? `<span class="res-section-status ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>`
+        : '';
+
+    const buttonLabel = latestRequest && String(latestRequest.status || '').toLowerCase() === 'rejected'
+        ? 'Submit New Reschedule Request'
+        : 'Request Reschedule';
+
+    return `
+        <div class="res-section-head">
+            <div>
+                <div class="res-section-title">Reschedule Request</div>
+                <div class="res-section-copy">Choose a new available date first, then wait for admin review before paying the reschedule fee.</div>
+            </div>
+            ${statusBadge}
+        </div>
+        ${summaryRows}
+        ${canReschedule ? `<button type="button" class="res-secondary-btn open-reschedule-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">${escapeHtml(buttonLabel)}</button>` : ''}
+    `;
+}
+
+function buildReservationCard(reservation, view) {
+    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
+    const paymentSummary = getPaymentSummary(reservation);
+    const paymentEntries = getReservationPayments(reservation.reservation_id);
+    const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
+    const contractMeta = getReservationContractMeta(reservation.reservation_id);
+    const packageName = getReservationPackageName(reservation);
+    const location = getReservationLocationLabel(reservation);
+    const paymentActionLabel = paymentEntries.length > 0 ? 'Manage Payment' : 'Continue Payment';
+    const canManagePayments = paymentModuleEnabled && view === 'active';
+    const compactPaymentLabel = getCompactPaymentSummaryLabel(paymentSummary);
+    const compactContractLabel = getCompactContractLabel(contractMeta);
+
+    return `
+        <article class="reservation-summary-card${view === 'past' ? ' past' : ''}">
+            <div class="reservation-summary-main">
+                <div class="reservation-summary-top">
+                    <div class="reservation-summary-title-row">
+                        <h3>${escapeHtml(reservation.event_type || 'Event')}</h3>
+                        <span class="res-status ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
+                    </div>
+                    <div>
+                        <p class="reservation-summary-package">${escapeHtml(packageName)}</p>
+                    </div>
+                </div>
+                <div class="reservation-summary-meta">
+                    <div class="reservation-meta-item reservation-meta-item-date">
+                        <strong>${escapeHtml(formatShortDate(reservation.event_date))}</strong>
+                        <span>${escapeHtml(reservation.event_time || 'No time selected')}</span>
+                    </div>
+                    <div class="reservation-meta-item">
+                        <strong>${escapeHtml(String(reservation.guest_count || 0))} Guests</strong>
+                    </div>
+                    <div class="reservation-meta-item">
+                        <strong>${escapeHtml(location)}</strong>
+                    </div>
+                </div>
+                <div class="reservation-summary-foot">
+                    <div class="reservation-summary-info-line">
+                        <span class="reservation-inline-group">
+                            <span class="reservation-inline-label">Payment</span>
+                            <strong class="reservation-inline-value ${escapeHtml(paymentSummary.key)}">${escapeHtml(compactPaymentLabel)}</strong>
+                        </span>
+                        <span class="reservation-inline-group">
+                            <span class="reservation-inline-label">Contract</span>
+                            <strong class="reservation-inline-value ${escapeHtml(contractMeta.key)}">${escapeHtml(compactContractLabel)}</strong>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="reservation-summary-side">
+                <div class="reservation-total-block">
+                    <span class="reservation-total-label">Total</span>
+                    <strong class="reservation-total-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
+                </div>
+                <div class="reservation-summary-actions">
+                    <button type="button" class="res-secondary-btn open-reservation-details-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">View Details</button>
+                    ${canManagePayments ? `<button type="button" class="res-primary-btn open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">${escapeHtml(paymentActionLabel)}</button>` : ''}
+                </div>
+            </div>
+        </article>
+    `;
+}
+
+function buildReservationEmptyState(view) {
+    const copy = view === 'past'
+        ? {
+            title: 'No past reservations yet',
+            message: 'Completed and previous bookings will appear here once you have reservation history.'
+        }
+        : {
+            title: 'No active reservations yet',
+            message: 'Upcoming and in-progress bookings will appear here after you make a reservation.'
+        };
+
+    return `
+        <div class="empty-state reservation-empty-state">
+            <div class="empty-icon">Reservations</div>
+            <h3>${copy.title}</h3>
+            <p>${copy.message}</p>
+            ${view === 'active' ? '<a href="../pages/reservations.html" class="res-book-btn">Book an Event</a>' : ''}
+        </div>
+    `;
+}
+
+function renderReservationDetailsModal(reservationId = state.reservationDetailsReservationId) {
+    if (!reservationDetailsView || !reservationId) return;
+
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    if (!reservation) {
+        closeReservationDetailsModal();
         return;
     }
 
-    const reservationIds = (reservations || []).map(r => r.reservation_id).filter(Boolean);
-    let contractsByReservationId = {};
+    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
+    const paymentSummary = getPaymentSummary(reservation);
+    const paymentEntries = getReservationPayments(reservation.reservation_id);
+    const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
+    const contract = getReservationContract(reservation.reservation_id);
+    const contractMeta = getReservationContractMeta(reservation.reservation_id);
+    const addOnName = getReservationAddOnName(reservation);
+    const canReschedule = canRescheduleReservation(reservation);
+    const latestRescheduleRequest = getReservationRescheduleRequests(reservation.reservation_id)[0] || null;
 
-    if (reservationIds.length) {
-        const { data: contracts, error: contractsError } = await supabase
-            .from('contracts')
-            .select('reservation_id, contract_url, verified_date')
-            .in('reservation_id', reservationIds);
+    reservationDetailsView.innerHTML = `
+        <div class="reservation-details-shell">
+            <section class="reservation-details-hero">
+                <div>
+                    <div class="reservation-details-name">${escapeHtml(reservation.event_type || 'Event')}</div>
+                    <div class="reservation-details-subline">${escapeHtml(getReservationPackageName(reservation))}</div>
+                </div>
+                <div class="reservation-details-badges">
+                    <span class="res-status ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
+                    <span class="reservation-summary-chip ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
+                </div>
+            </section>
 
-        if (contractsError) {
-            console.error('Failed to load contracts:', contractsError);
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Reservation Summary</h3>
+                        <p>Everything tied to this booking, including the uploaded contract.</p>
+                    </div>
+                </div>
+                <div class="reservation-details-grid">
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Reservation ID</span>
+                        <strong class="reservation-detail-value">${escapeHtml(reservation.reservation_id)}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Submitted</span>
+                        <strong class="reservation-detail-value">${escapeHtml(formatDateTime(reservation.created_at))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Event date</span>
+                        <strong class="reservation-detail-value">${escapeHtml(formatDate(reservation.event_date))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Start time</span>
+                        <strong class="reservation-detail-value">${escapeHtml(reservation.event_time || 'No time selected')}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Guest count</span>
+                        <strong class="reservation-detail-value">${escapeHtml(String(reservation.guest_count || 0))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Location</span>
+                        <strong class="reservation-detail-value">${escapeHtml(getReservationLocationLabel(reservation))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Package</span>
+                        <strong class="reservation-detail-value">${escapeHtml(getReservationPackageName(reservation))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Add-on</span>
+                        <strong class="reservation-detail-value">${escapeHtml(addOnName || 'No add-on selected')}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Total amount</span>
+                        <strong class="reservation-detail-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
+                    </div>
+                    <div class="reservation-detail-field full">
+                        <span class="reservation-detail-label">Special requests</span>
+                        <strong class="reservation-detail-value">${escapeHtml(reservation.special_requests || 'No notes provided.')}</strong>
+                    </div>
+                </div>
+            </section>
+
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Contract</h3>
+                        <p>Signed reservation contracts stay available here for reference and re-upload when admin requests corrections.</p>
+                    </div>
+                </div>
+                <div class="reservation-details-grid">
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Contract status</span>
+                        <strong class="reservation-detail-value">${escapeHtml(contractMeta.label)}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Verification</span>
+                        <strong class="reservation-detail-value">${escapeHtml(contractMeta.verification)}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Last reviewed</span>
+                        <strong class="reservation-detail-value">${escapeHtml(contractMeta.reviewedAt || 'Not reviewed yet')}</strong>
+                    </div>
+                    ${contractMeta.resubmittedAt ? `
+                        <div class="reservation-detail-field">
+                            <span class="reservation-detail-label">Replacement sent</span>
+                            <strong class="reservation-detail-value">${escapeHtml(contractMeta.resubmittedAt)}</strong>
+                        </div>
+                    ` : ''}
+                    <div class="reservation-detail-field full">
+                        <span class="reservation-detail-label">Admin note</span>
+                        <strong class="reservation-detail-value">${escapeHtml(contractMeta.note || 'No correction note from admin.')}</strong>
+                    </div>
+                </div>
+                <div class="reservation-details-actions">
+                    ${contract?.contract_url
+                        ? `<a class="res-primary-btn reservation-link-btn" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">View Signed Uploaded Contract</a>`
+                        : '<span class="reservation-inline-note">Your signed upload will appear here once the contract is submitted.</span>'}
+                </div>
+                ${contractMeta.statusKey === 'resubmission_requested' ? `
+                    <div class="reservation-contract-reupload">
+                        <div class="reservation-reupload-alert">
+                            Admin asked for a corrected signed contract. Upload the updated file here to send it back for review.
+                        </div>
+                        <div class="payment-proof-box">
+                            <label class="payment-field full" for="replacement-contract-file">
+                                <span class="reservation-detail-label">Replacement signed contract</span>
+                                <div class="payment-upload-control">
+                                    <label class="payment-upload-button" for="replacement-contract-file">Choose File</label>
+                                    <span class="payment-upload-name" data-contract-filename>No file chosen</span>
+                                </div>
+                                <input
+                                    id="replacement-contract-file"
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    data-field="replacement_contract"
+                                    data-reservation-id="${escapeHtml(reservation.reservation_id)}"
+                                    hidden
+                                />
+                            </label>
+                            <p class="payment-proof-note">Accepted formats: PDF, JPG, and PNG. Upload the corrected signed contract only.</p>
+                        </div>
+                        <div class="reservation-details-actions">
+                            <button
+                                type="button"
+                                class="res-primary-btn"
+                                data-action="submit-contract-resubmission"
+                                data-reservation-id="${escapeHtml(reservation.reservation_id)}"
+                            >
+                                Submit Replacement Contract
+                            </button>
+                        </div>
+                        <p class="account-modal-message" data-contract-resubmission-message></p>
+                    </div>
+                ` : ''}
+            </section>
+
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Payment Progress</h3>
+                        <p>Track the current payment step for this reservation.</p>
+                    </div>
+                </div>
+                <div class="reservation-details-grid">
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Current status</span>
+                        <strong class="reservation-detail-value">${escapeHtml(paymentSummary.label)}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Submitted payments</span>
+                        <strong class="reservation-detail-value">${escapeHtml(String(paymentEntries.length))}</strong>
+                    </div>
+                </div>
+                ${paymentModuleEnabled ? `
+                    <div class="reservation-details-actions">
+                        <button type="button" class="res-primary-btn open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Open Payments</button>
+                    </div>
+                ` : '<div class="reservation-inline-note">Payments will unlock after admin approves this reservation.</div>'}
+            </section>
+
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Reschedule</h3>
+                        <p>Request a new date and time only when this booking is eligible.</p>
+                    </div>
+                </div>
+                <div class="reservation-details-grid">
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Latest request</span>
+                        <strong class="reservation-detail-value">${escapeHtml(latestRescheduleRequest ? getRescheduleStatusMeta(latestRescheduleRequest.status).label : 'No reschedule request yet')}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Requested schedule</span>
+                        <strong class="reservation-detail-value">${escapeHtml(latestRescheduleRequest ? `${formatDate(latestRescheduleRequest.requested_date)} at ${latestRescheduleRequest.requested_time || 'No time selected'}` : 'No changes requested')}</strong>
+                    </div>
+                </div>
+                ${canReschedule ? `
+                    <div class="reservation-details-actions">
+                        <button type="button" class="res-secondary-btn open-reschedule-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Request Reschedule</button>
+                    </div>
+                ` : ''}
+            </section>
+        </div>
+    `;
+
+    state.reservationDetailsReservationId = reservation.reservation_id;
+    reservationDetailsBackdrop?.classList.remove('hidden');
+    reservationDetailsBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeReservationDetailsModal() {
+    state.reservationDetailsReservationId = null;
+    reservationDetailsBackdrop?.classList.add('hidden');
+    reservationDetailsBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+function syncPaymentComposerState(section) {
+    if (!section) return;
+
+    const cashEnabled = section.dataset.cashEnabled === 'true';
+    let activeMethod = section.querySelector('.res-payment-method.active')?.dataset.method || 'card';
+    let activeTypeChip = section.querySelector('.res-payment-type.active');
+    const fullPaymentChip = section.querySelector('.res-payment-type[data-payment-type="full_payment"]');
+    const paymentTypeChips = Array.from(section.querySelectorAll('.res-payment-type'));
+
+    if (activeMethod === 'cash' && !cashEnabled) {
+        const cashChip = section.querySelector('.res-payment-method[data-method="cash"]');
+        const firstNonCashChip = section.querySelector('.res-payment-method:not([data-method="cash"])');
+        cashChip?.classList.remove('active');
+        firstNonCashChip?.classList.add('active');
+        activeMethod = firstNonCashChip?.dataset.method || 'card';
+    }
+
+    paymentTypeChips.forEach((chip) => {
+        const shouldHide = activeMethod === 'cash' && chip.dataset.paymentType !== 'full_payment';
+        chip.hidden = shouldHide;
+        if (shouldHide) chip.classList.remove('active');
+    });
+
+    if (activeMethod === 'cash' && fullPaymentChip) {
+        fullPaymentChip.hidden = false;
+        if (!fullPaymentChip.classList.contains('active')) {
+            paymentTypeChips.forEach((chip) => chip.classList.remove('active'));
+            fullPaymentChip.classList.add('active');
+        }
+        activeTypeChip = fullPaymentChip;
+    } else {
+        const visibleActiveChip = paymentTypeChips.find((chip) => !chip.hidden && chip.classList.contains('active'));
+        if (!visibleActiveChip) {
+            paymentTypeChips.find((chip) => !chip.hidden)?.classList.add('active');
+        }
+        activeTypeChip = section.querySelector('.res-payment-type.active');
+    }
+
+    const amount = Number(activeTypeChip?.dataset.amount || 0);
+    const methodHelperEl = section.querySelector('[data-method-helper]');
+    const channelBoxEl = section.querySelector('[data-payment-channel]');
+    const selectionSummaryEl = section.querySelector('[data-selection-summary]');
+    const amountInput = section.querySelector('[data-field="amount"]');
+    const amountField = section.querySelector('.payment-amount-field');
+    const referenceField = section.querySelector('.payment-reference-field');
+    const paymentDateField = section.querySelector('.payment-payment-date-field');
+    const cashDateField = section.querySelector('.payment-cash-date-field');
+    const proofField = section.querySelector('.payment-proof-field');
+    const proofInput = section.querySelector('[data-field="proof_file"]');
+    const proofFilenameEl = section.querySelector('[data-proof-filename]');
+    const submitStepCopy = section.querySelector('[data-submit-step-copy]');
+
+    if (methodHelperEl) {
+        const methodHelper = PAYMENT_METHODS[activeMethod]?.helper || '';
+        methodHelperEl.textContent = activeMethod === 'cash'
+            ? `${methodHelper} Cash is available for full payment only.`
+            : methodHelper;
+    }
+
+    if (channelBoxEl) {
+        const channel = PAYMENT_METHODS[activeMethod]?.channel;
+        if (channel && activeMethod !== 'cash') {
+            channelBoxEl.hidden = false;
+            channelBoxEl.innerHTML = `
+                <div class="payment-channel-kicker">Payment Instructions</div>
+                <div class="payment-channel-title">Send your payment to:</div>
+                <div class="payment-channel-copy">${escapeHtml(channel.title)}</div>
+                <ul class="payment-channel-list">
+                    ${channel.lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+                </ul>
+            `;
         } else {
-            contractsByReservationId = contracts.reduce((map, contract) => {
-                map[contract.reservation_id] = contract;
-                return map;
-            }, {});
+            channelBoxEl.hidden = true;
+            channelBoxEl.innerHTML = '';
         }
     }
 
-    if (!reservations || reservations.length === 0) {
-        list.innerHTML = `
+    if (selectionSummaryEl && activeTypeChip) {
+        selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} • ${getPaymentLabel(activeTypeChip.dataset.paymentType || '')} • ${formatCurrency(amount)}`;
+    }
+
+    if (amountInput) {
+        amountInput.value = formatCurrency(amount);
+    }
+
+    const isCash = activeMethod === 'cash';
+    if (submitStepCopy) {
+        submitStepCopy.textContent = isCash
+            ? 'Review your cash payment schedule, then send the details for admin confirmation.'
+            : 'Upload your proof if needed, then send the payment details for review.';
+    }
+    if (amountField) {
+        amountField.hidden = isCash;
+        amountField.style.display = isCash ? 'none' : '';
+    }
+    if (referenceField) {
+        referenceField.hidden = isCash;
+        referenceField.style.display = isCash ? 'none' : '';
+    }
+    if (paymentDateField) {
+        paymentDateField.hidden = isCash;
+        paymentDateField.style.display = isCash ? 'none' : '';
+    }
+    if (cashDateField) {
+        cashDateField.hidden = !isCash;
+        cashDateField.style.display = isCash ? '' : 'none';
+    }
+    if (proofField) {
+        proofField.hidden = isCash;
+        proofField.style.display = isCash ? 'none' : '';
+    }
+    if (isCash && proofInput) {
+        proofInput.value = '';
+    }
+    if (isCash && proofFilenameEl) {
+        proofFilenameEl.textContent = 'No file chosen';
+    }
+}
+
+function renderReservations() {
+    if (!reservationsList) return;
+
+    if (!state.reservations.length) {
+        reservationsList.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">No reservations yet</div>
                 <h3>No reservations yet</h3>
                 <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
                 <a href="../pages/reservations.html" class="res-book-btn">Book an Event</a>
-            </div>`;
-        return;
-    }
-
-    list.innerHTML = '';
-    reservations.forEach(r => {
-        const statusLabel = {
-            pending: 'Pending Verification',
-            confirmed: 'Confirmed',
-            cancelled: 'Cancelled'
-        }[r.status] || r.status;
-
-        const date = r.event_date
-            ? new Date(r.event_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
-            : '—';
-
-        const price = r.total_price > 0
-            ? '₱' + Number(r.total_price).toLocaleString()
-            : 'Contact for quote';
-
-        const location = r.location_type === 'onsite'
-            ? 'Onsite — ELI Coffee'
-            : `Offsite — ${r.venue_location || ''}`;
-
-        const submittedOn = new Date(r.created_at).toLocaleDateString('en-PH', {
-            year: 'numeric', month: 'short', day: 'numeric'
-        });
-
-        const packageName = r.package?.package_name || r.package_id || '—';
-        const addOnName = r.add_on?.package_name || null;
-        const packageContractUrl = getContractFileForReservation(r);
-        const signedContract = contractsByReservationId[r.reservation_id];
-        const verifiedLabel = signedContract?.verified_date
-            ? `Verified on ${new Date(signedContract.verified_date).toLocaleDateString('en-PH', {
-                year: 'numeric', month: 'short', day: 'numeric'
-            })}`
-            : 'Pending verification';
-
-        const card = document.createElement('div');
-        card.className = 'reservation-card';
-        card.innerHTML = `
-            <div class="res-card-header">
-                <div>
-                    <h4>${r.event_type || 'Event'}</h4>
-                    <p class="res-submitted">Submitted on ${submittedOn}</p>
-                </div>
-                <span class="res-status ${r.status}">${statusLabel}</span>
-            </div>
-            <div class="res-card-body">
-                <div class="res-detail"><span class="res-icon">Date:</span><span><strong>Date:</strong> ${date}</span></div>
-                <div class="res-detail"><span class="res-icon">Time:</span><span><strong>Time:</strong> ${r.event_time || '—'}</span></div>
-                <div class="res-detail"><span class="res-icon">Guests:</span><span><strong>Guests:</strong> ${r.guest_count || '—'}</span></div>
-                <div class="res-detail"><span class="res-icon">Location:</span><span><strong>Location:</strong> ${location}</span></div>
-                <div class="res-detail"><span class="res-icon">Package:</span><span><strong>Package:</strong> ${packageName}</span></div>
-                ${addOnName ? `<div class="res-detail"><span class="res-icon">Add-on:</span><span><strong>Add-on:</strong> ${addOnName}</span></div>` : ''}
-                <div class="res-detail"><span class="res-icon">Total:</span><span><strong>Total:</strong> ${price}</span></div>
-                ${r.special_requests ? `<div class="res-detail"><span class="res-icon">Notes:</span><span><strong>Notes:</strong> ${r.special_requests}</span></div>` : ''}
-            </div>
-            <div class="res-card-footer">
-                <div class="res-contract-actions">
-                    ${packageContractUrl ? `<a class="res-contract-link" href="${packageContractUrl}" download>Download Selected Package Contract</a>` : `<span class="res-contract-link disabled">No package contract file assigned yet</span>`}
-                    ${signedContract?.contract_url ? `<a class="res-contract-link secondary" href="${signedContract.contract_url}" target="_blank" rel="noopener noreferrer">View Uploaded Signed Contract</a>` : ''}
-                </div>
-                ${signedContract ? `<p class="res-contract-meta">${verifiedLabel}</p>` : ''}
             </div>
         `;
-        list.appendChild(card);
+        return;
+    }
+
+    const { active, past } = getReservationBuckets();
+    const currentView = state.reservationView === 'past' ? 'past' : 'active';
+    const currentReservations = currentView === 'past' ? past : active;
+    const title = currentView === 'past' ? 'Past Reservations' : 'Active Reservations';
+    const copy = currentView === 'past'
+        ? 'Completed, previous, and archived bookings.'
+        : 'Upcoming and currently active bookings.';
+
+    reservationsList.innerHTML = `
+        <div class="reservation-hub">
+            <div class="reservation-view-switch" role="tablist" aria-label="Reservation views">
+                <button
+                    type="button"
+                    class="reservation-view-tab ${currentView === 'active' ? 'active' : ''}"
+                    data-reservation-view="active"
+                    aria-pressed="${currentView === 'active' ? 'true' : 'false'}"
+                >
+                    Active Reservations <span>${active.length}</span>
+                </button>
+                <button
+                    type="button"
+                    class="reservation-view-tab ${currentView === 'past' ? 'active' : ''}"
+                    data-reservation-view="past"
+                    aria-pressed="${currentView === 'past' ? 'true' : 'false'}"
+                >
+                    Past Reservations <span>${past.length}</span>
+                </button>
+            </div>
+            <div class="reservation-panel">
+                <div class="reservation-panel-head">
+                    <div>
+                        <h3>${title}</h3>
+                        <p>${copy}</p>
+                    </div>
+                </div>
+                <div class="reservation-panel-list">
+                    ${currentReservations.length ? currentReservations.map((reservation) => buildReservationCard(reservation, currentView)).join('') : buildReservationEmptyState(currentView)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function buildPaymentModuleCard(reservation) {
+    const paymentSummary = getPaymentSummary(reservation);
+    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
+    const contract = getReservationContract(reservation.reservation_id);
+    const location = String(reservation.location_type || '').toLowerCase() === 'onsite'
+        ? 'Onsite - ELI Coffee'
+        : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
+    const packageName = reservation.package?.package_name || reservation.package_id || 'No package selected';
+
+    return `
+        <div class="reservation-card payment-module-card" data-payment-reservation-id="${escapeHtml(reservation.reservation_id)}">
+            <div class="payment-module-shell">
+                <div class="payment-module-topbar">
+                    <div class="payment-module-topinfo">
+                        <div class="payment-module-eventblock">
+                            <div class="payment-module-event">${escapeHtml(reservation.event_type || 'Event')}</div>
+                            <div class="payment-module-datetime">${escapeHtml(formatDate(reservation.event_date))} at ${escapeHtml(reservation.event_time || 'No time selected')}</div>
+                        </div>
+                        <div class="payment-module-summary">
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Package:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(packageName)}</strong>
+                            </div>
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Location:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(location)}</strong>
+                            </div>
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Guests:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(String(reservation.guest_count || 0))}</strong>
+                            </div>
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Total:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="payment-module-topactions">
+                        <div class="payment-module-badges">
+                            <span class="res-status ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
+                            <span class="res-section-status ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
+                        </div>
+                        ${contract?.contract_url ? `<a class="res-link-btn payment-contract-btn" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">View Uploaded Signed Contract</a>` : ''}
+                    </div>
+                </div>
+                <div class="payment-workspace">
+                    <section class="payment-column payment-column-main">
+                        <div class="payment-panel-head">
+                            <div>
+                                <h4 class="payment-panel-heading">Payment</h4>
+                                <p class="payment-panel-subheading">Review your amount and submit payment.</p>
+                            </div>
+                        </div>
+                        <div class="payment-panel-surface">
+                            ${renderPaymentComposer(reservation)}
+                        </div>
+                    </section>
+                    <aside class="payment-column payment-column-side">
+                        <section class="payment-side-card payment-status-section">
+                            ${renderPaymentStatusContext(reservation)}
+                        </section>
+                        <section class="payment-side-card payment-reference-section">
+                            <div class="res-section-head">
+                                <div>
+                                    <div class="res-section-title">Payment Records</div>
+                                    <div class="res-section-copy">History and receipts stay on demand so the payment action stays focused.</div>
+                                </div>
+                            </div>
+                            ${renderPaymentReferenceTabs(reservation)}
+                        </section>
+                    </aside>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderPaymentsModule() {
+    if (!paymentsList) return;
+
+    const paymentReservations = state.reservations.filter((reservation) => (
+        isReservationPaymentEnabled(reservation)
+        || getReservationPayments(reservation.reservation_id).length > 0
+        || getReservationReceipts(reservation.reservation_id).length > 0
+    ));
+
+    if (!paymentReservations.length) {
+        paymentsList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">Payments</div>
+                <h3>No payments yet</h3>
+                <p>Approved reservations that need payment will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+
+    paymentsList.innerHTML = paymentReservations.map(buildPaymentModuleCard).join('');
+    paymentsList.querySelectorAll('.payment-composer').forEach((section) => syncPaymentComposerState(section));
+}
+
+function setInlineMessage(container, message, type = '') {
+    if (!container) return;
+    container.textContent = message;
+    container.className = `res-form-message${type ? ` ${type}` : ''}`;
+}
+
+function setReservationDetailsMessage(message, isError = false) {
+    const messageEl = reservationDetailsView?.querySelector('[data-contract-resubmission-message]');
+    if (!messageEl) return;
+    messageEl.textContent = message;
+    messageEl.classList.remove('error', 'success');
+    if (message) {
+        messageEl.classList.add(isError ? 'error' : 'success');
+    }
+}
+
+function openSubmissionFeedbackModal({
+    eyebrow = 'Contract Resubmitted',
+    title = 'Replacement Contract Submitted',
+    copy = 'Your corrected signed contract was sent to the admin for review.'
+} = {}) {
+    if (submissionFeedbackEyebrow) submissionFeedbackEyebrow.textContent = eyebrow;
+    if (submissionFeedbackTitle) submissionFeedbackTitle.textContent = title;
+    if (submissionFeedbackCopy) submissionFeedbackCopy.textContent = copy;
+    submissionFeedbackBackdrop?.classList.remove('hidden');
+    submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeSubmissionFeedbackModal() {
+    submissionFeedbackBackdrop?.classList.add('hidden');
+    submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+async function uploadPaymentProof(file) {
+    if (!file) return '';
+
+    if (file.size > CLOUDINARY_CONFIG.maxFileSize) {
+        throw new Error('Proof file must be 10MB or smaller.');
+    }
+
+    if (!String(file.type || '').startsWith('image/')) {
+        throw new Error('Please upload an image or screenshot for the payment proof.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    formData.append('folder', CLOUDINARY_CONFIG.paymentFolder);
+
+    const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/auto/upload`,
+        {
+            method: 'POST',
+            body: formData
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error('Failed to upload payment proof.');
+    }
+
+    const result = await response.json();
+    return result.secure_url || '';
+}
+
+async function uploadContractFile(file) {
+    if (!file) return '';
+
+    if (file.size > CLOUDINARY_CONFIG.maxFileSize) {
+        throw new Error('Contract file must be 10MB or smaller.');
+    }
+
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(String(file.type || '').toLowerCase())) {
+        throw new Error('Please upload the signed contract as a PDF, JPG, or PNG file.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    formData.append('folder', CLOUDINARY_CONFIG.contractFolder);
+
+    const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/auto/upload`,
+        {
+            method: 'POST',
+            body: formData
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error('Failed to upload the replacement signed contract.');
+    }
+
+    const result = await response.json();
+    return result.secure_url || '';
+}
+
+async function fetchContracts(reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reservation_contracts')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, resubmitted_at')
+        .in('reservation_id', reservationIds);
+
+    if (error) {
+        if (
+            isReservationContractsColumnMissing(error, 'review_status')
+            || isReservationContractsColumnMissing(error, 'review_notes')
+            || isReservationContractsColumnMissing(error, 'reviewed_at')
+            || isReservationContractsColumnMissing(error, 'resubmitted_at')
+        ) {
+            const fallback = await supabase
+                .from('reservation_contracts')
+                .select('reservation_id, contract_url, verified_date')
+                .in('reservation_id', reservationIds);
+
+            if (fallback.error) throw fallback.error;
+
+            return (fallback.data || []).reduce((map, contract) => {
+                map[contract.reservation_id] = contract;
+                return map;
+            }, {});
+        }
+
+        throw error;
+    }
+
+    return (data || []).reduce((map, contract) => {
+        map[contract.reservation_id] = contract;
+        return map;
+    }, {});
+}
+
+async function fetchPayments(reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('payment')
+        .select(`
+            payment_id,
+            reservation_id,
+            reschedule_request_id,
+            payment_type,
+            payment_method,
+            amount,
+            payment_status,
+            reference_number,
+            payment_date,
+            notes,
+            proof_url,
+            cash_payment_date,
+            submitted_at,
+            verified_at
+        `)
+        .in('reservation_id', reservationIds)
+        .order('submitted_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).reduce((map, payment) => {
+        if (!map[payment.reservation_id]) {
+            map[payment.reservation_id] = [];
+        }
+        map[payment.reservation_id].push(payment);
+        return map;
+    }, {});
+}
+
+async function fetchReceipts(paymentIds) {
+    if (!paymentIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('receipts')
+        .select('receipt_id, payment_id, receipt_number, issued_at')
+        .in('payment_id', paymentIds);
+
+    if (error) throw error;
+
+    return (data || []).reduce((map, receipt) => {
+        map[receipt.payment_id] = receipt;
+        return map;
+    }, {});
+}
+
+async function fetchRescheduleRequests(reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reschedule_requests')
+        .select(`
+            reschedule_request_id,
+            reservation_id,
+            user_id,
+            original_date,
+            original_time,
+            requested_date,
+            requested_time,
+            status,
+            requested_at,
+            reviewed_at
+        `)
+        .in('reservation_id', reservationIds)
+        .order('requested_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).reduce((map, request) => {
+        if (!map[request.reservation_id]) {
+            map[request.reservation_id] = [];
+        }
+        map[request.reservation_id].push(request);
+        return map;
+    }, {});
+}
+
+async function loadReservations() {
+    if (reservationsList) {
+        reservationsList.innerHTML = '<p style="color:#888;text-align:center;padding:40px 0;">Loading...</p>';
+    }
+
+    try {
+        const { data: reservations, error } = await supabase
+            .from('reservations')
+            .select(`
+                reservation_id,
+                user_id,
+                event_type,
+                event_date,
+                event_time,
+                guest_count,
+                location_type,
+                venue_location,
+                package_id,
+                add_on_id,
+                total_price,
+                special_requests,
+                status,
+                created_at,
+                package:package_id ( package_name, package_type ),
+                add_on:add_on_id ( package_name, package_type )
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        state.reservations = reservations || [];
+        const reservationIds = state.reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
+
+        state.contractsByReservationId = await fetchContracts(reservationIds);
+        state.paymentsByReservationId = await fetchPayments(reservationIds);
+        state.reschedulesByReservationId = await fetchRescheduleRequests(reservationIds);
+
+        const paymentIds = Object.values(state.paymentsByReservationId)
+            .flat()
+            .map((payment) => payment.payment_id)
+            .filter(Boolean);
+
+        state.receiptsByPaymentId = await fetchReceipts(paymentIds);
+        renderReservations();
+        renderPaymentsModule();
+        if (state.reservationDetailsReservationId) {
+            renderReservationDetailsModal(state.reservationDetailsReservationId);
+        }
+    } catch (error) {
+        console.error('Failed to load reservations:', error);
+        if (reservationsList) {
+            reservationsList.innerHTML = '<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations.</p>';
+        }
+        if (paymentsList) {
+            paymentsList.innerHTML = '<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load payments.</p>';
+        }
+    }
+}
+
+function openReceiptModal(paymentId, reservationId) {
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    const payment = getReservationPayments(reservationId).find((entry) => String(entry.payment_id) === String(paymentId));
+    const receipt = state.receiptsByPaymentId[paymentId];
+
+    if (!reservation || !payment || !receipt || !receiptView) return;
+
+    receiptView.innerHTML = `
+        <div class="receipt-panel">
+            <div class="receipt-panel-head">
+                <div>
+                    <div class="receipt-panel-title">${escapeHtml(getPaymentLabel(payment.payment_type))}</div>
+                    <div class="receipt-panel-sub">Receipt No. ${escapeHtml(receipt.receipt_number)}</div>
+                </div>
+                <span class="receipt-meta-chip">${escapeHtml(formatShortDate(receipt.issued_at))}</span>
+            </div>
+            <div class="receipt-panel-body">
+                <div class="receipt-grid">
+                    <div class="receipt-field">
+                        <span class="receipt-label">Customer</span>
+                        <span class="receipt-value">${escapeHtml(document.getElementById('sidebar-name')?.textContent || 'Customer')}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Event</span>
+                        <span class="receipt-value">${escapeHtml(reservation.event_type || 'Event')}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Reservation Date</span>
+                        <span class="receipt-value">${escapeHtml(formatDate(reservation.event_date))}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Package</span>
+                        <span class="receipt-value">${escapeHtml(reservation.package?.package_name || 'Package')}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Payment Type</span>
+                        <span class="receipt-value">${escapeHtml(getPaymentLabel(payment.payment_type))}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Payment Method</span>
+                        <span class="receipt-value">${escapeHtml(PAYMENT_METHODS[payment.payment_method]?.label || payment.payment_method)}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Amount Paid</span>
+                        <span class="receipt-value">${escapeHtml(formatCurrency(payment.amount))}</span>
+                    </div>
+                    <div class="receipt-field">
+                        <span class="receipt-label">Reference</span>
+                        <span class="receipt-value">${escapeHtml(payment.reference_number || 'Not provided')}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="receipt-panel-foot">
+                This acknowledges receipt of the payment recorded for this reservation. This is an acknowledgement receipt generated inside the system and is not an official sales invoice.
+            </div>
+        </div>
+    `;
+
+    state.receiptModalPaymentId = paymentId;
+    receiptModalBackdrop?.classList.remove('hidden');
+    receiptModalBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeReceiptModal() {
+    state.receiptModalPaymentId = null;
+    receiptModalBackdrop?.classList.add('hidden');
+    receiptModalBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+async function resolveBlackoutDateColumn() {
+    if (state.rescheduleModal.blackoutDateColumn) return state.rescheduleModal.blackoutDateColumn;
+
+    let lastError = null;
+    for (const column of BLACKOUT_DATE_COLUMNS) {
+        const { error } = await supabase
+            .from('calendar_blackouts')
+            .select(column)
+            .limit(1);
+
+        if (!error) {
+            state.rescheduleModal.blackoutDateColumn = column;
+            return column;
+        }
+
+        lastError = error;
+    }
+
+    throw lastError || new Error('Unable to determine blackout date column.');
+}
+
+function setRescheduleModalMessage(message, isError = false) {
+    if (!rescheduleModalMessage) return;
+    rescheduleModalMessage.textContent = message;
+    rescheduleModalMessage.classList.toggle('error', isError);
+}
+
+function formatDateForInput(value) {
+    const key = formatDateKey(value);
+    return key || '';
+}
+
+async function loadRescheduleAvailability(reservation) {
+    const blackoutDateColumn = await resolveBlackoutDateColumn();
+
+    const [{ data: blackoutRows, error: blackoutError }, { data: approvedReservations, error: reservationError }] = await Promise.all([
+        supabase
+            .from('calendar_blackouts')
+            .select(blackoutDateColumn),
+        supabase
+            .from('reservations')
+            .select(`
+                reservation_id,
+                event_date,
+                location_type,
+                status,
+                package:package_id ( package_name )
+            `)
+            .eq('status', 'approved')
+    ]);
+
+    if (blackoutError) throw blackoutError;
+    if (reservationError) throw reservationError;
+
+    state.rescheduleModal.bookedReservations = approvedReservations || [];
+    state.rescheduleModal.closedDates = new Set((blackoutRows || []).map((row) => row[blackoutDateColumn]).filter(Boolean));
+    state.rescheduleModal.blackoutDateColumn = blackoutDateColumn;
+    state.rescheduleModal.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    state.rescheduleModal.selectedDate = '';
+    state.rescheduleModal.selectedTime = reservation.event_time || '';
+}
+
+function renderRescheduleTimes() {
+    if (!rescheduleTimeGrid) return;
+
+    const selectedTime = state.rescheduleModal.selectedTime;
+    rescheduleTimeGrid.innerHTML = TIMES.map((time) => `
+        <button
+            type="button"
+            class="reschedule-time-btn ${selectedTime === time ? 'active' : ''}"
+            data-time="${escapeHtml(time)}"
+        >
+            ${escapeHtml(time)}
+        </button>
+    `).join('');
+}
+
+function renderRescheduleCalendar() {
+    if (!rescheduleCalendarGrid || !rescheduleMonthLabel) return;
+
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
+    if (!reservation) return;
+
+    const month = state.rescheduleModal.month;
+    const start = new Date(month.getFullYear(), month.getMonth(), 1);
+    const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const firstWeekday = start.getDay();
+    const daysInMonth = end.getDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const reservationScope = getBookingScope(reservation);
+    const currentReservationDate = formatDateKey(reservation.event_date);
+
+    rescheduleMonthLabel.textContent = month.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'long'
+    });
+
+    const cells = [];
+    for (let index = 0; index < firstWeekday; index += 1) {
+        cells.push('<div class="reschedule-empty-day"></div>');
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = new Date(month.getFullYear(), month.getMonth(), day);
+        const dateKey = [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
+        const isPastOrToday = date <= today;
+        const isClosed = state.rescheduleModal.closedDates.has(dateKey);
+        const approvedCount = reservationScope ? getBookedCountForScope(dateKey, reservationScope, reservation.reservation_id) : 0;
+        const bookingLimit = BOOKING_LIMITS[reservationScope] || 1;
+        const isBooked = reservationScope ? approvedCount >= bookingLimit : false;
+        const isCurrent = currentReservationDate === dateKey;
+        const isAvailable = !isPastOrToday && !isClosed && !isBooked && !isCurrent;
+        const isSelected = state.rescheduleModal.selectedDate === dateKey;
+        const classNames = ['reschedule-day'];
+        let label = 'Unavailable';
+
+        if (isAvailable) {
+            classNames.push('available');
+            label = 'Available';
+        } else if (isClosed) {
+            classNames.push('closed');
+            label = 'Closed';
+        } else if (isBooked) {
+            classNames.push('booked');
+            label = 'Fully Booked';
+        } else {
+            classNames.push('disabled');
+            label = isCurrent ? 'Current booking date' : 'Unavailable';
+        }
+
+        if (isCurrent) classNames.push('current');
+        if (isSelected) classNames.push('selected');
+
+        cells.push(`
+            <button
+                type="button"
+                class="${classNames.join(' ')}"
+                data-date="${escapeHtml(dateKey)}"
+                aria-label="${escapeHtml(label)} on ${escapeHtml(formatDate(dateKey))}"
+                ${isAvailable ? '' : 'disabled'}
+            >
+                <span>${day}</span>
+            </button>
+        `);
+    }
+
+    rescheduleCalendarGrid.innerHTML = cells.join('');
+}
+
+function closeRescheduleModal() {
+    state.rescheduleModal.reservationId = null;
+    state.rescheduleModal.selectedDate = '';
+    state.rescheduleModal.selectedTime = '';
+    state.rescheduleModal.bookedReservations = [];
+    state.rescheduleModal.closedDates = new Set();
+    rescheduleModalBackdrop?.classList.add('hidden');
+    rescheduleModalBackdrop?.setAttribute('aria-hidden', 'true');
+    rescheduleModalSubmit?.removeAttribute('disabled');
+    setRescheduleModalMessage('');
+}
+
+async function openRescheduleModal(reservationId) {
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    if (!reservation) return;
+
+    state.rescheduleModal.reservationId = reservationId;
+    if (rescheduleCurrentValue) {
+        rescheduleCurrentValue.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
+    }
+
+    setRescheduleModalMessage('Loading availability...');
+    rescheduleModalBackdrop?.classList.remove('hidden');
+    rescheduleModalBackdrop?.setAttribute('aria-hidden', 'false');
+
+    try {
+        await loadRescheduleAvailability(reservation);
+        renderRescheduleCalendar();
+        renderRescheduleTimes();
+        setRescheduleModalMessage('Choose a future available date and your new start time.');
+    } catch (error) {
+        setRescheduleModalMessage(`Failed to load availability: ${error.message}`, true);
+    }
+}
+
+async function submitRescheduleRequest() {
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
+    if (!reservation) return;
+
+    if (!state.rescheduleModal.selectedDate) {
+        setRescheduleModalMessage('Please choose a new available date first.', true);
+        return;
+    }
+
+    if (!state.rescheduleModal.selectedTime) {
+        setRescheduleModalMessage('Please choose a new event time.', true);
+        return;
+    }
+
+    rescheduleModalSubmit?.setAttribute('disabled', 'true');
+    setRescheduleModalMessage('Submitting your reschedule request...');
+
+    try {
+        const payload = {
+            reservation_id: reservation.reservation_id,
+            user_id: user.id,
+            original_date: reservation.event_date,
+            original_time: reservation.event_time,
+            requested_date: state.rescheduleModal.selectedDate,
+            requested_time: state.rescheduleModal.selectedTime,
+            status: 'pending'
+        };
+
+        const { error } = await supabase
+            .from('reschedule_requests')
+            .insert(payload);
+
+        if (error) throw error;
+
+        closeRescheduleModal();
+        await loadReservations();
+    } catch (error) {
+        rescheduleModalSubmit?.removeAttribute('disabled');
+        setRescheduleModalMessage(`Failed to submit request: ${error.message}`, true);
+    }
+}
+
+async function submitPayment(section, reservationId) {
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    const messageEl = section?.querySelector('[data-form-message]');
+    if (!section || !reservation) return;
+
+    const activeMethod = section.querySelector('.res-payment-method.active')?.dataset.method || 'card';
+    const activeOption = section.querySelector('.res-payment-type.active');
+
+    if (!activeOption) {
+        setInlineMessage(messageEl, 'Please choose a payment type first.', 'error');
+        return;
+    }
+
+    const amount = Number(activeOption.dataset.amount || 0);
+    const paymentType = activeOption.dataset.paymentType || '';
+    const rescheduleRequestId = activeOption.dataset.rescheduleRequestId || null;
+    const referenceNumber = section.querySelector('[data-field="reference_number"]')?.value.trim() || '';
+    const paymentDate = section.querySelector('[data-field="payment_date"]')?.value || null;
+    const cashPaymentDate = section.querySelector('[data-field="cash_payment_date"]')?.value || null;
+    const notes = section.querySelector('[data-field="notes"]')?.value.trim() || '';
+    const proofFile = section.querySelector('[data-field="proof_file"]')?.files?.[0] || null;
+
+    if (!amount || amount <= 0) {
+        setInlineMessage(messageEl, 'This payment option does not have a valid amount.', 'error');
+        return;
+    }
+
+    if (activeMethod === 'cash') {
+        if (!cashPaymentDate) {
+            setInlineMessage(messageEl, 'Please choose the date you will visit the cafe to pay in cash.', 'error');
+            return;
+        }
+    } else {
+        if (!referenceNumber) {
+            setInlineMessage(messageEl, 'Please enter your reference or transaction number.', 'error');
+            return;
+        }
+        if (!paymentDate) {
+            setInlineMessage(messageEl, 'Please choose the payment date.', 'error');
+            return;
+        }
+        if (!proofFile) {
+            setInlineMessage(messageEl, 'Please upload a proof of payment.', 'error');
+            return;
+        }
+    }
+
+    const submitBtn = section.querySelector('.submit-payment-btn');
+    submitBtn?.setAttribute('disabled', 'true');
+    setInlineMessage(messageEl, 'Submitting payment details...');
+
+    try {
+        const proofUrl = activeMethod === 'cash' ? '' : await uploadPaymentProof(proofFile);
+
+        const payload = {
+            reservation_id: reservation.reservation_id,
+            reschedule_request_id: rescheduleRequestId || null,
+            payment_type: paymentType,
+            payment_method: activeMethod,
+            amount,
+            payment_status: 'pending_review',
+            reference_number: activeMethod === 'cash' ? null : referenceNumber,
+            payment_date: activeMethod === 'cash' ? null : paymentDate,
+            notes: notes || null,
+            proof_url: proofUrl || null,
+            cash_payment_date: activeMethod === 'cash' ? cashPaymentDate : null,
+            submitted_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase
+            .from('payment')
+            .insert(payload);
+
+        if (error) throw error;
+
+        setInlineMessage(messageEl, 'Payment details submitted for admin review.', 'success');
+        await loadReservations();
+    } catch (error) {
+        submitBtn?.removeAttribute('disabled');
+        setInlineMessage(messageEl, `Failed to submit payment: ${error.message}`, 'error');
+    }
+}
+
+async function submitReplacementContract(reservationId) {
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    const contract = getReservationContract(reservationId);
+    const contractMeta = getReservationContractMeta(reservationId);
+    const fileInput = reservationDetailsView?.querySelector(`[data-field="replacement_contract"][data-reservation-id="${reservationId}"]`);
+    const submitBtn = reservationDetailsView?.querySelector(`[data-action="submit-contract-resubmission"][data-reservation-id="${reservationId}"]`);
+    const replacementFile = fileInput?.files?.[0] || null;
+
+    if (!reservation || !contract) {
+        setReservationDetailsMessage('This reservation contract could not be found.', true);
+        return;
+    }
+
+    if (contractMeta.statusKey !== 'resubmission_requested') {
+        setReservationDetailsMessage('Contract replacement is only available after admin requests a resubmission.', true);
+        return;
+    }
+
+    if (!replacementFile) {
+        setReservationDetailsMessage('Please choose the corrected signed contract first.', true);
+        return;
+    }
+
+    setReservationDetailsMessage('Uploading replacement contract...');
+    submitBtn?.setAttribute('disabled', 'true');
+
+    try {
+        const contractUrl = await uploadContractFile(replacementFile);
+        const resubmittedAt = new Date().toISOString();
+        const updatePayload = {
+            contract_url: contractUrl,
+            review_status: 'pending_review',
+            review_notes: null,
+            reviewed_at: null,
+            verified_date: null,
+            resubmitted_at: resubmittedAt
+        };
+
+        let updateResult = await supabase
+            .from('reservation_contracts')
+            .update(updatePayload)
+            .eq('reservation_id', reservationId)
+            .select('reservation_id')
+            .maybeSingle();
+
+        if (updateResult.error && isReservationContractsColumnMissing(updateResult.error, 'resubmitted_at')) {
+            const fallbackPayload = {
+                contract_url: contractUrl,
+                review_status: 'pending_review',
+                review_notes: null,
+                reviewed_at: null,
+                verified_date: null
+            };
+
+            updateResult = await supabase
+                .from('reservation_contracts')
+                .update(fallbackPayload)
+                .eq('reservation_id', reservationId)
+                .select('reservation_id')
+                .maybeSingle();
+        }
+
+        const { data, error } = updateResult;
+
+        if (error) throw error;
+        if (!data) {
+            throw new Error('Your reservation contract could not be updated.');
+        }
+
+        setReservationDetailsMessage('Replacement contract submitted for admin review.');
+        await loadReservations();
+        openSubmissionFeedbackModal();
+    } catch (error) {
+        submitBtn?.removeAttribute('disabled');
+        setReservationDetailsMessage(`Failed to submit replacement contract: ${error.message}`, true);
+    }
+}
+
+function activateAccountSection(sectionKey) {
+    const navButtons = document.querySelectorAll('.account-nav-item[data-section]');
+    const sections = document.querySelectorAll('.account-section');
+
+    navButtons.forEach((navButton) => {
+        navButton.classList.toggle('active', navButton.dataset.section === sectionKey);
+    });
+    sections.forEach((section) => {
+        section.classList.toggle('active', section.id === `section-${sectionKey}`);
     });
 }
 
-function getContractFileForReservation(reservation) {
-    const packageName = (reservation.package?.package_name || '').toLowerCase();
-    const addOnName = (reservation.add_on?.package_name || '').toLowerCase();
-    const locationType = (reservation.location_type || '').toLowerCase();
+function wireReservationActions() {
+    reservationsList?.addEventListener('click', async (event) => {
+        const viewToggle = event.target.closest('[data-reservation-view]');
+        if (viewToggle) {
+            const requestedView = viewToggle.dataset.reservationView === 'past' ? 'past' : 'active';
+            if (state.reservationView !== requestedView) {
+                state.reservationView = requestedView;
+                renderReservations();
+            }
+            return;
+        }
 
-    if (locationType === 'onsite') {
-        if (packageName.includes('vip')) return CONTRACT_FILES.onsite_vip;
-        if (packageName.includes('main hall')) return CONTRACT_FILES.onsite_main_hall;
-        if (addOnName.includes('snack') || addOnName.includes('biscuit')) return CONTRACT_FILES.add_on_snack;
-        return CONTRACT_FILES.onsite_default;
-    }
+        const detailsBtn = event.target.closest('.open-reservation-details-btn');
+        if (detailsBtn) {
+            renderReservationDetailsModal(detailsBtn.dataset.reservationId);
+            return;
+        }
 
-    if (locationType === 'offsite') {
-        if (packageName.includes('coffee')) return CONTRACT_FILES.offsite_coffee;
-        if (packageName.includes('snack') || packageName.includes('biscuit')) return CONTRACT_FILES.offsite_snack;
-        if (packageName.includes('catering')) return CONTRACT_FILES.offsite_catering;
-    }
+        const rescheduleBtn = event.target.closest('.open-reschedule-btn');
+        if (rescheduleBtn) {
+            await openRescheduleModal(rescheduleBtn.dataset.reservationId);
+            return;
+        }
 
-    return CONTRACT_FILES.default;
-}
-
-const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-if (profile) {
-    document.getElementById('sidebar-name').innerText = `${profile.first_name} ${profile.last_name}`;
-    document.getElementById('sidebar-email').innerText = profile.email;
-
-    document.getElementById('profile-first-name').value = profile.first_name || '';
-    document.getElementById('profile-middle-name').value = profile.middle_name || '';
-    document.getElementById('profile-last-name').value = profile.last_name || '';
-    document.getElementById('profile-email').value = profile.email || '';
-    document.getElementById('profile-phone').value = profile.phone_number || '';
-
-    const date = new Date(profile.date_registered);
-    document.getElementById('profile-date').value = date.toLocaleDateString('en-PH', {
-        year: 'numeric', month: 'long', day: 'numeric'
-    });
-}
-
-const navItems = document.querySelectorAll('.account-nav-item[data-section]');
-const sections = document.querySelectorAll('.account-section');
-
-navItems.forEach(item => {
-    item.addEventListener('click', () => {
-        const target = item.dataset.section;
-
-        navItems.forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-
-        sections.forEach(s => s.classList.remove('active'));
-        document.getElementById(`section-${target}`).classList.add('active');
-
-        if (target === 'reservations') {
-            loadReservations();
+        const openPaymentsBtn = event.target.closest('.open-payments-btn');
+        if (openPaymentsBtn) {
+            const reservationId = openPaymentsBtn.dataset.reservationId;
+            closeReservationDetailsModal();
+            activateAccountSection('payments');
+            const targetCard = paymentsList?.querySelector(`[data-payment-reservation-id="${reservationId}"]`);
+            targetCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     });
-});
+}
 
-loadReservations();
-
-document.getElementById('logout-btn').addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    window.location.href = '../pages/login_signup.html';
-});
-
-document.getElementById('profile-form').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const msg = document.getElementById('profile-msg');
-
-    const { error } = await supabase
-        .from('profiles')
-        .update({
-            first_name: document.getElementById('profile-first-name').value.trim(),
-            middle_name: document.getElementById('profile-middle-name').value.trim() || null,
-            last_name: document.getElementById('profile-last-name').value.trim(),
-            phone_number: document.getElementById('profile-phone').value.trim(),
-        })
-        .eq('id', user.id);
-
-    if (error) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Failed to save changes: ' + error.message;
-    } else {
-        msg.className = 'form-msg success';
-        msg.innerText = 'Profile updated successfully!';
-
-        document.getElementById('sidebar-name').innerText =
-            `${document.getElementById('profile-first-name').value} ${document.getElementById('profile-last-name').value}`;
-    }
-});
-
-document.getElementById('password-form').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const msg = document.getElementById('password-msg');
-
-    const currentPassword = document.getElementById('current-password').value;
-    const newPassword = document.getElementById('new-password').value;
-    const confirmPassword = document.getElementById('confirm-new-password').value;
-
-    msg.className = 'form-msg';
-    msg.innerText = '';
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Please fill in all password fields.';
-        return;
-    }
-
-    if (newPassword !== confirmPassword) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Passwords do not match.';
-        return;
-    }
-
-    if (newPassword.length < 8) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Password must be at least 8 characters.';
-        return;
-    }
-
-    if (currentPassword === newPassword) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'New password must be different from current password.';
-        return;
-    }
-
-    const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !currentUser?.email) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Unable to verify your account. Please log in again.';
-        return;
-    }
-
-    const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: currentUser.email,
-        password: currentPassword
+function wireReservationDetailsModal() {
+    reservationDetailsClose?.addEventListener('click', closeReservationDetailsModal);
+    reservationDetailsDismiss?.addEventListener('click', closeReservationDetailsModal);
+    reservationDetailsBackdrop?.addEventListener('click', (event) => {
+        if (event.target === reservationDetailsBackdrop) {
+            closeReservationDetailsModal();
+        }
     });
 
-    if (reauthError) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Current password is incorrect.';
-        return;
-    }
+    reservationDetailsView?.addEventListener('click', async (event) => {
+        const openPaymentsBtn = event.target.closest('.open-payments-btn');
+        if (openPaymentsBtn) {
+            const reservationId = openPaymentsBtn.dataset.reservationId;
+            closeReservationDetailsModal();
+            activateAccountSection('payments');
+            const targetCard = paymentsList?.querySelector(`[data-payment-reservation-id="${reservationId}"]`);
+            targetCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+        const rescheduleBtn = event.target.closest('.open-reschedule-btn');
+        if (rescheduleBtn) {
+            closeReservationDetailsModal();
+            await openRescheduleModal(rescheduleBtn.dataset.reservationId);
+            return;
+        }
 
-    if (error) {
-        msg.className = 'form-msg error';
-        msg.innerText = 'Failed to update password: ' + error.message;
-    } else {
-        msg.className = 'form-msg success';
-        msg.innerText = 'Password updated successfully!';
-        document.getElementById('password-form').reset();
+        const contractSubmitBtn = event.target.closest('[data-action="submit-contract-resubmission"]');
+        if (contractSubmitBtn) {
+            await submitReplacementContract(contractSubmitBtn.dataset.reservationId);
+        }
+    });
+
+    reservationDetailsView?.addEventListener('change', (event) => {
+        const fileInput = event.target.closest('[data-field="replacement_contract"]');
+        if (!fileInput) return;
+
+        const filenameEl = reservationDetailsView.querySelector('[data-contract-filename]');
+        const file = fileInput.files?.[0];
+        if (filenameEl) {
+            filenameEl.textContent = file?.name || 'No file chosen';
+        }
+    });
+}
+
+function wirePaymentActions() {
+    paymentsList?.addEventListener('click', async (event) => {
+        const referenceTab = event.target.closest('[data-payment-panel-tab]');
+        if (referenceTab) {
+            const shell = referenceTab.closest('.payment-reference-shell');
+            const targetTab = referenceTab.dataset.paymentPanelTab || 'history';
+            shell?.querySelectorAll('[data-payment-panel-tab]').forEach((tabButton) => {
+                const isActive = tabButton.dataset.paymentPanelTab === targetTab;
+                tabButton.classList.toggle('active', isActive);
+                tabButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            shell?.querySelectorAll('[data-payment-panel]').forEach((panel) => {
+                const isActive = panel.dataset.paymentPanel === targetTab;
+                panel.classList.toggle('active', isActive);
+                panel.hidden = !isActive;
+            });
+            return;
+        }
+
+        const methodChip = event.target.closest('.res-payment-method');
+        if (methodChip) {
+            const section = methodChip.closest('.payment-composer');
+            section?.querySelectorAll('.res-payment-method').forEach((chip) => chip.classList.remove('active'));
+            methodChip.classList.add('active');
+            syncPaymentComposerState(section);
+            return;
+        }
+
+        const typeChip = event.target.closest('.res-payment-type');
+        if (typeChip) {
+            const section = typeChip.closest('.payment-composer');
+            section?.querySelectorAll('.res-payment-type').forEach((chip) => chip.classList.remove('active'));
+            typeChip.classList.add('active');
+            syncPaymentComposerState(section);
+            return;
+        }
+
+        const receiptBtn = event.target.closest('.view-receipt-btn');
+        if (receiptBtn) {
+            openReceiptModal(receiptBtn.dataset.paymentId, receiptBtn.dataset.reservationId);
+            return;
+        }
+
+        const submitBtn = event.target.closest('.submit-payment-btn');
+        if (submitBtn) {
+            const section = submitBtn.closest('.payment-composer');
+            await submitPayment(section, submitBtn.dataset.reservationId);
+        }
+    });
+
+    paymentsList?.addEventListener('change', (event) => {
+        const fileInput = event.target.closest('[data-field="proof_file"]');
+        if (!fileInput) return;
+
+        const section = fileInput.closest('.payment-proof-box');
+        const filenameEl = section?.querySelector('[data-proof-filename]');
+        const file = fileInput.files?.[0];
+
+        if (filenameEl) {
+            filenameEl.textContent = file?.name || 'No file chosen';
+        }
+    });
+}
+
+function wireReceiptModal() {
+    receiptModalClose?.addEventListener('click', closeReceiptModal);
+    receiptModalDismiss?.addEventListener('click', closeReceiptModal);
+    receiptModalBackdrop?.addEventListener('click', (event) => {
+        if (event.target === receiptModalBackdrop) closeReceiptModal();
+    });
+}
+
+function wireRescheduleModal() {
+    rescheduleModalClose?.addEventListener('click', closeRescheduleModal);
+    rescheduleModalCancel?.addEventListener('click', closeRescheduleModal);
+    rescheduleModalSubmit?.addEventListener('click', submitRescheduleRequest);
+    rescheduleModalBackdrop?.addEventListener('click', (event) => {
+        if (event.target === rescheduleModalBackdrop) closeRescheduleModal();
+    });
+
+    reschedulePrevMonth?.addEventListener('click', () => {
+        state.rescheduleModal.month = new Date(
+            state.rescheduleModal.month.getFullYear(),
+            state.rescheduleModal.month.getMonth() - 1,
+            1
+        );
+        renderRescheduleCalendar();
+    });
+
+    rescheduleNextMonth?.addEventListener('click', () => {
+        state.rescheduleModal.month = new Date(
+            state.rescheduleModal.month.getFullYear(),
+            state.rescheduleModal.month.getMonth() + 1,
+            1
+        );
+        renderRescheduleCalendar();
+    });
+
+    rescheduleCalendarGrid?.addEventListener('click', (event) => {
+        const dayButton = event.target.closest('.reschedule-day.available');
+        if (!dayButton) return;
+        state.rescheduleModal.selectedDate = dayButton.dataset.date || '';
+        renderRescheduleCalendar();
+    });
+
+    rescheduleTimeGrid?.addEventListener('click', (event) => {
+        const timeButton = event.target.closest('.reschedule-time-btn');
+        if (!timeButton) return;
+        state.rescheduleModal.selectedTime = timeButton.dataset.time || '';
+        renderRescheduleTimes();
+    });
+}
+
+function wireSubmissionFeedbackModal() {
+    submissionFeedbackClose?.addEventListener('click', closeSubmissionFeedbackModal);
+    submissionFeedbackDismiss?.addEventListener('click', closeSubmissionFeedbackModal);
+    submissionFeedbackBackdrop?.addEventListener('click', (event) => {
+        if (event.target === submissionFeedbackBackdrop) {
+            closeSubmissionFeedbackModal();
+        }
+    });
+}
+
+async function loadProfile() {
+    const sidebarName = document.getElementById('sidebar-name');
+    const sidebarEmail = document.getElementById('sidebar-email');
+    const firstNameInput = document.getElementById('profile-first-name');
+    const middleNameInput = document.getElementById('profile-middle-name');
+    const lastNameInput = document.getElementById('profile-last-name');
+    const emailInput = document.getElementById('profile-email');
+    const phoneInput = document.getElementById('profile-phone');
+    const dateInput = document.getElementById('profile-date');
+
+    try {
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('user_id, first_name, middle_name, last_name, email, phone_number, role, date_registered')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        const fallbackProfile = {
+            user_id: user.id,
+            first_name: user.user_metadata?.first_name || '',
+            middle_name: user.user_metadata?.middle_name || '',
+            last_name: user.user_metadata?.last_name || '',
+            email: user.email || '',
+            phone_number: user.user_metadata?.phone_number || '',
+            role: 'customer',
+            date_registered: user.created_at || ''
+        };
+
+        state.profile = profile || fallbackProfile;
+        const displayName = getReservationName(state.profile);
+
+        if (sidebarName) sidebarName.textContent = displayName;
+        if (sidebarEmail) sidebarEmail.textContent = state.profile.email || user.email || '';
+        if (firstNameInput) firstNameInput.value = state.profile.first_name || '';
+        if (middleNameInput) middleNameInput.value = state.profile.middle_name || '';
+        if (lastNameInput) lastNameInput.value = state.profile.last_name || '';
+        if (emailInput) emailInput.value = state.profile.email || user.email || '';
+        if (phoneInput) phoneInput.value = state.profile.phone_number || '';
+        if (dateInput) dateInput.value = formatDate(state.profile.date_registered);
+    } catch (error) {
+        console.error('Failed to load profile:', error);
     }
-});
+}
+
+function wireAccountNavigation() {
+    const navButtons = document.querySelectorAll('.account-nav-item[data-section]');
+
+    navButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            activateAccountSection(button.dataset.section);
+        });
+    });
+}
+
+function wireProfileForm() {
+    const profileForm = document.getElementById('profile-form');
+    const profileMessage = document.getElementById('profile-msg');
+
+    profileForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const payload = {
+            user_id: user.id,
+            first_name: document.getElementById('profile-first-name')?.value.trim() || '',
+            middle_name: document.getElementById('profile-middle-name')?.value.trim() || null,
+            last_name: document.getElementById('profile-last-name')?.value.trim() || '',
+            email: user.email || '',
+            phone_number: document.getElementById('profile-phone')?.value.trim() || null,
+            role: state.profile?.role || 'customer',
+            date_registered: state.profile?.date_registered || user.created_at || new Date().toISOString()
+        };
+
+        if (!payload.first_name || !payload.last_name) {
+            profileMessage.textContent = 'First name and last name are required.';
+            return;
+        }
+
+        profileMessage.textContent = 'Saving profile...';
+
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .upsert(payload, { onConflict: 'user_id' });
+
+            if (error) throw error;
+
+            profileMessage.textContent = 'Profile updated successfully.';
+            await loadProfile();
+        } catch (error) {
+            profileMessage.textContent = `Failed to update profile: ${error.message}`;
+        }
+    });
+}
+
+function wirePasswordForm() {
+    const passwordForm = document.getElementById('password-form');
+    const passwordMessage = document.getElementById('password-msg');
+
+    passwordForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const currentPassword = document.getElementById('current-password')?.value || '';
+        const newPassword = document.getElementById('new-password')?.value || '';
+        const confirmPassword = document.getElementById('confirm-new-password')?.value || '';
+
+        if (newPassword.length < 8) {
+            passwordMessage.textContent = 'New password must be at least 8 characters long.';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            passwordMessage.textContent = 'New password and confirmation do not match.';
+            return;
+        }
+
+        passwordMessage.textContent = 'Updating password...';
+
+        try {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: currentPassword
+            });
+
+            if (signInError) throw new Error('Current password is incorrect.');
+
+            const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+            if (updateError) throw updateError;
+
+            passwordMessage.textContent = 'Password updated successfully.';
+            passwordForm.reset();
+        } catch (error) {
+            passwordMessage.textContent = `Failed to update password: ${error.message}`;
+        }
+    });
+}
+
+function wireLogout() {
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.href = '../pages/login_signup.html';
+    });
+
+    supabase.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') {
+            window.location.href = '../pages/login_signup.html';
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            if (state.reservationDetailsReservationId) closeReservationDetailsModal();
+            if (state.receiptModalPaymentId) closeReceiptModal();
+            if (state.rescheduleModal.reservationId) closeRescheduleModal();
+            if (submissionFeedbackBackdrop && !submissionFeedbackBackdrop.classList.contains('hidden')) {
+                closeSubmissionFeedbackModal();
+            }
+        }
+    });
+}
+
+wireAccountNavigation();
+wireReservationActions();
+wireReservationDetailsModal();
+wirePaymentActions();
+wireReceiptModal();
+wireRescheduleModal();
+wireSubmissionFeedbackModal();
+wireProfileForm();
+wirePasswordForm();
+wireLogout();
+
+await Promise.all([
+    loadProfile(),
+    loadReservations()
+]);

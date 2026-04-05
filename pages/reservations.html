@@ -54,7 +54,37 @@
                     <input class="res-input" type="text"   id="event-type"  placeholder="Event Type (e.g. Birthday, Wedding) *">
                     <input class="res-input" type="number" id="guest-count" placeholder="Number of Guests *" min="1">
                 </div>
-                <input class="res-input" type="date" id="event-date">
+                <input type="hidden" id="event-date">
+                <input class="res-input res-input-readonly" type="text" id="event-date-display" placeholder="Select a date from the availability calendar below *" readonly>
+                <section class="availability-panel" aria-labelledby="availabilityTitle">
+                    <div class="availability-head">
+                        <div>
+                            <h3 id="availabilityTitle">Availability Calendar</h3>
+                            <p>Choose an available date for your event.</p>
+                        </div>
+                        <div class="availability-nav">
+                            <button type="button" class="availability-nav-btn" id="availabilityPrevMonth" aria-label="Previous month">&lsaquo;</button>
+                            <span class="availability-month" id="availabilityMonthLabel">Loading...</span>
+                            <button type="button" class="availability-nav-btn" id="availabilityNextMonth" aria-label="Next month">&rsaquo;</button>
+                        </div>
+                    </div>
+                    <div class="availability-weekdays" aria-hidden="true">
+                        <span>Su</span>
+                        <span>Mo</span>
+                        <span>Tu</span>
+                        <span>We</span>
+                        <span>Th</span>
+                        <span>Fr</span>
+                        <span>Sa</span>
+                    </div>
+                    <div class="availability-grid" id="availabilityGrid"></div>
+                    <div class="availability-legend">
+                        <span class="availability-legend-item"><span class="availability-swatch available"></span>Available</span>
+                        <span class="availability-legend-item"><span class="availability-swatch booked"></span>Fully Booked</span>
+                        <span class="availability-legend-item"><span class="availability-swatch closed"></span>Closed</span>
+                    </div>
+                    <p class="availability-message" id="availabilityMessage">Loading availability...</p>
+                </section>
             </div>
 
             <!-- STEP 2: Location -->
@@ -63,17 +93,17 @@
                 <p>Will your event be held at ELI Coffee or at your own venue?</p>
                 <div class="location-options">
                     <div class="location-card" data-val="onsite">
-                        <div class="loc-icon">&#127968;</div>
+                        <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-store"></i></div>
                         <h4>Onsite</h4>
                         <p>Hold your event at ELI Coffee Events Caf&eacute;</p>
                     </div>
                     <div class="location-card" data-val="offsite">
-                        <div class="loc-icon">&#128663;</div>
+                        <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></div>
                         <h4>Offsite</h4>
                         <p>We bring the service to your venue</p>
                     </div>
                 </div>
-                <div id="venue-wrapper" class="hidden">
+                <div id="venue-wrapper" class="venue-wrapper hidden">
                     <input class="res-input" type="text" id="venue-location" placeholder="Venue Location *">
                 </div>
             </div>
@@ -156,7 +186,7 @@
 
             <!-- STEP 4: Time Slot (moved before Your Details) -->
             <div class="res-step" id="rs5">
-                <h2>Time Slot</h2>
+                <h2>Time</h2>
                 <p>Select your preferred event start time</p>
                 <div class="time-grid" id="time-grid"></div>
             </div>
@@ -235,6 +265,21 @@
         time: ''
     };
 
+    const eventDateInput = document.getElementById('event-date');
+    const eventDateDisplayInput = document.getElementById('event-date-display');
+    const availabilityGrid = document.getElementById('availabilityGrid');
+    const availabilityMonthLabel = document.getElementById('availabilityMonthLabel');
+    const availabilityMessage = document.getElementById('availabilityMessage');
+    const availabilityPrevMonthBtn = document.getElementById('availabilityPrevMonth');
+    const availabilityNextMonthBtn = document.getElementById('availabilityNextMonth');
+
+    const availabilityState = {
+        month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        bookedReservations: [],
+        closedDates: new Set(),
+        blackoutDateColumn: null
+    };
+
     const CONTRACT_FILES = {
         onsite_vip: '../files/contracts/contract-vip-lounge.pdf',
         onsite_main_hall: '../files/contracts/contract-main-hall.pdf',
@@ -255,6 +300,260 @@
         { label:'Snack Bar Corner', val:'snack',    icon:'&#127850;', desc:'Mobile snack bar with chocolate fountain' },
         { label:'Catering',         val:'catering', icon:'&#127869;&#65039;', desc:'Full catering service with buffet setup, styled tables &amp; more' }
     ];
+    const BOOKING_LIMITS = {
+        onsite_vip: 1,
+        onsite_main_hall: 1,
+        offsite: 1
+    };
+
+    function pad(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function toDateKey(date) {
+        return [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate())
+        ].join('-');
+    }
+
+    function setAvailabilityMessage(message, isError = false) {
+        if (!availabilityMessage) return;
+        availabilityMessage.textContent = message;
+        availabilityMessage.classList.toggle('error', isError);
+    }
+
+    function formatDisplayDate(dateKey) {
+        if (!dateKey) return '';
+        const [year, month, day] = dateKey.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        return date.toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function syncSelectedDate(dateKey) {
+        if (!eventDateInput) return;
+        eventDateInput.value = dateKey || '';
+        if (eventDateDisplayInput) {
+            eventDateDisplayInput.value = dateKey ? formatDisplayDate(dateKey) : '';
+        }
+        S.eventDate = dateKey || '';
+    }
+
+    function isUnavailableDate(dateKey) {
+        return isDateUnavailableForScope(dateKey, getSelectedBookingScope());
+    }
+
+    function refreshAvailabilityForSelectedScope() {
+        const selectedScope = getSelectedBookingScope();
+
+        if (S.eventDate && isDateUnavailableForScope(S.eventDate, selectedScope)) {
+            syncSelectedDate('');
+            setAvailabilityMessage('Your previously selected date is not available for the selected booking type. Please choose another date.', true);
+        }
+
+        renderAvailabilityCalendar();
+    }
+
+    function getBookingScope(locationType, packageName = '') {
+        const location = (locationType || '').toLowerCase();
+        const name = (packageName || '').toLowerCase();
+
+        if (location === 'offsite') return 'offsite';
+        if (location === 'onsite' && name.includes('main hall')) return 'onsite_main_hall';
+        if (location === 'onsite' && name.includes('vip')) return 'onsite_vip';
+        return null;
+    }
+
+    function getSelectedBookingScope() {
+        if (!S.locationType) return null;
+        if (S.locationType === 'offsite') return 'offsite';
+        return getBookingScope(S.locationType, S.miniPackage?.label || '');
+    }
+
+    function getApprovedReservationCount(dateKey, scope) {
+        return availabilityState.bookedReservations.filter((reservation) => (
+            reservation.dateKey === dateKey && reservation.scope === scope
+        )).length;
+    }
+
+    function isDateFullyBooked(dateKey) {
+        return Object.entries(BOOKING_LIMITS).every(([scope, limit]) => (
+            getApprovedReservationCount(dateKey, scope) >= limit
+        ));
+    }
+
+    function isDateUnavailableForScope(dateKey, scope) {
+        if (!dateKey) return false;
+        if (availabilityState.closedDates.has(dateKey)) return true;
+        if (!scope) return isDateFullyBooked(dateKey);
+        return getApprovedReservationCount(dateKey, scope) >= (BOOKING_LIMITS[scope] || 1);
+    }
+
+    async function resolveAvailabilityBlackoutColumn() {
+        if (availabilityState.blackoutDateColumn) return availabilityState.blackoutDateColumn;
+
+        for (const column of ['closed_date', 'date']) {
+            const { error } = await supabase
+                .from('calendar_blackouts')
+                .select(column)
+                .limit(1);
+
+            if (!error) {
+                availabilityState.blackoutDateColumn = column;
+                return column;
+            }
+        }
+
+        return null;
+    }
+
+    function renderAvailabilityCalendar() {
+        if (!availabilityGrid || !availabilityMonthLabel) return;
+
+        const monthStart = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth(), 1);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const gridStart = new Date(monthStart);
+        gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+        const selectedScope = getSelectedBookingScope();
+
+        availabilityMonthLabel.textContent = availabilityState.month.toLocaleDateString('en-US', {
+            month: 'long',
+            year: 'numeric'
+        });
+        if (availabilityPrevMonthBtn) {
+            availabilityPrevMonthBtn.disabled = monthStart <= currentMonthStart;
+        }
+
+        availabilityGrid.innerHTML = '';
+
+        for (let index = 0; index < 42; index += 1) {
+            const date = new Date(gridStart);
+            date.setDate(gridStart.getDate() + index);
+
+            const dateKey = toDateKey(date);
+            const isCurrentMonth = date.getMonth() === availabilityState.month.getMonth();
+            const isPast = date < today;
+            const isBooked = isDateUnavailableForScope(dateKey, selectedScope) && !availabilityState.closedDates.has(dateKey);
+            const isClosed = availabilityState.closedDates.has(dateKey);
+            const isSelected = eventDateInput?.value === dateKey;
+
+            const dayBtn = document.createElement('button');
+            dayBtn.type = 'button';
+            dayBtn.className = 'availability-day';
+            dayBtn.textContent = String(date.getDate());
+
+            if (!isCurrentMonth) {
+                dayBtn.classList.add('outside-month');
+                dayBtn.disabled = true;
+            } else if (isPast) {
+                dayBtn.classList.add('past');
+                dayBtn.disabled = true;
+            } else if (isClosed) {
+                dayBtn.classList.add('closed');
+                dayBtn.disabled = true;
+                dayBtn.title = 'This date is closed.';
+            } else if (isBooked) {
+                dayBtn.classList.add('booked');
+                dayBtn.disabled = true;
+                dayBtn.title = selectedScope
+                    ? 'This booking type is full on this date.'
+                    : 'All booking slots are full on this date.';
+            } else {
+                dayBtn.classList.add('available');
+                dayBtn.title = 'Click to select this date.';
+                dayBtn.addEventListener('click', () => {
+                    if (eventDateInput?.value === dateKey) {
+                        syncSelectedDate('');
+                        renderAvailabilityCalendar();
+                        setAvailabilityMessage('Date selection cleared.', false);
+                        return;
+                    }
+
+                    syncSelectedDate(dateKey);
+                    renderAvailabilityCalendar();
+                    setAvailabilityMessage('Selected ' + date.toLocaleDateString('en-PH', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }) + '.', false);
+                });
+            }
+
+            if (isSelected && isCurrentMonth) {
+                dayBtn.classList.add('selected');
+            }
+
+            availabilityGrid.appendChild(dayBtn);
+        }
+    }
+
+    async function loadAvailabilityCalendar() {
+        setAvailabilityMessage('Loading availability...');
+
+        const todayKey = toDateKey(new Date());
+
+        try {
+            const { data: approvedReservations, error: reservationsError } = await supabase
+                .from('reservations')
+                .select(`
+                    event_date,
+                    location_type,
+                    package:package_id ( package_name )
+                `)
+                .eq('status', 'approved')
+                .gte('event_date', todayKey);
+
+            if (reservationsError) {
+                console.warn('Availability reservations query failed:', reservationsError.message);
+                availabilityState.bookedReservations = [];
+                setAvailabilityMessage('Booked dates are hidden right now. Add a public/customer read policy for approved reservation dates to show full availability.', true);
+            } else {
+                availabilityState.bookedReservations = (approvedReservations || [])
+                    .map((row) => {
+                        const dateKey = row.event_date;
+                        const packageName = row.package?.package_name || '';
+                        const scope = getBookingScope(row.location_type, packageName);
+                        return dateKey && scope ? { dateKey, scope } : null;
+                    })
+                    .filter(Boolean);
+                setAvailabilityMessage('Green dates are available. Red and brown dates cannot be selected.', false);
+            }
+
+            const blackoutDateColumn = await resolveAvailabilityBlackoutColumn();
+            if (blackoutDateColumn) {
+                const { data: blackoutRows, error: blackoutError } = await supabase
+                    .from('calendar_blackouts')
+                    .select(blackoutDateColumn);
+
+                if (blackoutError) {
+                    console.warn('Availability blackouts query failed:', blackoutError.message);
+                    availabilityState.closedDates = new Set();
+                } else {
+                    availabilityState.closedDates = new Set(
+                        (blackoutRows || [])
+                            .map((row) => row[blackoutDateColumn])
+                            .filter(Boolean)
+                    );
+                }
+            } else {
+                availabilityState.closedDates = new Set();
+            }
+        } catch (error) {
+            console.error('Availability calendar failed:', error);
+            availabilityState.bookedReservations = [];
+            availabilityState.closedDates = new Set();
+            setAvailabilityMessage('Availability preview could not be loaded right now.', true);
+        }
+
+        renderAvailabilityCalendar();
+    }
 
     // ── Load packages from Supabase ──
     async function loadPackages() {
@@ -367,6 +666,7 @@
     }
 
     function populate(id) {
+        if (id === 'rs1') renderAvailabilityCalendar();
         if (id === 'rs3') buildStep3();
         if (id === 'rs5') buildTimeGrid();
         if (id === 'rs6') buildSummary();
@@ -481,6 +781,7 @@
                 activate(g, c);
                 document.getElementById('snack-addon').classList.remove('hidden');
                 buildSnackGrid();
+                refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
@@ -507,12 +808,18 @@
     function buildOffsiteCats() {
         const g = document.getElementById('offsite-cat-grid');
         g.innerHTML = '';
-        const icons = { coffee:'&#9749;', snack:'&#127850;', catering:'&#127869;&#65039;' };
+        const serviceIcons = {
+            coffee: 'fa-mug-hot',
+            snack: 'fa-cookie-bite',
+            catering: 'fa-utensils'
+        };
         OFFSITE_CATS.forEach(p => {
             const c = card(
-                '<h4>' + (icons[p.val] || '') + ' ' + p.label + '</h4><p class="pkg-desc">' + p.desc + '</p>',
+                '<div class="service-card-icon" aria-hidden="true"><i class="fa-solid ' + (serviceIcons[p.val] || 'fa-briefcase') + '"></i></div>' +
+                '<h4>' + p.label + '</h4><p class="pkg-desc">' + p.desc + '</p>',
                 S.offsiteCategory === p.val
             );
+            c.classList.add('service-card');
             c.onclick = () => {
                 S.offsiteCategory = p.val;
                 S.offsitePackage  = null;
@@ -859,6 +1166,7 @@
             if (!et || !gc || !ed) { alert('Please fill in all event details.'); return false; }
             const d = new Date(ed), today = new Date(); today.setHours(0,0,0,0);
             if (d < today) { alert('Please select a future date.'); return false; }
+            if (isUnavailableDate(ed)) { alert('Please choose an available date from the calendar.'); return false; }
             S.eventType = et; S.guestCount = gc; S.eventDate = ed;
         }
 
@@ -868,6 +1176,10 @@
                 const v = document.getElementById('venue-location').value.trim();
                 if (!v) { alert('Please enter your venue location.'); return false; }
                 S.venueLocation = v;
+            }
+            if (S.eventDate && isDateUnavailableForScope(S.eventDate, getSelectedBookingScope())) {
+                alert('The selected date is not available for this booking type. Please choose another date.');
+                return false;
             }
         }
 
@@ -884,6 +1196,10 @@
                 } else {
                     if (!S.offsitePackage) { alert('Please select a specific package.'); return false; }
                 }
+            }
+            if (S.eventDate && isDateUnavailableForScope(S.eventDate, getSelectedBookingScope())) {
+                alert('The selected date is not available for this package. Please go back and choose another date.');
+                return false;
             }
         }
 
@@ -940,7 +1256,26 @@
             S.offsitePackage  = null;
             S.cateringCart    = [];
             document.getElementById('venue-wrapper').classList.toggle('hidden', S.locationType !== 'offsite');
+            renderAvailabilityCalendar();
         };
+    });
+
+    availabilityPrevMonthBtn?.addEventListener('click', () => {
+        availabilityState.month = new Date(
+            availabilityState.month.getFullYear(),
+            availabilityState.month.getMonth() - 1,
+            1
+        );
+        renderAvailabilityCalendar();
+    });
+
+    availabilityNextMonthBtn?.addEventListener('click', () => {
+        availabilityState.month = new Date(
+            availabilityState.month.getFullYear(),
+            availabilityState.month.getMonth() + 1,
+            1
+        );
+        renderAvailabilityCalendar();
     });
 
     async function submitDone() {
@@ -1010,18 +1345,65 @@
 
             if (insertError) throw new Error('Reservation save failed: ' + insertError.message);
 
+            async function getActiveTemplateId(pkgId) {
+                if (!pkgId) return null;
+                const { data: tmpl, error: tmplErr } = await supabase
+                    .from('contract_templates')
+                    .select('template_id')
+                    .eq('package_id', pkgId)
+                    .eq('is_active', true)
+                    .order('version_no', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                if (tmplErr) {
+                    console.warn('Template lookup failed:', tmplErr.message);
+                    return null;
+                }
+                return tmpl?.template_id || null;
+            }
+
             const selectedContract = getSelectedContractInfo();
-            const { error: contractInsertError } = await supabase
-                .from('contracts')
-                .insert({
-                    reservation_id: reservation.reservation_id,
-                    contract_type: selectedContract?.contractType || 'package_contract',
-                    description: selectedContract
-                        ? 'Signed contract upload for ' + selectedContract.title
-                        : 'Signed reservation contract upload',
-                    contract_url: contractUrl,
-                    verified_date: null
-                });
+            const templateId = await getActiveTemplateId(packageId);
+
+            const contractPayload = {
+                reservation_id: reservation.reservation_id,
+                template_id: templateId,
+                contract_type: selectedContract?.contractType || 'package_contract',
+                contract_url: contractUrl,
+                review_status: 'pending_review',
+                review_notes: null,
+                reviewed_at: null,
+                verified_date: null
+            };
+
+            let contractInsertError = null;
+            {
+                const insertResult = await supabase
+                    .from('reservation_contracts')
+                    .insert(contractPayload);
+                contractInsertError = insertResult.error;
+            }
+
+            const contractInsertMessage = contractInsertError?.message || '';
+            const missingReviewColumns = contractInsertMessage.includes("Could not find the 'review_status' column")
+                || contractInsertMessage.includes('column reservation_contracts.review_status does not exist')
+                || contractInsertMessage.includes("Could not find the 'review_notes' column")
+                || contractInsertMessage.includes('column reservation_contracts.review_notes does not exist')
+                || contractInsertMessage.includes("Could not find the 'reviewed_at' column")
+                || contractInsertMessage.includes('column reservation_contracts.reviewed_at does not exist');
+
+            if (missingReviewColumns) {
+                const fallbackResult = await supabase
+                    .from('reservation_contracts')
+                    .insert({
+                        reservation_id: reservation.reservation_id,
+                        template_id: templateId,
+                        contract_type: selectedContract?.contractType || 'package_contract',
+                        contract_url: contractUrl,
+                        verified_date: null
+                    });
+                contractInsertError = fallbackResult.error;
+            }
 
             if (contractInsertError) {
                 throw new Error('Contract save failed: ' + contractInsertError.message);
@@ -1076,7 +1458,9 @@
     }
 
     // Load packages from DB first, then start the form
+    syncSelectedDate('');
     await loadPackages();
+    await loadAvailabilityCalendar();
     showStep(1);
     </script>
 

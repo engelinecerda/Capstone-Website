@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reservation Management - Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/admin_reservations.css">
 </head>
 <body>
@@ -22,37 +22,38 @@
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </span>
-          Dashboard
+          <span class="nav-label">Dashboard</span>
         </a>
-        <a href="#" class="nav-item active">
+        <a href="./admin_reservations.html" class="nav-item active">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </span>
-          Reservations
+          <span class="nav-label">Reservations</span>
+          <span class="nav-badge" id="navReservationCount">0</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="./admin_payments.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
           </span>
-          Payments
+          <span class="nav-label">Payments</span>
         </a>
         <a href="#" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </span>
-          Contracts
+          <span class="nav-label">Contracts</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="./admin_customers.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </span>
-          ELITE (Customers)
+          <span class="nav-label">ELITE (Customers)</span>
         </a>
         <a href="#" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
           </span>
-          Packages
+          <span class="nav-label">Packages</span>
         </a>
       </nav>
       <div class="sidebar-bottom">
@@ -65,114 +66,278 @@
   </aside>
 
   <main class="main">
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">Reservation Management</h1>
-        <p class="page-sub">Manage and process reservation requests</p>
-      </div>
-    </header>
-
-    <section class="stat-row" id="statRow">
-      <div class="stat-card" data-status="pending">
-        <p class="stat-label">Pending</p>
-        <div class="stat-value" id="stat-pending">0</div>
-      </div>
-      <div class="stat-card" data-status="approved">
-        <p class="stat-label">Approved</p>
-        <div class="stat-value" id="stat-approved">0</div>
-      </div>
-      <div class="stat-card" data-status="declined">
-        <p class="stat-label">Declined</p>
-        <div class="stat-value" id="stat-declined">0</div>
-      </div>
-      <div class="stat-card" data-status="completed">
-        <p class="stat-label">Completed</p>
-        <div class="stat-value" id="stat-completed">0</div>
-      </div>
-      <div class="stat-card" data-status="total">
-        <p class="stat-label">Total</p>
-        <div class="stat-value" id="stat-total">0</div>
-      </div>
-    </section>
-
-    <section class="filters-bar">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input id="searchInput" type="text" placeholder="Search by customer name or email..." />
-      </div>
-      <div class="filter-select-wrap">
-        <span class="filter-icon">⚙️</span>
-        <select id="statusDropdown">
-          <option value="all">All Reservations</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="declined">Declined</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="rescheduled">Rescheduled</option>
-        </select>
-      </div>
-    </section>
-
-    <section class="chips-row" id="chipsRow">
-      <button class="chip active" data-status="all">All (0)</button>
-      <button class="chip" data-status="pending">Pending (0)</button>
-      <button class="chip" data-status="approved">Approved (0)</button>
-      <button class="chip" data-status="declined">Declined (0)</button>
-      <button class="chip" data-status="completed">Completed (0)</button>
-      <button class="chip" data-status="cancelled">Cancelled (0)</button>
-      <button class="chip" data-status="rescheduled">Rescheduled (0)</button>
-    </section>
-
-    <section class="card table-card">
-      <div class="table-head">
+    <section class="page-shell">
+      <header class="page-header">
         <div>
-          <h2 class="card-title">Reservations</h2>
-          <p class="card-sub">Filtered results</p>
+          <h1 class="page-title">Reservation Management <span class="admin-badge">Admin</span></h1>
+          <p class="page-sub">Review bookings, update statuses, and manage day availability without leaving the page.</p>
         </div>
-        <button class="refresh-btn" id="refreshBtn">Refresh</button>
-      </div>
-      <p class="dashboard-message" id="tableMessage">Loading reservations...</p>
-      <div class="table-wrap">
-        <table class="reservation-table">
-          <thead>
-            <tr>
-              <th>Customer</th>
-              <th>Package</th>
-              <th>Contract</th>
-              <th>Payment</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="reservationsBody"></tbody>
-        </table>
-      </div>
-    </section>
+      </header>
 
-    <section class="card calendar-card">
-      <div class="table-head">
-        <div>
-          <h2 class="card-title">Calendar</h2>
-          <p class="card-sub">Approved bookings and closed dates</p>
+      <section class="stat-row" id="statRow">
+        <div class="stat-card stat-card-pending" data-status="pending">
+          <p class="stat-label">Pending</p>
+          <div class="stat-value" id="stat-pending">0</div>
         </div>
-        <div class="legend">
-          <span class="legend-item"><span class="dot dot-available"></span>Available</span>
-          <span class="legend-item"><span class="dot dot-booked"></span>Fully booked</span>
-          <span class="legend-item"><span class="dot dot-closed"></span>Closed</span>
+        <div class="stat-card stat-card-approved" data-status="approved">
+          <p class="stat-label">Approved</p>
+          <div class="stat-value" id="stat-approved">0</div>
         </div>
-      </div>
-      <div class="calendar-wrap">
-        <div class="calendar-header">
-          <button id="prevMonth" class="calendar-nav">‹</button>
-          <div id="calendarMonthLabel" class="calendar-month"></div>
-          <button id="nextMonth" class="calendar-nav">›</button>
+        <div class="stat-card stat-card-completed" data-status="completed">
+          <p class="stat-label">Completed</p>
+          <div class="stat-value" id="stat-completed">0</div>
         </div>
-        <div class="calendar-grid" id="calendarGrid"></div>
-      </div>
-      <p class="calendar-message" id="calendarMessage"></p>
+        <div class="stat-card stat-card-total" data-status="total">
+          <p class="stat-label">Total</p>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+      </section>
+
+      <section class="toolbar-grid">
+        <div class="filters-bar">
+          <label class="search-wrap">
+            <span class="search-icon">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="searchInput" type="text" placeholder="Search by customer name or email..." />
+          </label>
+
+          <div class="filter-select-wrap">
+            <span class="filter-icon">Status</span>
+            <select id="statusDropdown">
+              <option value="all">All Reservations</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="declined">Declined</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="rescheduled">Rescheduled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toolbar-actions">
+          <button
+            type="button"
+            class="refresh-btn calendar-toggle-btn"
+            id="calendarToggleBtn"
+            aria-expanded="false"
+            aria-controls="calendarCollapse"
+          >
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Availability Calendar</span>
+          </button>
+          <button type="button" class="refresh-btn refresh-panel-btn" id="refreshBtn">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="workspace-grid">
+        <div class="workspace-main">
+          <section class="card calendar-card hidden" id="calendarCollapse" aria-hidden="true">
+            <div class="calendar-panel-head">
+              <div class="calendar-panel-header-row">
+                <div>
+                  <h2 class="card-title">Availability Calendar</h2>
+                  <p class="card-sub">Open dates can be closed. Closed dates can be reopened.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="calendar-wrap">
+              <div class="calendar-header">
+                <button id="prevMonth" class="calendar-nav">&lsaquo;</button>
+                <div id="calendarMonthLabel" class="calendar-month"></div>
+                <button id="nextMonth" class="calendar-nav">&rsaquo;</button>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true">
+                <span>Sun</span>
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+              </div>
+              <div class="calendar-grid" id="calendarGrid"></div>
+
+              <div class="calendar-legend-stack">
+                <span class="legend-item"><span class="dot dot-available"></span>Open</span>
+                <span class="legend-item"><span class="dot dot-booked"></span>Booked</span>
+                <span class="legend-item"><span class="dot dot-closed"></span>Closed</span>
+              </div>
+            </div>
+
+            <p class="calendar-message" id="calendarMessage"></p>
+          </section>
+
+          <section class="chips-row" id="chipsRow">
+            <button class="chip active" data-status="all">All (0)</button>
+            <button class="chip" data-status="pending">Pending (0)</button>
+            <button class="chip" data-status="approved">Approved (0)</button>
+            <button class="chip" data-status="completed">Completed (0)</button>
+            <button class="chip" data-status="declined">Declined (0)</button>
+            <button class="chip" data-status="cancelled">Cancelled (0)</button>
+            <button class="chip" data-status="rescheduled">Rescheduled (0)</button>
+          </section>
+
+          <section class="card table-card">
+            <div class="table-head">
+              <div>
+                <h2 class="card-title">Reservations</h2>
+                <p class="card-sub">Scan the essentials here, then open one reservation details view for payments, contract, and staff actions.</p>
+              </div>
+            </div>
+            <p class="dashboard-message" id="tableMessage">Loading reservations...</p>
+            <div class="table-wrap">
+              <table class="reservation-table">
+                <thead>
+                  <tr>
+                    <th>Customer / Package</th>
+                    <th>Event Date &amp; Time</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th>Staff</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="reservationsBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
     </section>
   </main>
+
+  <div class="modal-backdrop hidden" id="blackoutModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle">
+      <button type="button" class="modal-close" id="blackoutModalClose" aria-label="Close dialog">x</button>
+      <p class="modal-eyebrow" id="blackoutModalEyebrow">Close calendar date</p>
+      <h2 class="modal-title" id="blackoutModalTitle">Confirm date closure</h2>
+      <p class="modal-copy" id="blackoutModalCopy">You are about to close this date on the admin calendar.</p>
+
+      <div class="modal-date-block">
+        <span class="modal-date-label">Selected date</span>
+        <strong class="modal-date-value" id="blackoutSelectedDate">Loading...</strong>
+      </div>
+
+      <label class="modal-field" for="blackoutReason" id="blackoutReasonField">
+        <span class="modal-label" id="blackoutReasonLabel">Reason for closing this date</span>
+        <textarea
+          id="blackoutReason"
+          class="modal-textarea"
+          rows="4"
+          placeholder="Enter the reason for closing this date..."
+        ></textarea>
+      </label>
+
+      <p class="modal-message" id="blackoutModalMessage"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="blackoutCancelBtn">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="blackoutConfirmBtn">Confirm closure</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="reservationDetailsModal" aria-hidden="true">
+    <div class="modal-card reservation-details-modal-card" role="dialog" aria-modal="true" aria-labelledby="reservationDetailsTitle">
+      <button type="button" class="modal-close" id="reservationDetailsClose" aria-label="Close reservation details">x</button>
+      <p class="modal-eyebrow">Reservation Details</p>
+      <h2 class="modal-title" id="reservationDetailsTitle">Reservation Overview</h2>
+      <p class="modal-copy">Keep the table light, then handle payments, contract access, and staff assignment from here.</p>
+
+      <div class="reservation-details-hero" id="reservationDetailsHero"></div>
+      <div class="reservation-details-meta" id="reservationDetailsMeta"></div>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Reservation Summary</h3>
+          <p class="details-section-copy">Core booking information for this reservation.</p>
+        </div>
+        <div class="details-grid" id="reservationSummaryGrid"></div>
+      </section>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Payment</h3>
+          <p class="details-section-copy">Review the current payment state and take the next action if needed.</p>
+        </div>
+        <div id="reservationPaymentSection"></div>
+      </section>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Contract</h3>
+          <p class="details-section-copy">Open the uploaded reservation contract when it is available.</p>
+        </div>
+        <div id="reservationContractSection"></div>
+      </section>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Staff Assignment</h3>
+          <p class="details-section-copy">See who is assigned, then jump into the assignment picker when needed.</p>
+        </div>
+        <div id="reservationStaffSection"></div>
+      </section>
+
+      <section class="details-section">
+        <div class="details-section-head">
+          <h3 class="details-section-title">Reservation Actions</h3>
+          <p class="details-section-copy">Status and reschedule controls are grouped here instead of in every row.</p>
+        </div>
+        <div id="reservationActionsSection"></div>
+      </section>
+
+      <p class="modal-message" id="reservationDetailsMessage"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="reservationDetailsDismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="assignmentModal" aria-hidden="true">
+    <div class="modal-card assignment-modal-card" role="dialog" aria-modal="true" aria-labelledby="assignmentModalTitle">
+      <button type="button" class="modal-close" id="assignmentModalClose" aria-label="Close assignment dialog">x</button>
+      <p class="modal-eyebrow">Staff Assignment</p>
+      <h2 class="modal-title" id="assignmentModalTitle">Assign Employee</h2>
+      <p class="modal-copy">Choose one or more staff members for this approved reservation. Saving replaces the full assigned staff list.</p>
+
+      <div class="modal-date-block assignment-summary-block">
+        <span class="modal-date-label">Reservation</span>
+        <strong class="modal-date-value" id="assignmentReservationSummary">Loading...</strong>
+        <span class="assignment-summary-sub" id="assignmentReservationMeta">Loading reservation details...</span>
+      </div>
+
+      <label class="modal-field assignment-search-field" for="assignmentSearchInput">
+        <span class="modal-label">Search staff</span>
+        <input
+          id="assignmentSearchInput"
+          class="assignment-search-input"
+          type="search"
+          placeholder="Search by name or email..."
+        />
+      </label>
+
+      <div class="assignment-selection-meta">
+        <span id="assignmentSelectionCount">0 selected</span>
+      </div>
+
+      <div class="assignment-staff-list" id="assignmentStaffList"></div>
+
+      <p class="modal-message" id="assignmentModalMessage"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="assignmentCancelBtn">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="assignmentSaveBtn">Save Assignment</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="../js/admin_reservations.js"></script>
 </body>

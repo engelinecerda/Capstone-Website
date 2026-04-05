@@ -1,7 +1,6 @@
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 import { supabase } from './supabase.js';
-
-const ADMIN_EMAIL = 'adminelicoffee@gmail.com';
+import { verifyAdminSession } from './admin_auth.js';
 
 const adminEmail = document.getElementById('adminEmail');
 const adminStatus = document.getElementById('adminStatus');
@@ -16,7 +15,8 @@ const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
     approved: document.getElementById('approvedReservationsValue'),
     completed: document.getElementById('completedEventsValue'),
-    customers: document.getElementById('totalCustomersValue')
+    customers: document.getElementById('totalCustomersValue'),
+    replacementContracts: document.getElementById('replacementContractsValue')
 };
 
 const chipTargets = {
@@ -94,6 +94,37 @@ function formatStatus(status) {
         key: normalized,
         label: labelMap[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1)
     };
+}
+
+function isReservationContractsColumnMissing(error, columnName) {
+    const message = error?.message || '';
+    return message.includes(`Could not find the '${columnName}' column`)
+        || message.includes(`column reservation_contracts.${columnName} does not exist`);
+}
+
+function getContractStatusMeta(contract) {
+    if (!contract?.contract_url) {
+        return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
+    }
+
+    const reviewStatus = String(contract.review_status || '').toLowerCase();
+    if (reviewStatus === 'verified' || contract.verified_date) {
+        return { key: 'approved', label: 'Verified', sublabel: 'Ready for approval' };
+    }
+
+    if (reviewStatus === 'resubmission_requested') {
+        return { key: 'resubmission_requested', label: 'Fix Requested', sublabel: 'Waiting for customer' };
+    }
+
+    if (reviewStatus === 'pending_review' && contract.resubmitted_at) {
+        return { key: 'resubmitted', label: 'Replacement Submitted', sublabel: 'Needs admin review' };
+    }
+
+    if (reviewStatus === 'pending_review' || contract.contract_url) {
+        return { key: 'pending', label: 'Pending Review', sublabel: 'Initial contract uploaded' };
+    }
+
+    return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
 }
 
 function createEmptyMonthlyBuckets() {
@@ -307,14 +338,15 @@ function renderDemandChart(year) {
     });
 }
 
-function updateStats(reservations) {
+function updateStats(reservations, contractsByReservationId = {}) {
     const totals = {
         pending: 0,
         approved: 0,
         declined: 0,
         completed: 0,
         cancelled: 0,
-        rescheduled: 0
+        rescheduled: 0,
+        replacementContracts: 0
     };
 
     const customerIds = new Set();
@@ -328,12 +360,18 @@ function updateStats(reservations) {
         if (status === 'cancelled') totals.cancelled += 1;
         if (status === 'rescheduled') totals.rescheduled += 1;
         if (reservation.user_id) customerIds.add(reservation.user_id);
+
+        const contract = contractsByReservationId[reservation.reservation_id];
+        if (String(contract?.review_status || '').toLowerCase() === 'pending_review' && contract?.resubmitted_at) {
+            totals.replacementContracts += 1;
+        }
     });
 
     if (statTargets.pending) statTargets.pending.textContent = String(totals.pending);
     if (statTargets.approved) statTargets.approved.textContent = String(totals.approved);
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
+    if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
     if (navReservationCount) navReservationCount.textContent = String(reservations.length);
 
     if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
@@ -344,13 +382,13 @@ function updateStats(reservations) {
     if (chipTargets.rescheduled) chipTargets.rescheduled.textContent = String(totals.rescheduled);
 }
 
-function renderReservationsTable(reservations) {
+function renderReservationsTable(reservations, contractsByReservationId = {}) {
     if (!recentReservationsBody) return;
 
     if (!reservations.length) {
         recentReservationsBody.innerHTML = `
             <tr>
-                <td colspan="6">No reservations found yet.</td>
+                <td colspan="7">No reservations found yet.</td>
             </tr>
         `;
         return;
@@ -366,6 +404,7 @@ function renderReservationsTable(reservations) {
                 ? 'Onsite - ELI Coffee'
                 : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
             const status = formatStatus(reservation.status);
+            const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
 
             return `
                 <tr>
@@ -386,6 +425,10 @@ function renderReservationsTable(reservations) {
                         <span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span>
                     </td>
                     <td>${escapeHtml(location)}</td>
+                    <td>
+                        <span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span>
+                        <span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span>
+                    </td>
                     <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
                 </tr>
             `;
@@ -424,20 +467,61 @@ async function fetchReservations() {
     return data || [];
 }
 
+async function fetchContracts(reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reservation_contracts')
+        .select('reservation_id, contract_url, verified_date, review_status, resubmitted_at')
+        .in('reservation_id', reservationIds);
+
+    if (error) {
+        if (
+            isReservationContractsColumnMissing(error, 'review_status')
+            || isReservationContractsColumnMissing(error, 'resubmitted_at')
+        ) {
+            const fallback = await supabase
+                .from('reservation_contracts')
+                .select('reservation_id, contract_url, verified_date')
+                .in('reservation_id', reservationIds);
+
+            if (fallback.error) throw fallback.error;
+
+            return (fallback.data || []).reduce((map, contract) => {
+                map[contract.reservation_id] = contract;
+                return map;
+            }, {});
+        }
+
+        throw error;
+    }
+
+    return (data || []).reduce((map, contract) => {
+        map[contract.reservation_id] = contract;
+        return map;
+    }, {});
+}
+
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
 
     try {
         const reservations = await fetchReservations();
-        updateStats(reservations);
-        renderReservationsTable(reservations);
+        const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
+        const contractsByReservationId = await fetchContracts(reservationIds);
+        const replacementContracts = Object.values(contractsByReservationId)
+            .filter((contract) => String(contract?.review_status || '').toLowerCase() === 'pending_review' && contract?.resubmitted_at)
+            .length;
+
+        updateStats(reservations, contractsByReservationId);
+        renderReservationsTable(reservations, contractsByReservationId);
         renderBarChart(buildMonthlyDataset(reservations));
         renderPieChart(buildPackageDataset(reservations));
         const selectedYear = demandYearSelect?.value || '2026';
         renderDemandChart(selectedYear);
 
         const summaryText = reservations.length
-            ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s).`
+            ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
             : 'No reservations available yet.';
 
         setDashboardMessage(summaryText);
@@ -447,7 +531,8 @@ async function loadDashboard() {
             `Failed to load reservations: ${error?.message || 'unknown error'}. If this admin account should see all bookings, check RLS policies and the admin role.`,
             true
         );
-        renderReservationsTable([]);
+        updateStats([], {});
+        renderReservationsTable([], {});
         renderBarChart(buildMonthlyDataset([]));
         renderPieChart(buildPackageDataset([]));
         const selectedYear = demandYearSelect?.value || '2026';
@@ -456,17 +541,9 @@ async function loadDashboard() {
 }
 
 async function validateAdminSession() {
-    const { data, error } = await supabase.auth.getSession();
+    const { session } = await verifyAdminSession(supabase);
 
-    if (error) {
-        redirectToAdminLogin();
-        return null;
-    }
-
-    const session = data.session;
-    const email = session?.user?.email?.toLowerCase();
-
-    if (!session || email !== ADMIN_EMAIL) {
+    if (!session) {
         await supabase.auth.signOut();
         redirectToAdminLogin();
         return null;
@@ -477,7 +554,7 @@ async function validateAdminSession() {
     }
 
     if (adminStatus) {
-        adminStatus.textContent = 'Authenticated';
+        adminStatus.textContent = 'Admin verified';
     }
 
     return session;

@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
+import { ADMIN_EMAIL, verifyAdminSession } from './admin_auth.js';
 
-const ADMIN_EMAIL = 'adminelicoffee@gmail.com';
 const adminLoginForm = document.getElementById('adminLoginForm');
 const formMsg = document.getElementById('formMsg');
 const emailInput = document.getElementById('email');
@@ -12,15 +12,8 @@ function setMessage(message, type = '') {
 }
 
 async function redirectIfAdminSessionExists() {
-    const { data, error } = await supabase.auth.getSession();
-
-    if (error) {
-        setMessage('Unable to verify the current session right now.', 'error');
-        return;
-    }
-
-    const sessionEmail = data.session?.user?.email?.toLowerCase();
-    if (sessionEmail === ADMIN_EMAIL) {
+    const { session } = await verifyAdminSession(supabase);
+    if (session) {
         window.location.replace('./admin_homepage.html');
     }
 }
@@ -57,6 +50,13 @@ adminLoginForm?.addEventListener('submit', async (event) => {
     if (signedInEmail !== ADMIN_EMAIL) {
         await supabase.auth.signOut();
         setMessage('This account is not allowed to use the admin portal.', 'error');
+        return;
+    }
+
+    const { session, message } = await verifyAdminSession(supabase);
+    if (!session) {
+        await supabase.auth.signOut();
+        setMessage(message, 'error');
         return;
     }
 
