@@ -63,6 +63,18 @@
   color: var(--muted);
 }
 
+.payment-balance-sub.pending {
+  color: #8a6500;
+}
+
+.payment-balance-sub.unpaid {
+  color: #991b1b;
+}
+
+.payment-balance-sub.approved {
+  color: #166534;
+}
+
 .payment-mode-stack,
 .payment-status-stack {
   display: grid;

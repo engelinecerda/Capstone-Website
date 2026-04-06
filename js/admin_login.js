@@ -6,6 +6,7 @@ const formMsg = document.getElementById('formMsg');
 const emailInput = document.getElementById('email');
 const roleSelect = document.getElementById('role');
 const PORTAL_ROUTES = {
+    super_admin: './admin_homepage.html',
     admin: './admin_homepage.html',
     staff: './staff_dashboard.html'
 };
@@ -61,7 +62,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
     const targetRoute = getPortalRoute(selectedRole);
 
     if (!targetRoute) {
-        setMessage('This portal currently supports Admin and Staff roles only.', 'error');
+        setMessage('This portal currently supports Super Admin, Admin, and Staff roles only.', 'error');
         roleSelect?.focus();
         return;
     }

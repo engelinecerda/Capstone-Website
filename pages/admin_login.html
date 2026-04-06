@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff and Admin Portal - ELI Coffee Events Management System</title>
+    <title>ELI Coffee Events Management System</title>
     <link rel="stylesheet" href="../css/admin_login.css">
     <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     
 </head>
 <body>
 
-    <div class="top-bar">ELI Coffee Events Management System &mdash; Staff and Admin Portal</div>
+    <div class="top-bar">ELI Coffee Events Management System &mdash; Staff, Admin, and Super Admin Portal</div>
 
     <div class="admin-page">
         <div class="admin-wrapper">
@@ -30,7 +30,7 @@
             <!-- Login Card -->
             <div class="admin-card">
                 <h2>Portal Login</h2>
-                <p class="subtitle">Enter your credentials to access the correct staff or admin workspace</p>
+                <p class="subtitle">Enter your credentials to access the correct portal workspace</p>
 
                 <form id="adminLoginForm">
 
@@ -40,6 +40,7 @@
                         <div class="select-wrapper">
                             <select id="role" name="role" required>
                                 <option value="admin" selected>Admin</option>
+                                <option value="super_admin">Super Admin</option>
                                 <option value="staff">Staff</option>
                             </select>
                         </div>
@@ -80,7 +81,7 @@
 
                     <!-- Forgot Password -->
                     <div class="options options-forgot-only">
-                        <a href="forgot_password.html" class="forgot">Forgot password?</a>
+                        <a href="portal_forgot_password.html" class="forgot">Forgot password?</a>
                     </div>
 
                     <!-- Submit -->

@@ -46,6 +46,7 @@ const PAYMENT_TYPE_META = {
     reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' }
 };
 const ONSITE_RESERVATION_FEE = 999;
+const PAYMENT_BALANCE_DUE_DAYS = 7;
 
 const PAYMENT_STATUS_META = {
     pending_review: { label: 'Pending Review', key: 'pending' },
@@ -265,6 +266,19 @@ function getPaymentLabel(paymentType) {
     return PAYMENT_TYPE_META[paymentType]?.label || (paymentType || 'Payment');
 }
 
+function buildLocalDateKey(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+    ].join('-');
+}
+
+function getTodayDateKey() {
+    return buildLocalDateKey(new Date());
+}
+
 function getPaymentStatusMeta(status) {
     return PAYMENT_STATUS_META[String(status || 'pending_review').toLowerCase()] || PAYMENT_STATUS_META.pending_review;
 }
@@ -394,10 +408,12 @@ function getReservationContractMeta(reservationId) {
 function getCompactPaymentSummaryLabel(paymentSummary) {
     const label = String(paymentSummary?.label || '').toLowerCase();
 
-    if (label.includes('complete')) return 'Completed';
-    if (label.includes('partially paid')) return 'Partially Paid';
+    if (label.includes('paid in full')) return 'Paid in Full';
+    if (label.includes('remaining balance')) return 'Balance Due';
     if (label.includes('pending review')) return 'Pending Review';
     if (label.includes('reschedule fee')) return 'Reschedule Fee Pending';
+    if (label.includes('overdue')) return 'Overdue';
+    if (label.includes('initial payment')) return 'Initial Payment';
     if (label.includes('pending')) return 'Pending';
     return paymentSummary?.label || 'Pending';
 }
@@ -473,6 +489,101 @@ function getApprovedBasePaymentsTotal(reservationId) {
         .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
+function getPendingBasePayment(reservationId) {
+    return getNormalPayments(reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
+        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+}
+
+function getReservationBalanceDueDate(reservation) {
+    const eventDateKey = formatDateKey(reservation?.event_date);
+    if (!eventDateKey) return null;
+
+    const dueDate = new Date(`${eventDateKey}T00:00:00`);
+    if (Number.isNaN(dueDate.getTime())) return null;
+
+    dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
+    return dueDate;
+}
+
+function getReservationBalanceDetails(reservation) {
+    const reservationId = reservation?.reservation_id;
+    const totalPrice = roundCurrency(Number(reservation?.total_price || 0));
+    const approvedBaseTotal = roundCurrency(getApprovedBasePaymentsTotal(reservationId));
+    const remainingBalance = roundCurrency(Math.max(totalPrice - approvedBaseTotal, 0));
+    const dueDate = getReservationBalanceDueDate(reservation);
+    const dueDateKey = dueDate ? buildLocalDateKey(dueDate) : '';
+    const dueDateLabel = dueDateKey ? formatDate(dueDateKey) : 'No due date';
+    const isPastDue = Boolean(remainingBalance > 0 && dueDateKey && getTodayDateKey() > dueDateKey);
+    const hasPartialPayment = approvedBaseTotal > 0 && remainingBalance > 0;
+
+    let phaseLabel = 'Initial Payment';
+    let stateLabel = 'Initial payment required';
+    let toneKey = 'pending';
+    let helperText = 'Choose Reservation Fee, Down Payment, or Full Payment to start this reservation.';
+
+    if (remainingBalance <= 0) {
+        phaseLabel = 'Paid in Full';
+        stateLabel = 'Paid in full';
+        toneKey = 'approved';
+        helperText = 'All required reservation payments are already recorded.';
+    } else if (hasPartialPayment) {
+        phaseLabel = 'Remaining Balance';
+        stateLabel = isPastDue ? 'Overdue' : 'Partially paid';
+        toneKey = isPastDue ? 'rejected' : 'info';
+        helperText = isPastDue
+            ? `The remaining balance is past due. It should have been settled by ${dueDateLabel}.`
+            : `Your reservation is confirmed. Settle the remaining balance by ${dueDateLabel}.`;
+    } else if (isPastDue) {
+        stateLabel = 'Overdue';
+        toneKey = 'rejected';
+        helperText = `Your payment should have been submitted by ${dueDateLabel}.`;
+    } else if (dueDateKey) {
+        helperText = `To stay on schedule, complete payment by ${dueDateLabel}.`;
+    }
+
+    return {
+        totalPrice,
+        approvedBaseTotal,
+        remainingBalance,
+        dueDate,
+        dueDateKey,
+        dueDateLabel,
+        isPastDue,
+        hasPartialPayment,
+        phaseLabel,
+        stateLabel,
+        toneKey,
+        helperText
+    };
+}
+
+function getPaymentActionLabel(paymentType, reservation, amount = 0, rescheduleRequestId = '') {
+    if (paymentType === 'full_payment' && !rescheduleRequestId) {
+        const balance = getReservationBalanceDetails(reservation);
+        if (balance.approvedBaseTotal > 0 && amount < balance.totalPrice) {
+            return 'Remaining Balance';
+        }
+    }
+
+    return getPaymentLabel(paymentType);
+}
+
+function buildPaymentOption(reservation, paymentType, amount, overrides = {}) {
+    const displayLabel = overrides.displayLabel || getPaymentActionLabel(paymentType, reservation, amount, overrides.rescheduleRequestId || '');
+    const baseDescription = PAYMENT_TYPE_META[paymentType]?.description || '';
+
+    return {
+        paymentType,
+        amount,
+        label: PAYMENT_TYPE_META[paymentType]?.label || displayLabel,
+        displayLabel,
+        description: baseDescription,
+        displayDescription: overrides.displayDescription || baseDescription,
+        rescheduleRequestId: overrides.rescheduleRequestId || ''
+    };
+}
+
 function hasPendingOrApprovedPayment(reservationId, paymentType) {
     return getNormalPayments(reservationId).some((payment) => (
         payment.payment_type === paymentType
@@ -501,45 +612,50 @@ function getAvailablePaymentOptions(reservation) {
     }
 
     const reservationId = reservation.reservation_id;
-    const totalPrice = Number(reservation.total_price || 0);
-    const approvedBasePayments = getApprovedBasePaymentsTotal(reservationId);
-    const remainingBalance = roundCurrency(Math.max(totalPrice - approvedBasePayments, 0));
+    const balance = getReservationBalanceDetails(reservation);
+    const totalPrice = balance.totalPrice;
+    const approvedBasePayments = balance.approvedBaseTotal;
+    const remainingBalance = balance.remainingBalance;
+    const pendingBasePayment = getPendingBasePayment(reservationId);
     const options = [];
 
-    if (remainingBalance > 0 && !hasPendingOrApprovedPayment(reservationId, 'reservation_fee')) {
-        options.push({
-            paymentType: 'reservation_fee',
-            amount: getReservationFeeAmount(reservation, remainingBalance),
-            label: PAYMENT_TYPE_META.reservation_fee.label,
-            description: PAYMENT_TYPE_META.reservation_fee.description,
-            rescheduleRequestId: ''
-        });
-    }
+    if (!pendingBasePayment && remainingBalance > 0) {
+        if (approvedBasePayments > 0) {
+            if (!hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
+                options.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, {
+                    displayLabel: 'Remaining Balance',
+                    displayDescription: balance.dueDateKey
+                        ? `Settle the unpaid balance by ${balance.dueDateLabel}.`
+                        : 'Settle the unpaid balance for this reservation.'
+                }));
+            }
+        } else {
+            if (!hasPendingOrApprovedPayment(reservationId, 'reservation_fee')) {
+                options.push(buildPaymentOption(
+                    reservation,
+                    'reservation_fee',
+                    getReservationFeeAmount(reservation, remainingBalance),
+                    { displayDescription: 'Confirm your reservation with the reservation fee.' }
+                ));
+            }
 
-    const downPaymentAmount = roundCurrency(Math.min(totalPrice * 0.5, remainingBalance));
-    if (
-        remainingBalance > 0
-        && downPaymentAmount > 0
-        && downPaymentAmount < remainingBalance
-        && !hasPendingOrApprovedPayment(reservationId, 'down_payment')
-    ) {
-        options.push({
-            paymentType: 'down_payment',
-            amount: downPaymentAmount,
-            label: PAYMENT_TYPE_META.down_payment.label,
-            description: PAYMENT_TYPE_META.down_payment.description,
-            rescheduleRequestId: ''
-        });
-    }
+            const downPaymentAmount = roundCurrency(Math.min(totalPrice * 0.5, remainingBalance));
+            if (
+                downPaymentAmount > 0
+                && downPaymentAmount < remainingBalance
+                && !hasPendingOrApprovedPayment(reservationId, 'down_payment')
+            ) {
+                options.push(buildPaymentOption(reservation, 'down_payment', downPaymentAmount, {
+                    displayDescription: 'Pay 50% now to confirm the reservation and settle the rest later.'
+                }));
+            }
 
-    if (remainingBalance > 0 && !hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
-        options.push({
-            paymentType: 'full_payment',
-            amount: remainingBalance,
-            label: PAYMENT_TYPE_META.full_payment.label,
-            description: PAYMENT_TYPE_META.full_payment.description,
-            rescheduleRequestId: ''
-        });
+            if (!hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
+                options.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, {
+                    displayDescription: 'Settle the reservation in one payment.'
+                }));
+            }
+        }
     }
 
     getReservationRescheduleRequests(reservationId)
@@ -551,13 +667,10 @@ function getAvailablePaymentOptions(reservation) {
             ));
 
             if (!hasExistingRescheduleFee) {
-                options.push({
-                    paymentType: 'reschedule_fee',
-                    amount: 3000,
-                    label: PAYMENT_TYPE_META.reschedule_fee.label,
-                    description: `${PAYMENT_TYPE_META.reschedule_fee.description} for ${formatDate(request.requested_date)}`,
+                options.push(buildPaymentOption(reservation, 'reschedule_fee', 3000, {
+                    displayDescription: `${PAYMENT_TYPE_META.reschedule_fee.description} for ${formatDate(request.requested_date)}`,
                     rescheduleRequestId: request.reschedule_request_id
-                });
+                }));
             }
         });
 
@@ -566,35 +679,47 @@ function getAvailablePaymentOptions(reservation) {
 
 function getPaymentSummary(reservation) {
     const reservationId = reservation.reservation_id;
-    const totalPrice = Number(reservation.total_price || 0);
-    const approvedBaseTotal = getApprovedBasePaymentsTotal(reservationId);
-    const pendingPayment = getReservationPayments(reservationId)
-        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
-        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0];
+    const balance = getReservationBalanceDetails(reservation);
+    const pendingPayment = getPendingBasePayment(reservationId);
 
     if (pendingPayment) {
+        const pendingLabel = getPaymentActionLabel(
+            pendingPayment.payment_type,
+            reservation,
+            Number(pendingPayment.amount || 0),
+            pendingPayment.reschedule_request_id || ''
+        );
         return {
-            label: `${getPaymentLabel(pendingPayment.payment_type)} pending review`,
-            key: 'pending'
+            label: `${pendingLabel} pending review`,
+            key: 'pending',
+            sublabel: 'Waiting for admin confirmation'
         };
     }
 
-    if (totalPrice > 0 && approvedBaseTotal >= totalPrice) {
-        return { label: 'Payment complete', key: 'approved' };
+    if (balance.remainingBalance <= 0) {
+        return { label: 'Paid in full', key: 'approved', sublabel: 'All required payments recorded' };
     }
 
-    if (approvedBaseTotal > 0) {
-        return { label: `Partially paid (${formatCurrency(approvedBaseTotal)})`, key: 'approved' };
+    if (balance.hasPartialPayment) {
+        return {
+            label: balance.isPastDue ? 'Overdue' : 'Remaining balance due',
+            key: balance.toneKey,
+            sublabel: `${formatCurrency(balance.remainingBalance)} remaining / Pay by ${balance.dueDateLabel}`
+        };
     }
 
     const approvedRescheduleRequest = getReservationRescheduleRequests(reservationId)
         .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
 
     if (approvedRescheduleRequest) {
-        return { label: 'Reschedule fee pending', key: 'info' };
+        return { label: 'Reschedule fee pending', key: 'info', sublabel: 'Complete the reschedule fee to finalize the change' };
     }
 
-    return { label: 'Payment pending', key: 'pending' };
+    return {
+        label: balance.isPastDue ? 'Overdue' : 'Initial payment needed',
+        key: balance.toneKey,
+        sublabel: balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'Choose your first payment'
+    };
 }
 
 function getLatestReservationPayment(reservationId) {
@@ -603,24 +728,192 @@ function getLatestReservationPayment(reservationId) {
         .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
 }
 
+function getLatestApprovedReservationPayment(reservationId) {
+    return getReservationPayments(reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
+        .slice()
+        .sort((left, right) => new Date(right.verified_at || right.submitted_at || 0) - new Date(left.verified_at || left.submitted_at || 0))[0] || null;
+}
+
+function isCompletedPaymentOverview(reservation) {
+    const paymentSummary = getPaymentSummary(reservation);
+    const availableOptions = getAvailablePaymentOptions(reservation);
+    return paymentSummary.key === 'approved' && !availableOptions.length;
+}
+
+function isPendingPaymentOverview(reservation) {
+    const paymentSummary = getPaymentSummary(reservation);
+    const availableOptions = getAvailablePaymentOptions(reservation);
+    return paymentSummary.key === 'pending'
+        && Boolean(getPendingBasePayment(reservation.reservation_id))
+        && !availableOptions.length;
+}
+
+function getTimelineTimestamp(value, fallback = Number.MAX_SAFE_INTEGER) {
+    const timestamp = new Date(value || 0).getTime();
+    return Number.isNaN(timestamp) ? fallback : timestamp;
+}
+
+function getPaymentTimelineEntries(reservation) {
+    const reservationId = reservation.reservation_id;
+    const pendingBasePayment = getPendingBasePayment(reservationId);
+    const approvedPayments = getReservationPayments(reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
+        .slice()
+        .sort((left, right) => new Date(left.verified_at || left.submitted_at || 0) - new Date(right.verified_at || right.submitted_at || 0));
+    const receipts = getReservationReceipts(reservationId);
+    const entries = [];
+
+    entries.push({
+        key: 'default',
+        title: 'Reservation Created',
+        meta: formatShortDate(reservation.created_at || reservation.event_date),
+        note: 'Reservation recorded in the system',
+        sortTimestamp: getTimelineTimestamp(reservation.created_at || reservation.event_date),
+        sortOrder: 10
+    });
+
+    const firstBaseApproval = approvedPayments.find((payment) => !payment.reschedule_request_id);
+    if (firstBaseApproval) {
+        entries.push({
+            key: 'approved',
+            title: 'Reservation Confirmed',
+            meta: formatShortDate(firstBaseApproval.verified_at || firstBaseApproval.submitted_at),
+            note: `${getPaymentLabel(firstBaseApproval.payment_type)} approved`,
+            sortTimestamp: getTimelineTimestamp(firstBaseApproval.verified_at || firstBaseApproval.submitted_at),
+            sortOrder: 20
+        });
+    }
+
+    if (pendingBasePayment) {
+        const pendingTimestamp = getTimelineTimestamp(pendingBasePayment.submitted_at);
+        entries.push({
+            key: 'pending',
+            title: `${getPaymentLabel(pendingBasePayment.payment_type)} Submitted`,
+            meta: formatShortDate(pendingBasePayment.submitted_at),
+            note: `${formatCurrency(pendingBasePayment.amount)} / ${PAYMENT_METHODS[pendingBasePayment.payment_method]?.label || pendingBasePayment.payment_method} / awaiting admin review`,
+            proofUrl: pendingBasePayment.proof_url || '',
+            sortTimestamp: pendingTimestamp,
+            sortOrder: 30
+        });
+        entries.push({
+            key: 'info',
+            title: 'Awaiting Approval',
+            meta: 'Pending',
+            note: 'The admin still needs to approve the latest submission before the payment step can continue.',
+            sortTimestamp: pendingTimestamp,
+            sortOrder: 31
+        });
+        entries.push({
+            key: 'default',
+            title: 'Receipt Generation',
+            meta: 'Next step',
+            note: 'A receipt will appear here automatically once the submitted payment is approved.',
+            sortTimestamp: pendingTimestamp,
+            sortOrder: 32
+        });
+    }
+
+    approvedPayments.forEach((payment) => {
+        entries.push({
+            key: 'approved',
+            title: getPaymentLabel(payment.payment_type),
+            meta: `Approved ${formatShortDate(payment.verified_at || payment.submitted_at)}`,
+            note: `${formatCurrency(payment.amount)} / ${PAYMENT_METHODS[payment.payment_method]?.label || payment.payment_method}`,
+            sortTimestamp: getTimelineTimestamp(payment.verified_at || payment.submitted_at),
+            sortOrder: 40
+        });
+    });
+
+    receipts.forEach(({ payment, receipt }) => {
+        entries.push({
+            key: 'info',
+            title: 'Receipt Generated',
+            meta: formatShortDate(receipt.issued_at),
+            note: `${getPaymentLabel(payment.payment_type)} acknowledgement receipt available`,
+            paymentId: payment.payment_id,
+            reservationId,
+            sortTimestamp: getTimelineTimestamp(receipt.issued_at),
+            sortOrder: 50
+        });
+    });
+
+    return entries
+        .sort((left, right) => {
+            if (left.sortTimestamp !== right.sortTimestamp) {
+                return left.sortTimestamp - right.sortTimestamp;
+            }
+            return (left.sortOrder || 0) - (right.sortOrder || 0);
+        })
+        .map(({ sortTimestamp, sortOrder, ...entry }) => entry);
+}
+
+function renderPaymentTimeline(reservation) {
+    const entries = getPaymentTimelineEntries(reservation);
+    if (!entries.length) {
+        return '<div class="payment-empty">Timeline details will appear as payment steps are approved.</div>';
+    }
+
+    return `
+        <div class="payment-timeline-list">
+            ${entries.map((entry) => `
+                <div class="payment-timeline-item">
+                    <span class="payment-timeline-dot ${escapeHtml(entry.key)}" aria-hidden="true"></span>
+                    <div class="payment-timeline-main">
+                        <div class="payment-timeline-title-row">
+                            <strong class="payment-timeline-title">${escapeHtml(entry.title)}</strong>
+                            <span class="payment-timeline-meta">${escapeHtml(entry.meta)}</span>
+                        </div>
+                        <div class="payment-timeline-note">${escapeHtml(entry.note)}</div>
+                    </div>
+                    ${entry.paymentId ? `
+                        <button
+                            type="button"
+                            class="res-link-btn view-receipt-btn"
+                            data-reservation-id="${escapeHtml(entry.reservationId)}"
+                            data-payment-id="${escapeHtml(entry.paymentId)}"
+                        >
+                            View Receipt
+                        </button>
+                    ` : entry.proofUrl ? `
+                        <a
+                            class="res-link-btn"
+                            href="${escapeHtml(entry.proofUrl)}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            View Proof
+                        </a>
+                    ` : ''}
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
 function getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnabled, hasPayments) {
     const summaryKey = String(paymentSummary?.key || '').toLowerCase();
     const summaryLabel = String(paymentSummary?.label || '').toLowerCase();
+    const balance = getReservationBalanceDetails(reservation);
 
     if (!paymentModuleEnabled) {
         return 'Wait for admin approval. The payment step will unlock here once your reservation is approved.';
     }
 
-    if (summaryKey === 'approved' && summaryLabel.includes('complete')) {
+    if (summaryKey === 'approved' && summaryLabel.includes('paid in full')) {
         return 'Payment is complete. Open the Payments module if you want to review the submitted details or receipt.';
     }
 
     if (summaryKey === 'pending' && hasPayments) {
-        return 'Your latest payment submission is under review. Open the Payments module to track the current status.';
+        return summaryLabel.includes('remaining balance')
+            ? 'Your remaining balance submission is under review. Once approved, this reservation will show as fully paid.'
+            : 'Your payment submission is under review. Wait for admin confirmation before sending another reservation payment.';
     }
 
-    if (summaryLabel.includes('partially paid')) {
-        return 'You still have a remaining payment step. Open the Payments module to continue the process.';
+    if (balance.hasPartialPayment) {
+        return balance.isPastDue
+            ? `Your reservation is confirmed, but the remaining balance is overdue. Please settle it immediately.`
+            : `Your reservation is confirmed. The remaining balance must be settled by ${balance.dueDateLabel}.`;
     }
 
     if (summaryKey === 'info') {
@@ -628,8 +921,8 @@ function getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnable
     }
 
     return hasPayments
-        ? 'Open the Payments module to continue the next payment step and review your submitted entries.'
-        : 'The next step is payment submission. Open the Payments module to continue the process.';
+        ? 'Open the Payments module to continue this reservation payment and review your submitted entries.'
+        : 'Choose an initial payment to confirm this reservation. Reservation Fee, Down Payment, or Full Payment are all accepted.';
 }
 
 function canRescheduleReservation(reservation) {
@@ -642,15 +935,22 @@ function canRescheduleReservation(reservation) {
 
 function renderPaymentComposer(reservation) {
     const options = getAvailablePaymentOptions(reservation);
+    const balance = getReservationBalanceDetails(reservation);
     if (!options.length) {
         if (!isReservationPaymentEnabled(reservation)) {
             return '<div class="payment-empty">Payment submission becomes available after admin approves this reservation.</div>';
         }
-        return '<div class="payment-empty">No new payment actions are available right now.</div>';
+        const waitingMessage = getPendingBasePayment(reservation.reservation_id)
+            ? 'Your latest reservation payment is still pending admin review.'
+            : 'No new payment actions are available right now.';
+        return `<div class="payment-empty">${escapeHtml(waitingMessage)}</div>`;
     }
 
     const defaultMethod = 'card';
     const canUseCash = options.some((option) => option.paymentType === 'full_payment');
+    const actionIntro = balance.hasPartialPayment
+        ? `This reservation is already confirmed. Settle the remaining balance by ${balance.dueDateLabel}.`
+        : 'Choose the payment that works for you to confirm this reservation.';
     const methodChips = Object.entries(PAYMENT_METHODS).map(([method, meta]) => `
         <button
             type="button"
@@ -674,25 +974,27 @@ function renderPaymentComposer(reservation) {
             data-payment-type="${escapeHtml(option.paymentType)}"
             data-amount="${escapeHtml(option.amount)}"
             data-reschedule-request-id="${escapeHtml(option.rescheduleRequestId || '')}"
+            data-display-label="${escapeHtml(option.displayLabel || option.label)}"
+            data-display-description="${escapeHtml(option.displayDescription || option.description)}"
         >
             <div class="payment-type-head">
-                <strong>${escapeHtml(option.label)}</strong>
+                <strong>${escapeHtml(option.displayLabel || option.label)}</strong>
             </div>
             <span class="payment-choice-amount">${escapeHtml(formatCurrency(option.amount))}</span>
-            <span class="payment-choice-copy">${escapeHtml(option.description)}</span>
+            <span class="payment-choice-copy">${escapeHtml(option.displayDescription || option.description)}</span>
         </button>
     `).join('');
 
     return `
         <div class="payment-composer" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-cash-enabled="${canUseCash ? 'true' : 'false'}">
-            <div class="payment-flow-intro">Finish the payment action here, then let the admin review your submission.</div>
+            <div class="payment-flow-intro">${escapeHtml(actionIntro)}</div>
             <section class="payment-action-card payment-selection-card">
                 <div class="payment-panel-minihead">
                     <div class="payment-step-head">
                         <span class="payment-step-number">1</span>
                         <div class="payment-step-body">
                             <div class="payment-step-title">Payment Selection</div>
-                            <div class="payment-step-copy">Choose how you will pay and what you are paying for.</div>
+                            <div class="payment-step-copy">Choose your method, then send the next required payment for this reservation.</div>
                         </div>
                     </div>
                 </div>
@@ -708,7 +1010,7 @@ function renderPaymentComposer(reservation) {
                 </div>
                 <div class="payment-selection-summary">
                     <div class="payment-selection-summary-title" data-selection-summary>
-                        Selected: ${escapeHtml(PAYMENT_METHODS[defaultMethod].label)} &bull; ${escapeHtml(options[0].label)} &bull; ${escapeHtml(formatCurrency(options[0].amount))}
+                        Selected: ${escapeHtml(PAYMENT_METHODS[defaultMethod].label)} / ${escapeHtml(options[0].displayLabel || options[0].label)} / ${escapeHtml(formatCurrency(options[0].amount))}
                     </div>
                     <div class="payment-selection-summary-note">
                         <span class="payment-selection-summary-icon" aria-hidden="true">&#9432;</span>
@@ -794,17 +1096,17 @@ function renderPaymentStatusContext(reservation) {
     const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
     const nextStepCopy = getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnabled, paymentEntries.length > 0);
     const availableOptions = getAvailablePaymentOptions(reservation);
+    const balance = getReservationBalanceDetails(reservation);
     const nextPayment = availableOptions[0] || null;
     const latestPayment = getLatestReservationPayment(reservation.reservation_id);
     const latestReceipt = getReservationReceipts(reservation.reservation_id)[0] || null;
 
-    const amountTitle = nextPayment ? formatCurrency(nextPayment.amount) : 'No payment due right now';
-    const amountCopy = nextPayment
-        ? `${nextPayment.label} is the next payment you can submit.`
+    const nextActionCopy = nextPayment
+        ? `${nextPayment.displayLabel || nextPayment.label} is the next action available in this reservation.`
         : (paymentSummary.key === 'approved' ? 'All required payments are already recorded.' : 'No payment action is available yet.');
 
     const latestSubmissionTitle = latestPayment
-        ? getPaymentLabel(latestPayment.payment_type)
+        ? getPaymentActionLabel(latestPayment.payment_type, reservation, Number(latestPayment.amount || 0), latestPayment.reschedule_request_id || '')
         : 'No payment submitted yet';
     const latestSubmissionCopy = latestPayment
         ? `${formatCurrency(latestPayment.amount)}${latestPayment.submitted_at ? ` submitted ${formatShortDate(latestPayment.submitted_at)}` : ''}`
@@ -828,9 +1130,24 @@ function renderPaymentStatusContext(reservation) {
         <p class="payment-status-explainer">${escapeHtml(nextStepCopy)}</p>
         <div class="payment-status-grid">
             <div class="payment-status-card">
-                <span class="payment-status-label">Amount to pay now</span>
-                <strong class="payment-status-value">${escapeHtml(amountTitle)}</strong>
-                <span class="payment-status-note">${escapeHtml(amountCopy)}</span>
+                <span class="payment-status-label">Total Amount</span>
+                <strong class="payment-status-value">${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
+                <span class="payment-status-note">The full reservation amount recorded in the system.</span>
+            </div>
+            <div class="payment-status-card">
+                <span class="payment-status-label">Approved Payments</span>
+                <strong class="payment-status-value">${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                <span class="payment-status-note">${escapeHtml(balance.remainingBalance <= 0 ? 'Everything required has already been approved.' : 'Only admin-approved payments reduce your remaining balance.')}</span>
+            </div>
+            <div class="payment-status-card">
+                <span class="payment-status-label">${escapeHtml(balance.phaseLabel)}</span>
+                <strong class="payment-status-value">${escapeHtml(balance.remainingBalance <= 0 ? 'Paid' : formatCurrency(balance.remainingBalance))}</strong>
+                <span class="payment-status-note">${escapeHtml(nextActionCopy)}</span>
+            </div>
+            <div class="payment-status-card">
+                <span class="payment-status-label">Pay By</span>
+                <strong class="payment-status-value">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel)}</strong>
+                <span class="payment-status-note">${escapeHtml(balance.helperText)}</span>
             </div>
             <div class="payment-status-card">
                 <span class="payment-status-label">Latest submission</span>
@@ -916,9 +1233,11 @@ function renderReceiptHistory(reservation) {
     `;
 }
 
-function renderPaymentReferenceTabs(reservation) {
+function renderPaymentReferenceTabs(reservation, options = {}) {
     const paymentCount = getReservationPayments(reservation.reservation_id).length;
     const receiptCount = getReservationReceipts(reservation.reservation_id).length;
+    const includeTimeline = Boolean(options.includeTimeline);
+    const timelineCount = getPaymentTimelineEntries(reservation).length;
 
     return `
         <div class="payment-reference-shell">
@@ -939,6 +1258,16 @@ function renderPaymentReferenceTabs(reservation) {
                 >
                     Receipts <span>${escapeHtml(String(receiptCount))}</span>
                 </button>
+                ${includeTimeline ? `
+                    <button
+                        type="button"
+                        class="payment-reference-tab"
+                        data-payment-panel-tab="timeline"
+                        aria-selected="false"
+                    >
+                        Status Timeline <span>${escapeHtml(String(timelineCount))}</span>
+                    </button>
+                ` : ''}
             </div>
             <div class="payment-reference-panel active" data-payment-panel="history">
                 ${renderPaymentHistory(reservation)}
@@ -946,6 +1275,11 @@ function renderPaymentReferenceTabs(reservation) {
             <div class="payment-reference-panel" data-payment-panel="receipts" hidden>
                 ${renderReceiptHistory(reservation)}
             </div>
+            ${includeTimeline ? `
+                <div class="payment-reference-panel" data-payment-panel="timeline" hidden>
+                    ${renderPaymentTimeline(reservation)}
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -987,15 +1321,260 @@ function renderRescheduleSection(reservation) {
     `;
 }
 
+function renderCompletedPaymentOverview(reservation) {
+    const balance = getReservationBalanceDetails(reservation);
+    const latestApprovedPayment = getLatestApprovedReservationPayment(reservation.reservation_id);
+    const latestReceiptEntry = getReservationReceipts(reservation.reservation_id)[0] || null;
+    const latestReceipt = latestReceiptEntry?.receipt || null;
+    const latestProofUrl = latestApprovedPayment?.proof_url || '';
+    const latestPaymentCopy = latestApprovedPayment
+        ? `${getPaymentLabel(latestApprovedPayment.payment_type)} / ${formatShortDate(latestApprovedPayment.verified_at || latestApprovedPayment.submitted_at)}`
+        : 'No approved payment yet';
+    const latestReceiptCopy = latestReceipt
+        ? `${formatShortDate(latestReceipt.issued_at)} acknowledgement receipt available`
+        : 'Receipt will appear after admin approval';
+
+    return `
+        <div class="payment-overview-layout">
+            <div class="payment-overview-main">
+                <section class="payment-complete-card">
+                    <div class="payment-complete-header">
+                        <div class="payment-complete-icon" aria-hidden="true">&#10003;</div>
+                        <div class="payment-complete-copy">
+                            <div class="payment-complete-title">Payment Completed!</div>
+                            <p class="payment-complete-text">All required payments for this reservation have already been approved and recorded.</p>
+                            <p class="payment-complete-subtext">Thank you. Your reservation is fully paid and your records remain available below.</p>
+                        </div>
+                    </div>
+                    <div class="payment-complete-stats">
+                        <div class="payment-complete-stat">
+                            <span class="payment-complete-label">Total Amount</span>
+                            <strong class="payment-complete-value">${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
+                            <span class="payment-complete-note">Reservation total</span>
+                        </div>
+                        <div class="payment-complete-stat">
+                            <span class="payment-complete-label">Approved Payments</span>
+                            <strong class="payment-complete-value">${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                            <span class="payment-complete-note">Total approved</span>
+                        </div>
+                        <div class="payment-complete-stat">
+                            <span class="payment-complete-label">Remaining Balance</span>
+                            <strong class="payment-complete-value approved">P0</strong>
+                            <span class="payment-complete-note">All paid</span>
+                        </div>
+                        <div class="payment-complete-stat">
+                            <span class="payment-complete-label">Latest Receipt</span>
+                            <strong class="payment-complete-value">${escapeHtml(latestReceipt ? formatShortDate(latestReceipt.issued_at) : 'No receipt')}</strong>
+                            <span class="payment-complete-note">${escapeHtml(latestReceiptCopy)}</span>
+                        </div>
+                    </div>
+                    <div class="payment-complete-actions">
+                        ${latestReceiptEntry ? `
+                            <button
+                                type="button"
+                                class="res-secondary-btn view-receipt-btn"
+                                data-reservation-id="${escapeHtml(reservation.reservation_id)}"
+                                data-payment-id="${escapeHtml(latestReceiptEntry.payment.payment_id)}"
+                            >
+                                View Latest Receipt
+                            </button>
+                        ` : ''}
+                        ${latestProofUrl ? `
+                            <a
+                                class="res-link-btn"
+                                href="${escapeHtml(latestProofUrl)}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                View Latest Proof
+                            </a>
+                        ` : ''}
+                    </div>
+                </section>
+
+                <section class="payment-records-board">
+                    <div class="res-section-head">
+                        <div>
+                            <div class="res-section-title">Payment Records</div>
+                            <div class="res-section-copy">History, receipts, and the status timeline stay in the main content area once payment is complete.</div>
+                        </div>
+                    </div>
+                    ${renderPaymentReferenceTabs(reservation, { includeTimeline: true })}
+                </section>
+            </div>
+
+            <aside class="payment-overview-side">
+                <section class="payment-side-card payment-side-summary-card">
+                    <div class="payment-side-summary-head">
+                        <div>
+                            <div class="res-section-title">Payment Status</div>
+                            <div class="res-section-copy">A compact summary for this completed reservation.</div>
+                        </div>
+                        <span class="res-section-status approved">Paid in full</span>
+                    </div>
+                    <div class="payment-side-summary-list">
+                        <div class="payment-side-summary-row">
+                            <span>Total Amount</span>
+                            <strong>${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
+                        </div>
+                        <div class="payment-side-summary-row">
+                            <span>Approved Payments</span>
+                            <strong>${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                        </div>
+                        <div class="payment-side-summary-row">
+                            <span>Remaining Balance</span>
+                            <strong class="approved">P0</strong>
+                        </div>
+                        <div class="payment-side-summary-row">
+                            <span>Status</span>
+                            <strong class="approved">Paid in full</strong>
+                        </div>
+                        <div class="payment-side-summary-row">
+                            <span>Pay By</span>
+                            <strong>Completed</strong>
+                        </div>
+                        <div class="payment-side-summary-row">
+                            <span>Latest Submission</span>
+                            <strong>${escapeHtml(latestPaymentCopy)}</strong>
+                        </div>
+                        <div class="payment-side-summary-row">
+                            <span>Latest Receipt</span>
+                            <strong>${escapeHtml(latestReceipt ? formatShortDate(latestReceipt.issued_at) : 'No receipt')}</strong>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    `;
+}
+
+function renderPendingPaymentOverview(reservation) {
+    const balance = getReservationBalanceDetails(reservation);
+    const pendingPayment = getPendingBasePayment(reservation.reservation_id) || getLatestReservationPayment(reservation.reservation_id);
+    const pendingStatus = getPaymentStatusMeta(pendingPayment?.payment_status || 'pending_review');
+    const paymentLabel = pendingPayment ? getPaymentLabel(pendingPayment.payment_type) : 'Payment';
+    const paymentMethod = pendingPayment
+        ? (PAYMENT_METHODS[pendingPayment.payment_method]?.label || pendingPayment.payment_method || 'Payment method not provided')
+        : 'Payment details unavailable';
+    const latestReceiptEntry = getReservationReceipts(reservation.reservation_id)[0] || null;
+    const referenceValue = pendingPayment?.reference_number ? pendingPayment.reference_number : 'Not provided';
+    const nextStepCopy = balance.hasPartialPayment
+        ? `Once this ${paymentLabel.toLowerCase()} is approved, your remaining balance summary will refresh automatically.`
+        : 'Once this payment is approved, the reservation will continue to the next payment stage automatically.';
+    const bannerTitle = paymentLabel.toLowerCase().includes('remaining balance')
+        ? 'Remaining Balance Under Review'
+        : 'Payment Under Review';
+    const bannerCopy = pendingPayment
+        ? `Your ${paymentLabel.toLowerCase()} has been submitted and is currently under admin review. You will be notified once it is approved.`
+        : 'Your latest payment submission is currently under admin review.';
+
+    return `
+        <div class="payment-review-layout">
+            <section class="payment-review-banner">
+                <div class="payment-review-banner-head">
+                    <div class="payment-review-banner-icon" aria-hidden="true">&#9711;</div>
+                    <div class="payment-review-banner-copy">
+                        <div class="payment-review-banner-title">${escapeHtml(bannerTitle)}</div>
+                        <p class="payment-review-banner-text">${escapeHtml(bannerCopy)}</p>
+                        <p class="payment-review-banner-subtext">${escapeHtml(nextStepCopy)}</p>
+                    </div>
+                    <span class="res-section-status ${escapeHtml(pendingStatus.key)}">${escapeHtml(pendingStatus.label)}</span>
+                </div>
+                <div class="payment-review-summary-grid">
+                    <div class="payment-review-summary-card">
+                        <span class="payment-review-summary-label">Total Amount</span>
+                        <strong class="payment-review-summary-value">${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
+                        <span class="payment-review-summary-note">Reservation total</span>
+                    </div>
+                    <div class="payment-review-summary-card">
+                        <span class="payment-review-summary-label">Approved Payments</span>
+                        <strong class="payment-review-summary-value">${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                        <span class="payment-review-summary-note">Only approved payments reduce the balance</span>
+                    </div>
+                    <div class="payment-review-summary-card">
+                        <span class="payment-review-summary-label">Next Payment</span>
+                        <strong class="payment-review-summary-value">${escapeHtml(pendingPayment ? formatCurrency(pendingPayment.amount) : formatCurrency(balance.remainingBalance))}</strong>
+                        <span class="payment-review-summary-note">${escapeHtml(paymentLabel)}</span>
+                    </div>
+                    <div class="payment-review-summary-card">
+                        <span class="payment-review-summary-label">Pay By</span>
+                        <strong class="payment-review-summary-value">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel)}</strong>
+                        <span class="payment-review-summary-note">${escapeHtml(balance.helperText)}</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="payment-latest-submission-card">
+                <div class="payment-latest-submission-head">
+                    <div>
+                        <div class="res-section-title">Latest Submission</div>
+                        <div class="res-section-copy">This is the payment currently being reviewed by the admin.</div>
+                    </div>
+                    <span class="res-section-status ${escapeHtml(pendingStatus.key)}">${escapeHtml(pendingStatus.label)}</span>
+                </div>
+                <div class="payment-latest-submission-body">
+                    <div class="payment-latest-submission-main">
+                        <div class="payment-latest-submission-title">${escapeHtml(paymentLabel)}</div>
+                        <div class="payment-latest-submission-meta">
+                            ${escapeHtml(formatCurrency(pendingPayment?.amount || 0))} / ${escapeHtml(paymentMethod)} / ${escapeHtml(pendingPayment?.submitted_at ? `Submitted ${formatShortDate(pendingPayment.submitted_at)}` : 'Submission recorded')}
+                        </div>
+                    </div>
+                    <div class="payment-latest-submission-details">
+                        <div class="payment-latest-detail">
+                            <span>Reference Number</span>
+                            <strong>${escapeHtml(referenceValue)}</strong>
+                        </div>
+                        <div class="payment-latest-detail">
+                            <span>Latest Receipt</span>
+                            <strong>${escapeHtml(latestReceiptEntry ? formatShortDate(latestReceiptEntry.receipt.issued_at) : 'Not available yet')}</strong>
+                        </div>
+                        <div class="payment-latest-detail">
+                            <span>What Happens Next</span>
+                            <strong>${escapeHtml('Wait for admin approval')}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="payment-latest-submission-actions">
+                    ${pendingPayment?.proof_url ? `
+                        <a
+                            class="res-link-btn"
+                            href="${escapeHtml(pendingPayment.proof_url)}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            View Proof
+                        </a>
+                    ` : ''}
+                </div>
+            </section>
+
+            <section class="payment-records-board">
+                <div class="res-section-head">
+                    <div>
+                        <div class="res-section-title">Payment Records</div>
+                        <div class="res-section-copy">Status, history, receipts, and the timeline stay in the main content while this payment is under review.</div>
+                    </div>
+                </div>
+                ${renderPaymentReferenceTabs(reservation, { includeTimeline: true })}
+            </section>
+        </div>
+    `;
+}
+
 function buildReservationCard(reservation, view) {
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
     const paymentSummary = getPaymentSummary(reservation);
+    const balance = getReservationBalanceDetails(reservation);
     const paymentEntries = getReservationPayments(reservation.reservation_id);
     const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
     const contractMeta = getReservationContractMeta(reservation.reservation_id);
     const packageName = getReservationPackageName(reservation);
     const location = getReservationLocationLabel(reservation);
-    const paymentActionLabel = paymentEntries.length > 0 ? 'Manage Payment' : 'Continue Payment';
+    const paymentActionLabel = balance.remainingBalance <= 0
+        ? 'View Payments'
+        : balance.hasPartialPayment
+            ? 'Pay Remaining Balance'
+            : paymentEntries.length > 0 ? 'Manage Payment' : 'Continue Payment';
     const canManagePayments = paymentModuleEnabled && view === 'active';
     const compactPaymentLabel = getCompactPaymentSummaryLabel(paymentSummary);
     const compactContractLabel = getCompactContractLabel(contractMeta);
@@ -1034,6 +1613,20 @@ function buildReservationCard(reservation, view) {
                             <span class="reservation-inline-label">Contract</span>
                             <strong class="reservation-inline-value ${escapeHtml(contractMeta.key)}">${escapeHtml(compactContractLabel)}</strong>
                         </span>
+                    </div>
+                    <div class="reservation-balance-strip">
+                        <div class="reservation-balance-item">
+                            <span class="reservation-balance-label">Approved</span>
+                            <strong class="reservation-balance-value">${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                        </div>
+                        <div class="reservation-balance-item">
+                            <span class="reservation-balance-label">Remaining Balance</span>
+                            <strong class="reservation-balance-value ${escapeHtml(balance.toneKey)}">${escapeHtml(balance.remainingBalance <= 0 ? 'Paid' : formatCurrency(balance.remainingBalance))}</strong>
+                        </div>
+                        <div class="reservation-balance-item">
+                            <span class="reservation-balance-label">Pay By</span>
+                            <strong class="reservation-balance-value ${escapeHtml(balance.isPastDue ? 'rejected' : 'neutral')}">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel)}</strong>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1083,6 +1676,7 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
 
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
     const paymentSummary = getPaymentSummary(reservation);
+    const balance = getReservationBalanceDetails(reservation);
     const paymentEntries = getReservationPayments(reservation.reservation_id);
     const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
     const contract = getReservationContract(reservation.reservation_id);
@@ -1233,7 +1827,7 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                 <div class="reservation-details-section-head">
                     <div>
                         <h3>Payment Progress</h3>
-                        <p>Track the current payment step for this reservation.</p>
+                        <p>Track what has been approved, what remains, and when the balance should be settled.</p>
                     </div>
                 </div>
                 <div class="reservation-details-grid">
@@ -1242,10 +1836,19 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                         <strong class="reservation-detail-value">${escapeHtml(paymentSummary.label)}</strong>
                     </div>
                     <div class="reservation-detail-field">
-                        <span class="reservation-detail-label">Submitted payments</span>
-                        <strong class="reservation-detail-value">${escapeHtml(String(paymentEntries.length))}</strong>
+                        <span class="reservation-detail-label">Approved payments</span>
+                        <strong class="reservation-detail-value">${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Remaining balance</span>
+                        <strong class="reservation-detail-value">${escapeHtml(balance.remainingBalance <= 0 ? 'Paid in full' : formatCurrency(balance.remainingBalance))}</strong>
+                    </div>
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Pay by</span>
+                        <strong class="reservation-detail-value">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel)}</strong>
                     </div>
                 </div>
+                <div class="reservation-inline-note">${escapeHtml(balance.helperText)}</div>
                 ${paymentModuleEnabled ? `
                     <div class="reservation-details-actions">
                         <button type="button" class="res-primary-btn open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Open Payments</button>
@@ -1329,6 +1932,8 @@ function syncPaymentComposerState(section) {
     }
 
     const amount = Number(activeTypeChip?.dataset.amount || 0);
+    const activeDisplayLabel = activeTypeChip?.dataset.displayLabel || getPaymentLabel(activeTypeChip?.dataset.paymentType || '');
+    const activeDisplayDescription = activeTypeChip?.dataset.displayDescription || '';
     const methodHelperEl = section.querySelector('[data-method-helper]');
     const channelBoxEl = section.querySelector('[data-payment-channel]');
     const selectionSummaryEl = section.querySelector('[data-selection-summary]');
@@ -1368,7 +1973,7 @@ function syncPaymentComposerState(section) {
     }
 
     if (selectionSummaryEl && activeTypeChip) {
-        selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} • ${getPaymentLabel(activeTypeChip.dataset.paymentType || '')} • ${formatCurrency(amount)}`;
+        selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} / ${activeDisplayLabel} / ${formatCurrency(amount)}`;
     }
 
     if (amountInput) {
@@ -1378,8 +1983,8 @@ function syncPaymentComposerState(section) {
     const isCash = activeMethod === 'cash';
     if (submitStepCopy) {
         submitStepCopy.textContent = isCash
-            ? 'Review your cash payment schedule, then send the details for admin confirmation.'
-            : 'Upload your proof if needed, then send the payment details for review.';
+            ? `${activeDisplayDescription || 'Review the payment details.'} Choose when you will visit the cafe to complete this cash payment.`
+            : `${activeDisplayDescription || 'Review the payment details.'} Upload your proof, then send the payment details for review.`;
     }
     if (amountField) {
         amountField.hidden = isCash;
@@ -1469,47 +2074,35 @@ function renderReservations() {
 
 function buildPaymentModuleCard(reservation) {
     const paymentSummary = getPaymentSummary(reservation);
+    const balance = getReservationBalanceDetails(reservation);
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
     const contract = getReservationContract(reservation.reservation_id);
-    const location = String(reservation.location_type || '').toLowerCase() === 'onsite'
-        ? 'Onsite - ELI Coffee'
-        : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
+    const isCompletedOverview = isCompletedPaymentOverview(reservation);
+    const isPendingOverview = isPendingPaymentOverview(reservation);
+    const isOnsite = String(reservation.location_type || '').toLowerCase() === 'onsite';
+    const locationLabel = isOnsite ? 'Onsite' : 'Offsite';
+    const locationValue = isOnsite ? 'ELI Coffee' : (reservation.venue_location || 'Venue not provided');
     const packageName = reservation.package?.package_name || reservation.package_id || 'No package selected';
-
-    return `
-        <div class="reservation-card payment-module-card" data-payment-reservation-id="${escapeHtml(reservation.reservation_id)}">
-            <div class="payment-module-shell">
-                <div class="payment-module-topbar">
-                    <div class="payment-module-topinfo">
-                        <div class="payment-module-eventblock">
-                            <div class="payment-module-event">${escapeHtml(reservation.event_type || 'Event')}</div>
-                            <div class="payment-module-datetime">${escapeHtml(formatDate(reservation.event_date))} at ${escapeHtml(reservation.event_time || 'No time selected')}</div>
-                        </div>
-                        <div class="payment-module-summary">
-                            <div class="payment-module-summary-item">
-                                <span class="payment-module-summary-label">Package:</span>
-                                <strong class="payment-module-summary-value">${escapeHtml(packageName)}</strong>
-                            </div>
-                            <div class="payment-module-summary-item">
-                                <span class="payment-module-summary-label">Location:</span>
-                                <strong class="payment-module-summary-value">${escapeHtml(location)}</strong>
-                            </div>
-                            <div class="payment-module-summary-item">
-                                <span class="payment-module-summary-label">Guests:</span>
-                                <strong class="payment-module-summary-value">${escapeHtml(String(reservation.guest_count || 0))}</strong>
-                            </div>
-                            <div class="payment-module-summary-item">
-                                <span class="payment-module-summary-label">Total:</span>
-                                <strong class="payment-module-summary-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
-                            </div>
-                        </div>
+    const contentMarkup = isCompletedOverview
+        ? renderCompletedPaymentOverview(reservation)
+        : isPendingOverview
+            ? renderPendingPaymentOverview(reservation)
+            : `
+                <div class="payment-progress-strip">
+                    <div class="payment-progress-card">
+                        <span class="payment-progress-label">Approved Payments</span>
+                        <strong class="payment-progress-value">${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</strong>
+                        <span class="payment-progress-note">Only approved payments count toward the reservation total.</span>
                     </div>
-                    <div class="payment-module-topactions">
-                        <div class="payment-module-badges">
-                            <span class="res-status ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
-                            <span class="res-section-status ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
-                        </div>
-                        ${contract?.contract_url ? `<a class="res-link-btn payment-contract-btn" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">View Uploaded Signed Contract</a>` : ''}
+                    <div class="payment-progress-card">
+                        <span class="payment-progress-label">Remaining Balance</span>
+                        <strong class="payment-progress-value ${escapeHtml(balance.toneKey)}">${escapeHtml(balance.remainingBalance <= 0 ? 'Paid' : formatCurrency(balance.remainingBalance))}</strong>
+                        <span class="payment-progress-note">${escapeHtml(balance.phaseLabel)}</span>
+                    </div>
+                    <div class="payment-progress-card">
+                        <span class="payment-progress-label">Pay By</span>
+                        <strong class="payment-progress-value ${escapeHtml(balance.isPastDue ? 'rejected' : 'neutral')}">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel)}</strong>
+                        <span class="payment-progress-note">${escapeHtml(balance.helperText)}</span>
                     </div>
                 </div>
                 <div class="payment-workspace">
@@ -1517,7 +2110,7 @@ function buildPaymentModuleCard(reservation) {
                         <div class="payment-panel-head">
                             <div>
                                 <h4 class="payment-panel-heading">Payment</h4>
-                                <p class="payment-panel-subheading">Review your amount and submit payment.</p>
+                                <p class="payment-panel-subheading">Follow the next required payment step for this reservation.</p>
                             </div>
                         </div>
                         <div class="payment-panel-surface">
@@ -1539,6 +2132,51 @@ function buildPaymentModuleCard(reservation) {
                         </section>
                     </aside>
                 </div>
+            `;
+
+    return `
+        <div class="reservation-card payment-module-card${isCompletedOverview ? ' complete-state' : ''}${isPendingOverview ? ' pending-state' : ''}" data-payment-reservation-id="${escapeHtml(reservation.reservation_id)}">
+            <div class="payment-module-shell">
+                <div class="payment-module-topbar">
+                    <div class="payment-module-topinfo">
+                        <div class="payment-module-eventblock">
+                            <div class="payment-module-event">${escapeHtml(reservation.event_type || 'Event')}</div>
+                            <div class="payment-module-datetime">${escapeHtml(formatDate(reservation.event_date))} at ${escapeHtml(reservation.event_time || 'No time selected')}</div>
+                        </div>
+                        <div class="payment-module-summary">
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Package:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(packageName)}</strong>
+                            </div>
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Guests:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(String(reservation.guest_count || 0))}</strong>
+                            </div>
+                            <div class="payment-module-summary-item">
+                                <span class="payment-module-summary-label">Total:</span>
+                                <strong class="payment-module-summary-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="payment-module-topactions">
+                        <div class="payment-module-badges">
+                            <span class="res-status ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
+                            <span class="res-section-status ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
+                        </div>
+                        ${contract?.contract_url ? `<a class="res-link-btn payment-contract-btn" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">View Uploaded Signed Contract</a>` : ''}
+                    </div>
+                </div>
+                <div class="payment-module-location-row">
+                    <div class="payment-module-location-item">
+                        <span class="payment-module-location-label">Location</span>
+                        <strong class="payment-module-location-value">${escapeHtml(locationLabel)}</strong>
+                    </div>
+                    <div class="payment-module-location-item address">
+                        <span class="payment-module-location-label">${escapeHtml(isOnsite ? 'Venue' : 'Address')}</span>
+                        <strong class="payment-module-location-value">${escapeHtml(locationValue)}</strong>
+                    </div>
+                </div>
+                ${contentMarkup}
             </div>
         </div>
     `;

@@ -5,7 +5,11 @@ function normalizeRole(value) {
 export function formatPortalRoleLabel(role, fallback = 'Portal User') {
   const normalized = normalizeRole(role);
   return normalized
-    ? normalized.charAt(0).toUpperCase() + normalized.slice(1)
+    ? normalized
+        .split(/[_\-\s]+/)
+        .filter(Boolean)
+        .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+        .join(' ')
     : fallback;
 }
 

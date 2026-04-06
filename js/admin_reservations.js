@@ -70,6 +70,7 @@ const PAYMENT_TYPE_LABELS = {
   full_payment: 'Full Payment',
   reschedule_fee: 'Reschedule Fee'
 };
+const PAYMENT_BALANCE_DUE_DAYS = 7;
 
 let reservationsCache = [];
 let blackouts = new Set();
@@ -230,6 +231,19 @@ function formatDateTime(value) {
     hour: 'numeric',
     minute: '2-digit'
   });
+}
+
+function buildLocalDateKey(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
+function getTodayDateKey() {
+  return buildLocalDateKey(new Date());
 }
 
 function getReservationById(reservationId) {
@@ -619,6 +633,48 @@ function getReservationRescheduleRequests(reservation) {
   return reservation.reschedule_requests || [];
 }
 
+function getApprovedBasePaymentsTotal(reservation) {
+  return getReservationPayments(reservation)
+    .filter((payment) => (
+      !payment.reschedule_request_id
+      && String(payment.payment_status || '').toLowerCase() === 'approved'
+    ))
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+}
+
+function getReservationBalanceSummary(reservation) {
+  const totalAmount = Number(reservation?.total_price || 0);
+  const approvedTotal = getApprovedBasePaymentsTotal(reservation);
+  const remainingBalance = Math.max(totalAmount - approvedTotal, 0);
+  const eventDateKey = formatDateKey(reservation?.event_date);
+
+  let dueDateKey = '';
+  let dueDateLabel = 'No due date';
+  if (eventDateKey) {
+    const dueDate = new Date(`${eventDateKey}T00:00:00`);
+    if (!Number.isNaN(dueDate.getTime())) {
+      dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
+      dueDateKey = buildLocalDateKey(dueDate);
+      dueDateLabel = formatReservationDate(dueDateKey);
+    }
+  }
+
+  const isPastDue = Boolean(remainingBalance > 0 && dueDateKey && getTodayDateKey() > dueDateKey);
+  const hasPartialPayment = approvedTotal > 0 && remainingBalance > 0;
+
+  return {
+    totalAmount,
+    approvedTotal,
+    remainingBalance,
+    dueDateKey,
+    dueDateLabel,
+    isPastDue,
+    hasPartialPayment,
+    toneKey: remainingBalance <= 0 ? 'approved' : isPastDue ? 'unpaid' : 'pending',
+    statusLabel: remainingBalance <= 0 ? 'Paid in Full' : isPastDue ? 'Overdue' : hasPartialPayment ? 'Partially Paid' : 'Initial Payment'
+  };
+}
+
 function getPaymentTypeLabel(type) {
   return PAYMENT_TYPE_LABELS[type] || type || 'Payment';
 }
@@ -647,23 +703,26 @@ function getLatestOpenRescheduleRequest(reservation) {
 }
 
 function paymentStatus(res) {
+  const balance = getReservationBalanceSummary(res);
   const pendingPayment = getPendingPayment(res);
   if (pendingPayment) {
     return {
-      label: 'Pending',
+      label: 'Pending Review',
       key: 'pending',
-      sublabel: getPaymentTypeLabel(pendingPayment.payment_type)
+      sublabel: `${getPaymentTypeLabel(pendingPayment.payment_type)} / ${formatCurrency(balance.remainingBalance)} remaining`
     };
   }
 
-  const approvedPayments = getReservationPayments(res)
-    .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved');
+  if (balance.remainingBalance <= 0) {
+    return { label: 'Paid', key: 'approved', sublabel: 'Paid in full' };
+  }
 
-  if (approvedPayments.length) {
-    const paidAmount = approvedPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-    return approvedPayments.some((payment) => payment.payment_type === 'full_payment')
-      ? { label: 'Paid', key: 'approved', sublabel: 'Complete' }
-      : { label: 'Paid', key: 'approved', sublabel: `${formatCurrency(paidAmount)} recorded` };
+  if (balance.hasPartialPayment) {
+    return {
+      label: balance.isPastDue ? 'Overdue' : 'Partially Paid',
+      key: balance.toneKey,
+      sublabel: `Remaining ${formatCurrency(balance.remainingBalance)} / Pay by ${balance.dueDateLabel}`
+    };
   }
 
   const rescheduleRequest = getLatestOpenRescheduleRequest(res);
@@ -671,7 +730,11 @@ function paymentStatus(res) {
     return { label: 'Pending', key: 'pending', sublabel: 'Reschedule fee' };
   }
 
-  return { label: 'Unpaid', key: 'unpaid', sublabel: 'No payment yet' };
+  return {
+    label: balance.isPastDue ? 'Overdue' : 'Unpaid',
+    key: balance.isPastDue ? 'unpaid' : 'pending',
+    sublabel: balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'No payment yet'
+  };
 }
 
 function getStaffSummary(reservationId) {
@@ -809,6 +872,7 @@ function renderReservationDetailsModal() {
   }
 
   const paymentSummary = paymentStatus(reservation);
+  const balance = getReservationBalanceSummary(reservation);
   const reservationStatus = formatStatusPill(reservation.status);
   const contract = contractStatus(reservation);
   const contractRecord = contract.contract;
@@ -859,12 +923,24 @@ function renderReservationDetailsModal() {
   }
 
   if (reservationPaymentSection) {
-    const paymentCards = latestPayment ? [
-      buildDetailCard('Payment Type', getPaymentTypeLabel(latestPayment.payment_type)),
-      buildDetailCard('Method', getPaymentMethodLabel(latestPayment.payment_method)),
-      buildDetailCard('Amount', formatCurrency(latestPayment.amount)),
-      buildDetailCard('Submitted', formatDateTime(latestPayment.submitted_at))
-    ].join('') : buildDetailCard('Payment State', 'No submitted payment yet.', { full: true, subtle: true });
+    const paymentCards = [
+      buildDetailCard('Total Amount', formatCurrency(balance.totalAmount)),
+      buildDetailCard('Approved Payments', formatCurrency(balance.approvedTotal)),
+      buildDetailCard('Remaining Balance', balance.remainingBalance <= 0 ? 'Paid in Full' : formatCurrency(balance.remainingBalance)),
+      buildDetailCard('Pay By', balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel),
+      latestPayment
+        ? buildDetailCard('Latest Payment Type', getPaymentTypeLabel(latestPayment.payment_type))
+        : buildDetailCard('Latest Payment', 'No submitted payment yet.', { subtle: true }),
+      latestPayment
+        ? buildDetailCard('Latest Amount', formatCurrency(latestPayment.amount))
+        : buildDetailCard('Latest Method', 'No payment submitted yet.', { subtle: true }),
+      latestPayment
+        ? buildDetailCard('Latest Method', getPaymentMethodLabel(latestPayment.payment_method))
+        : buildDetailCard('Latest Submitted', 'No submission yet.', { subtle: true }),
+      latestPayment
+        ? buildDetailCard('Latest Submitted', formatDateTime(latestPayment.submitted_at))
+        : buildDetailCard('Balance Status', balance.statusLabel)
+    ].join('');
 
     const paymentActions = pendingPayment ? `
       <div class="details-action-row">
@@ -890,7 +966,7 @@ function renderReservationDetailsModal() {
           <span class="detail-label">Current Payment State</span>
           <div class="detail-badge-stack">
             <span class="status-pill ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
-            <span class="detail-inline-copy">${escapeHtml(paymentSummary.sublabel || '')}</span>
+            <span class="detail-inline-copy">${escapeHtml(paymentSummary.sublabel || balance.statusLabel)}</span>
           </div>
         </div>
         ${paymentCards}
