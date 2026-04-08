@@ -156,7 +156,7 @@ function isMissingProfileColumnError(error, columnName) {
 }
 
 function formatCurrency(value) {
-    return `P${Number(value || 0).toLocaleString()}`;
+    return `₱${Number(value || 0).toLocaleString()}`;
 }
 
 function formatDate(value) {
@@ -1358,7 +1358,7 @@ function renderCompletedPaymentOverview(reservation) {
                     <div class="payment-complete-header">
                         <div class="payment-complete-icon" aria-hidden="true">&#10003;</div>
                         <div class="payment-complete-copy">
-                            <div class="payment-complete-title">Payment Completed!</div>
+                            <div class="payment-complete-title">Payment Completed</div>
                             <p class="payment-complete-text">All required payments for this reservation have already been approved and recorded.</p>
                             <p class="payment-complete-subtext">Thank you. Your reservation is fully paid and your records remain available below.</p>
                         </div>
@@ -1376,7 +1376,7 @@ function renderCompletedPaymentOverview(reservation) {
                         </div>
                         <div class="payment-complete-stat">
                             <span class="payment-complete-label">Remaining Balance</span>
-                            <strong class="payment-complete-value approved">P0</strong>
+                            <strong class="payment-complete-value approved">${escapeHtml(formatCurrency(0))}</strong>
                             <span class="payment-complete-note">All paid</span>
                         </div>
                         <div class="payment-complete-stat">
@@ -1440,7 +1440,7 @@ function renderCompletedPaymentOverview(reservation) {
                         </div>
                         <div class="payment-side-summary-row">
                             <span>Remaining Balance</span>
-                            <strong class="approved">P0</strong>
+                            <strong class="approved">${escapeHtml(formatCurrency(0))}</strong>
                         </div>
                         <div class="payment-side-summary-row">
                             <span>Status</span>
