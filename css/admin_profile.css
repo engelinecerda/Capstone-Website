@@ -41,11 +41,12 @@
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .profile-side {
   min-width: 0;
+  height: 100%;
 }
 
 .profile-panel {
@@ -58,6 +59,12 @@
 
 .profile-panel-password {
   margin-top: 18px;
+}
+
+.profile-panel-side {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-head {
@@ -236,6 +243,8 @@
   display: grid;
   gap: 14px;
   padding: 20px;
+  flex: 1;
+  align-content: start;
 }
 
 .detail-card {

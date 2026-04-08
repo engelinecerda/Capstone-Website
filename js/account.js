@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { customerSupabase as supabase } from './supabase.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -115,6 +115,7 @@ const state = {
     receiptsByPaymentId: {},
     reschedulesByReservationId: {},
     profile: null,
+    emailSecurityReady: true,
     reservationView: 'active',
     reservationDetailsReservationId: null,
     receiptModalPaymentId: null,
@@ -136,6 +137,22 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function normalizeEmail(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function setFormMessage(element, message, tone = '') {
+    if (!element) return;
+    element.textContent = message;
+    element.className = 'form-msg' + (tone ? ` ${tone}` : '');
+}
+
+function isMissingProfileColumnError(error, columnName) {
+    const message = error?.message || '';
+    return message.includes(`Could not find the '${columnName}' column`)
+        || message.includes(`column profiles.${columnName} does not exist`);
 }
 
 function formatCurrency(value) {
@@ -3159,7 +3176,158 @@ function wireSubmissionFeedbackModal() {
     });
 }
 
+function getProfileFallback() {
+    return {
+        user_id: user.id,
+        first_name: user.user_metadata?.first_name || '',
+        middle_name: user.user_metadata?.middle_name || '',
+        last_name: user.user_metadata?.last_name || '',
+        email: normalizeEmail(user.email || ''),
+        pending_email: null,
+        email_change_requested_at: null,
+        phone_number: user.user_metadata?.phone_number || '',
+        role: 'customer',
+        date_registered: user.created_at || ''
+    };
+}
+
+function getConfirmedProfileEmail(profile) {
+    return normalizeEmail(profile?.email || user.email || '');
+}
+
+function getPendingProfileEmail(profile) {
+    const pendingEmail = normalizeEmail(profile?.pending_email || '');
+    const confirmedEmail = getConfirmedProfileEmail(profile);
+    return pendingEmail && pendingEmail !== confirmedEmail ? pendingEmail : '';
+}
+
+function renderPendingEmailNotice(profile) {
+    const pendingEmailNote = document.getElementById('pending-email-note');
+    if (!pendingEmailNote) return;
+
+    const pendingEmail = getPendingProfileEmail(profile);
+    if (!pendingEmail) {
+        pendingEmailNote.hidden = true;
+        pendingEmailNote.textContent = '';
+        return;
+    }
+
+    pendingEmailNote.textContent = `Pending change to ${pendingEmail}. Confirm the email links sent to your inboxes before the new email becomes active.`;
+    pendingEmailNote.hidden = false;
+}
+
+async function fetchCurrentProfile() {
+    let response = await supabase
+        .from('profiles')
+        .select('user_id, first_name, middle_name, last_name, email, pending_email, email_change_requested_at, phone_number, role, date_registered')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (
+        response.error
+        && (
+            isMissingProfileColumnError(response.error, 'pending_email')
+            || isMissingProfileColumnError(response.error, 'email_change_requested_at')
+        )
+    ) {
+        state.emailSecurityReady = false;
+        response = await supabase
+            .from('profiles')
+            .select('user_id, first_name, middle_name, last_name, email, phone_number, role, date_registered')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (response.error) throw response.error;
+
+        return response.data
+            ? {
+                ...response.data,
+                email: normalizeEmail(response.data.email || ''),
+                pending_email: null,
+                email_change_requested_at: null
+            }
+            : null;
+    }
+
+    if (response.error) throw response.error;
+
+    state.emailSecurityReady = true;
+    return response.data
+        ? {
+            ...response.data,
+            email: normalizeEmail(response.data.email || ''),
+            pending_email: normalizeEmail(response.data.pending_email || '')
+        }
+        : null;
+}
+
+async function syncConfirmedEmailToProfile(profile) {
+    const authEmail = normalizeEmail(user.email || '');
+    const profileEmail = getConfirmedProfileEmail(profile);
+
+    if (!state.emailSecurityReady || !authEmail || !profileEmail || authEmail === profileEmail) {
+        return profile;
+    }
+
+    const reconciledProfile = {
+        ...profile,
+        email: authEmail,
+        pending_email: null,
+        email_change_requested_at: null
+    };
+
+    const { error } = await supabase
+        .from('profiles')
+        .upsert(reconciledProfile, { onConflict: 'user_id' });
+
+    if (error) throw error;
+
+    return reconciledProfile;
+}
+
+async function isEmailAlreadyUsed(requestedEmail) {
+    const normalizedRequestedEmail = normalizeEmail(requestedEmail);
+    if (!normalizedRequestedEmail) return false;
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, email, pending_email')
+        .neq('user_id', user.id);
+
+    if (error) {
+        console.warn('Profile email pre-check fallback:', error);
+        return false;
+    }
+
+    return (data || []).some((profile) => {
+        const confirmedEmail = normalizeEmail(profile.email || '');
+        const pendingEmail = normalizeEmail(profile.pending_email || '');
+        return confirmedEmail === normalizedRequestedEmail || pendingEmail === normalizedRequestedEmail;
+    });
+}
+
+function getEmailConflictMessage() {
+    return 'This email is already in use. Please enter a different email address.';
+}
+
+function getEmailChangeErrorMessage(error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (
+        message.includes('already registered')
+        || message.includes('already been registered')
+        || message.includes('already in use')
+        || message.includes('user already registered')
+        || message.includes('email address is already in use')
+        || message.includes('email already in use')
+    ) {
+        return getEmailConflictMessage();
+    }
+
+    return error?.message || 'Unable to request the email change right now.';
+}
+
 async function loadProfile() {
+    const profileMessage = document.getElementById('profile-msg');
     const sidebarName = document.getElementById('sidebar-name');
     const sidebarEmail = document.getElementById('sidebar-email');
     const firstNameInput = document.getElementById('profile-first-name');
@@ -3170,38 +3338,25 @@ async function loadProfile() {
     const dateInput = document.getElementById('profile-date');
 
     try {
-        const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('user_id, first_name, middle_name, last_name, email, phone_number, role, date_registered')
-            .eq('user_id', user.id)
-            .maybeSingle();
+        const profile = await fetchCurrentProfile();
+        const fallbackProfile = getProfileFallback();
 
-        if (error) throw error;
-
-        const fallbackProfile = {
-            user_id: user.id,
-            first_name: user.user_metadata?.first_name || '',
-            middle_name: user.user_metadata?.middle_name || '',
-            last_name: user.user_metadata?.last_name || '',
-            email: user.email || '',
-            phone_number: user.user_metadata?.phone_number || '',
-            role: 'customer',
-            date_registered: user.created_at || ''
-        };
-
-        state.profile = profile || fallbackProfile;
+        state.profile = await syncConfirmedEmailToProfile(profile || fallbackProfile);
         const displayName = getReservationName(state.profile);
+        const confirmedEmail = getConfirmedProfileEmail(state.profile);
 
         if (sidebarName) sidebarName.textContent = displayName;
-        if (sidebarEmail) sidebarEmail.textContent = state.profile.email || user.email || '';
+        if (sidebarEmail) sidebarEmail.textContent = confirmedEmail;
         if (firstNameInput) firstNameInput.value = state.profile.first_name || '';
         if (middleNameInput) middleNameInput.value = state.profile.middle_name || '';
         if (lastNameInput) lastNameInput.value = state.profile.last_name || '';
-        if (emailInput) emailInput.value = state.profile.email || user.email || '';
+        if (emailInput) emailInput.value = confirmedEmail;
         if (phoneInput) phoneInput.value = state.profile.phone_number || '';
         if (dateInput) dateInput.value = formatDate(state.profile.date_registered);
+        renderPendingEmailNotice(state.profile);
     } catch (error) {
         console.error('Failed to load profile:', error);
+        setFormMessage(profileMessage, 'Unable to load the latest profile details right now.', 'error');
     }
 }
 
@@ -3222,35 +3377,119 @@ function wireProfileForm() {
     profileForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
 
+        const confirmedEmail = getConfirmedProfileEmail(state.profile);
+        const requestedEmail = normalizeEmail(document.getElementById('profile-email')?.value || '');
+        const currentPendingEmail = getPendingProfileEmail(state.profile);
         const payload = {
             user_id: user.id,
-            first_name: document.getElementById('profile-first-name')?.value.trim() || '',
-            middle_name: document.getElementById('profile-middle-name')?.value.trim() || null,
-            last_name: document.getElementById('profile-last-name')?.value.trim() || '',
-            email: user.email || '',
+            first_name: state.profile?.first_name || '',
+            middle_name: state.profile?.middle_name || null,
+            last_name: state.profile?.last_name || '',
+            email: confirmedEmail,
             phone_number: document.getElementById('profile-phone')?.value.trim() || null,
             role: state.profile?.role || 'customer',
             date_registered: state.profile?.date_registered || user.created_at || new Date().toISOString()
         };
 
-        if (!payload.first_name || !payload.last_name) {
-            profileMessage.textContent = 'First name and last name are required.';
+        if (state.emailSecurityReady) {
+            payload.pending_email = currentPendingEmail || null;
+            payload.email_change_requested_at = state.profile?.email_change_requested_at || null;
+        }
+
+        if (!payload.first_name || !payload.last_name || !requestedEmail) {
+            setFormMessage(profileMessage, 'First name, last name, and email are required.', 'error');
             return;
         }
 
-        profileMessage.textContent = 'Saving profile...';
+        setFormMessage(profileMessage, 'Saving profile...');
 
         try {
-            const { error } = await supabase
+            const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert(payload, { onConflict: 'user_id' });
 
-            if (error) throw error;
+            if (profileError) throw profileError;
 
-            profileMessage.textContent = 'Profile updated successfully.';
+            state.profile = {
+                ...state.profile,
+                ...payload
+            };
+
+            const emailChanged = requestedEmail !== confirmedEmail;
+            if (!emailChanged) {
+                await loadProfile();
+                setFormMessage(profileMessage, currentPendingEmail
+                    ? `Your profile was updated. Pending change to ${currentPendingEmail} is still waiting for confirmation.`
+                    : 'Profile updated successfully.', currentPendingEmail ? 'warning' : 'success');
+                return;
+            }
+
+            if (currentPendingEmail && requestedEmail === currentPendingEmail) {
+                await loadProfile();
+                setFormMessage(profileMessage, `Pending change to ${currentPendingEmail} is still waiting for confirmation. Check your inboxes before requesting another email change.`, 'warning');
+                return;
+            }
+
+            if (!state.emailSecurityReady) {
+                await loadProfile();
+                setFormMessage(profileMessage, 'Your other profile changes were saved, but secure email change needs the pending_email profile migration before it can be used.', 'warning');
+                return;
+            }
+
+            const emailInUse = await isEmailAlreadyUsed(requestedEmail);
+            if (emailInUse) {
+                await loadProfile();
+                setFormMessage(profileMessage, `Your other profile changes were saved, but ${getEmailConflictMessage()}`, 'warning');
+                return;
+            }
+
+            const emailRedirectTo = new URL('../pages/account.html', window.location.href).href;
+            const { error: emailError } = await supabase.auth.updateUser({
+                email: requestedEmail,
+                options: {
+                    emailRedirectTo
+                }
+            });
+
+            if (emailError) {
+                await loadProfile();
+                setFormMessage(profileMessage, `Your other profile changes were saved, but the email change could not be requested: ${getEmailChangeErrorMessage(emailError)}`, 'warning');
+                return;
+            }
+
+            const pendingPayload = {
+                ...payload,
+                pending_email: requestedEmail,
+                email_change_requested_at: new Date().toISOString()
+            };
+
+            const { error: pendingError } = await supabase
+                .from('profiles')
+                .upsert(pendingPayload, { onConflict: 'user_id' });
+
+            if (pendingError) {
+                await loadProfile();
+                setFormMessage(
+                    profileMessage,
+                    'The confirmation email was requested, but we could not save the pending email state on your profile. Please refresh this page and check both your old and new inboxes before trying again.',
+                    'warning'
+                );
+                return;
+            }
+
+            state.profile = {
+                ...state.profile,
+                ...pendingPayload
+            };
+
             await loadProfile();
+            setFormMessage(
+                profileMessage,
+                `Pending change to ${requestedEmail}. Confirm the email links sent to your inboxes before the new email becomes active.`,
+                'warning'
+            );
         } catch (error) {
-            profileMessage.textContent = `Failed to update profile: ${error.message}`;
+            setFormMessage(profileMessage, `Failed to update profile: ${error.message}`, 'error');
         }
     });
 }

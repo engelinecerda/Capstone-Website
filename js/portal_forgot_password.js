@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 
 const form = document.getElementById('portal-forgot-password-form');
 const message = document.getElementById('portal-forgot-password-msg');

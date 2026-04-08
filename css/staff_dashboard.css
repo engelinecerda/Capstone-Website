@@ -70,6 +70,8 @@ body {
 .sidebar-profile {
   display: block;
   padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
 }
 
 .sidebar-avatar {
@@ -656,6 +658,10 @@ body {
   padding: 12px 14px;
 }
 
+.reservation-meta-card-note {
+  grid-column: 1 / -1;
+}
+
 .reservation-meta-label {
   color: var(--muted);
   font-size: 11px;
@@ -670,6 +676,10 @@ body {
   font-size: 13.5px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+.reservation-note-copy {
+  white-space: pre-wrap;
 }
 
 .reservation-actions {
@@ -825,6 +835,7 @@ body {
   font-size: 14px;
   font-weight: 700;
   line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .modal-actions {

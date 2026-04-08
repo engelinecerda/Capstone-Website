@@ -104,7 +104,7 @@
                     </div>
                 </div>
                 <div id="venue-wrapper" class="venue-wrapper hidden">
-                    <input class="res-input" type="text" id="venue-location" placeholder="Venue Location *">
+                    <input class="res-input" type="text" id="venue-location" placeholder="Enter complete venue address (e.g., 0221 National Road, Calumpang, Binangonan, Rizal) *">
                 </div>
             </div>
 
@@ -250,7 +250,7 @@
     <script type="module" src="../js/navbar.js"></script>
 
     <script type="module">
-    import { supabase } from '../js/supabase.js';
+    import { customerSupabase as supabase } from '../js/supabase.js';
 
     const { data: { session } } = await supabase.auth.getSession();
     const isLoggedIn = !!session;
@@ -267,6 +267,9 @@
 
     const eventDateInput = document.getElementById('event-date');
     const eventDateDisplayInput = document.getElementById('event-date-display');
+    const nameInput = document.getElementById('name');
+    const phoneInput = document.getElementById('phone');
+    const emailInput = document.getElementById('email');
     const availabilityGrid = document.getElementById('availabilityGrid');
     const availabilityMonthLabel = document.getElementById('availabilityMonthLabel');
     const availabilityMessage = document.getElementById('availabilityMessage');
@@ -342,6 +345,65 @@
             eventDateDisplayInput.value = dateKey ? formatDisplayDate(dateKey) : '';
         }
         S.eventDate = dateKey || '';
+    }
+
+    function getReservationContactName(profile, user) {
+        const parts = [
+            profile?.first_name,
+            profile?.middle_name,
+            profile?.last_name
+        ].filter(Boolean);
+
+        return parts.join(' ').trim() || user?.email || '';
+    }
+
+    function applyReservationContactPrefill(profile, user) {
+        const fullName = getReservationContactName(profile, user);
+        const email = profile?.email || user?.email || '';
+        const phone = profile?.phone_number || user?.user_metadata?.phone_number || '';
+
+        if (nameInput && !nameInput.value.trim()) {
+            nameInput.value = fullName;
+        }
+
+        if (phoneInput && !phoneInput.value.trim()) {
+            phoneInput.value = phone;
+        }
+
+        if (emailInput && !emailInput.value.trim()) {
+            emailInput.value = email;
+        }
+
+        S.name = nameInput?.value.trim() || S.name;
+        S.phone = phoneInput?.value.trim() || S.phone;
+        S.email = emailInput?.value.trim() || S.email;
+    }
+
+    async function prefillReservationContactDetails() {
+        const user = session?.user;
+        if (!user) return;
+
+        const fallbackProfile = {
+            first_name: user.user_metadata?.first_name || '',
+            middle_name: user.user_metadata?.middle_name || '',
+            last_name: user.user_metadata?.last_name || '',
+            email: user.email || '',
+            phone_number: user.user_metadata?.phone_number || ''
+        };
+
+        try {
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('first_name, middle_name, last_name, email, phone_number')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (error) throw error;
+            applyReservationContactPrefill(profile || fallbackProfile, user);
+        } catch (error) {
+            console.error('Failed to prefill reservation contact details:', error);
+            applyReservationContactPrefill(fallbackProfile, user);
+        }
     }
 
     function isUnavailableDate(dateKey) {
@@ -555,6 +617,38 @@
         renderAvailabilityCalendar();
     }
 
+    const MINI_PACKAGE_DETAIL_FALLBACKS = {
+        'VIP Lite':        { pax: '15-18 pax',    hours: '2 hours', credit: '&#8369;2,000 food credit' },
+        'VIP Plus':        { pax: '15-18 pax',    hours: '3 hours', credit: '&#8369;2,499 food credit' },
+        'VIP Max':         { pax: '15-18 pax',    hours: '4 hours', credit: '&#8369;3,000 food credit' },
+        'Main Hall Basic': { pax: 'Up to 25 pax', hours: '2 hours', credit: '&#8369;8,000 food credit' },
+        'Main Hall Plus':  { pax: 'Up to 25 pax', hours: '3 hours', credit: '&#8369;9,000 food credit' }
+    };
+
+    function parseMiniPackageDetails(pkg) {
+        const fallback = MINI_PACKAGE_DETAIL_FALLBACKS[pkg.package_name] || {};
+        const description = String(pkg.description || '').trim();
+        const match = description.match(/^(.+?)\s*,\s*(\d+\s*hours?)\s*,\s*((?:P|&#8369;|\u20B1)\s*\d[\d,]*\s*food credit)$/i);
+
+        if (match) {
+            const currencyNormalizedCredit = match[3]
+                .replace(/^P\s*/i, '&#8369;')
+                .replace(/^\u20B1\s*/i, '&#8369;');
+
+            return {
+                pax: match[1].trim(),
+                hours: match[2].trim(),
+                credit: currencyNormalizedCredit.trim()
+            };
+        }
+
+        return {
+            pax: fallback.pax || (pkg.guest_capacity ? 'Up to ' + pkg.guest_capacity + ' pax' : ''),
+            hours: fallback.hours || '',
+            credit: fallback.credit || ''
+        };
+    }
+
     // ── Load packages from Supabase ──
     async function loadPackages() {
         const { data: pkgs, error } = await supabase
@@ -584,7 +678,10 @@
                     SNACK.push(base);
                 } else {
                     // main onsite package
-                    MINI.push({ ...base, pax: p.guest_capacity ? p.guest_capacity + ' pax' : '' });
+                    MINI.push({
+                        ...base,
+                        ...parseMiniPackageDetails(p)
+                    });
                 }
             } else if (p.location_type === 'offsite') {
                 // Infer offsite category from package name since package_type is only 'main'/'add on'
@@ -1459,6 +1556,7 @@
 
     // Load packages from DB first, then start the form
     syncSelectedDate('');
+    await prefillReservationContactDetails();
     await loadPackages();
     await loadAvailabilityCalendar();
     showStep(1);

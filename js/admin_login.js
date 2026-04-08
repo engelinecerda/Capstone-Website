@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
 
 const adminLoginForm = document.getElementById('adminLoginForm');

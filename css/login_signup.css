@@ -243,31 +243,6 @@ body {
 }
 
 /* ========================
-   Admin Link
-======================== */
-.admin-link {
-    text-align: center;
-    margin-top: 18px;
-    font-size: 0.875rem;
-    color: #4A2B16;
-}
-
-.admin-link a {
-    color: #4A2B16;
-    text-decoration: none;
-    font-weight: 700;
-}
-
-.admin-link a:visited {
-    color: #4A2B16;
-}
-
-.admin-link a:hover {
-    color: #2A1408;
-    text-decoration: underline;
-}
-
-/* ========================
    Password Hint
 ======================== */
 .password-hint {

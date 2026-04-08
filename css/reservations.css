@@ -862,9 +862,10 @@
         .summary-row:last-child { border-bottom: none; }
         .summary-row .s-label { font-weight: 600; color: #6B3A1F; flex-shrink: 0; margin-right: 16px; }
         .summary-row .s-value { text-align: right; }
-        .summary-divider { border: none; border-top: 1px solid #e0d0c0; margin: 10px 0; }
-        .summary-total { font-size: 17px; font-weight: 700; color: #6B3A1F; display: flex; justify-content: space-between; padding-top: 10px; }
-        .summary-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #aaa; margin: 12px 0 6px; }
+        .summary-divider { display: none; }
+        .summary-total { font-size: 17px; font-weight: 700; color: #6B3A1F; display: flex; justify-content: space-between; padding-top: 14px; margin-top: 14px; }
+        .summary-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #aaa; margin: 16px 0 6px; padding-top: 14px; }
+        .summary-box .summary-section-title:first-child { margin-top: 0; padding-top: 0; }
 
         /* Guest Warning */
         .guest-warning { display: flex; align-items: flex-start; gap: 12px; background: #FFF3CD; border: 1px solid #FFD966; border-radius: 12px; padding: 14px 18px; margin-top: 16px; font-size: 14px; color: #6B4C00; }

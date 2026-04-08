@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
@@ -15,7 +15,6 @@ const staffRoleCopy = document.getElementById('staffRoleCopy');
 const detailPortalRole = document.getElementById('detailPortalRole');
 const detailStaffRole = document.getElementById('detailStaffRole');
 const detailDisplayName = document.getElementById('detailDisplayName');
-const focusProfileBtn = document.getElementById('focusProfileBtn');
 const pageMessage = document.getElementById('pageMessage');
 const profileForm = document.getElementById('profileForm');
 const profileMessage = document.getElementById('profileMessage');
@@ -271,10 +270,6 @@ async function handlePasswordSubmit(event) {
 function bindEvents() {
   profileForm?.addEventListener('submit', handleProfileSubmit);
   passwordForm?.addEventListener('submit', handlePasswordSubmit);
-  focusProfileBtn?.addEventListener('click', () => {
-    profileFirstName?.focus();
-    profileFirstName?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
 
   logoutBtn?.addEventListener('click', async () => {
     await supabase.auth.signOut();

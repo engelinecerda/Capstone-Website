@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
@@ -189,6 +189,10 @@ function getLocationLabel(reservation) {
 
 function getEventTitle(reservation) {
   return reservation?.event_type || reservation?.package?.package_name || 'Assigned Reservation';
+}
+
+function getAssignmentNote(reservation) {
+  return String(reservation?.assignment_note || '').trim();
 }
 
 function parseTimeValue(value) {
@@ -409,6 +413,12 @@ function renderReservations() {
             <span class="reservation-meta-label">Guests</span>
             <div class="reservation-meta-value">${escapeHtml(String(reservation.guest_count || 0))} pax</div>
           </div>
+          ${getAssignmentNote(reservation) ? `
+            <div class="reservation-meta-card reservation-meta-card-note">
+              <span class="reservation-meta-label">Assigned Note</span>
+              <div class="reservation-meta-value reservation-note-copy">${escapeHtml(getAssignmentNote(reservation))}</div>
+            </div>
+          ` : ''}
         </div>
         <div class="reservation-actions">
           <button type="button" class="primary-btn" data-action="view-details" data-reservation-id="${reservation.reservation_id}">View Details</button>
@@ -457,7 +467,10 @@ function renderReservationModal(reservationId) {
     buildModalCard('Package', reservation.package?.package_name || 'Package pending'),
     buildModalCard('Guests', `${String(reservation.guest_count || 0)} pax`),
     buildModalCard('Reservation Status', status.label),
-    buildModalCard('Event Type', reservation.event_type || 'Reserved event', true)
+    buildModalCard('Event Type', reservation.event_type || 'Reserved event', true),
+    ...(getAssignmentNote(reservation)
+      ? [buildModalCard('Assigned Note', getAssignmentNote(reservation), true)]
+      : [])
   ].join('');
 
   reservationModal.classList.remove('hidden');
@@ -479,12 +492,35 @@ function getAssignmentsErrorHint(error) {
 }
 
 async function fetchAssignedReservations(userId) {
-  const { data: assignments, error: assignmentError } = await supabase
+  let assignmentResponse = await supabase
     .from('reservation_staff_assignments')
-    .select('reservation_id, assigned_at')
+    .select('reservation_id, assigned_at, assignment_note')
     .eq('staff_user_id', userId);
 
+  if (
+    assignmentResponse.error
+    && (
+      String(assignmentResponse.error.message || '').includes("Could not find the 'assignment_note' column")
+      || String(assignmentResponse.error.message || '').includes('column reservation_staff_assignments.assignment_note does not exist')
+    )
+  ) {
+    assignmentResponse = await supabase
+      .from('reservation_staff_assignments')
+      .select('reservation_id, assigned_at')
+      .eq('staff_user_id', userId);
+  }
+
+  const { data: assignments, error: assignmentError } = assignmentResponse;
+
   if (assignmentError) throw assignmentError;
+
+  const assignmentMetaByReservationId = (assignments || []).reduce((map, assignment) => {
+    map[assignment.reservation_id] = {
+      assigned_at: assignment.assigned_at || null,
+      assignment_note: assignment.assignment_note || ''
+    };
+    return map;
+  }, {});
 
   const reservationIds = (assignments || []).map((assignment) => assignment.reservation_id).filter(Boolean);
   if (!reservationIds.length) return [];
@@ -509,7 +545,11 @@ async function fetchAssignedReservations(userId) {
     .in('reservation_id', reservationIds);
 
   if (reservationError) throw reservationError;
-  return sortReservations(reservations || []);
+  return sortReservations((reservations || []).map((reservation) => ({
+    ...reservation,
+    assigned_at: assignmentMetaByReservationId[reservation.reservation_id]?.assigned_at || null,
+    assignment_note: assignmentMetaByReservationId[reservation.reservation_id]?.assignment_note || ''
+  })));
 }
 
 function determineInitialFilter() {

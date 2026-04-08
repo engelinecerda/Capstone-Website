@@ -1474,6 +1474,10 @@ body {
   margin-bottom: 12px;
 }
 
+.assignment-note-field {
+  margin-bottom: 14px;
+}
+
 .assignment-search-input {
   width: 100%;
   border: 1px solid #dccfbe;

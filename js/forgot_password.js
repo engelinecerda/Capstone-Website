@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { customerSupabase as supabase } from './supabase.js';
 
 const form = document.getElementById('forgot-password-form');
 const message = document.getElementById('forgot-password-msg');

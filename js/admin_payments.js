@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
@@ -242,6 +242,10 @@ function getReceipt(paymentId) {
 
 function getRescheduleRequest(requestId) {
   return rescheduleRequestMap[requestId] || null;
+}
+
+function countPendingReservations(list) {
+  return list.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
 }
 
 function getReservationSummary(payment) {
@@ -730,7 +734,7 @@ async function loadData() {
     );
 
     if (navReservationCount) {
-      navReservationCount.textContent = String(Object.keys(reservationMap).length);
+      navReservationCount.textContent = String(countPendingReservations(Object.values(reservationMap)));
     }
 
     filterAndRender();

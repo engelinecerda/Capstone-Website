@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
 const tableMessage = document.getElementById('tableMessage');
@@ -53,6 +53,7 @@ const assignmentStaffList = document.getElementById('assignmentStaffList');
 const assignmentReservationSummary = document.getElementById('assignmentReservationSummary');
 const assignmentReservationMeta = document.getElementById('assignmentReservationMeta');
 const assignmentSelectionCount = document.getElementById('assignmentSelectionCount');
+const assignmentNoteInput = document.getElementById('assignmentNoteInput');
 const BOOKING_LIMITS = {
   onsite_vip: 1,
   onsite_main_hall: 1,
@@ -129,6 +130,12 @@ function getAssignmentSchemaHint(error) {
     || message.includes("Could not find the table 'reservation_staff_assignments' in the schema cache")
   ) {
     return 'Create the reservation_staff_assignments table in Supabase before using employee assignment.';
+  }
+  if (
+    message.includes("Could not find the 'assignment_note' column")
+    || message.includes('column reservation_staff_assignments.assignment_note does not exist')
+  ) {
+    return 'Add an `assignment_note` text column to reservation_staff_assignments so admins can save staff notes.';
   }
   if (message.includes('row-level security policy')) {
     return 'The employee assignment table exists, but its RLS policy is blocking admin access. Add an admin manage policy for reservation_staff_assignments.';
@@ -296,6 +303,12 @@ function formatStaffRole(staffRole) {
 
 function getAssignedStaff(reservationId) {
   return assignmentMapByReservationId[reservationId] || [];
+}
+
+function getAssignmentNoteForReservation(reservationId) {
+  const assignedStaff = getAssignedStaff(reservationId);
+  const noteHolder = assignedStaff.find((staff) => String(staff?.assignment_note || '').trim());
+  return String(noteHolder?.assignment_note || '').trim();
 }
 
 function canAssignEmployees(reservation) {
@@ -516,7 +529,8 @@ function getApprovalLimitMessage(reservation) {
 function isMissingColumnError(error, columnName) {
   const message = error?.message || '';
   return message.includes(`Could not find the '${columnName}' column`)
-    || message.includes(`column reservation_contracts.${columnName} does not exist`);
+    || message.includes(`column reservation_contracts.${columnName} does not exist`)
+    || message.includes(`column reservation_staff_assignments.${columnName} does not exist`);
 }
 
 function getContractReviewMeta(reservation) {
@@ -792,7 +806,7 @@ function renderStats(list) {
     const el = document.getElementById(`stat-${id}`);
     if (el) el.textContent = counts[id] ?? 0;
   });
-  if (navReservationCount) navReservationCount.textContent = String(counts.total);
+  if (navReservationCount) navReservationCount.textContent = String(counts.pending);
   chipsRow?.querySelectorAll('.chip').forEach(chip => {
     const status = chip.dataset.status;
     const val = status === 'all' ? counts.total : (counts[status] ?? 0);
@@ -1264,15 +1278,28 @@ async function fetchStaffProfiles() {
 async function fetchReservationAssignments(reservationIds, knownStaffProfiles) {
   if (!reservationIds.length) return {};
 
-  const { data, error } = await supabase
+  let response = await supabase
     .from('reservation_staff_assignments')
     .select(`
       reservation_id,
       staff_user_id,
-      assigned_at
+      assigned_at,
+      assignment_note
     `)
     .in('reservation_id', reservationIds);
 
+  if (response.error && isMissingColumnError(response.error, 'assignment_note')) {
+    response = await supabase
+      .from('reservation_staff_assignments')
+      .select(`
+        reservation_id,
+        staff_user_id,
+        assigned_at
+      `)
+      .in('reservation_id', reservationIds);
+  }
+
+  const { data, error } = response;
   if (error) throw error;
 
   const staffById = (knownStaffProfiles || []).reduce((map, staff) => {
@@ -1284,7 +1311,11 @@ async function fetchReservationAssignments(reservationIds, knownStaffProfiles) {
     if (!map[assignment.reservation_id]) map[assignment.reservation_id] = [];
     const staffProfile = staffById[assignment.staff_user_id];
     if (staffProfile) {
-      map[assignment.reservation_id].push(staffProfile);
+      map[assignment.reservation_id].push({
+        ...staffProfile,
+        assigned_at: assignment.assigned_at || null,
+        assignment_note: assignment.assignment_note || ''
+      });
     }
     return map;
   }, {});
@@ -1579,6 +1610,7 @@ function closeAssignmentModal() {
   assignmentModal?.classList.add('hidden');
   assignmentModal?.setAttribute('aria-hidden', 'true');
   if (assignmentSearchInput) assignmentSearchInput.value = '';
+  if (assignmentNoteInput) assignmentNoteInput.value = '';
   assignmentSaveBtn?.removeAttribute('disabled');
   setAssignmentModalMessage('');
 }
@@ -1602,6 +1634,9 @@ function openAssignmentModal(reservationId) {
   if (assignmentReservationMeta) {
     assignmentReservationMeta.textContent = `${formatReservationDate(reservation.event_date)} at ${formatReservationTime(reservation.event_time)}`;
   }
+  if (assignmentNoteInput) {
+    assignmentNoteInput.value = getAssignmentNoteForReservation(reservationId);
+  }
 
   assignmentModal?.classList.remove('hidden');
   assignmentModal?.setAttribute('aria-hidden', 'false');
@@ -1616,6 +1651,7 @@ async function saveAssignmentSelection() {
   assignmentSaveBtn?.setAttribute('disabled', 'true');
   setAssignmentModalMessage('Saving staff assignment...');
 
+  const assignmentNote = String(assignmentNoteInput?.value || '').trim();
   const selectedStaffIds = Array.from(assignmentSelection);
   const existingStaffIds = new Set(
     getAssignedStaff(activeAssignmentReservationId).map((staff) => staff.user_id)
@@ -1639,7 +1675,8 @@ async function saveAssignmentSelection() {
       const payload = staffIdsToInsert.map((staffUserId) => ({
         reservation_id: activeAssignmentReservationId,
         staff_user_id: staffUserId,
-        assigned_by: adminSession?.user?.id || null
+        assigned_by: adminSession?.user?.id || null,
+        assignment_note: assignmentNote || null
       }));
 
       const { error: insertError } = await supabase
@@ -1647,6 +1684,16 @@ async function saveAssignmentSelection() {
         .insert(payload);
 
       if (insertError) throw insertError;
+    }
+
+    if (selectedStaffIds.length) {
+      const { error: updateError } = await supabase
+        .from('reservation_staff_assignments')
+        .update({ assignment_note: assignmentNote || null })
+        .eq('reservation_id', activeAssignmentReservationId)
+        .in('staff_user_id', selectedStaffIds);
+
+      if (updateError) throw updateError;
     }
 
     closeAssignmentModal();

@@ -171,10 +171,53 @@ body{
     gap: 20px;
 }
 
+.profile-panels {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+    gap: 24px;
+    align-items: stretch;
+}
+
+.profile-subsection {
+    background-color: #fffdfa;
+    border: 1px solid #f0e8e0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-subsection .account-form {
+    flex: 1;
+}
+
+.subsection-header {
+    margin-bottom: 22px;
+}
+
+.subsection-header h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2A1408;
+    margin-bottom: 4px;
+}
+
+.subsection-header p {
+    font-size: 14px;
+    color: #888;
+    line-height: 1.6;
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 16px;
+}
+
+.form-row-two {
+    grid-template-columns: 1fr 1fr;
 }
 
 .form-group {
@@ -219,6 +262,20 @@ body{
     margin: 0;
 }
 
+.field-note.pending-email-note {
+    margin-top: 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #f2d2a9;
+    background-color: #fff7ed;
+    color: #8a4b14;
+    line-height: 1.6;
+}
+
+.field-note.pending-email-note[hidden] {
+    display: none;
+}
+
 .save-btn {
     align-self: flex-start;
     background-color: #6B3A1F;
@@ -249,6 +306,10 @@ body{
 
 .form-msg.error {
     color: #c0392b;
+}
+
+.form-msg.warning {
+    color: #b45309;
 }
 
 /* ========================
@@ -3027,7 +3088,16 @@ body{
         padding: 24px 20px;
     }
 
+    .profile-panels {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
     .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row-two {
         grid-template-columns: 1fr;
     }
 

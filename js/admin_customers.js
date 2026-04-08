@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
 const sidebarName = document.getElementById('sidebarName');
@@ -258,6 +258,10 @@ function mergeCustomersWithActivity(profiles, reservations) {
   }));
 }
 
+function countPendingReservations(reservations) {
+  return reservations.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
+}
+
 async function loadCustomers() {
   setCustomersMessage('Loading customers...');
 
@@ -271,7 +275,7 @@ async function loadCustomers() {
 
     updateStats(allCustomers);
     if (navReservationCount) {
-      navReservationCount.textContent = String(reservations.length);
+      navReservationCount.textContent = String(countPendingReservations(reservations));
     }
 
     applyFilters();

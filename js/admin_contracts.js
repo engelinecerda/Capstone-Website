@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
@@ -33,6 +33,10 @@ let contractsCache = [];
 let allReservationsCount = 0;
 let activeContractReservationId = null;
 let contractDetailsFlash = null;
+
+function countPendingReservations(reservations) {
+  return reservations.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
+}
 
 function setMessage(el, msg, isError = false) {
   if (!el) return;
@@ -759,7 +763,7 @@ async function loadData() {
     const reservations = await fetchReservations();
     allReservationsCount = reservations.length;
     if (navReservationCount) {
-      navReservationCount.textContent = String(allReservationsCount);
+      navReservationCount.textContent = String(countPendingReservations(reservations));
     }
 
     contractsCache = reservations

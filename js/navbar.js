@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { customerSupabase as supabase } from './supabase.js';
 
 async function updateNavbar() {
     const { data: { session } } = await supabase.auth.getSession();

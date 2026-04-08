@@ -66,6 +66,8 @@ body {
 .sidebar-profile {
   display: block;
   padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
 }
 
 .sidebar-avatar,
@@ -127,6 +129,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 0;
 }
 
 .nav-item {
@@ -284,11 +287,12 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .profile-side {
   min-width: 0;
+  height: 100%;
 }
 
 .profile-panel {
@@ -301,6 +305,12 @@ body {
 
 .profile-panel-password {
   margin-top: 18px;
+}
+
+.profile-panel-side {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-head {
@@ -338,19 +348,6 @@ body {
 .detail-icon-badge {
   width: 28px;
   height: 28px;
-}
-
-.panel-edit-btn {
-  min-height: 34px;
-  padding: 7px 12px;
-  border-radius: 10px;
-  border: 1px solid #ead8c7;
-  background: #f8efe5;
-  color: var(--accent);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .hero-eyebrow,
@@ -483,6 +480,8 @@ body {
   display: grid;
   gap: 14px;
   padding: 20px;
+  flex: 1;
+  align-content: start;
 }
 
 .detail-card {

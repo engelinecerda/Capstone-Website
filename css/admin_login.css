@@ -273,26 +273,6 @@ body {
 }
 
 /* ========================
-   Back Link
-======================== */
-.back-link {
-    text-align: center;
-    margin-top: 20px;
-    font-size: 0.875rem;
-}
-
-.back-link a {
-    color: #6B3A1F;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.back-link a:hover {
-    text-decoration: underline;
-    color: #2A1408;
-}
-
-/* ========================
    Form Message
 ======================== */
 .form-msg {

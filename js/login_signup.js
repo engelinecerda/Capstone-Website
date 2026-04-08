@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { customerSupabase as supabase } from './supabase.js';
 
 // ========================
 // Navbar Toggle

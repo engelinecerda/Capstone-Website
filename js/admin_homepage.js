@@ -1,5 +1,5 @@
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
-import { supabase } from './supabase.js';
+import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
 
 const sidebarName = document.getElementById('sidebarName');
@@ -373,7 +373,7 @@ function updateStats(reservations, contractsByReservationId = {}) {
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
     if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
-    if (navReservationCount) navReservationCount.textContent = String(reservations.length);
+    if (navReservationCount) navReservationCount.textContent = String(totals.pending);
 
     if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
     if (chipTargets.approved) chipTargets.approved.textContent = String(totals.approved);
