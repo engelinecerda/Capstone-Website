@@ -84,6 +84,10 @@
                         <span class="availability-legend-item"><span class="availability-swatch closed"></span>Closed</span>
                     </div>
                     <p class="availability-message" id="availabilityMessage">Loading availability...</p>
+                    <div class="availability-closure-note hidden" id="availabilityClosureNote" aria-live="polite">
+                        <p class="availability-closure-label" id="availabilityClosureLabel">Date unavailable</p>
+                        <p class="availability-closure-copy" id="availabilityClosureCopy"></p>
+                    </div>
                 </section>
             </div>
 
@@ -273,6 +277,9 @@
     const availabilityGrid = document.getElementById('availabilityGrid');
     const availabilityMonthLabel = document.getElementById('availabilityMonthLabel');
     const availabilityMessage = document.getElementById('availabilityMessage');
+    const availabilityClosureNote = document.getElementById('availabilityClosureNote');
+    const availabilityClosureLabel = document.getElementById('availabilityClosureLabel');
+    const availabilityClosureCopy = document.getElementById('availabilityClosureCopy');
     const availabilityPrevMonthBtn = document.getElementById('availabilityPrevMonth');
     const availabilityNextMonthBtn = document.getElementById('availabilityNextMonth');
 
@@ -280,7 +287,9 @@
         month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         bookedReservations: [],
         closedDates: new Set(),
-        blackoutDateColumn: null
+        blackoutDateColumn: null,
+        blackoutReasonColumn: null,
+        closedDateReasons: new Map()
     };
 
     const CONTRACT_FILES = {
@@ -327,6 +336,27 @@
         availabilityMessage.classList.toggle('error', isError);
     }
 
+    function setClosedDateNotice(dateKey = '', reason = '') {
+        if (!availabilityClosureNote || !availabilityClosureCopy) return;
+
+        const safeReason = String(reason || '').trim();
+        if (!dateKey) {
+            availabilityClosureNote.classList.add('hidden');
+            availabilityClosureCopy.textContent = '';
+            return;
+        }
+
+        if (availabilityClosureLabel) {
+            availabilityClosureLabel.textContent = `Date unavailable${dateKey ? `: ${formatDisplayDate(dateKey)}` : ''}`;
+        }
+
+        availabilityClosureCopy.textContent = safeReason
+            ? `This date is unavailable due to: ${safeReason}.`
+            : 'This date is currently unavailable for booking.';
+
+        availabilityClosureNote.classList.remove('hidden');
+    }
+
     function formatDisplayDate(dateKey) {
         if (!dateKey) return '';
         const [year, month, day] = dateKey.split('-').map(Number);
@@ -345,6 +375,9 @@
             eventDateDisplayInput.value = dateKey ? formatDisplayDate(dateKey) : '';
         }
         S.eventDate = dateKey || '';
+        if (dateKey) {
+            setClosedDateNotice('', '');
+        }
     }
 
     function getReservationContactName(profile, user) {
@@ -418,6 +451,7 @@
             setAvailabilityMessage('Your previously selected date is not available for the selected booking type. Please choose another date.', true);
         }
 
+        setClosedDateNotice('', '');
         renderAvailabilityCalendar();
     }
 
@@ -474,6 +508,24 @@
         return null;
     }
 
+    async function resolveAvailabilityBlackoutReasonColumn() {
+        if (availabilityState.blackoutReasonColumn) return availabilityState.blackoutReasonColumn;
+
+        for (const column of ['note', 'reason']) {
+            const { error } = await supabase
+                .from('calendar_blackouts')
+                .select(column)
+                .limit(1);
+
+            if (!error) {
+                availabilityState.blackoutReasonColumn = column;
+                return column;
+            }
+        }
+
+        return null;
+    }
+
     function renderAvailabilityCalendar() {
         if (!availabilityGrid || !availabilityMonthLabel) return;
 
@@ -519,8 +571,12 @@
                 dayBtn.disabled = true;
             } else if (isClosed) {
                 dayBtn.classList.add('closed');
-                dayBtn.disabled = true;
-                dayBtn.title = 'This date is closed.';
+                dayBtn.title = 'Click to view why this date is unavailable.';
+                dayBtn.addEventListener('click', () => {
+                    syncSelectedDate('');
+                    setClosedDateNotice(dateKey, availabilityState.closedDateReasons.get(dateKey) || '');
+                    setAvailabilityMessage(`Selected a closed date: ${formatDisplayDate(dateKey)}.`, false);
+                });
             } else if (isBooked) {
                 dayBtn.classList.add('booked');
                 dayBtn.disabled = true;
@@ -590,27 +646,43 @@
 
             const blackoutDateColumn = await resolveAvailabilityBlackoutColumn();
             if (blackoutDateColumn) {
+                const blackoutReasonColumn = await resolveAvailabilityBlackoutReasonColumn();
+                const blackoutSelectColumns = blackoutReasonColumn
+                    ? `${blackoutDateColumn}, ${blackoutReasonColumn}`
+                    : blackoutDateColumn;
                 const { data: blackoutRows, error: blackoutError } = await supabase
                     .from('calendar_blackouts')
-                    .select(blackoutDateColumn);
+                    .select(blackoutSelectColumns);
 
                 if (blackoutError) {
                     console.warn('Availability blackouts query failed:', blackoutError.message);
                     availabilityState.closedDates = new Set();
+                    availabilityState.closedDateReasons = new Map();
                 } else {
                     availabilityState.closedDates = new Set(
                         (blackoutRows || [])
                             .map((row) => row[blackoutDateColumn])
                             .filter(Boolean)
                     );
+                    availabilityState.closedDateReasons = new Map(
+                        (blackoutRows || [])
+                            .map((row) => {
+                                const dateKey = row[blackoutDateColumn];
+                                const reason = blackoutReasonColumn ? row[blackoutReasonColumn] : '';
+                                return dateKey ? [dateKey, String(reason || '').trim()] : null;
+                            })
+                            .filter(Boolean)
+                    );
                 }
             } else {
                 availabilityState.closedDates = new Set();
+                availabilityState.closedDateReasons = new Map();
             }
         } catch (error) {
             console.error('Availability calendar failed:', error);
             availabilityState.bookedReservations = [];
             availabilityState.closedDates = new Set();
+            availabilityState.closedDateReasons = new Map();
             setAvailabilityMessage('Availability preview could not be loaded right now.', true);
         }
 

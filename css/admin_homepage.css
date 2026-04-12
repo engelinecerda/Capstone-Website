@@ -585,7 +585,7 @@ body {
 @media (max-width: 720px) {
   :root { --sidebar-w: 0px; }
   .sidebar { display: none; }
-  .main { padding: 20px 16px; }
+  .main { margin-left: 0; width: 100%; flex-basis: 100%; padding: 20px 16px; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .status-chips { grid-template-columns: repeat(2, 1fr); }
   .section-head { flex-direction: column; }

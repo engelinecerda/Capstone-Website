@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -12,6 +13,8 @@ const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
 const navReservationCount = document.getElementById('navReservationCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
+const navContractCount = document.getElementById('navContractCount');
+const navReviewCount = document.getElementById('navReviewCount');
 const paymentDetailsModal = document.getElementById('paymentDetailsModal');
 const paymentDetailsClose = document.getElementById('paymentDetailsClose');
 const paymentDetailsDismiss = document.getElementById('paymentDetailsDismiss');
@@ -318,7 +321,7 @@ function renderStats(list) {
   document.getElementById('stat-approved').textContent = counts.approved;
   document.getElementById('stat-rejected').textContent = counts.rejected;
   document.getElementById('stat-total').textContent = counts.total;
-  if (navPaymentCount) navPaymentCount.textContent = String(counts.pending_review);
+  setBadgeCount(navPaymentCount, counts.pending_review);
 }
 
 function matchesSearch(payment, term) {
@@ -364,36 +367,36 @@ function renderTable(list) {
 
     return `
       <tr class="payment-row">
-        <td>
+        <td data-label="Reservation">
           <div class="payment-cell-stack">
             <span class="payment-cell-main">${escapeHtml(reservationSummary.main)}</span>
             <span class="payment-cell-sub">${escapeHtml(reservationSummary.sub)}</span>
           </div>
         </td>
-        <td>
+        <td data-label="Customer">
           <div class="payment-cell-stack">
             <span class="payment-cell-main">${escapeHtml(customerSummary.main)}</span>
             <span class="payment-cell-sub">${escapeHtml(customerSummary.sub)}</span>
           </div>
         </td>
-        <td class="payment-amount-cell">
+        <td class="payment-amount-cell" data-label="Amount">
           <span class="payment-cell-main">${escapeHtml(formatCurrency(payment.amount))}</span>
           <span class="payment-cell-sub">Submitted ${escapeHtml(formatDate(payment.submitted_at))}</span>
           <span class="payment-cell-sub payment-balance-sub ${escapeHtml(balance.toneKey)}">Remaining ${escapeHtml(balance.remainingBalance <= 0 ? 'Paid' : formatCurrency(balance.remainingBalance))}</span>
           <span class="payment-cell-sub payment-balance-sub ${escapeHtml(balance.toneKey)}">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : `Pay by ${balance.dueDateLabel}`)}</span>
         </td>
-        <td>
+        <td data-label="Payment Info">
           <div class="payment-mode-stack compact">
             <span class="payment-cell-main">${escapeHtml(paymentInfo.main)}</span>
             <span class="payment-cell-sub">${escapeHtml(paymentInfo.sub)}</span>
           </div>
         </td>
-        <td>
+        <td data-label="Status">
           <div class="payment-status-stack">
             <span class="status-pill ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
           </div>
         </td>
-        <td class="actions actions-single">
+        <td class="actions actions-single" data-label="Action">
           <button class="action-btn view review-payment-btn" data-action="review-payment" data-payment-id="${payment.payment_id}">Review Payment</button>
         </td>
       </tr>
@@ -494,7 +497,8 @@ async function fetchPayments() {
       proof_url,
       cash_payment_date,
       submitted_at,
-      verified_at
+      verified_at,
+      ocr_extracted
     `)
     .order('submitted_at', { ascending: false });
 
@@ -540,6 +544,89 @@ function getPaymentById(paymentId) {
   return paymentsCache.find((payment) => String(payment.payment_id) === String(paymentId)) || null;
 }
 
+// ── OCR helpers ─────────────────────────────────────────────────────────────
+function getOcrConfidenceMeta(confidence) {
+  const map = {
+    high:   { label: 'High confidence',   cls: 'ocr-badge-high' },
+    medium: { label: 'Medium confidence', cls: 'ocr-badge-medium' },
+    low:    { label: 'Low confidence',    cls: 'ocr-badge-low' },
+    failed: { label: 'OCR failed',        cls: 'ocr-badge-failed' }
+  };
+  return map[confidence] || { label: 'Not processed', cls: 'ocr-badge-none' };
+}
+
+function buildOcrPanel(payment) {
+  // Cash payments don't have a proof image — skip OCR panel
+  if (payment.payment_method === 'cash') return '';
+
+  // No proof uploaded
+  if (!payment.proof_url) return '';
+
+  const ocr = payment.ocr_extracted;
+
+  // OCR not yet run
+  if (!ocr) {
+    return `
+      <div class="ocr-panel ocr-panel-none">
+        <div class="ocr-panel-head">
+          <span class="ocr-panel-title">OCR Extraction</span>
+          <span class="ocr-badge ocr-badge-none">Not processed</span>
+        </div>
+        <p class="ocr-panel-note">OCR has not run for this payment yet.</p>
+      </div>
+    `;
+  }
+
+  // OCR attempted but failed
+  if (ocr.error) {
+    return `
+      <div class="ocr-panel ocr-panel-failed">
+        <div class="ocr-panel-head">
+          <span class="ocr-panel-title">OCR Extraction</span>
+          <span class="ocr-badge ocr-badge-failed">Failed</span>
+        </div>
+        <p class="ocr-panel-note">Cloud Vision could not read this image: ${escapeHtml(ocr.error)}</p>
+      </div>
+    `;
+  }
+
+  const confidence = getOcrConfidenceMeta(ocr.confidence);
+  const amountDisplay = ocr.amount
+    ? `\u20B1${Number(ocr.amount).toLocaleString()}`
+    : 'Not found';
+
+  return `
+    <div class="ocr-panel">
+      <div class="ocr-panel-head">
+        <span class="ocr-panel-title">\uD83D\uDD0D OCR Extraction</span>
+        <span class="ocr-badge ${escapeHtml(confidence.cls)}">${escapeHtml(confidence.label)}</span>
+      </div>
+      <p class="ocr-panel-note">Automatically read from the uploaded proof. Cross-check with the payment details above before approving.</p>
+      <div class="ocr-fields">
+        <div class="ocr-field">
+          <span class="ocr-field-label">Extracted Amount</span>
+          <span class="ocr-field-value ${ocr.amount ? '' : 'ocr-not-found'}">${escapeHtml(amountDisplay)}</span>
+        </div>
+        <div class="ocr-field">
+          <span class="ocr-field-label">Reference Number</span>
+          <span class="ocr-field-value ${ocr.reference_number ? '' : 'ocr-not-found'}">${escapeHtml(ocr.reference_number || 'Not found')}</span>
+        </div>
+        <div class="ocr-field">
+          <span class="ocr-field-label">Payment Date</span>
+          <span class="ocr-field-value ${ocr.payment_date ? '' : 'ocr-not-found'}">${escapeHtml(ocr.payment_date || 'Not found')}</span>
+        </div>
+      </div>
+      ${ocr.raw_text ? `
+        <details class="ocr-raw-details">
+          <summary>View full extracted text</summary>
+          <pre class="ocr-raw-text">${escapeHtml(ocr.raw_text)}</pre>
+        </details>
+      ` : ''}
+    </div>
+  `;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 async function handlePaymentReview(paymentId, nextStatus) {
   const payment = getPaymentById(paymentId);
   if (!payment) throw new Error('Payment record could not be found.');
@@ -569,7 +656,8 @@ async function handlePaymentReview(paymentId, nextStatus) {
         .from('reservations')
         .update({
           event_date: request.requested_date,
-          event_time: request.requested_time
+          event_time: request.requested_time,
+          status: 'rescheduled'
         })
         .eq('reservation_id', payment.reservation_id);
 
@@ -672,6 +760,12 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
     <a class="modal-btn modal-btn-secondary proof-link-btn" href="${payment.proof_url}" target="_blank" rel="noopener noreferrer">Open Original</a>
   ` : '';
 
+  // Render OCR panel below the proof image
+  const ocrPanelEl = document.getElementById('paymentOcrPanel');
+  if (ocrPanelEl) {
+    ocrPanelEl.innerHTML = buildOcrPanel(payment);
+  }
+
   reviewActions.push('<button type="button" class="modal-btn modal-btn-secondary" id="paymentDetailsDismiss">Close</button>');
 
   if (String(payment.payment_status || '').toLowerCase() === 'pending_review') {
@@ -733,9 +827,13 @@ async function loadData() {
       Array.from(new Set(paymentsCache.map((payment) => payment.reschedule_request_id).filter(Boolean)))
     );
 
-    if (navReservationCount) {
-      navReservationCount.textContent = String(countPendingReservations(Object.values(reservationMap)));
-    }
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    });
 
     filterAndRender();
     if (activePaymentReviewId) {
@@ -747,6 +845,13 @@ async function loadData() {
     }
   } catch (error) {
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    }).catch(() => {});
     renderTable([]);
   }
 }

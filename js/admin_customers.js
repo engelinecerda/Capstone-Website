@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -10,6 +11,9 @@ const searchInput = document.getElementById('searchInput');
 const customersMessage = document.getElementById('customersMessage');
 const customersBody = document.getElementById('customersBody');
 const navReservationCount = document.getElementById('navReservationCount');
+const navContractCount = document.getElementById('navContractCount');
+const navPaymentCount = document.getElementById('navPaymentCount');
+const navReviewCount = document.getElementById('navReviewCount');
 
 const statTotalCustomers = document.getElementById('statTotalCustomers');
 const statCustomersWithReservations = document.getElementById('statCustomersWithReservations');
@@ -49,6 +53,23 @@ function formatDate(value) {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return 'No date on file';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'No date on file';
+  }
+
+  return date.toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
   });
 }
 
@@ -214,7 +235,15 @@ async function fetchProfiles() {
 async function fetchReservationActivity() {
   const { data, error } = await supabase
     .from('reservations')
-    .select('user_id, status, created_at');
+    .select(`
+      reservation_id,
+      user_id,
+      status,
+      created_at,
+      event_type,
+      event_date,
+      package:package_id ( package_name )
+    `);
 
   if (error) {
     throw error;
@@ -274,9 +303,13 @@ async function loadCustomers() {
     allCustomers = mergeCustomersWithActivity(profiles, reservations);
 
     updateStats(allCustomers);
-    if (navReservationCount) {
-      navReservationCount.textContent = String(countPendingReservations(reservations));
-    }
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    });
 
     applyFilters();
   } catch (error) {
@@ -284,6 +317,13 @@ async function loadCustomers() {
     allCustomers = [];
     updateStats([]);
     renderCustomers([]);
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    }).catch(() => {});
     setCustomersMessage(
       `Failed to load registered customers: ${error?.message || 'unknown error'}. If the admin account should see all profiles, check the RLS policies for the profiles table.`,
       true

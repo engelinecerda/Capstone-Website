@@ -2,8 +2,8 @@
 
 .payments-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 12px;
+  border-collapse: collapse;
+  border-spacing: 0;
 }
 
 .payments-table th,
@@ -20,24 +20,22 @@
   letter-spacing: 0.04em;
   color: var(--muted);
   padding-top: 0;
-  padding-bottom: 2px;
-  border-bottom: none;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
 }
 
 .payments-table tbody td {
-  background: #fff;
-  border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
 
 .payments-table tbody td:first-child {
-  border-left: 1px solid var(--border);
-  border-radius: 18px 0 0 18px;
+  border-left: none;
+  border-radius: 0;
 }
 
 .payments-table tbody td:last-child {
-  border-right: 1px solid var(--border);
-  border-radius: 0 18px 18px 0;
+  border-right: none;
+  border-radius: 0;
 }
 
 .payment-row:hover td {
@@ -54,6 +52,7 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
+  word-break: break-word;
 }
 
 .payment-cell-sub {
@@ -61,6 +60,7 @@
   margin-top: 4px;
   font-size: 12px;
   color: var(--muted);
+  word-break: break-word;
 }
 
 .payment-balance-sub.pending {
@@ -122,6 +122,21 @@
 
 .actions.actions-single {
   align-content: center;
+}
+
+.payments-table tbody td.actions {
+  width: 240px;
+  min-width: 240px;
+  text-align: center;
+  vertical-align: middle;
+  padding-left: 18px;
+  padding-right: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.payments-table tbody td.actions .action-btn {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .review-payment-btn {
@@ -345,6 +360,95 @@
   font-size: 13px;
 }
 
+@media (max-width: 1450px) {
+  .table-wrap {
+    overflow: visible;
+  }
+
+  .payments-table {
+    display: block;
+    width: 100%;
+    border-spacing: 0;
+  }
+
+  .payments-table thead {
+    display: none;
+  }
+
+  .payments-table tbody {
+    display: grid;
+    gap: 14px;
+  }
+
+  .payment-row {
+    display: grid;
+    gap: 0;
+  }
+
+  .payments-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(110px, 144px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    width: 100%;
+    padding: 14px 16px;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-top: none;
+    border-bottom: none;
+    border-radius: 0;
+    background: #fff;
+  }
+
+  .payments-table tbody td:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+  }
+
+  .payments-table tbody td:last-child {
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 18px 18px;
+  }
+
+  .payments-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.45;
+    padding-top: 2px;
+  }
+
+  .payment-cell-stack,
+  .payment-mode-stack,
+  .payment-status-stack,
+  .payment-amount-cell .payment-cell-main,
+  .payment-amount-cell .payment-cell-sub {
+    min-width: 0;
+  }
+
+  .payments-table tbody td.actions {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    vertical-align: top;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-bottom: none;
+  }
+
+  .actions.actions-single {
+    align-content: start;
+  }
+
+  .actions.actions-single .action-btn {
+    width: 100%;
+  }
+}
+
 @media (max-width: 900px) {
   .payment-review-layout,
   .details-grid {
@@ -358,5 +462,140 @@
 
   .proof-preview-stage {
     min-height: 280px;
+  }
+}
+
+/* ── OCR Panel ─────────────────────────────────────────────────────────────── */
+.ocr-panel {
+  margin-top: 14px;
+  background: #faf7f3;
+  border: 1px solid #e8ddd3;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.ocr-panel-failed {
+  background: #fff8f8;
+  border-color: #f5c6c6;
+}
+
+.ocr-panel-none {
+  background: #f7f7f7;
+  border-color: #e4e4e4;
+}
+
+.ocr-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 10px;
+}
+
+.ocr-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5c3d24;
+}
+
+.ocr-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ocr-badge-high   { background: #d1fae5; color: #065f46; }
+.ocr-badge-medium { background: #fef3c7; color: #92400e; }
+.ocr-badge-low    { background: #fee2e2; color: #991b1b; }
+.ocr-badge-failed { background: #fee2e2; color: #991b1b; }
+.ocr-badge-none   { background: #f0ede9; color: #7d6b5b; }
+
+.ocr-panel-note {
+  font-size: 12px;
+  color: #8a7060;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.ocr-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ocr-field {
+  background: #fff;
+  border: 1px solid #ede4da;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ocr-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #9b8878;
+}
+
+.ocr-field-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2a1408;
+  word-break: break-word;
+}
+
+.ocr-field-value.ocr-not-found {
+  font-size: 13px;
+  font-weight: 400;
+  font-style: italic;
+  color: #b0a09a;
+}
+
+.ocr-raw-details {
+  margin-top: 12px;
+}
+
+.ocr-raw-details summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a5c3e;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.ocr-raw-details summary:hover {
+  color: #4e3120;
+}
+
+.ocr-raw-text {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e8ddd3;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #3d2010;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .ocr-fields {
+    grid-template-columns: 1fr;
   }
 }

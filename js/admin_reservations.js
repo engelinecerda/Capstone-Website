@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -10,6 +11,9 @@ const refreshBtn = document.getElementById('refreshBtn');
 const calendarToggleBtn = document.getElementById('calendarToggleBtn');
 const calendarCollapse = document.getElementById('calendarCollapse');
 const navReservationCount = document.getElementById('navReservationCount');
+const navContractCount = document.getElementById('navContractCount');
+const navPaymentCount = document.getElementById('navPaymentCount');
+const navReviewCount = document.getElementById('navReviewCount');
 const statIds = ['pending', 'approved', 'completed', 'total'];
 const calendarGrid = document.getElementById('calendarGrid');
 const calendarMonthLabel = document.getElementById('calendarMonthLabel');
@@ -20,6 +24,10 @@ const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
 const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
+const rescheduleAlert = document.getElementById('rescheduleAlert');
+const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
+const rescheduleAlertText = document.getElementById('rescheduleAlertText');
+const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
 const blackoutModal = document.getElementById('blackoutModal');
 const blackoutModalClose = document.getElementById('blackoutModalClose');
 const blackoutCancelBtn = document.getElementById('blackoutCancelBtn');
@@ -72,6 +80,7 @@ const PAYMENT_TYPE_LABELS = {
   reschedule_fee: 'Reschedule Fee'
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
+const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
 
 let reservationsCache = [];
 let blackouts = new Set();
@@ -93,6 +102,7 @@ let assignmentSelection = new Set();
 let assignmentSearchTerm = '';
 let activeDetailsReservationId = null;
 let reservationDetailsFlash = null;
+let showPendingRescheduleOnly = false;
 
 function setMessage(el, msg, isError = false) {
   if (!el) return;
@@ -251,6 +261,112 @@ function buildLocalDateKey(date) {
 
 function getTodayDateKey() {
   return buildLocalDateKey(new Date());
+}
+
+function parseReservationTimeParts(timeValue) {
+  const value = String(timeValue || '').trim();
+  if (!value) return null;
+
+  const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    return {
+      hours: Number(match[1]),
+      minutes: Number(match[2])
+    };
+  }
+
+  const parsed = new Date(`1970-01-01 ${value}`);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return {
+    hours: parsed.getHours(),
+    minutes: parsed.getMinutes()
+  };
+}
+
+function getReservationEventDateTime(reservation) {
+  const dateKey = formatDateKey(reservation?.event_date);
+  if (!dateKey) return null;
+
+  const timeParts = parseReservationTimeParts(reservation?.event_time);
+  const eventDate = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(eventDate.getTime())) return null;
+
+  if (timeParts) {
+    eventDate.setHours(timeParts.hours, timeParts.minutes, 0, 0);
+  }
+
+  return eventDate;
+}
+
+function getEffectiveReservationStatus(reservation) {
+  const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
+  if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
+    return normalizedStatus;
+  }
+
+  const eventDateTime = getReservationEventDateTime(reservation);
+  if (eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
+    return 'completed';
+  }
+
+  if (normalizedStatus === 'confirmed') {
+    return 'approved';
+  }
+
+  return normalizedStatus;
+}
+
+function getReservationTimeSortValue(timeValue) {
+  const value = String(timeValue || '').trim();
+  if (!value) return null;
+
+  const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    return (Number(match[1]) * 60) + Number(match[2]);
+  }
+
+  const parsed = new Date(`1970-01-01T${value}`);
+  if (!Number.isNaN(parsed.getTime())) {
+    return (parsed.getHours() * 60) + parsed.getMinutes();
+  }
+
+  return null;
+}
+
+function isUpcomingReservation(reservation) {
+  const status = getEffectiveReservationStatus(reservation);
+  const eventDateKey = formatDateKey(reservation?.event_date);
+  return Boolean(eventDateKey)
+    && eventDateKey >= getTodayDateKey()
+    && UPCOMING_ACTIVE_STATUSES.has(status);
+}
+
+function sortReservationsForView(list, status) {
+  const rows = [...list];
+  if (status !== 'upcoming') return rows;
+
+  return rows.sort((left, right) => {
+    const leftDateKey = formatDateKey(left.event_date);
+    const rightDateKey = formatDateKey(right.event_date);
+    if (leftDateKey !== rightDateKey) {
+      return leftDateKey.localeCompare(rightDateKey);
+    }
+
+    const leftTime = getReservationTimeSortValue(left.event_time);
+    const rightTime = getReservationTimeSortValue(right.event_time);
+    if (leftTime !== null && rightTime !== null && leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+
+    return new Date(left.created_at || 0) - new Date(right.created_at || 0);
+  });
+}
+
+function getEmptyFilterMessage(status) {
+  if (showPendingRescheduleOnly) return 'No pending reschedule requests match the current filter.';
+  if (status === 'upcoming') return 'No upcoming reservations found.';
+  return 'No reservations match the current filter.';
 }
 
 function getReservationById(reservationId) {
@@ -716,6 +832,41 @@ function getLatestOpenRescheduleRequest(reservation) {
     .find((request) => ['pending', 'approved_pending_payment'].includes(String(request.status || '').toLowerCase())) || null;
 }
 
+function hasPendingRescheduleRequest(reservation) {
+  return getReservationRescheduleRequests(reservation)
+    .some((request) => String(request.status || '').toLowerCase() === 'pending');
+}
+
+function getPendingRescheduleRequestCount(list) {
+  return list.filter((reservation) => hasPendingRescheduleRequest(reservation)).length;
+}
+
+function renderPendingRescheduleAlert(list) {
+  if (!rescheduleAlert || !rescheduleAlertCount || !rescheduleAlertText) return;
+
+  const pendingCount = getPendingRescheduleRequestCount(list);
+  if (!pendingCount) {
+    showPendingRescheduleOnly = false;
+    rescheduleAlert.hidden = true;
+    rescheduleAlert.classList.add('hidden');
+    rescheduleAlert.setAttribute('aria-hidden', 'true');
+    rescheduleAlertCount.textContent = '0';
+    rescheduleAlertText.textContent = 'Customers have requested schedule changes that still need admin review.';
+    return;
+  }
+
+  rescheduleAlert.hidden = false;
+  rescheduleAlert.classList.remove('hidden');
+  rescheduleAlert.setAttribute('aria-hidden', 'false');
+  rescheduleAlertCount.textContent = String(pendingCount);
+  rescheduleAlertText.textContent = pendingCount === 1
+    ? '1 customer has requested a schedule change that still needs admin review.'
+    : `${pendingCount} customers have requested schedule changes that still need admin review.`;
+  if (rescheduleAlertAction) {
+    rescheduleAlertAction.textContent = 'Review Requests';
+  }
+}
+
 function paymentStatus(res) {
   const balance = getReservationBalanceSummary(res);
   const pendingPayment = getPendingPayment(res);
@@ -790,28 +941,31 @@ function matchesSearch(res, term) {
 
 function matchesStatus(res, status) {
   if (status === 'all') return true;
-  return (res.status || '').toLowerCase() === status;
+  if (status === 'upcoming') return isUpcomingReservation(res);
+  return getEffectiveReservationStatus(res) === status;
 }
 
 function renderStats(list) {
   const counts = {
-    pending: 0, approved: 0, declined: 0, completed: 0,
+    upcoming: 0, pending: 0, approved: 0, declined: 0, completed: 0,
     cancelled: 0, rescheduled: 0, total: list.length
   };
   list.forEach(r => {
-    const k = (r.status || 'pending').toLowerCase();
+    const k = getEffectiveReservationStatus(r);
     if (counts[k] !== undefined) counts[k] += 1;
+    if (isUpcomingReservation(r)) counts.upcoming += 1;
   });
   statIds.forEach(id => {
     const el = document.getElementById(`stat-${id}`);
     if (el) el.textContent = counts[id] ?? 0;
   });
-  if (navReservationCount) navReservationCount.textContent = String(counts.pending);
+  setBadgeCount(navReservationCount, counts.pending);
   chipsRow?.querySelectorAll('.chip').forEach(chip => {
     const status = chip.dataset.status;
     const val = status === 'all' ? counts.total : (counts[status] ?? 0);
     chip.textContent = `${chip.textContent.split('(')[0].trim()} (${val})`;
   });
+  renderPendingRescheduleAlert(list);
 }
 
 function renderTable(list) {
@@ -823,11 +977,11 @@ function renderTable(list) {
   reservationsBody.innerHTML = list.map(res => {
     const pkg = res.package?.package_name || 'No package selected';
     const pay = paymentStatus(res);
-    const status = formatStatusPill(res.status);
+    const status = formatStatusPill(getEffectiveReservationStatus(res));
     const staffSummary = getStaffSummary(res.reservation_id);
     return `
       <tr class="reservation-row">
-        <td>
+        <td data-label="Customer / Package">
           <div class="reservation-customer">
             <span class="reservation-avatar">${escapeHtml(getCustomerInitials(res.contact_name, res.contact_email))}</span>
             <div class="reservation-customer-copy">
@@ -837,26 +991,26 @@ function renderTable(list) {
             </div>
           </div>
         </td>
-        <td>
+        <td data-label="Event Date & Time">
           <div class="table-date">
             <span class="table-date-main">${escapeHtml(formatReservationDate(res.event_date))}</span>
             <span class="table-date-time">${escapeHtml(formatReservationTime(res.event_time))}</span>
           </div>
         </td>
-        <td>
+        <td data-label="Payment">
           <div class="table-summary-stack">
             <span class="status-pill ${escapeHtml(pay.key)}">${escapeHtml(pay.label)}</span>
             <span class="table-sub">${escapeHtml(pay.sublabel || '')}</span>
           </div>
         </td>
-        <td class="table-status-cell"><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
-        <td>
+        <td class="table-status-cell" data-label="Status"><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+        <td data-label="Staff">
           <div class="staff-summary">
             <span class="table-main">${escapeHtml(staffSummary.label)}</span>
             <span class="table-sub">${escapeHtml(staffSummary.sublabel)}</span>
           </div>
         </td>
-        <td class="actions actions-single">
+        <td class="actions actions-single" data-label="Action">
           <button class="action-btn view" data-action="view-details" data-reservation-id="${res.reservation_id}">
             View Details
           </button>
@@ -887,7 +1041,7 @@ function renderReservationDetailsModal() {
 
   const paymentSummary = paymentStatus(reservation);
   const balance = getReservationBalanceSummary(reservation);
-  const reservationStatus = formatStatusPill(reservation.status);
+  const reservationStatus = formatStatusPill(getEffectiveReservationStatus(reservation));
   const contract = contractStatus(reservation);
   const contractRecord = contract.contract;
   const latestPayment = getLatestPaymentEntry(reservation);
@@ -1133,24 +1287,39 @@ function filterAndRender() {
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
   const status = dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
-  const filtered = reservationsCache.filter(r => matchesStatus(r, status) && matchesSearch(r, term));
+  if (!getPendingRescheduleRequestCount(reservationsCache)) {
+    showPendingRescheduleOnly = false;
+  }
+  const filtered = sortReservationsForView(
+    reservationsCache.filter(r => matchesStatus(r, status) && matchesSearch(r, term) && (!showPendingRescheduleOnly || hasPendingRescheduleRequest(r))),
+    status
+  );
   renderStats(reservationsCache);
   renderTable(filtered);
-  setMessage(tableMessage, filtered.length ? '' : 'No reservations match the current filter.', false);
+  setMessage(tableMessage, filtered.length ? '' : getEmptyFilterMessage(status), false);
 }
 
 function wireFilters() {
   searchInput?.addEventListener('input', filterAndRender);
   statusDropdown?.addEventListener('change', () => {
+    showPendingRescheduleOnly = false;
     chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     filterAndRender();
   });
   chipsRow?.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
+    showPendingRescheduleOnly = false;
     chipsRow.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     statusDropdown.value = 'all';
+    filterAndRender();
+  });
+  rescheduleAlertAction?.addEventListener('click', () => {
+    showPendingRescheduleOnly = true;
+    statusDropdown.value = 'all';
+    chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chipsRow?.querySelector('[data-status="all"]')?.classList.add('active');
     filterAndRender();
   });
 }
@@ -1513,7 +1682,8 @@ async function handlePaymentReview(reservationId, paymentId, nextStatus) {
         .from('reservations')
         .update({
           event_date: request.requested_date,
-          event_time: request.requested_time
+          event_time: request.requested_time,
+          status: 'rescheduled'
         })
         .eq('reservation_id', reservationId);
 
@@ -2009,6 +2179,13 @@ async function loadData() {
       }
     }
 
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    });
     renderStats(reservationsCache);
     filterAndRender();
     await loadCalendar();
@@ -2024,6 +2201,13 @@ async function loadData() {
     }
   } catch (err) {
     setMessage(tableMessage, `Failed to load: ${err.message}`, true);
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    }).catch(() => {});
     renderTable([]);
   }
 }
