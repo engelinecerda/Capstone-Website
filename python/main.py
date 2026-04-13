@@ -8,7 +8,7 @@ import subprocess
 import threading
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
-SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM"  # 🔥 PUT YOUR REAL KEY
+SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM" 
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔁 Run Prophet
+# Run Prophet
 def run_forecast():
     subprocess.run(["python", "python\\forecast.py"])
 
@@ -34,11 +34,11 @@ def start_scheduler():
     if not scheduler.running:
         scheduler.start()
 
-    # ✅ Run forecast in background (non-blocking)
+    # Run forecast in background (non-blocking)
     threading.Thread(target=run_forecast).start()
 
 # =========================
-# 📈 FORECAST
+# FORECAST
 # =========================
 @app.get("/forecast")
 def get_forecast():
@@ -61,7 +61,7 @@ def get_forecast():
         f["ds"][:7]: f["yhat"] for f in forecast_data
     }
 
-    # 🔹 Actual data
+    # Actual data
     res = supabase.table("reservations").select("event_date").execute()
 
     actual_map = {}
@@ -74,11 +74,11 @@ def get_forecast():
         years.add(year)
         actual_map[key] = actual_map.get(key, 0) + 1
 
-    # 🔥 ADD FUTURE YEARS (next 2 years)
+    # ADD FUTURE YEARS (next 2 years)
     current_year = datetime.now().year
     years.update([str(current_year + 1), str(current_year + 2)])
 
-    # 🔥 SORT YEARS
+    # SORT YEARS
     years = sorted(years)
 
     result = []
@@ -97,7 +97,7 @@ def get_forecast():
     return result
 
 # =========================
-# 📊 LAST 6 MONTHS
+# MONTHLY RESERVATIONS (LAST 6 MONTHS)
 # =========================
 @app.get("/analytics/monthly-reservations")
 def monthly_reservations():
@@ -129,7 +129,7 @@ def monthly_reservations():
     return grouped[['month','count']].to_dict(orient='records')
 
 # =========================
-# 🍩 PACKAGE DISTRIBUTION
+# PACKAGE DISTRIBUTION
 # =========================
 @app.get("/analytics/package-distribution")
 def package_distribution():
