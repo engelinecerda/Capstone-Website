@@ -1,6 +1,7 @@
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -10,6 +11,9 @@ const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const navReservationCount = document.getElementById('navReservationCount');
+const navContractCount = document.getElementById('navContractCount');
+const navPaymentCount = document.getElementById('navPaymentCount');
+const navReviewCount = document.getElementById('navReviewCount');
 const demandYearSelect = document.getElementById('demandYear');
 const API = "http://127.0.0.1:8000"; //  ADDED
 
@@ -77,6 +81,65 @@ function formatDate(value) {
         month: 'short',
         day: 'numeric'
     });
+}
+
+
+function formatDateKey(value) {
+    return String(value || '').split('T')[0];
+}
+
+function parseEventTimeToParts(timeValue) {
+    const value = String(timeValue || '').trim();
+    if (!value) return null;
+
+    const directMatch = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (directMatch) {
+        return {
+            hours: Number(directMatch[1]),
+            minutes: Number(directMatch[2])
+        };
+    }
+
+    const parsed = new Date(`1970-01-01 ${value}`);
+    if (Number.isNaN(parsed.getTime())) return null;
+
+    return {
+        hours: parsed.getHours(),
+        minutes: parsed.getMinutes()
+    };
+}
+
+function getReservationEventDateTime(reservation) {
+    const dateKey = formatDateKey(reservation?.event_date);
+    if (!dateKey) return null;
+
+    const timeParts = parseEventTimeToParts(reservation?.event_time);
+    const date = new Date(`${dateKey}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+
+    if (timeParts) {
+        date.setHours(timeParts.hours, timeParts.minutes, 0, 0);
+    }
+
+    return date;
+}
+
+function getEffectiveReservationStatus(reservation) {
+    const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
+    if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
+        return normalizedStatus;
+    }
+
+    const eventDateTime = getReservationEventDateTime(reservation);
+    if (eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
+        return 'completed';
+    }
+
+    if (normalizedStatus === 'confirmed') {
+        return 'approved';
+    }
+
+    return normalizedStatus;
 }
 
 function formatStatus(status) {
@@ -373,7 +436,7 @@ function updateStats(reservations, contractsByReservationId = {}) {
     const customerIds = new Set();
 
     reservations.forEach((reservation) => {
-        const status = (reservation.status || 'pending').toLowerCase();
+        const status = getEffectiveReservationStatus(reservation);
         if (status === 'pending') totals.pending += 1;
         if (status === 'confirmed' || status === 'approved') totals.approved += 1;
         if (status === 'declined') totals.declined += 1;
@@ -393,7 +456,7 @@ function updateStats(reservations, contractsByReservationId = {}) {
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
     if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
-    if (navReservationCount) navReservationCount.textContent = String(totals.pending);
+    setBadgeCount(navReservationCount, totals.pending);
 
     if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
     if (chipTargets.approved) chipTargets.approved.textContent = String(totals.approved);
@@ -424,7 +487,7 @@ function renderReservationsTable(reservations, contractsByReservationId = {}) {
             const location = reservation.location_type === 'onsite'
                 ? 'Onsite - ELI Coffee'
                 : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
-            const status = formatStatus(reservation.status);
+            const status = formatStatus(getEffectiveReservationStatus(reservation));
             const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
 
             return `
@@ -558,6 +621,13 @@ async function loadDashboard() {
             .length;
 
         updateStats(reservations, contractsByReservationId);
+        await refreshAdminSidebarCounts({
+            supabase,
+            reservationBadgeEl: navReservationCount,
+            paymentBadgeEl: navPaymentCount,
+            contractBadgeEl: navContractCount,
+            reviewBadgeEl: navReviewCount
+        });
         renderReservationsTable(reservations, contractsByReservationId);
         await renderBarChart(await loadMonthly()); //  CHANGED
         await renderPieChart(await loadPackages()); //  CHANGED
@@ -579,6 +649,13 @@ async function loadDashboard() {
             true
         );
         updateStats([], {});
+        await refreshAdminSidebarCounts({
+            supabase,
+            reservationBadgeEl: navReservationCount,
+            paymentBadgeEl: navPaymentCount,
+            contractBadgeEl: navContractCount,
+            reviewBadgeEl: navReviewCount
+        }).catch(() => {});
         renderReservationsTable([], {});
         await renderBarChart([]); //CHANGED
         await renderPieChart([]); //CHANGED

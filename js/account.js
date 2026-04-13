@@ -101,6 +101,15 @@ const rescheduleCalendarGrid = document.getElementById('reschedule-calendar-grid
 const rescheduleTimeGrid = document.getElementById('reschedule-time-grid');
 const reschedulePrevMonth = document.getElementById('reschedule-prev-month');
 const rescheduleNextMonth = document.getElementById('reschedule-next-month');
+const reviewPromptBackdrop = document.getElementById('review-prompt-backdrop');
+const reviewPromptClose = document.getElementById('review-prompt-close');
+const reviewPromptDismiss = document.getElementById('review-prompt-dismiss');
+const reviewPromptSubmit = document.getElementById('review-prompt-submit');
+const reviewPromptReservationMeta = document.getElementById('review-prompt-reservation-meta');
+const reviewPromptRating = document.getElementById('review-prompt-rating');
+const reviewPromptRatingCopy = document.getElementById('review-prompt-rating-copy');
+const reviewPromptComment = document.getElementById('review-prompt-comment');
+const reviewPromptMessage = document.getElementById('review-prompt-message');
 const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
 const submissionFeedbackClose = document.getElementById('submission-feedback-close');
 const submissionFeedbackDismiss = document.getElementById('submission-feedback-dismiss');
@@ -114,11 +123,15 @@ const state = {
     paymentsByReservationId: {},
     receiptsByPaymentId: {},
     reschedulesByReservationId: {},
+    reviewsByReservationId: {},
     profile: null,
     emailSecurityReady: true,
     reservationView: 'active',
     reservationDetailsReservationId: null,
     receiptModalPaymentId: null,
+    reviewPromptReservationId: null,
+    reviewPromptRating: 0,
+    reviewPromptEvaluated: false,
     rescheduleModal: {
         reservationId: null,
         month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -153,6 +166,42 @@ function isMissingProfileColumnError(error, columnName) {
     const message = error?.message || '';
     return message.includes(`Could not find the '${columnName}' column`)
         || message.includes(`column profiles.${columnName} does not exist`);
+}
+
+function isMissingColumnError(error, tableName, columnName) {
+    const message = error?.message || '';
+    return message.includes(`Could not find the '${columnName}' column`)
+        || message.includes(`column ${tableName}.${columnName} does not exist`);
+}
+
+function isMissingReviewsTableError(error) {
+    const message = error?.message || '';
+    return message.includes(`Could not find the table 'public.reviews'`)
+        || message.includes("relation \"public.reviews\" does not exist")
+        || message.includes("relation \"reviews\" does not exist");
+}
+
+function getReviewFeatureErrorMessage(error, action = 'use') {
+    const message = error?.message || '';
+    const details = error?.details || '';
+    const code = error?.code || '';
+    const combined = `${message} ${details}`;
+
+    if (isMissingReviewsTableError(error) || isMissingColumnError(error, 'reservations', 'review_prompt_dismissed_at')) {
+        return 'The review feature is not fully set up in Supabase yet. Run the SQL in `supabase/migrations/20260411_create_reviews.sql` on the hosted project, then reload this page.';
+    }
+
+    if (code === '23505' || combined.includes('duplicate key value') || combined.includes('unique (reservation_id)')) {
+        return 'A review for this reservation was already submitted. Reload the page and check your completed reservation details.';
+    }
+
+    if (combined.toLowerCase().includes('row-level security') || code === '42501') {
+        return action === 'dismiss'
+            ? 'Supabase rejected this review prompt update. Apply the review SQL in `supabase/migrations/20260411_create_reviews.sql` and make sure this reservation belongs to the signed-in customer.'
+            : 'Supabase rejected this review submission. Apply the review SQL in `supabase/migrations/20260411_create_reviews.sql`, then make sure the reservation is completed or already past its event date/time before submitting again.';
+    }
+
+    return message || 'unknown error';
 }
 
 function formatCurrency(value) {
@@ -253,7 +302,7 @@ function getEffectiveReservationStatus(reservation) {
     const eventDateTime = getReservationEventDateTime(reservation);
     if (!eventDateTime) return normalizedStatus;
 
-    if (eventDateTime.getTime() < Date.now() && normalizedStatus === 'approved') {
+    if (eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
         return 'completed';
     }
 
@@ -320,6 +369,10 @@ function getReservationReceipts(reservationId) {
 
 function getReservationRescheduleRequests(reservationId) {
     return state.reschedulesByReservationId[reservationId] || [];
+}
+
+function getReservationReview(reservationId) {
+    return state.reviewsByReservationId[reservationId] || null;
 }
 
 function getReservationContract(reservationId) {
@@ -466,6 +519,60 @@ function getReservationBuckets() {
         }
         return groups;
     }, { active: [], past: [] });
+}
+
+function getReservationReviewState(reservation) {
+    const review = getReservationReview(reservation?.reservation_id);
+    const isCompleted = getEffectiveReservationStatus(reservation) === 'completed';
+    const dismissedAt = reservation?.review_prompt_dismissed_at || '';
+
+    return {
+        review,
+        isCompleted,
+        dismissedAt,
+        isDismissed: Boolean(dismissedAt) && !review,
+        canReview: isCompleted && !review && !dismissedAt
+    };
+}
+
+function getReviewPromptCandidate() {
+    return state.reservations
+        .filter((reservation) => getReservationReviewState(reservation).canReview)
+        .sort((left, right) => {
+            const leftTime = getReservationEventDateTime(left)?.getTime() || new Date(left?.created_at || 0).getTime() || 0;
+            const rightTime = getReservationEventDateTime(right)?.getTime() || new Date(right?.created_at || 0).getTime() || 0;
+            return rightTime - leftTime;
+        })[0] || null;
+}
+
+function getReviewRatingLabel(rating) {
+    const normalizedRating = Number(rating || 0);
+    if (!normalizedRating) return 'Not rated';
+    if (normalizedRating === 1) return '1 out of 5';
+    return `${normalizedRating} out of 5`;
+}
+
+function buildReviewStarsMarkup(rating, { interactive = false } = {}) {
+    const normalizedRating = Math.max(0, Math.min(5, Number(rating || 0)));
+    return Array.from({ length: 5 }, (_, index) => {
+        const filled = index < normalizedRating;
+        if (interactive) {
+            const value = index + 1;
+            return `
+                <button
+                    type="button"
+                    class="review-star-btn ${value <= normalizedRating ? 'active' : ''}"
+                    data-rating-value="${value}"
+                    aria-label="${value} star${value === 1 ? '' : 's'}"
+                    aria-checked="${value === normalizedRating ? 'true' : 'false'}"
+                >
+                    &#9733;
+                </button>
+            `;
+        }
+
+        return `<span class="review-display-star ${filled ? 'filled' : ''}" aria-hidden="true">${filled ? '&#9733;' : '&#9734;'}</span>`;
+    }).join('');
 }
 
 function getBookingScope(reservation) {
@@ -1311,7 +1418,7 @@ function renderRescheduleSection(reservation) {
 
     const summaryRows = latestRequest ? `
         <div class="reschedule-summary">
-            <div class="reschedule-summary-row"><strong>Current:</strong> ${escapeHtml(formatDate(latestRequest.original_date))} at ${escapeHtml(latestRequest.original_time || 'No time')}</div>
+            <div class="reschedule-summary-row"><strong>Current:</strong> ${escapeHtml(formatDate(reservation.event_date))} at ${escapeHtml(reservation.event_time || 'No time')}</div>
             <div class="reschedule-summary-row"><strong>Requested:</strong> ${escapeHtml(formatDate(latestRequest.requested_date))} at ${escapeHtml(latestRequest.requested_time || 'No time')}</div>
         </div>
     ` : '';
@@ -1682,6 +1789,215 @@ function buildReservationEmptyState(view) {
     `;
 }
 
+function buildReservationReviewSection(reservation) {
+    const { review, isCompleted, isDismissed, canReview, dismissedAt } = getReservationReviewState(reservation);
+
+    if (!isCompleted) {
+        return '';
+    }
+
+    if (review) {
+        return `
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Your Review</h3>
+                        <p>This reservation is complete and your feedback has already been saved.</p>
+                    </div>
+                </div>
+                <div class="reservation-review-card">
+                    <div class="reservation-review-top">
+                        <div class="reservation-review-stars" aria-label="${escapeHtml(getReviewRatingLabel(review.rating))}">
+                            ${buildReviewStarsMarkup(review.rating)}
+                        </div>
+                        <span class="reservation-review-score">${escapeHtml(`${Number(review.rating || 0)}/5`)}</span>
+                    </div>
+                    <div class="reservation-review-copy">${escapeHtml(review.comment || 'No comment added.')}</div>
+                    <div class="reservation-review-meta">Submitted on ${escapeHtml(formatDateTime(review.created_at))}</div>
+                </div>
+            </section>
+        `;
+    }
+
+    if (isDismissed) {
+        return `
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Your Review</h3>
+                        <p>This reservation is complete. You chose not to leave a review for it.</p>
+                    </div>
+                </div>
+                <div class="reservation-inline-note">Review skipped${dismissedAt ? ` on ${escapeHtml(formatDateTime(dismissedAt))}` : ''}.</div>
+            </section>
+        `;
+    }
+
+    if (canReview) {
+        return `
+            <section class="reservation-details-section">
+                <div class="reservation-details-section-head">
+                    <div>
+                        <h3>Your Review</h3>
+                        <p>This reservation is complete and you can still leave a review whenever you are ready.</p>
+                    </div>
+                </div>
+                <div class="reservation-inline-note">Share a quick rating and optional comment about this completed reservation.</div>
+                <div class="reservation-details-actions">
+                    <button type="button" class="res-secondary-btn open-review-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Leave a Review</button>
+                </div>
+            </section>
+        `;
+    }
+
+    return '';
+}
+
+function setReviewPromptMessage(message, type = '') {
+    if (!reviewPromptMessage) return;
+    reviewPromptMessage.textContent = message;
+    reviewPromptMessage.classList.remove('error', 'success');
+    if (type) {
+        reviewPromptMessage.classList.add(type);
+    }
+}
+
+function setReviewPromptRating(rating) {
+    state.reviewPromptRating = Math.max(0, Math.min(5, Number(rating || 0)));
+
+    reviewPromptRating?.querySelectorAll('[data-rating-value]').forEach((button, index) => {
+        const value = Number(button.dataset.ratingValue || index + 1);
+        const isActive = value <= state.reviewPromptRating;
+        const isSelected = value === state.reviewPromptRating;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+    });
+
+    if (reviewPromptRatingCopy) {
+        reviewPromptRatingCopy.textContent = state.reviewPromptRating
+            ? `${getReviewRatingLabel(state.reviewPromptRating)} selected`
+            : 'Choose a rating before you submit.';
+    }
+}
+
+function setReviewPromptBusy(isBusy) {
+    reviewPromptClose?.toggleAttribute('disabled', isBusy);
+    reviewPromptDismiss?.toggleAttribute('disabled', isBusy);
+    reviewPromptSubmit?.toggleAttribute('disabled', isBusy);
+}
+
+function openReviewPromptModal(reservationId) {
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    const reviewState = reservation ? getReservationReviewState(reservation) : null;
+
+    if (!reservation || !reviewState?.canReview) {
+        return;
+    }
+
+    state.reviewPromptReservationId = reservation.reservation_id;
+    setReviewPromptBusy(false);
+    setReviewPromptMessage('');
+    setReviewPromptRating(0);
+    if (reviewPromptComment) {
+        reviewPromptComment.value = '';
+    }
+    if (reviewPromptReservationMeta) {
+        reviewPromptReservationMeta.innerHTML = `
+            <div class="review-reservation-title">${escapeHtml(reservation.event_type || 'Event')}</div>
+            <div class="review-reservation-copy">
+                ${escapeHtml(getReservationPackageName(reservation))} • ${escapeHtml(formatDate(reservation.event_date))} • ${escapeHtml(reservation.event_time || 'No time selected')}
+            </div>
+        `;
+    }
+
+    reviewPromptBackdrop?.classList.remove('hidden');
+    reviewPromptBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeReviewPromptModal() {
+    state.reviewPromptReservationId = null;
+    setReviewPromptBusy(false);
+    setReviewPromptMessage('');
+    reviewPromptBackdrop?.classList.add('hidden');
+    reviewPromptBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+function openEligibleReviewPrompt() {
+    const reservation = getReviewPromptCandidate();
+    if (!reservation) return;
+    openReviewPromptModal(reservation.reservation_id);
+}
+
+async function dismissReviewPrompt() {
+    const reservationId = state.reviewPromptReservationId;
+    if (!reservationId) return;
+
+    try {
+        setReviewPromptBusy(true);
+        setReviewPromptMessage('Saving your choice...');
+
+        const { error } = await supabase.rpc('dismiss_reservation_review_prompt', {
+            p_reservation_id: reservationId
+        });
+
+        if (error) throw error;
+
+        closeReviewPromptModal();
+        await loadReservations();
+    } catch (error) {
+        setReviewPromptBusy(false);
+        setReviewPromptMessage(`Failed to update this review prompt: ${getReviewFeatureErrorMessage(error, 'dismiss')}`, 'error');
+    }
+}
+
+async function submitReservationReview() {
+    const reservationId = state.reviewPromptReservationId;
+    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
+    if (!reservation) {
+        setReviewPromptMessage('This reservation could not be found.', 'error');
+        return;
+    }
+
+    if (!getReservationReviewState(reservation).canReview) {
+        setReviewPromptMessage('This reservation is no longer open for review.', 'error');
+        return;
+    }
+
+    if (!state.reviewPromptRating) {
+        setReviewPromptMessage('Choose a rating before you submit your review.', 'error');
+        return;
+    }
+
+    try {
+        setReviewPromptBusy(true);
+        setReviewPromptMessage('Submitting your review...');
+
+        const payload = {
+            reservation_id: reservationId,
+            user_id: user.id,
+            rating: state.reviewPromptRating,
+            comment: reviewPromptComment?.value.trim() || null
+        };
+
+        const { error } = await supabase
+            .from('reviews')
+            .insert(payload);
+
+        if (error) throw error;
+
+        closeReviewPromptModal();
+        await loadReservations();
+        openSubmissionFeedbackModal({
+            eyebrow: 'Review Submitted',
+            title: 'Thank You for the Feedback',
+            copy: 'Your review has been saved to your completed reservation.'
+        });
+    } catch (error) {
+        setReviewPromptBusy(false);
+        setReviewPromptMessage(`Failed to submit your review: ${getReviewFeatureErrorMessage(error, 'submit')}`, 'error');
+    }
+}
+
 function renderReservationDetailsModal(reservationId = state.reservationDetailsReservationId) {
     if (!reservationDetailsView || !reservationId) return;
 
@@ -1896,6 +2212,8 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                     </div>
                 ` : ''}
             </section>
+
+            ${buildReservationReviewSection(reservation)}
         </div>
     `;
 
@@ -2440,43 +2758,100 @@ async function fetchRescheduleRequests(reservationIds) {
     }, {});
 }
 
+async function fetchReviews(reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+            review_id,
+            reservation_id,
+            user_id,
+            rating,
+            comment,
+            created_at
+        `)
+        .eq('user_id', user.id)
+        .in('reservation_id', reservationIds)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        if (isMissingReviewsTableError(error)) {
+            console.warn('Reviews table is not available in Supabase yet:', error.message);
+            return {};
+        }
+
+        throw error;
+    }
+
+    return (data || []).reduce((map, review) => {
+        if (!map[review.reservation_id]) {
+            map[review.reservation_id] = review;
+        }
+        return map;
+    }, {});
+}
+
 async function loadReservations() {
     if (reservationsList) {
         reservationsList.innerHTML = '<p style="color:#888;text-align:center;padding:40px 0;">Loading...</p>';
     }
 
     try {
-        const { data: reservations, error } = await supabase
+        const baseReservationSelect = `
+            reservation_id,
+            user_id,
+            event_type,
+            event_date,
+            event_time,
+            guest_count,
+            location_type,
+            venue_location,
+            package_id,
+            add_on_id,
+            total_price,
+            special_requests,
+            status,
+            created_at,
+            package:package_id ( package_name, package_type ),
+            add_on:add_on_id ( package_name, package_type )
+        `;
+        const reservationSelectWithReviewPrompt = `
+            ${baseReservationSelect},
+            review_prompt_dismissed_at
+        `;
+
+        let reservationResponse = await supabase
             .from('reservations')
-            .select(`
-                reservation_id,
-                user_id,
-                event_type,
-                event_date,
-                event_time,
-                guest_count,
-                location_type,
-                venue_location,
-                package_id,
-                add_on_id,
-                total_price,
-                special_requests,
-                status,
-                created_at,
-                package:package_id ( package_name, package_type ),
-                add_on:add_on_id ( package_name, package_type )
-            `)
+            .select(reservationSelectWithReviewPrompt)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (reservationResponse.error && isMissingColumnError(reservationResponse.error, 'reservations', 'review_prompt_dismissed_at')) {
+            console.warn('review_prompt_dismissed_at is missing in Supabase; loading reservations without review prompt support.');
+            reservationResponse = await supabase
+                .from('reservations')
+                .select(baseReservationSelect)
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
 
-        state.reservations = reservations || [];
+            if (!reservationResponse.error) {
+                reservationResponse.data = (reservationResponse.data || []).map((reservation) => ({
+                    ...reservation,
+                    review_prompt_dismissed_at: null
+                }));
+            }
+        }
+
+        if (reservationResponse.error) throw reservationResponse.error;
+
+        state.reservations = reservationResponse.data || [];
         const reservationIds = state.reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
 
         state.contractsByReservationId = await fetchContracts(reservationIds);
         state.paymentsByReservationId = await fetchPayments(reservationIds);
         state.reschedulesByReservationId = await fetchRescheduleRequests(reservationIds);
+        state.reviewsByReservationId = await fetchReviews(reservationIds);
 
         const paymentIds = Object.values(state.paymentsByReservationId)
             .flat()
@@ -2489,10 +2864,15 @@ async function loadReservations() {
         if (state.reservationDetailsReservationId) {
             renderReservationDetailsModal(state.reservationDetailsReservationId);
         }
+        if (!state.reviewPromptEvaluated) {
+            state.reviewPromptEvaluated = true;
+            openEligibleReviewPrompt();
+        }
     } catch (error) {
         console.error('Failed to load reservations:', error);
         if (reservationsList) {
-            reservationsList.innerHTML = '<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations.</p>';
+            const reviewFeatureMessage = getReviewFeatureErrorMessage(error);
+            reservationsList.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations: ${escapeHtml(reviewFeatureMessage)}.</p>`;
         }
         if (paymentsList) {
             paymentsList.innerHTML = '<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load payments.</p>';
@@ -2849,7 +3229,12 @@ async function submitPayment(section, reservationId) {
 
     const submitBtn = section.querySelector('.submit-payment-btn');
     submitBtn?.setAttribute('disabled', 'true');
-    setInlineMessage(messageEl, 'Submitting payment details...');
+    setInlineMessage(
+        messageEl,
+        activeMethod === 'cash'
+            ? 'Submitting payment details...'
+            : 'Submitting payment details and processing OCR...'
+    );
 
     try {
         const proofUrl = activeMethod === 'cash' ? '' : await uploadPaymentProof(proofFile);
@@ -2869,13 +3254,34 @@ async function submitPayment(section, reservationId) {
             submitted_at: new Date().toISOString()
         };
 
-        const { error } = await supabase
+        const { data: insertedRows, error } = await supabase
             .from('payment')
-            .insert(payload);
+            .insert(payload)
+            .select('payment_id')
+            .limit(1);
 
         if (error) throw error;
 
-        setInlineMessage(messageEl, 'Payment details submitted for admin review.', 'success');
+        // ── OCR: fire-and-forget — failure never blocks the customer ──────────
+        const newPaymentId = insertedRows?.[0]?.payment_id;
+        let successMessage = 'Payment details submitted for admin review.';
+
+        if (proofUrl && newPaymentId) {
+            const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-payment', {
+                body: { payment_id: newPaymentId, image_url: proofUrl }
+            });
+
+            if (ocrError) {
+                console.warn('OCR invoke failed:', ocrError.message);
+                successMessage = 'Payment details submitted for admin review, but OCR could not be processed yet.';
+            } else if (ocrData?.saved === false) {
+                console.warn('OCR save failed:', ocrData?.error || 'Unknown OCR save error');
+                successMessage = 'Payment details submitted for admin review, but OCR could not be saved yet.';
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        setInlineMessage(messageEl, successMessage, 'success');
         await loadReservations();
     } catch (error) {
         submitBtn?.removeAttribute('disabled');
@@ -2997,6 +3403,12 @@ function wireReservationActions() {
             return;
         }
 
+        const reviewBtn = event.target.closest('.open-review-btn');
+        if (reviewBtn) {
+            openReviewPromptModal(reviewBtn.dataset.reservationId);
+            return;
+        }
+
         const openPaymentsBtn = event.target.closest('.open-payments-btn');
         if (openPaymentsBtn) {
             const reservationId = openPaymentsBtn.dataset.reservationId;
@@ -3032,6 +3444,13 @@ function wireReservationDetailsModal() {
         if (rescheduleBtn) {
             closeReservationDetailsModal();
             await openRescheduleModal(rescheduleBtn.dataset.reservationId);
+            return;
+        }
+
+        const reviewBtn = event.target.closest('.open-review-btn');
+        if (reviewBtn) {
+            closeReservationDetailsModal();
+            openReviewPromptModal(reviewBtn.dataset.reservationId);
             return;
         }
 
@@ -3163,6 +3582,26 @@ function wireRescheduleModal() {
         if (!timeButton) return;
         state.rescheduleModal.selectedTime = timeButton.dataset.time || '';
         renderRescheduleTimes();
+    });
+}
+
+function wireReviewPromptModal() {
+    reviewPromptClose?.addEventListener('click', closeReviewPromptModal);
+    reviewPromptDismiss?.addEventListener('click', async () => {
+        await dismissReviewPrompt();
+    });
+    reviewPromptSubmit?.addEventListener('click', async () => {
+        await submitReservationReview();
+    });
+    reviewPromptBackdrop?.addEventListener('click', (event) => {
+        if (event.target === reviewPromptBackdrop) {
+            closeReviewPromptModal();
+        }
+    });
+    reviewPromptRating?.addEventListener('click', (event) => {
+        const starBtn = event.target.closest('[data-rating-value]');
+        if (!starBtn) return;
+        setReviewPromptRating(starBtn.dataset.ratingValue);
     });
 }
 
@@ -3553,6 +3992,7 @@ function wireLogout() {
             if (state.reservationDetailsReservationId) closeReservationDetailsModal();
             if (state.receiptModalPaymentId) closeReceiptModal();
             if (state.rescheduleModal.reservationId) closeRescheduleModal();
+            if (state.reviewPromptReservationId) closeReviewPromptModal();
             if (submissionFeedbackBackdrop && !submissionFeedbackBackdrop.classList.contains('hidden')) {
                 closeSubmissionFeedbackModal();
             }
@@ -3566,6 +4006,7 @@ wireReservationDetailsModal();
 wirePaymentActions();
 wireReceiptModal();
 wireRescheduleModal();
+wireReviewPromptModal();
 wireSubmissionFeedbackModal();
 wireProfileForm();
 wirePasswordForm();

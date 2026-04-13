@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ELITE Customers - Admin</title>
+  <title>Customer Reviews - Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/admin_customers.css">
 </head>
@@ -53,14 +53,14 @@
           <span class="nav-label">Payments</span>
           <span class="nav-badge" id="navPaymentCount" hidden>0</span>
         </a>
-        <a href="./admin_reviews.html" class="nav-item">
+        <a href="./admin_reviews.html" class="nav-item active">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
           </span>
           <span class="nav-label">Reviews</span>
           <span class="nav-badge" id="navReviewCount" hidden>0</span>
         </a>
-        <a href="./admin_customers.html" class="nav-item active">
+        <a href="./admin_customers.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </span>
@@ -89,31 +89,31 @@
     <section class="page-shell">
       <header class="page-header">
         <div>
-          <h1 class="page-title">ELITE Customers <span class="admin-badge">Admin</span></h1>
-          <p class="page-sub">A read-only list of registered customers with their account details and reservation activity.</p>
+          <h1 class="page-title">Customer Reviews <span class="admin-badge">Admin</span></h1>
+          <p class="page-sub">Read submitted customer feedback in one dedicated admin page instead of mixing it into the dashboard.</p>
         </div>
       </header>
 
       <section class="stat-grid">
         <div class="stat-card">
-          <p class="stat-label">Registered Customers</p>
-          <p class="stat-value" id="statTotalCustomers">0</p>
-          <p class="stat-sub">Profiles available in the customer registry</p>
+          <p class="stat-label">Total Reviews</p>
+          <p class="stat-value" id="statTotalReviews">0</p>
+          <p class="stat-sub">All submitted customer reviews currently saved</p>
         </div>
         <div class="stat-card">
-          <p class="stat-label">With Reservations</p>
-          <p class="stat-value" id="statCustomersWithReservations">0</p>
-          <p class="stat-sub">Customers who have submitted at least one booking</p>
+          <p class="stat-label">Average Rating</p>
+          <p class="stat-value" id="statAverageRating">0.0</p>
+          <p class="stat-sub">Average score across all submitted reviews</p>
         </div>
         <div class="stat-card">
-          <p class="stat-label">New This Month</p>
-          <p class="stat-value" id="statNewThisMonth">0</p>
-          <p class="stat-sub">Profiles registered during the current month</p>
+          <p class="stat-label">5-Star Reviews</p>
+          <p class="stat-value" id="statFiveStarReviews">0</p>
+          <p class="stat-sub">Customers who gave the highest rating</p>
         </div>
         <div class="stat-card">
-          <p class="stat-label">With Phone Number</p>
-          <p class="stat-value" id="statCustomersWithPhone">0</p>
-          <p class="stat-sub">Profiles with a contact number on file</p>
+          <p class="stat-label">With Comment</p>
+          <p class="stat-value" id="statCommentedReviews">0</p>
+          <p class="stat-sub">Reviews that include written feedback</p>
         </div>
       </section>
 
@@ -122,10 +122,10 @@
           <span class="search-icon">
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </span>
-          <input id="searchInput" type="text" placeholder="Search by customer name, email, or phone..." />
+          <input id="searchInput" type="text" placeholder="Search by customer, email, package, event, or comment..." />
         </label>
 
-        <button type="button" class="refresh-btn" id="refreshCustomersBtn">
+        <button type="button" class="refresh-btn" id="refreshReviewsBtn">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
           <span>Refresh</span>
         </button>
@@ -134,31 +134,31 @@
       <section class="card table-card">
         <div class="table-head">
           <div>
-            <h2 class="card-title">Registered Customers</h2>
-            <p class="card-sub">Customer accounts only. Admin profiles are excluded.</p>
+            <h2 class="card-title">Submitted Reviews</h2>
+            <p class="card-sub">Each row shows the customer, linked reservation context, star rating, and review comment.</p>
           </div>
         </div>
 
-        <p class="table-message" id="customersMessage">Loading customers...</p>
+        <p class="table-message" id="reviewsMessage">Loading reviews...</p>
 
         <div class="table-wrap">
           <table class="customers-table">
             <thead>
               <tr>
                 <th>Customer</th>
-                <th>Contact</th>
-                <th>Registered</th>
-                <th>Reservation Activity</th>
+                <th>Reservation</th>
+                <th>Rating</th>
+                <th>Comment</th>
+                <th>Submitted</th>
               </tr>
             </thead>
-            <tbody id="customersBody"></tbody>
+            <tbody id="reviewsBody"></tbody>
           </table>
         </div>
       </section>
-
     </section>
   </main>
 
-  <script type="module" src="../js/admin_customers.js"></script>
+  <script type="module" src="../js/admin_reviews.js"></script>
 </body>
 </html>

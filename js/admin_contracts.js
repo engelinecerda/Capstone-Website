@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -12,6 +13,9 @@ const tableMessage = document.getElementById('tableMessage');
 const contractsBody = document.getElementById('contractsBody');
 const chipsRow = document.getElementById('chipsRow');
 const navReservationCount = document.getElementById('navReservationCount');
+const navContractCount = document.getElementById('navContractCount');
+const navPaymentCount = document.getElementById('navPaymentCount');
+const navReviewCount = document.getElementById('navReviewCount');
 
 const statPendingContracts = document.getElementById('statPendingContracts');
 const statReplacementContracts = document.getElementById('statReplacementContracts');
@@ -83,6 +87,64 @@ function formatDate(value) {
     month: 'short',
     day: 'numeric'
   });
+}
+
+function formatDateKey(value) {
+  return String(value || '').split('T')[0];
+}
+
+function parseEventTimeToParts(timeValue) {
+  const value = String(timeValue || '').trim();
+  if (!value) return null;
+
+  const directMatch = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (directMatch) {
+    return {
+      hours: Number(directMatch[1]),
+      minutes: Number(directMatch[2])
+    };
+  }
+
+  const parsed = new Date(`1970-01-01 ${value}`);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return {
+    hours: parsed.getHours(),
+    minutes: parsed.getMinutes()
+  };
+}
+
+function getReservationEventDateTime(reservation) {
+  const dateKey = formatDateKey(reservation?.event_date);
+  if (!dateKey) return null;
+
+  const timeParts = parseEventTimeToParts(reservation?.event_time);
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (timeParts) {
+    date.setHours(timeParts.hours, timeParts.minutes, 0, 0);
+  }
+
+  return date;
+}
+
+function getEffectiveReservationStatus(reservation) {
+  const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
+  if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
+    return normalizedStatus;
+  }
+
+  const eventDateTime = getReservationEventDateTime(reservation);
+  if (eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
+    return 'completed';
+  }
+
+  if (normalizedStatus === 'confirmed') {
+    return 'approved';
+  }
+
+  return normalizedStatus;
 }
 
 function formatDateTime(value) {
@@ -289,6 +351,7 @@ function renderStats(list) {
   if (statRequestedContracts) statRequestedContracts.textContent = String(counts.resubmissionRequested);
   if (statVerifiedContracts) statVerifiedContracts.textContent = String(counts.approved);
   if (statTotalContracts) statTotalContracts.textContent = String(counts.total);
+  setBadgeCount(navContractCount, counts.pending + counts.resubmitted);
 
   if (!chipsRow) return;
 
@@ -344,7 +407,7 @@ function renderTable(list) {
 
   contractsBody.innerHTML = list.map((reservation) => {
     const contract = getContractReviewMeta(reservation);
-    const reservationStatus = formatReservationStatus(reservation.status);
+          const reservationStatus = formatReservationStatus(getEffectiveReservationStatus(reservation));
     const reviewActivity = contract.resubmittedAt
       ? `Replacement submitted ${escapeHtml(contract.resubmittedAt)}`
       : contract.reviewedAt
@@ -354,7 +417,7 @@ function renderTable(list) {
 
     return `
       <tr class="reservation-row">
-        <td>
+        <td data-label="Customer / Package">
           <div class="reservation-customer">
             <span class="reservation-avatar">${escapeHtml(getCustomerInitials(reservation.contact_name, reservation.contact_email))}</span>
             <div class="reservation-customer-copy">
@@ -364,32 +427,32 @@ function renderTable(list) {
             </div>
           </div>
         </td>
-        <td>
+        <td data-label="Event Schedule">
           <div class="table-date">
             <span class="table-date-main">${escapeHtml(formatDate(reservation.event_date))}</span>
             <span class="table-date-time">${escapeHtml(reservation.event_time || 'No time selected')}</span>
             <span class="table-sub">${escapeHtml(reservation.event_type || 'Event')}</span>
           </div>
         </td>
-        <td class="table-status-cell">
+        <td class="table-status-cell" data-label="Reservation Status">
           <div class="status-stack">
             <span class="status-pill ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
           </div>
         </td>
-        <td class="table-status-cell">
+        <td class="table-status-cell" data-label="Contract Status">
           <div class="status-stack">
             <span class="status-pill ${escapeHtml(contract.key)}">${escapeHtml(contract.label)}</span>
             <span class="table-sub">${escapeHtml(contract.verification)}</span>
             ${contract.note ? `<span class="table-note">${escapeHtml(contract.note)}</span>` : ''}
           </div>
         </td>
-        <td>
+        <td data-label="Review Activity">
           <div class="contract-activity-stack">
             <span class="table-main">${reviewActivity}</span>
             <span class="table-sub">${escapeHtml(eventSchedule)}</span>
           </div>
         </td>
-        <td class="actions actions-single">
+        <td class="actions actions-single" data-label="Action">
           <button class="action-btn view" data-action="review-contract" data-reservation-id="${reservation.reservation_id}">Review Contract</button>
         </td>
       </tr>
@@ -762,9 +825,13 @@ async function loadData() {
   try {
     const reservations = await fetchReservations();
     allReservationsCount = reservations.length;
-    if (navReservationCount) {
-      navReservationCount.textContent = String(countPendingReservations(reservations));
-    }
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    });
 
     contractsCache = reservations
       .filter((reservation) => getContractReviewMeta(reservation).hasFile)
@@ -781,6 +848,13 @@ async function loadData() {
     }
   } catch (error) {
     setMessage(tableMessage, `Failed to load contracts: ${error.message}`, true);
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    }).catch(() => {});
     renderStats([]);
     renderTable([]);
   }

@@ -6,6 +6,7 @@ import {
   populatePortalIdentity,
   verifyAdminSession
 } from './admin_auth.js';
+import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -23,6 +24,10 @@ const profileMessage = document.getElementById('profileMessage');
 const passwordForm = document.getElementById('passwordForm');
 const passwordMessage = document.getElementById('passwordMessage');
 const logoutBtn = document.getElementById('logoutBtn');
+const navReservationCount = document.getElementById('navReservationCount');
+const navContractCount = document.getElementById('navContractCount');
+const navPaymentCount = document.getElementById('navPaymentCount');
+const navReviewCount = document.getElementById('navReviewCount');
 
 const profileFirstName = document.getElementById('profileFirstName');
 const profileMiddleName = document.getElementById('profileMiddleName');
@@ -128,8 +133,22 @@ async function loadAdminProfile() {
     state.session = session;
     state.profile = profile || getFallbackProfile(session);
     renderProfileShell();
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    });
     setPageMessage('Your admin profile is ready.');
   } catch (error) {
+    await refreshAdminSidebarCounts({
+      supabase,
+      reservationBadgeEl: navReservationCount,
+      paymentBadgeEl: navPaymentCount,
+      contractBadgeEl: navContractCount,
+      reviewBadgeEl: navReviewCount
+    }).catch(() => {});
     setPageMessage(error?.message || 'Unable to load your admin profile right now.', true);
   }
 }
