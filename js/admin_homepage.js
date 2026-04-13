@@ -11,6 +11,7 @@ const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const navReservationCount = document.getElementById('navReservationCount');
 const demandYearSelect = document.getElementById('demandYear');
+const API = "http://127.0.0.1:8000"; //  ADDED
 
 const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
@@ -33,23 +34,22 @@ let barChart;
 let pieChart;
 let demandChart;
 
-const demandDataByYear = {
-    2024: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        actual: [1, 1, 12, 4, 3, 5, 3, 4, 2, 4, 0, 0],
-        forecast: [1, 1, 12, 4, 3, 5, 3, 4, 2, 4, 0, 0]
-    },
-    2025: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        actual: [2, 2, 10, 5, 4, 6, 4, 5, 3, 5, 1, 1],
-        forecast: [2, 2, 10, 5, 4, 6, 4, 5, 3, 5, 6, 8]
-    },
-    2026: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        actual: [1, 1, 12, 4, 3, 5, 3, 4, 2, 4, 0, 0],
-        forecast: [1, 1, 12, 4, 3, 5, 3, 4, 2, 4, 9, 13]
-    }
-};
+let fullData = []; //  ADDED
+
+async function loadForecast() { //  ADDED
+    const res = await fetch(`${API}/forecast`);
+    return res.ok ? res.json() : [];
+}
+
+async function loadMonthly() { //  ADDED
+    const res = await fetch(`${API}/analytics/monthly-reservations`);
+    return res.ok ? res.json() : [];
+}
+
+async function loadPackages() { //  ADDED
+    const res = await fetch(`${API}/analytics/package-distribution`);
+    return res.ok ? res.json() : [];
+}
 
 function redirectToAdminLogin() {
     window.location.replace('./admin_login.html');
@@ -139,7 +139,7 @@ function createEmptyMonthlyBuckets() {
     return buckets;
 }
 
-function buildMonthlyDataset(reservations) {
+function buildMonthlyDataset(reservations) { // PIN
     const buckets = createEmptyMonthlyBuckets();
     const counts = new Map(
         buckets.map((date) => [
@@ -168,7 +168,7 @@ function buildMonthlyDataset(reservations) {
     };
 }
 
-function buildPackageDataset(reservations) {
+function buildPackageDataset(reservations) { // CAN BE USED AS FALLBACK
     const counts = new Map();
 
     reservations.forEach((reservation) => {
@@ -197,21 +197,23 @@ function buildPackageDataset(reservations) {
     return { labels, values };
 }
 
-function renderBarChart(dataset) {
+async function renderBarChart(data) { //  CHANGED
+
+    const labels = data.map(d => d.month);
+    const values = data.map(d => d.count);
+
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
 
-    if (barChart) {
-        barChart.destroy();
-    }
+    if (barChart) barChart.destroy();
 
     barChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dataset.labels,
+            labels,
             datasets: [{
                 label: 'Reservations',
-                data: dataset.values,
+                data: values,
                 backgroundColor: '#6b3a2a',
                 borderRadius: 6,
                 borderSkipped: false
@@ -220,38 +222,31 @@ function renderBarChart(dataset) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
+            plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#9ca3af' }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f3f0eb', borderDash: [4, 4] },
-                    ticks: { precision: 0, color: '#9ca3af' }
-                }
+                x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#9ca3af' } }
             }
         }
     });
 }
 
-function renderPieChart(dataset) {
+async function renderPieChart(data) { //  CHANGED
+
+    const labels = data.map(d => d.package);
+    const values = data.map(d => d.count);
+
     const ctx = document.getElementById('pieChart');
     if (!ctx) return;
 
-    if (pieChart) {
-        pieChart.destroy();
-    }
+    if (pieChart) pieChart.destroy();
 
     pieChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: dataset.labels,
+            labels,
             datasets: [{
-                data: dataset.values,
+                data: values,
                 backgroundColor: ['#6b3a2a', '#a0522d', '#c9833a', '#d4a574', '#e8d5c0', '#b08b66'],
                 borderWidth: 0,
                 hoverOffset: 6
@@ -267,8 +262,7 @@ function renderPieChart(dataset) {
                     labels: {
                         color: '#374151',
                         padding: 14,
-                        usePointStyle: true,
-                        pointStyleWidth: 8
+                        usePointStyle: true
                     }
                 }
             }
@@ -276,42 +270,68 @@ function renderPieChart(dataset) {
     });
 }
 
-function renderDemandChart(year) {
+async function renderDemandChart(year) { //  CHANGED
+
+    const filtered = fullData.filter(d => d.year === year);
+
+    const allMonths = [
+    "Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec"
+    ];
+
+    const labels = allMonths;
+
+        const dataMap = {};
+    filtered.forEach(d => {
+    dataMap[d.month_name] = d;
+    });
+
+    const actual = allMonths.map(month => {
+    const d = dataMap[month];
+    return d ? d.y : 0;
+    });
+
+    const forecast = allMonths.map(month => {
+    const d = dataMap[month];
+    return d && d.yhat !== null && d.yhat !== undefined
+        ? Math.round(d.yhat)
+        : null;
+    });
+
     const ctx = document.getElementById('demandChart');
     if (!ctx) return;
 
-    const data = demandDataByYear[year] || demandDataByYear[Object.keys(demandDataByYear)[0]];
-    if (!data) return;
-
-    if (demandChart) {
-        demandChart.destroy();
-    }
+    if (demandChart) demandChart.destroy();
 
     demandChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.labels,
+            labels,
             datasets: [
                 {
                     label: 'Actual',
-                    data: data.actual,
+                    data: actual,
                     borderColor: '#6b4a32',
                     backgroundColor: '#6b4a32',
                     borderWidth: 2,
                     pointRadius: 4,
                     pointBackgroundColor: '#6b4a32',
                     pointBorderColor: '#fff',
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: true
                 },
                 {
                     label: 'Forecast',
-                    data: data.forecast,
+                    data: forecast,
                     borderColor: '#c79c73',
                     backgroundColor: '#c79c73',
                     borderWidth: 2,
                     borderDash: [6, 6],
-                    pointRadius: 0,
-                    tension: 0.25
+                    pointRadius: 4,
+                    pointBackgroundColor: '#c79c73',
+                    pointBorderColor: '#fff',
+                    tension: 0.25,
+                    spanGaps: true
                 }
             ]
         },
@@ -507,6 +527,29 @@ async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
 
     try {
+        fullData = await loadForecast(); // Preload forecast data for demand chart
+         if (demandYearSelect && fullData.length) {
+            const years = [...new Set(fullData.map(d => d.year))].sort();
+
+            demandYearSelect.innerHTML = "";
+
+            years.forEach(year => {
+                const option = document.createElement("option");
+                option.value = year;
+                option.textContent = year;
+                demandYearSelect.appendChild(option);
+        });
+
+        const currentYear = new Date().getFullYear().toString();
+
+        if (years.includes(currentYear)) {
+            demandYearSelect.value = currentYear;
+        } else {
+            demandYearSelect.value = years[years.length - 1];
+        }
+        //demandYearSelect.value = years[years.length - 1];
+    }
+
         const reservations = await fetchReservations();
         const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
         const contractsByReservationId = await fetchContracts(reservationIds);
@@ -516,10 +559,13 @@ async function loadDashboard() {
 
         updateStats(reservations, contractsByReservationId);
         renderReservationsTable(reservations, contractsByReservationId);
-        renderBarChart(buildMonthlyDataset(reservations));
-        renderPieChart(buildPackageDataset(reservations));
-        const selectedYear = demandYearSelect?.value || '2026';
-        renderDemandChart(selectedYear);
+        await renderBarChart(await loadMonthly()); //  CHANGED
+        await renderPieChart(await loadPackages()); //  CHANGED
+
+        const selectedYear = demandYearSelect?.value; //ADDED
+        if (selectedYear) {
+            await renderDemandChart(selectedYear); 
+        }
 
         const summaryText = reservations.length
             ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
@@ -534,10 +580,14 @@ async function loadDashboard() {
         );
         updateStats([], {});
         renderReservationsTable([], {});
-        renderBarChart(buildMonthlyDataset([]));
-        renderPieChart(buildPackageDataset([]));
-        const selectedYear = demandYearSelect?.value || '2026';
-        renderDemandChart(selectedYear);
+        await renderBarChart([]); //CHANGED
+        await renderPieChart([]); //CHANGED
+
+        const fallbackYear = demandYearSelect?.value; // ADDED
+
+        if (fallbackYear) {
+            await renderDemandChart(fallbackYear);
+        }
     }
 }
 
