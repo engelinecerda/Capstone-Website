@@ -193,6 +193,40 @@
         .res-step.active { display: block; }
         .res-step h2 { color: #2A1408; font-size: 22px; margin-bottom: 6px; font-weight: 700; }
         .res-step > p { color: #777; font-size: 14px; margin-bottom: 20px; }
+        .smart-step-section {
+            margin-top: 24px;
+            padding-top: 22px;
+            border-top: 1px solid #f0e5db;
+        }
+        .smart-step-section:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+        .smart-step-heading {
+            margin-bottom: 16px;
+        }
+        .smart-step-kicker {
+            display: inline-block;
+            margin-bottom: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6B3A1F;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .smart-step-heading h3 {
+            margin: 0 0 6px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #2A1408;
+        }
+        .smart-step-heading p {
+            margin: 0;
+            font-size: 13px;
+            color: #7b6a5d;
+            line-height: 1.6;
+        }
 
         /* Inputs */
         .res-input {
@@ -348,6 +382,18 @@
             transform: translateY(-1px);
             border-color: #c5a890;
             box-shadow: 0 8px 18px rgba(104, 67, 37, 0.08);
+        }
+        .availability-day.context-disabled {
+            background: #f8f5f1;
+            border-color: #e9ded3;
+            color: #b19f8f;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .availability-day.context-disabled:hover {
+            transform: none;
+            border-color: #e9ded3;
+            box-shadow: none;
         }
         .availability-day.past {
             background: #f8f5f1;
@@ -883,6 +929,22 @@
         .time-card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; color: #2A1408; transition: all 0.2s; }
         .time-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
         .time-card.active { border-color: #6B3A1F; background: #FFEDE0; }
+        .time-card.disabled {
+            cursor: not-allowed;
+            background: #f5f1eb;
+            color: #9c8f84;
+            border-color: #e3d8cd;
+        }
+        .time-card.disabled:hover {
+            border-color: #e3d8cd;
+            background: #f5f1eb;
+        }
+        .time-status-note {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #6B3A1F;
+            line-height: 1.6;
+        }
 
         /* Summary */
         .summary-box { background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 22px 24px; width: 100%; box-sizing: border-box; }
