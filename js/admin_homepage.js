@@ -11,7 +11,7 @@ const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const navReservationCount = document.getElementById('navReservationCount');
 const demandYearSelect = document.getElementById('demandYear');
-const API = "http://127.0.0.1:8000"; //  ADDED. ONLY FOR LOCAL TESTING. CHANGE TO DEPLOYED URL WHEN READY. WON'T WORK IF uvicorn python.main:app --reload IS NOT RUNNING
+const API = "https://capstone-website-papg.onrender.com"; //  ADDED.
 
 const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
