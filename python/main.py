@@ -24,7 +24,7 @@ app.add_middleware(
 
 # Run Prophet
 def run_forecast():
-    subprocess.run(["python", "python\\forecast.py"])
+    subprocess.run(["python", "python/forecast.py"])
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(run_forecast, "interval", hours=24)
