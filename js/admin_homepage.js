@@ -56,7 +56,7 @@ const demandDataByYear = {
 };
 
 function redirectToAdminLogin() {
-    window.location.replace('/admin');
+    window.location.replace('/admin/index.html');
 }
 
 function setDashboardMessage(message, isError = false) {

@@ -16,12 +16,12 @@ async function updateNavbar() {
         const displayName = profile ? profile.first_name : 'Account';
 
         navBtn.innerHTML = `
-            <a href="/account" class="button">${displayName}</a>
+            <a href="/account.html" class="button">${displayName}</a>
         `;
 
     } else {
         navBtn.innerHTML = `
-            <a href="/login" class="button">Login / Sign Up</a>
+            <a href="/login.html" class="button">Login / Sign Up</a>
         `;
     }
 }

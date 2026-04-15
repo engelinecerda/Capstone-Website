@@ -715,7 +715,7 @@ export async function submitCustomerPayment({
 }
 
 export function buildCustomerPaymentUrl(reservationId) {
-    const url = new URL('/payment', window.location.href);
+    const url = new URL('/payment.html', window.location.href);
     if (reservationId) {
         url.searchParams.set('reservation_id', reservationId);
     }
@@ -723,7 +723,7 @@ export function buildCustomerPaymentUrl(reservationId) {
 }
 
 export function buildCustomerAccountUrl(section = 'reservations') {
-    const url = new URL('/account', window.location.href);
+    const url = new URL('/account.html', window.location.href);
     if (section) {
         url.searchParams.set('section', section);
     }

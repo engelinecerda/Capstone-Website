@@ -42,7 +42,7 @@ const state = {
 };
 
 function redirectLogin() {
-  window.location.replace('/admin');
+  window.location.replace('/admin/index.html');
 }
 
 function setPageMessage(message, isError = false) {

@@ -59,7 +59,7 @@ function escapeHtml(value) {
 }
 
 function redirectLogin() {
-  window.location.replace('/admin');
+  window.location.replace('/admin/index.html');
 }
 
 async function validateAdmin() {

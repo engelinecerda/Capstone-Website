@@ -24,7 +24,7 @@ let allReviews = [];
 let adminSession = null;
 
 function redirectToAdminLogin() {
-  window.location.replace('/admin');
+  window.location.replace('/admin/index.html');
 }
 
 function setReviewsMessage(message, isError = false) {

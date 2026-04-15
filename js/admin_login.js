@@ -6,9 +6,9 @@ const formMsg = document.getElementById('formMsg');
 const emailInput = document.getElementById('email');
 const roleSelect = document.getElementById('role');
 const PORTAL_ROUTES = {
-    super_admin: '/admin/dashboard',
-    admin: '/admin/dashboard',
-    staff: '/admin/staff'
+    super_admin: '/admin/dashboard.html',
+    admin: '/admin/dashboard.html',
+    staff: '/admin/staff/index.html'
 };
 
 function normalizeRole(value) {

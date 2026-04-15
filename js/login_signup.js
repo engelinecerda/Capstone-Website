@@ -98,7 +98,7 @@ signupForm.addEventListener('submit', async function (e) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating account...';
 
-    const emailRedirectTo = new URL('/login', window.location.href).href;
+    const emailRedirectTo = new URL('/login.html', window.location.href).href;
     const { data, error } = await supabase.auth.signUp({
         email,
         password,

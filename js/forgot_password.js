@@ -8,7 +8,7 @@ form?.addEventListener('submit', async function (e) {
 
     const email = document.getElementById('reset-email').value.trim();
     const submitBtn = form.querySelector('button[type="submit"]');
-    const redirectTo = new URL('/reset-password', window.location.href).href;
+    const redirectTo = new URL('/reset-password.html', window.location.href).href;
 
     message.className = 'form-msg';
     message.innerText = '';

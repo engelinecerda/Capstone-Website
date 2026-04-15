@@ -89,7 +89,7 @@ const TIMES = [
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-    window.location.href = '/login';
+    window.location.href = '/login.html';
 }
 
 const user = session.user;
@@ -1842,7 +1842,7 @@ function buildReservationEmptyState(view) {
             <div class="empty-icon">Reservations</div>
             <h3>${copy.title}</h3>
             <p>${copy.message}</p>
-            ${view === 'active' ? '<a href="/reservations" class="res-book-btn">Book an Event</a>' : ''}
+            ${view === 'active' ? '<a href="/reservations.html" class="res-book-btn">Book an Event</a>' : ''}
         </div>
     `;
 }
@@ -2421,7 +2421,7 @@ function renderReservations() {
                 <div class="empty-icon">No reservations yet</div>
                 <h3>No reservations yet</h3>
                 <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
-                <a href="/reservations" class="res-book-btn">Book an Event</a>
+                <a href="/reservations.html" class="res-book-btn">Book an Event</a>
             </div>
         `;
         return;
@@ -4008,7 +4008,7 @@ function wireProfileForm() {
                 return;
             }
 
-            const emailRedirectTo = new URL('/account', window.location.href).href;
+            const emailRedirectTo = new URL('/account.html', window.location.href).href;
             const { error: emailError } = await supabase.auth.updateUser({
                 email: requestedEmail,
                 options: {
@@ -4104,12 +4104,12 @@ function wirePasswordForm() {
 function wireLogout() {
     document.getElementById('logout-btn')?.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        window.location.href = '/login';
+        window.location.href = '/login.html';
     });
 
     supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_OUT') {
-            window.location.href = '/login';
+            window.location.href = '/login.html';
         }
     });
 
