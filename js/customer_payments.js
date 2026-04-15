@@ -434,8 +434,17 @@ export async function uploadPaymentProof(file) {
         throw new Error('Proof file must be 10MB or smaller.');
     }
 
-    if (!String(file.type || '').startsWith('image/')) {
-        throw new Error('Please upload an image or screenshot for the payment proof.');
+    if (Number(file.size || 0) <= 0) {
+        throw new Error('The selected proof file is empty. Please choose a valid image.');
+    }
+
+    const mimeType = String(file.type || '').toLowerCase();
+    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+    const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+    if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+        throw new Error('Please upload the proof of payment as a JPG, JPEG, PNG, or WEBP image.');
     }
 
     const formData = new FormData();

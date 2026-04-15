@@ -2202,7 +2202,7 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                                     hidden
                                 />
                             </label>
-                            <p class="payment-proof-note">Accepted formats: PDF, JPG, and PNG. Upload the corrected signed contract only.</p>
+                            <p class="payment-proof-note">Accepted formats: PDF, JPG, JPEG, and PNG. Maximum 10MB. Upload the corrected signed contract only.</p>
                         </div>
                         <div class="reservation-details-actions">
                             <button
@@ -2644,8 +2644,17 @@ async function uploadPaymentProof(file) {
         throw new Error('Proof file must be 10MB or smaller.');
     }
 
-    if (!String(file.type || '').startsWith('image/')) {
-        throw new Error('Please upload an image or screenshot for the payment proof.');
+    if (Number(file.size || 0) <= 0) {
+        throw new Error('The selected proof file is empty. Please choose a valid image.');
+    }
+
+    const mimeType = String(file.type || '').toLowerCase();
+    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+    const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+    if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+        throw new Error('Please upload the proof of payment as a JPG, JPEG, PNG, or WEBP image.');
     }
 
     const formData = new FormData();
@@ -2676,9 +2685,17 @@ async function uploadContractFile(file) {
         throw new Error('Contract file must be 10MB or smaller.');
     }
 
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(String(file.type || '').toLowerCase())) {
-        throw new Error('Please upload the signed contract as a PDF, JPG, or PNG file.');
+    if (Number(file.size || 0) <= 0) {
+        throw new Error('The selected contract file is empty. Please choose a valid file.');
+    }
+
+    const mimeType = String(file.type || '').toLowerCase();
+    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']);
+    const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
+
+    if (!allowedTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+        throw new Error('Please upload the signed contract as a PDF, JPG, JPEG, or PNG file.');
     }
 
     const formData = new FormData();

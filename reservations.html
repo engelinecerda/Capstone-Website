@@ -253,7 +253,19 @@
                     <div class="contract-upload">
                         <label for="contract">Upload Signed Contract *</label>
                         <input type="file" id="contract" accept=".pdf,.jpg,.jpeg,.png">
-                        <p class="contract-note">Accepted formats: PDF, JPG, PNG</p>
+                        <p class="contract-note">Accepted formats: PDF, JPG, JPEG, PNG. Maximum 10MB.</p>
+                        <p class="contract-file-status" id="contract-file-status" aria-live="polite">No file chosen yet.</p>
+                    </div>
+                    <div class="contract-agreement-box">
+                        <div class="contract-agreement-row">
+                            <input type="checkbox" id="contract-agreement" class="contract-agreement-checkbox">
+                            <label for="contract-agreement" class="contract-agreement-copy">I agree to the</label>
+                            <button type="button" class="contract-policy-link" data-policy="terms">Terms &amp; Conditions</button>
+                            <span class="contract-agreement-copy">and</span>
+                            <button type="button" class="contract-policy-link" data-policy="privacy">Data Privacy Policy</button>
+                            <span class="contract-agreement-copy">.</span>
+                        </div>
+                        <p class="contract-inline-message" id="contract-policy-message" aria-live="polite"></p>
                     </div>
                 </div>
             </div>
@@ -266,6 +278,19 @@
 
         </div>
     </section>
+
+    <div class="policy-modal-backdrop hidden" id="policy-modal-backdrop" aria-hidden="true">
+        <div class="policy-modal-card" role="dialog" aria-modal="true" aria-labelledby="policy-modal-title">
+            <button type="button" class="policy-modal-close" id="policy-modal-close" aria-label="Close policy modal">&times;</button>
+            <p class="policy-modal-eyebrow">Reservation Policy</p>
+            <h3 class="policy-modal-title" id="policy-modal-title">Terms &amp; Conditions</h3>
+            <div class="policy-modal-content" id="policy-modal-content"></div>
+            <div class="policy-modal-actions">
+                <button type="button" class="policy-btn policy-btn-secondary" id="policy-modal-dismiss">Close</button>
+                <button type="button" class="policy-btn policy-btn-primary" id="policy-modal-agree">Agree</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="/js/navbar.js"></script>
 
@@ -310,6 +335,17 @@
     const availabilityPrevMonthBtn = document.getElementById('availabilityPrevMonth');
     const availabilityNextMonthBtn = document.getElementById('availabilityNextMonth');
     const timeStatusNote = document.getElementById('time-status-note');
+    const contractInput = document.getElementById('contract');
+    const contractFileStatus = document.getElementById('contract-file-status');
+    const contractAgreementCheckbox = document.getElementById('contract-agreement');
+    const contractPolicyMessage = document.getElementById('contract-policy-message');
+    const policyModalBackdrop = document.getElementById('policy-modal-backdrop');
+    const policyModalTitle = document.getElementById('policy-modal-title');
+    const policyModalContent = document.getElementById('policy-modal-content');
+    const policyModalClose = document.getElementById('policy-modal-close');
+    const policyModalDismiss = document.getElementById('policy-modal-dismiss');
+    const policyModalAgree = document.getElementById('policy-modal-agree');
+    const policyButtons = document.querySelectorAll('[data-policy]');
 
     const availabilityState = {
         month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -321,6 +357,172 @@
         selectedDateAvailability: null,
         timeStatusOverride: ''
     };
+
+    const CONTRACT_UPLOAD_RULES = {
+        maxFileSize: 10 * 1024 * 1024,
+        allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png']
+    };
+
+    const POLICY_CONTENT = {
+        terms: {
+            title: 'Terms & Conditions',
+            sections: [
+                {
+                    heading: '1. Reservation Agreement',
+                    paragraphs: [
+                        'By submitting a reservation, the customer confirms that all provided information is accurate and agrees to comply with the policies stated in this system. A reservation is considered pending until reviewed and approved by the administrator.'
+                    ]
+                },
+                {
+                    heading: '2. Package and Services',
+                    paragraphs: [
+                        'The selected package includes the agreed services such as catering setup, food and beverage inclusions, event setup, and assigned staff. Specific inclusions depend on the chosen package and are displayed during the reservation process.',
+                        'Additional costs such as crew meals and transportation fees may apply depending on the event location and requirements.'
+                    ]
+                },
+                {
+                    heading: '3. Payment Terms',
+                    paragraphs: [
+                        'Reservations may be confirmed through any of the following:'
+                    ],
+                    bullets: [
+                        'Full Payment',
+                        '50% Down Payment',
+                        'Reservation Fee'
+                    ],
+                    trailingParagraphs: [
+                        'Any reservation fee paid will be deducted from the total package amount. The remaining balance must be settled before the specified payment deadline.',
+                        'All submitted payments are subject to verification by the administrator. Customers must provide accurate payment details and valid proof of payment.'
+                    ]
+                },
+                {
+                    heading: '4. Non-Refundable Policy',
+                    paragraphs: [
+                        'All payments made are strictly non-refundable. Once a payment is submitted and verified, it cannot be reversed or refunded under any circumstances.'
+                    ]
+                },
+                {
+                    heading: '5. Rescheduling Policy',
+                    paragraphs: [
+                        'Customers may request to reschedule their reservation depending on availability. A rescheduling fee of P3,000 will be required. The requested date must be available and is subject to approval by the administrator.'
+                    ]
+                },
+                {
+                    heading: '6. Cancellation Policy',
+                    paragraphs: [
+                        'In the event of cancellation, all payments made will remain non-refundable. Cancellation requests may still be recorded in the system for documentation and administrative purposes.'
+                    ]
+                },
+                {
+                    heading: '7. Contract Submission',
+                    paragraphs: [
+                        'Customers are required to submit a signed contract as part of the reservation process. The system may allow resubmission of contracts if revisions are requested by the administrator. Submitted contracts are subject to review and approval.'
+                    ]
+                },
+                {
+                    heading: '8. Electronic Transactions and Signatures',
+                    paragraphs: [
+                        'This system complies with Republic Act No. 8792, also known as the Electronic Commerce Act of 2000, which recognizes the legal validity of electronic data messages, electronic documents, and electronic signatures.',
+                        'All electronic records, including reservation details, submitted contracts, and uploaded documents, are considered legally binding and equivalent to their paper-based counterparts.',
+                        'By submitting a reservation and signing the contract electronically, the customer acknowledges and agrees that their electronic signature represents their identity and intent to enter into a binding agreement with ELI Coffee Events.'
+                    ]
+                },
+                {
+                    heading: '9. System Usage',
+                    paragraphs: [
+                        'By using this system, the customer agrees not to provide false information, misuse the platform, or submit invalid or fraudulent payment records. The administrator reserves the right to reject, cancel, or take appropriate action on reservations that violate system policies.'
+                    ]
+                },
+                {
+                    heading: '10. Data Privacy',
+                    paragraphs: [
+                        'Customer information such as name, contact details, and uploaded documents will be securely stored and used solely for reservation processing, communication, and administrative purposes in accordance with applicable data privacy regulations.'
+                    ]
+                },
+                {
+                    heading: '11. Agreement',
+                    paragraphs: [
+                        'By checking the agreement box and submitting the reservation, the customer confirms that they have read, understood, and agreed to all the terms and conditions stated above.'
+                    ]
+                }
+            ]
+        },
+        privacy: {
+            title: 'Data Privacy Policy',
+            sections: [
+                {
+                    heading: 'Policy Statement',
+                    paragraphs: [
+                        'ELI Coffee Events is committed to protecting the privacy and personal data of its users in accordance with Republic Act No. 10173, also known as the Data Privacy Act of 2012.'
+                    ]
+                },
+                {
+                    heading: '1. Collection of Personal Data',
+                    paragraphs: [
+                        'The system collects personal information such as name, email address, phone number, and other relevant details provided during account registration, reservation, and payment submission. Uploaded files such as proof of payment and signed contracts are also collected as part of the reservation process.'
+                    ]
+                },
+                {
+                    heading: '2. Purpose of Data Collection',
+                    paragraphs: [
+                        'Personal data is collected and used solely for the following purposes:'
+                    ],
+                    bullets: [
+                        'Processing and managing reservations',
+                        'Verifying payment submissions',
+                        'Reviewing and validating contracts',
+                        'Communicating with customers regarding their reservations',
+                        'Maintaining records for administrative and operational purposes'
+                    ]
+                },
+                {
+                    heading: '3. Data Storage and Security',
+                    paragraphs: [
+                        'All personal data and uploaded documents are securely stored using trusted third-party services. Reasonable organizational, physical, and technical security measures are implemented to protect data against unauthorized access, alteration, disclosure, or destruction.'
+                    ]
+                },
+                {
+                    heading: '4. Data Sharing and Disclosure',
+                    paragraphs: [
+                        'Personal data will not be sold, shared, or disclosed to unauthorized third parties. Data may only be accessed by authorized personnel of ELI Coffee Events for operational and administrative purposes.'
+                    ]
+                },
+                {
+                    heading: '5. Data Retention',
+                    paragraphs: [
+                        'Personal data will be retained only for as long as necessary to fulfill the purposes stated above or as required by applicable laws and regulations. Records related to reservations, payments, and contracts may be retained for documentation and audit purposes.'
+                    ]
+                },
+                {
+                    heading: '6. User Rights',
+                    paragraphs: [
+                        'Users have the right to access, review, and request correction of their personal data stored in the system. Requests may be subject to verification and system limitations.'
+                    ]
+                },
+                {
+                    heading: '7. Use of System',
+                    paragraphs: [
+                        'By using this system and submitting personal information, the user consents to the collection, use, and processing of their data in accordance with this policy.'
+                    ]
+                },
+                {
+                    heading: '8. Contact and Inquiries',
+                    paragraphs: [
+                        'For any questions or concerns regarding data privacy, users may contact ELI Coffee Events through the provided contact channels.'
+                    ]
+                },
+                {
+                    heading: '9. Policy Updates',
+                    paragraphs: [
+                        'This Data Privacy Policy may be updated from time to time. Continued use of the system constitutes acceptance of any changes made.'
+                    ]
+                }
+            ]
+        }
+    };
+
+    let activePolicyKey = 'terms';
 
     const CONTRACT_FILES = {
         onsite_vip: '../files/contracts/contract-vip-lounge.pdf',
@@ -358,6 +560,102 @@
         if (!availabilityMessage) return;
         availabilityMessage.textContent = message;
         availabilityMessage.classList.toggle('error', isError);
+    }
+
+    function setContractPolicyMessage(message, tone = '') {
+        if (!contractPolicyMessage) return;
+        contractPolicyMessage.textContent = message;
+        contractPolicyMessage.className = 'contract-inline-message' + (tone ? ` ${tone}` : '');
+    }
+
+    function getFileExtension(fileName) {
+        const parts = String(fileName || '').toLowerCase().split('.');
+        return parts.length > 1 ? `.${parts.pop()}` : '';
+    }
+
+    function getContractUploadValidationMessage(file) {
+        if (!file) {
+            return 'Please upload your signed contract.';
+        }
+
+        if (Number(file.size || 0) <= 0) {
+            return 'The selected contract file is empty. Please choose a valid file.';
+        }
+
+        if (file.size > CONTRACT_UPLOAD_RULES.maxFileSize) {
+            return 'The signed contract must be 10MB or smaller.';
+        }
+
+        const mimeType = String(file.type || '').toLowerCase();
+        const extension = getFileExtension(file.name);
+        const validMimeType = CONTRACT_UPLOAD_RULES.allowedMimeTypes.includes(mimeType);
+        const validExtension = CONTRACT_UPLOAD_RULES.allowedExtensions.includes(extension);
+
+        if (!validMimeType && !validExtension) {
+            return 'Please upload the signed contract as a PDF, JPG, JPEG, or PNG file.';
+        }
+
+        return '';
+    }
+
+    function updateContractFileStatus(file) {
+        if (!contractFileStatus) return;
+
+        const validationMessage = getContractUploadValidationMessage(file);
+        if (!file) {
+            contractFileStatus.textContent = 'No file chosen yet.';
+            contractFileStatus.className = 'contract-file-status';
+            return;
+        }
+
+        if (validationMessage) {
+            contractFileStatus.textContent = validationMessage;
+            contractFileStatus.className = 'contract-file-status error';
+            return;
+        }
+
+        const fileSizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        contractFileStatus.textContent = `${file.name} selected (${fileSizeMb} MB).`;
+        contractFileStatus.className = 'contract-file-status success';
+    }
+
+    function renderPolicyContent(policyKey) {
+        const policy = POLICY_CONTENT[policyKey];
+        if (!policy) return;
+
+        policyModalTitle.textContent = policy.title;
+        policyModalContent.innerHTML = policy.sections.map((section) => `
+            <section class="policy-section">
+                <h4>${section.heading}</h4>
+                ${(section.paragraphs || []).map((paragraph) => `<p>${paragraph}</p>`).join('')}
+                ${section.bullets?.length ? `
+                    <ul>
+                        ${section.bullets.map((item) => `<li>${item}</li>`).join('')}
+                    </ul>
+                ` : ''}
+                ${(section.trailingParagraphs || []).map((paragraph) => `<p>${paragraph}</p>`).join('')}
+            </section>
+        `).join('');
+    }
+
+    function openPolicyModal(policyKey) {
+        activePolicyKey = policyKey;
+        renderPolicyContent(policyKey);
+        policyModalBackdrop.classList.remove('hidden');
+        policyModalBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePolicyModal() {
+        policyModalBackdrop.classList.add('hidden');
+        policyModalBackdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    function agreeToPolicies() {
+        if (contractAgreementCheckbox) {
+            contractAgreementCheckbox.checked = true;
+        }
+        setContractPolicyMessage('');
+        closePolicyModal();
     }
 
     function setTimeStatusOverride(message = '') {
@@ -1545,9 +1843,18 @@
         }
 
         if (id === 'rs7') {
-            if (!document.getElementById('contract').files.length) {
-                alert('Please upload your signed contract.'); return false;
+            const contractFile = contractInput?.files?.[0] || null;
+            const contractValidationMessage = getContractUploadValidationMessage(contractFile);
+            if (contractValidationMessage) {
+                setContractPolicyMessage(contractValidationMessage, 'error');
+                updateContractFileStatus(contractFile);
+                return false;
             }
+            if (!contractAgreementCheckbox?.checked) {
+                setContractPolicyMessage('Please agree to the Terms & Conditions and Data Privacy Policy before submitting.', 'error');
+                return false;
+            }
+            setContractPolicyMessage('');
         }
 
         return true;
@@ -1619,7 +1926,12 @@
             const { data: { session } } = await supabase.auth.getSession();
             const userId = session.user.id;
 
-            const contractFile = document.getElementById('contract').files[0];
+            const contractFile = contractInput?.files?.[0] || null;
+            const contractValidationMessage = getContractUploadValidationMessage(contractFile);
+            if (contractValidationMessage) {
+                throw new Error(contractValidationMessage);
+            }
+
             const formData = new FormData();
             formData.append('file',          contractFile);
             formData.append('upload_preset', 'eli_contracts');
@@ -1764,6 +2076,36 @@
             nextBtn.textContent = 'Submit';
         }
     }
+
+    contractInput?.addEventListener('change', () => {
+        updateContractFileStatus(contractInput.files?.[0] || null);
+        setContractPolicyMessage('');
+    });
+
+    contractAgreementCheckbox?.addEventListener('change', () => {
+        if (contractAgreementCheckbox.checked) {
+            setContractPolicyMessage('');
+        }
+    });
+
+    policyButtons.forEach((button) => {
+        button.addEventListener('click', () => openPolicyModal(button.dataset.policy));
+    });
+
+    policyModalClose?.addEventListener('click', closePolicyModal);
+    policyModalDismiss?.addEventListener('click', closePolicyModal);
+    policyModalAgree?.addEventListener('click', agreeToPolicies);
+    policyModalBackdrop?.addEventListener('click', (event) => {
+        if (event.target === policyModalBackdrop) {
+            closePolicyModal();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && policyModalBackdrop && !policyModalBackdrop.classList.contains('hidden')) {
+            closePolicyModal();
+        }
+    });
 
     function card(html, isActive) {
         const d = document.createElement('div');
