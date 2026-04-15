@@ -706,9 +706,7 @@ export async function submitCustomerPayment({
 }
 
 export function buildCustomerPaymentUrl(reservationId) {
-    const currentPath = String(window.location.pathname || '').toLowerCase();
-    const basePath = currentPath.includes('/pages/') ? './payment.html' : './pages/payment.html';
-    const url = new URL(basePath, window.location.href);
+    const url = new URL('/payment', window.location.href);
     if (reservationId) {
         url.searchParams.set('reservation_id', reservationId);
     }
@@ -716,9 +714,7 @@ export function buildCustomerPaymentUrl(reservationId) {
 }
 
 export function buildCustomerAccountUrl(section = 'reservations') {
-    const currentPath = String(window.location.pathname || '').toLowerCase();
-    const basePath = currentPath.includes('/pages/') ? './account.html' : './pages/account.html';
-    const url = new URL(basePath, window.location.href);
+    const url = new URL('/account', window.location.href);
     if (section) {
         url.searchParams.set('section', section);
     }

@@ -20,7 +20,7 @@ import {
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-    window.location.href = '../pages/login_signup.html';
+    window.location.href = '/login';
 }
 
 const user = session.user;

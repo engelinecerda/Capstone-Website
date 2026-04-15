@@ -8,7 +8,7 @@ form?.addEventListener('submit', async (event) => {
 
   const email = document.getElementById('portal-reset-email')?.value.trim() || '';
   const submitBtn = form.querySelector('button[type="submit"]');
-  const redirectTo = new URL('../pages/portal_reset_password.html', window.location.href).href;
+  const redirectTo = new URL('/admin/reset-password', window.location.href).href;
 
   message.className = 'form-msg';
   message.innerText = '';

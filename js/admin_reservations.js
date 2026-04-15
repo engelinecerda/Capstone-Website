@@ -584,7 +584,7 @@ async function validateAdmin() {
 }
 
 function redirectLogin() {
-  window.location.replace('./admin_login.html');
+  window.location.replace('/admin');
 }
 
 function formatStatusPill(status) {
@@ -1122,7 +1122,7 @@ function renderReservationDetailsModal() {
 
     const paymentLinks = `
       <div class="details-action-row">
-        <a class="action-btn view" href="./admin_payments.html?reservation=${encodeURIComponent(reservation.reservation_id)}">Open Payments</a>
+        <a class="action-btn view" href="/admin/payments?reservation=${encodeURIComponent(reservation.reservation_id)}">Open Payments</a>
         ${pendingPayment?.proof_url ? `<a class="action-btn view" href="${pendingPayment.proof_url}" target="_blank" rel="noopener noreferrer">View Proof</a>` : ''}
       </div>
     `;

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "redirects": [
+    { "source": "/index.html", "destination": "/", "permanent": true },
+    { "source": "/pages/about.html", "destination": "/about", "permanent": true },
+    { "source": "/pages/account.html", "destination": "/account", "permanent": true },
+    { "source": "/pages/faqs.html", "destination": "/faqs", "permanent": true },
+    { "source": "/pages/forgot_password.html", "destination": "/forgot-password", "permanent": true },
+    { "source": "/pages/login_signup.html", "destination": "/login", "permanent": true },
+    { "source": "/pages/packages.html", "destination": "/packages", "permanent": true },
+    { "source": "/pages/payment.html", "destination": "/payment", "permanent": true },
+    { "source": "/pages/reservations.html", "destination": "/reservations", "permanent": true },
+    { "source": "/pages/reset_password.html", "destination": "/reset-password", "permanent": true },
+    { "source": "/pages/admin_login.html", "destination": "/admin", "permanent": true },
+    { "source": "/pages/admin_homepage.html", "destination": "/admin/dashboard", "permanent": true },
+    { "source": "/pages/admin_reservations.html", "destination": "/admin/reservations", "permanent": true },
+    { "source": "/pages/admin_contracts.html", "destination": "/admin/contracts", "permanent": true },
+    { "source": "/pages/admin_payments.html", "destination": "/admin/payments", "permanent": true },
+    { "source": "/pages/admin_reviews.html", "destination": "/admin/reviews", "permanent": true },
+    { "source": "/pages/admin_customers.html", "destination": "/admin/customers", "permanent": true },
+    { "source": "/pages/admin_profile.html", "destination": "/admin/profile", "permanent": true },
+    { "source": "/pages/portal_forgot_password.html", "destination": "/admin/forgot-password", "permanent": true },
+    { "source": "/pages/portal_reset_password.html", "destination": "/admin/reset-password", "permanent": true },
+    { "source": "/pages/staff_dashboard.html", "destination": "/admin/staff", "permanent": true },
+    { "source": "/pages/staff_profile.html", "destination": "/admin/staff/profile", "permanent": true }
+  ]
+}

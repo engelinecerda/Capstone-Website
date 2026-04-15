@@ -65,7 +65,7 @@ loginForm.addEventListener('submit', async function (e) {
     }
 
     console.log('Login success:', data);
-    window.location.href = '../index.html';
+    window.location.href = '/';
 });
 
 // ========================
@@ -98,7 +98,7 @@ signupForm.addEventListener('submit', async function (e) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating account...';
 
-    const emailRedirectTo = new URL('../pages/login_signup.html', window.location.href).href;
+    const emailRedirectTo = new URL('/login', window.location.href).href;
     const { data, error } = await supabase.auth.signUp({
         email,
         password,

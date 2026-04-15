@@ -1,0 +1,760 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/modals.css">
+    <link rel="stylesheet" href="/css/packages.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <title>ELI Coffee Events Cafe</title>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar__container">
+            <a href="/" id="navbar__logo">
+                <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+            </a>
+
+            <div class="navbar__toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+
+        <ul class="navbar__menu">
+            <li class="navbar__item">
+                <a href="/" class="navbar__links">Home</a>
+            </li>
+            <li class="navbar__item">
+                <a href="/packages" class="navbar__links">Packages</a>
+            </li>
+            <li class="navbar__item">
+                <a href="/reservations" class="navbar__links">Reservations</a>
+            </li>
+            <li class="navbar__item">
+                <a href="/faqs" class="navbar__links">FAQs</a>
+            </li>
+            <li class="navbar__item">
+                <a href="/about" class="navbar__links">About</a>
+            </li>
+            <li class="navbar__btn"></li>
+        </ul>
+        </div>
+    </nav>
+
+    <div class="hero-package">
+        <img src="/images/wedding.png" alt="Hero Image for Packages">
+    </div>
+
+    <div class="what-we-offer">
+        <h1>What We Offer</h1>
+        <p>
+            Celebrate life's special moments with ELI Coffee Events Cafe. Choose from our curated packages and enjoy great coffee, delicious food, and warm hospitalityâ€”all tailored to make your occasion unforgettable.
+        </p>
+    </div>
+
+    <div class="packages-section" id="packages">
+        <div class="cards-container">
+
+            <!-- Card 1 -->
+            <div class="card" data-modal="coffee-bar">
+                <img src="/images/coffee bar.jpg" class="card-img" alt="Coffee Bar">
+                <div class="card-body">
+                    <div class="card-title">
+                        <h3>Eli Coffee Bar</h3>
+                    </div>
+                    <p>Professional coffee bar service for weddings, baptismal, and corporate events.</p>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="card" data-modal="snack-bar">
+                <img src="/images/snack bar corner.jpg" class="card-img" alt="Snack Bar Corner">
+                <div class="card-body">
+                    <div class="card-title">
+                        <h3>Snack Bar Corner</h3>
+                    </div>
+                    <p>Mobile snack bar with chocolate fountain for intimate events.</p>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="card" data-modal="mini-gathering">
+                <img src="/images/mini gathering.jpg" class="card-img" alt="Mini Gathering">
+                <div class="card-body">
+                    <div class="card-title">
+                        <h3>Mini Gathering Packages</h3>
+                    </div>
+                    <p>Private venue for intimate celebrations with food and entertainment.</p>
+                </div>
+            </div>
+
+            <!-- Card 4 â€” Food Tray card REMOVED, Catering stays -->
+            <div class="card" data-modal="catering">
+                <img src="/images/catering.jpg" class="card-img" alt="Catering">
+                <div class="card-body">
+                    <div class="card-title">
+                        <h3>Catering</h3>
+                    </div>
+                    <p>Fully customizable catering services for weddings, birthdays, baptisms, and corporate events. Includes food tray options for smaller home gatherings.</p>
+                </div>
+            </div>
+
+            <div class="card card-featured" data-modal="intimate-wedding">
+                <img src="/images/intimate-wedding-4.jpg" class="card-img wedding-preview-image" alt="Intimate Wedding Package">
+                <div class="card-body">
+                    <div class="card-title">
+                        <h3>Intimate Wedding Package</h3>
+                    </div>
+                    <p>Venue and catering package for simple weddings, civil weddings, and family celebrations.</p>
+                </div>
+            </div>
+
+            <div class="card card-featured" data-modal="birthday-baptism">
+                <img src="/images/birthday-img-3.jpg" class="card-img" alt="Birthday and Baptism All In Package">
+                <div class="card-body">
+                    <div class="card-title">
+                        <h3>Birthday / Baptism All In Package</h3>
+                    </div>
+                    <p>All-in celebration package with venue, catering, and event add-ons for intimate parties.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- â”€â”€ Modals â”€â”€ -->
+
+    <!-- Coffee Bar Modal -->
+    <div id="coffee-bar" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Eli Coffee Bar</h2>
+            <p>Professional coffee bar service for weddings, baptismal, and corporate events.</p>
+
+            <h3>Pricing Options</h3>
+            <div class="packages-grid">
+                <div class="modal-card"><h4>30 pax</h4><p class="price">â‚±3,990</p></div>
+                <div class="modal-card"><h4>50 pax</h4><p class="price">â‚±5,990</p></div>
+                <div class="modal-card"><h4>100 pax</h4><p class="price">â‚±10,990</p></div>
+                <div class="modal-card"><h4>150 pax</h4><p class="price">â‚±14,990</p></div>
+            </div>
+
+            <h3>Inclusions</h3>
+            <ul class="check-list">
+                <li>Transportation fees</li>
+                <li>Full table setup</li>
+                <li>2â€“3 baristas</li>
+                <li>3 hours service</li>
+                <li>1:1 coffee serving</li>
+                <li>Coffee tasting for two</li>
+                <li>Choice of iced or hot coffee (12oz)</li>
+            </ul>
+
+            <h3>Coverage Areas</h3>
+            <ul class="check-list">
+                <li>Rizal Area (within 10km of Eli Coffee Binangonan)</li>
+                <li>Out of town areas (11km+)</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Snack Bar Modal -->
+    <div id="snack-bar" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Snack Bar Corner</h2>
+            <p>Mobile snack bar for intimate gatherings with chocolate fountain and assorted treats.</p>
+
+            <h3>Package Options</h3>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Biscuits and Candies</span>
+                    <span class="snack-package-price">â‚±3,500</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Chocolate fountain</span>
+                    <span>Biscuits</span>
+                    <span>Assorted candies</span>
+                    <span>Marshmallow (680g)</span>
+                    <span>Caramel bars</span>
+                    <span>Brownies</span>
+                    <span>20 doughy donuts</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Biscuits, Candies &amp; Fruits</span>
+                    <span class="snack-package-price">â‚±4,000</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Chocolate fountain</span>
+                    <span>Biscuits</span>
+                    <span>Candies</span>
+                    <span>Marshmallow</span>
+                    <span>4 seasonal fruits</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Biscuits, Chips &amp; Drinks</span>
+                    <span class="snack-package-price">â‚±5,000</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Chocolate fountain</span>
+                    <span>Biscuits and chips</span>
+                    <span>Cupcakes</span>
+                    <span>Marshmallow</span>
+                    <span>Caramel bars</span>
+                    <span>Brownies</span>
+                    <span>2 drinks</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mini Gathering Modal -->
+    <div id="mini-gathering" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Mini Gathering Packages</h2>
+            <p>Private venue for intimate celebrations with food and entertainment.</p>
+
+            <h3>General Inclusions</h3>
+            <ul class="check-list">
+                <li>Fully air-conditioned venue</li>
+                <li>Basic sound system</li>
+                <li>TV presentation screen</li>
+                <li>Karaoke system</li>
+                <li>Arcade games</li>
+                <li>Consumable-based food packages</li>
+            </ul>
+
+            <h3>VIP Lounge</h3>
+            <p>15â€“18 pax (max 20) â€¢ Extension: â‚±800/hour</p>
+            <div class="packages-grid">
+                <div class="modal-card"><h4>VIP Lite</h4><p class="price">â‚±2,999 â€” 2 hours, â‚±2,000 food credit</p></div>
+                <div class="modal-card"><h4>VIP Plus</h4><p class="price">â‚±3,999 â€” 3 hours, â‚±2,499 food credit</p></div>
+                <div class="modal-card"><h4>VIP Max</h4><p class="price">â‚±4,999 â€” 4 hours, â‚±3,000 food credit</p></div>
+            </div>
+
+            <h3>Main Hall</h3>
+            <p>Up to 25 pax (max 30) â€¢ Extension: â‚±1,000/hour</p>
+            <div class="packages-grid">
+                <div class="modal-card"><h4>Main Hall Basic</h4><p class="price">â‚±9,999 â€” 2 hours, â‚±8,000 food credit</p></div>
+                <div class="modal-card"><h4>Main Hall Plus</h4><p class="price">â‚±11,999 â€” 3 hours, â‚±9,000 food credit</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catering Modal â€” now includes Food Tray section -->
+    <div id="catering" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Catering</h2>
+            <p>Fully customizable catering services for weddings, birthdays, baptisms, and corporate events.</p>
+
+            <h3>Package Inclusions</h3>
+            <ul class="check-list">
+                <li>Buffet setup (3 dishes, 1 pasta, rice, dessert, drink)</li>
+                <li>Table and chair setup</li>
+                <li>Table centerpieces</li>
+                <li>Basic stage backdrop</li>
+                <li>Uniformed waiters and servers</li>
+                <li>3â€“4 hours service</li>
+            </ul>
+
+            <h3>Special Offers</h3>
+            <ul class="check-list">
+                <li>Free overflowing coffee</li>
+                <li>Free appetizer or dessert</li>
+            </ul>
+
+            <p>Pricing varies based on guest count and menu selection.</p>
+
+            <!-- â”€â”€ Food Tray Section (merged from removed Food Tray card) â”€â”€ -->
+            <hr style="margin: 24px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h2>Food Trays</h2>
+            <p>Ideal for small gatherings in the comfort of your home. Choose from our wide selection of main courses, pasta, and desserts.</p>
+
+            <h3>Main Course</h3>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Chicken</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Chicken ala King</span>
+                    <span>Chicken Fillet w/ White Sauce</span>
+                    <span>Garlic Butter Chicken</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Pork</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Pork with Mushroom</span>
+                    <span>Crunchy Pork</span>
+                    <span>Pork Caldereta</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Beef</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Beef Teriyaki</span>
+                    <span>Beef Salpicao</span>
+                    <span>Beef and Broccoli</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Fish</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Fish Fillet with Tartar Sauce</span>
+                    <span>Sweet and Sour Fish Fillet</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Vegetables</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Mixed Vegetables in Butter Corn and Carrots</span>
+                    <span>Potato Marble</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Pasta</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Spaghetti</span>
+                    <span>Carbonara</span>
+                    <span>Baked Macaroni</span>
+                    <span>Tuna Pesto</span>
+                    <span>Pancit Canton</span>
+                </div>
+            </div>
+
+            <div class="snack-package-card">
+                <div class="snack-package-header">
+                    <span class="snack-package-name">Dessert</span>
+                </div>
+                <div class="snack-package-items">
+                    <span>Coffee Jelly</span>
+                    <span>Buko Pandan</span>
+                    <span>Mango Sago</span>
+                    <span>Chocolate Mousse</span>
+                </div>
+            </div>
+
+            <h3>Food Tray Pricing (per tray)</h3>
+            <div class="price-table-wrapper">
+                <table class="price-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>20 pax</th>
+                            <th>30 pax</th>
+                            <th>40 pax</th>
+                            <th>50 pax</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Pork</td><td>â‚±2,700</td><td>â‚±3,800</td><td>â‚±4,800</td><td>â‚±5,900</td></tr>
+                        <tr><td>Chicken</td><td>â‚±2,700</td><td>â‚±3,800</td><td>â‚±4,800</td><td>â‚±5,900</td></tr>
+                        <tr><td>Fish</td><td>â‚±2,400</td><td>â‚±3,400</td><td>â‚±4,500</td><td>â‚±5,600</td></tr>
+                        <tr><td>Vegetable</td><td>â‚±2,400</td><td>â‚±3,400</td><td>â‚±4,500</td><td>â‚±5,600</td></tr>
+                        <tr><td>Pasta</td><td>â‚±2,000</td><td>â‚±2,900</td><td>â‚±3,800</td><td>â‚±4,600</td></tr>
+                        <tr><td>Dessert</td><td>â‚±1,400</td><td>â‚±2,900</td><td>â‚±2,600</td><td>â‚±3,200</td></tr>
+                        <tr><td>Rice</td><td>â‚±600</td><td>â‚±900</td><td>â‚±1,200</td><td>â‚±1,500</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+    <!-- â”€â”€ End Food Trays modal removed â€” content merged above â”€â”€ -->
+
+
+    <!-- Intimate Wedding Modal -->
+    <div id="intimate-wedding" class="modal">
+        <div class="modal-content package-detail-modal package-detail-modal-wide">
+            <span class="close-btn">&times;</span>
+            <h2>Intimate Wedding Package</h2>
+            <p>Venue and catering package for intimate weddings and simple celebrations.</p>
+
+            <div class="package-tab-row" data-package-tabs="intimate-wedding">
+                <button type="button" class="package-tab is-active" data-package-tab="overview" aria-selected="true">Overview</button>
+                <button type="button" class="package-tab" data-package-tab="inclusions" aria-selected="false">Inclusions</button>
+                <button type="button" class="package-tab" data-package-tab="tiers" aria-selected="false">Tiers</button>
+            </div>
+
+            <section class="package-panel is-active" data-package-panel="overview">
+                <img src="/images/intimate-wedding-5.jpg" class="package-modal-hero wedding-modal-hero" alt="Intimate Wedding Package Details">
+
+                <div class="package-summary-grid">
+                    <article class="package-summary-card">
+                        <h3>Venue</h3>
+                        <ul class="package-feature-list">
+                            <li>Main Hall and VIP Hall access</li>
+                            <li>3 hours reception use plus 1 hour ingress</li>
+                            <li>Parking and electricity included</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-summary-card">
+                        <h3>Catering</h3>
+                        <ul class="package-feature-list">
+                            <li>3 main courses, pasta or noodles, and dessert</li>
+                            <li>Rice, iced tea or juice, and drinking water</li>
+                            <li>Full buffet setup with utensils and service team</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-summary-card">
+                        <h3>Lights &amp; Sounds</h3>
+                        <ul class="package-feature-list">
+                            <li>3 active speakers and audio mixer</li>
+                            <li>2 wireless mics, 1 wired mic, and mic stand</li>
+                            <li>LED backdrop lights, music stand, and HDMI cable</li>
+                        </ul>
+                    </article>
+                </div>
+
+                <div class="package-note-box">
+                    <strong>Need more details?</strong>
+                    <p>Talk to our event coordinator for exclusive freebies.</p>
+                </div>
+            </section>
+
+            <section class="package-panel" data-package-panel="inclusions" hidden>
+                <div class="package-inclusions-grid">
+                    <article class="package-info-block">
+                        <h3>Venue</h3>
+                        <ul class="package-feature-list package-feature-list-detailed">
+                            <li>Main Hall and VIP Hall</li>
+                            <li>3 hours use of reception hall</li>
+                            <li>1 hour ingress</li>
+                            <li>Parking</li>
+                            <li>Electricity</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-info-block">
+                        <h3>Catering</h3>
+                        <ul class="package-feature-list package-feature-list-detailed">
+                            <li>3 main course dishes</li>
+                            <li>1 pasta or noodles</li>
+                            <li>1 dessert</li>
+                            <li>Steamed rice</li>
+                            <li>Iced tea or juice</li>
+                            <li>Purified drinking water</li>
+                            <li>Full buffet setup and utensils</li>
+                            <li>Cake and gift table</li>
+                            <li>Uniformed waiters and food controllers</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-info-block">
+                        <h3>Lights &amp; Sounds</h3>
+                        <ul class="package-feature-list package-feature-list-detailed">
+                            <li>3 active speakers</li>
+                            <li>2 wireless microphones</li>
+                            <li>1 wired microphone</li>
+                            <li>1 mic stand</li>
+                            <li>Audio mixer</li>
+                            <li>4 LED stage backdrop lights</li>
+                            <li>1 music stand</li>
+                            <li>HDMI long cable</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="package-panel" data-package-panel="tiers" hidden>
+                <h3 class="package-section-heading">Choose a Package Tier</h3>
+                <div class="package-tier-popup-grid">
+                    <article class="package-tier-popup-card">
+                        <div class="package-tier-popup-head">
+                            <h4>Bronze</h4>
+                            <p>Civil &amp; Simple Celebration Package</p>
+                        </div>
+                        <div class="package-tier-popup-body">
+                            <p class="package-tier-copy">Best for civil weddings and family-only celebrations.</p>
+                            <p class="package-tier-muted">Ask our coordinator for full inclusions.</p>
+                        </div>
+                    </article>
+
+                    <article class="package-tier-popup-card">
+                        <div class="package-tier-popup-head">
+                            <h4>Silver</h4>
+                            <p>Balanced package for intimate wedding receptions</p>
+                        </div>
+                        <div class="package-tier-popup-body">
+                            <ul class="package-feature-list package-tier-highlights">
+                                <li>1-tier customized cake</li>
+                                <li>Host or singer</li>
+                                <li>Reception coordinator</li>
+                                <li>AVP slideshow</li>
+                                <li>Digital invitation</li>
+                                <li>Photo coverage</li>
+                            </ul>
+                            <button type="button" class="package-tier-toggle" aria-expanded="false">View full inclusions</button>
+                            <div class="package-tier-extra" hidden>
+                                <ul class="package-feature-list package-feature-list-detailed">
+                                    <li>10 printed invitations</li>
+                                    <li>Couple wine toast</li>
+                                    <li>Rustic backdrop and setup</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="package-tier-popup-card">
+                        <div class="package-tier-popup-head">
+                            <h4>Gold</h4>
+                            <p>Premium setup for a more complete wedding celebration</p>
+                        </div>
+                        <div class="package-tier-popup-body">
+                            <ul class="package-feature-list package-tier-highlights">
+                                <li>2-tier customized cake</li>
+                                <li>Host or singer</li>
+                                <li>Unlimited photobooth</li>
+                                <li>Grazing table</li>
+                                <li>Red carpet</li>
+                                <li>Photo and video coverage</li>
+                            </ul>
+                            <button type="button" class="package-tier-toggle" aria-expanded="false">View full inclusions</button>
+                            <div class="package-tier-extra" hidden>
+                                <ul class="package-feature-list package-feature-list-detailed">
+                                    <li>Couple wine toast</li>
+                                    <li>Reception coordinator</li>
+                                    <li>AVP slideshow and digital invitation</li>
+                                    <li>20 printed invitations</li>
+                                    <li>Premium backdrop and setup</li>
+                                    <li>VIP table for couple, parents, and sponsors</li>
+                                    <li>Prenup and save the date</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Birthday / Baptism Modal -->
+    <div id="birthday-baptism" class="modal">
+        <div class="modal-content package-detail-modal package-detail-modal-wide">
+            <span class="close-btn">&times;</span>
+            <h2>Birthday / Baptism All In Package</h2>
+            <p>All-in celebration package with venue, catering, and event add-ons for intimate parties.</p>
+
+            <div class="package-tab-row" data-package-tabs="birthday-baptism">
+                <button type="button" class="package-tab is-active" data-package-tab="overview" aria-selected="true">Overview</button>
+                <button type="button" class="package-tab" data-package-tab="inclusions" aria-selected="false">Inclusions</button>
+                <button type="button" class="package-tab" data-package-tab="tiers" aria-selected="false">Tiers</button>
+            </div>
+
+            <section class="package-panel is-active" data-package-panel="overview">
+                <img src="/images/birthday-img-4.jpg" class="package-modal-hero birthday-modal-hero" alt="Birthday and Baptism All In Package Details">
+
+                <div class="package-summary-grid">
+                    <article class="package-summary-card">
+                        <h3>Venue</h3>
+                        <ul class="package-feature-list">
+                            <li>Main Hall and VIP Hall access</li>
+                            <li>3 hours reception use plus 1 hour ingress</li>
+                            <li>Parking and electricity included</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-summary-card">
+                        <h3>Catering</h3>
+                        <ul class="package-feature-list">
+                            <li>3 main courses, pasta or noodles, and dessert</li>
+                            <li>Rice, iced tea or juice, and drinking water</li>
+                            <li>Buffet setup, utensils, and service staff</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-summary-card">
+                        <h3>Lights &amp; Sounds</h3>
+                        <ul class="package-feature-list">
+                            <li>3 active speakers and audio mixer</li>
+                            <li>2 wireless mics, 1 wired mic, and mic stand</li>
+                            <li>LED backdrop lights, music stand, and HDMI cable</li>
+                        </ul>
+                    </article>
+                </div>
+
+                <div class="package-note-box">
+                    <strong>Need more details?</strong>
+                    <p>Talk to our event coordinator for exclusive freebies.</p>
+                </div>
+            </section>
+
+            <section class="package-panel" data-package-panel="inclusions" hidden>
+                <div class="package-inclusions-grid">
+                    <article class="package-info-block">
+                        <h3>Lights &amp; Sounds</h3>
+                        <ul class="package-feature-list package-feature-list-detailed">
+                            <li>3 active speakers</li>
+                            <li>2 wireless microphones</li>
+                            <li>1 wired microphone</li>
+                            <li>1 mic stand</li>
+                            <li>Audio mixer</li>
+                            <li>4 LED stage backdrop lights</li>
+                            <li>1 music stand</li>
+                            <li>HDMI long cable</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-info-block">
+                        <h3>Venue</h3>
+                        <ul class="package-feature-list package-feature-list-detailed">
+                            <li>Main Hall and VIP Hall</li>
+                            <li>3 hours use of reception hall</li>
+                            <li>1 hour ingress</li>
+                            <li>Parking</li>
+                            <li>Electricity</li>
+                        </ul>
+                    </article>
+
+                    <article class="package-info-block">
+                        <h3>Catering</h3>
+                        <ul class="package-feature-list package-feature-list-detailed">
+                            <li>3 main course dishes</li>
+                            <li>1 pasta or noodles</li>
+                            <li>1 dessert</li>
+                            <li>Steamed rice</li>
+                            <li>Iced tea or juice</li>
+                            <li>Purified drinking water</li>
+                            <li>Full buffet setup and utensils</li>
+                            <li>Cake and gift table</li>
+                            <li>Uniformed waiters and food controllers</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="package-panel" data-package-panel="tiers" hidden>
+                <h3 class="package-section-heading">Choose a Package Tier</h3>
+                <div class="package-tier-popup-grid">
+                    <article class="package-tier-popup-card">
+                        <div class="package-tier-popup-head">
+                            <h4>Bronze</h4>
+                            <p>Intimate Party Starter</p>
+                        </div>
+                        <div class="package-tier-popup-body">
+                            <p class="package-tier-copy">A simple venue and catering package for smaller family celebrations.</p>
+                            <p class="package-tier-muted">Ask our coordinator for full inclusions.</p>
+                        </div>
+                    </article>
+
+                    <article class="package-tier-popup-card">
+                        <div class="package-tier-popup-head">
+                            <h4>Silver</h4>
+                            <p>Celebration package with key event add-ons</p>
+                        </div>
+                        <div class="package-tier-popup-body">
+                            <ul class="package-feature-list package-tier-highlights">
+                                <li>1-tier customized cake</li>
+                                <li>Host or game master</li>
+                                <li>Reception coordinator</li>
+                                <li>AVP slideshow</li>
+                                <li>Digital invitation</li>
+                                <li>Photo coverage</li>
+                            </ul>
+                            <button type="button" class="package-tier-toggle" aria-expanded="false">View full inclusions</button>
+                            <div class="package-tier-extra" hidden>
+                                <ul class="package-feature-list package-feature-list-detailed">
+                                    <li>10 printed invitations</li>
+                                    <li>Rustic backdrop and setup</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="package-tier-popup-card">
+                        <div class="package-tier-popup-head">
+                            <h4>Gold</h4>
+                            <p>Full celebration setup for a more premium event</p>
+                        </div>
+                        <div class="package-tier-popup-body">
+                            <ul class="package-feature-list package-tier-highlights">
+                                <li>2-tier customized cake</li>
+                                <li>Host or game master</li>
+                                <li>Unlimited photobooth</li>
+                                <li>Grazing table</li>
+                                <li>Red carpet</li>
+                                <li>Photo and video coverage</li>
+                            </ul>
+                            <button type="button" class="package-tier-toggle" aria-expanded="false">View full inclusions</button>
+                            <div class="package-tier-extra" hidden>
+                                <ul class="package-feature-list package-feature-list-detailed">
+                                    <li>Reception coordinator</li>
+                                    <li>AVP slideshow and digital invitation</li>
+                                    <li>20 printed invitations</li>
+                                    <li>Premium backdrop and setup</li>
+                                    <li>VIP table for parents and sponsors</li>
+                                    <li>Pre-debut and save the date</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-top">
+            <div class="footer-brand">
+                <img src="/images/eli coffee binangonan logo.png" alt="ELI Coffee Logo" class="footer-logo">
+                <p>Your go-to events cafe in Binangonan, Rizal.</p>
+            </div>
+
+            <div class="footer-contact">
+                <h3>Contact Us</h3>
+                <p><i class="fa-solid fa-phone"></i> 0917 562 0306 | 0917 562 0308</p>
+                <p><i class="fa-solid fa-at"></i> elicoffeetea@gmail.com</p>
+            </div>
+
+            <div class="footer-social">
+                <h3>Follow Us</h3>
+                <p><i class="fa-brands fa-facebook"></i> Facebook: @elicoffeeph</p>
+                <p><i class="fa-brands fa-instagram"></i> Instagram: @elicoffeeph</p>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2024 ELI Coffee Events Cafe. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/packages.js"></script>
+    <script type="module" src="/js/navbar.js"></script>
+
+</body>
+</html>
+

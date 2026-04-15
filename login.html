@@ -1,0 +1,143 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login / Sign Up - ELI Coffee Events Cafe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/login_signup.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar__container">
+      <a href="/">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+      </a>
+      <div class="navbar__toggle" id="mobile-menu">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </div>
+      <ul class="navbar__menu">
+        <li class="navbar__item"><a href="/" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/packages" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/faqs" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about" class="navbar__links">About</a></li>
+        <li class="navbar__btn"></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Login / Signup Page Wrapper -->
+  <div class="login-page">
+    <div class="login-container">
+
+      <!-- Logo -->
+      <div class="login-logo">
+        <span class="coffee-icon">â˜•</span>
+        <h1>ELI Coffee Events</h1>
+      </div>
+
+      <p class="welcome">
+        Welcome to ELI Coffee Events<br>
+        <span>Sign in to manage your reservations</span>
+      </p>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" id="login-tab">Login</button>
+        <button class="tab" id="signup-tab">Sign Up</button>
+      </div>
+
+      <!-- ========================
+           Login Form
+      ======================== -->
+      <form class="login-form active" id="login-form">
+        <h2>Login to Your Account</h2>
+        <p class="subtitle">Enter your credentials to access your dashboard</p>
+
+        <div class="form-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" placeholder="your.email@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required>
+        </div>
+
+        <div class="options">
+          <label><input type="checkbox"> Remember me</label>
+          <a href="/forgot-password" class="forgot">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="login-btn">Login</button>
+
+      </form>
+
+      <!-- ========================
+           Sign Up Form
+      ======================== -->
+      <form id ="signup-form" class="signup-form">
+        <h2>Create an Account</h2>
+        <p class="subtitle">Fill in your details to get started</p>
+
+        <!-- First, Middle, Last Name -->
+        <div class="name-row-three">
+          <div class="form-group">
+            <label for="first-name">First Name</label>
+            <input type="text" id="first-name" placeholder="Juan" required>
+          </div>
+          <div class="form-group">
+            <label for="middle-name">Middle Name</label>
+            <input type="text" id="middle-name" placeholder="Santos">
+          </div>
+          <div class="form-group">
+            <label for="last-name">Last Name</label>
+            <input type="text" id="last-name" placeholder="Dela Cruz" required>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="signup-email">Email Address</label>
+          <input type="email" id="signup-email" placeholder="your.email@example.com" required>
+        </div>
+
+        <!-- Phone Number -->
+        <div class="form-group">
+          <label for="signup-phone">Phone Number</label>
+          <input type="tel" id="signup-phone" placeholder="09XXXXXXXXX" required>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required>
+        </div>
+        <p class="password-hint">Must be at least 8 characters long</p>
+
+        <!-- Confirm Password -->
+        <div class="form-group">
+          <label for="confirm-password">Confirm Password</label>
+          <input type="password" id="confirm-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required>
+        </div>
+
+        <button type="submit" class="signup-btn">Create Account</button>
+        <p id="signup-message" class="form-msg" aria-live="polite"></p>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- type="module" is required for import/export to work -->
+  <script type="module" src="/js/login_signup.js"></script>
+  <script type="module" src="/js/navbar.js"></script>
+
+</body>
+</html>
+

@@ -45,7 +45,7 @@ function normalizeRole(value) {
 }
 
 function redirectLogin() {
-  window.location.replace('./admin_login.html');
+  window.location.replace('/admin');
 }
 
 function setPageMessage(message, isError = false) {
