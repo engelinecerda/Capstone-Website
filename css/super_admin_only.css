@@ -1,0 +1,7 @@
+.super-admin-only {
+    display: none;
+}
+
+.show-super-admin {
+    display: flex;
+}

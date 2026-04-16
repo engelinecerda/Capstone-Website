@@ -1,17 +1,20 @@
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
+const badge = document.getElementById('adminBadge');
+const sidebarTitle = document.getElementById('sidebarTitle');
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const navReservationCount = document.getElementById('navReservationCount');
 const demandYearSelect = document.getElementById('demandYear');
-const API = "https://capstone-website-papg.onrender.com"; //  ADDED.
+const API = "https://capstone-website-papg.onrender.com";
 
 const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
@@ -34,19 +37,46 @@ let barChart;
 let pieChart;
 let demandChart;
 
-let fullData = []; //  ADDED
+let fullData = [];
 
-async function loadForecast() { //  ADDED
+/*const ALLOWED_ROLES = ['admin', 'super_admin'];
+
+function applyRoleVisibility(role) {
+    const isSuperAdmin = role === 'super_admin';
+
+    document.querySelectorAll('.super-admin-only').forEach(el => {
+        if (isSuperAdmin) { 
+            el.classList.add("show-super-admin");
+        }
+    });
+
+    if (badge) {
+        badge.textContent = isSuperAdmin ? "Super Admin" : "Admin";
+    }
+
+    //  UPDATE SIDEBAR TITLE
+    if (sidebarTitle) {
+        sidebarTitle.textContent = isSuperAdmin ? "Super Admin Panel" : "Admin Panel";
+    }
+
+    //  ROLE PILL 
+    if (sidebarRolePill) {
+        sidebarRolePill.textContent = isSuperAdmin ? "Super Admin" : "Admin";
+    }  
+}*/
+
+
+async function loadForecast() {
     const res = await fetch(`${API}/forecast`);
     return res.ok ? res.json() : [];
 }
 
-async function loadMonthly() { //  ADDED
+async function loadMonthly() {
     const res = await fetch(`${API}/analytics/monthly-reservations`);
     return res.ok ? res.json() : [];
 }
 
-async function loadPackages() { //  ADDED
+async function loadPackages() {
     const res = await fetch(`${API}/analytics/package-distribution`);
     return res.ok ? res.json() : [];
 }
@@ -139,7 +169,7 @@ function createEmptyMonthlyBuckets() {
     return buckets;
 }
 
-function buildMonthlyDataset(reservations) { // PIN
+function buildMonthlyDataset(reservations) {
     const buckets = createEmptyMonthlyBuckets();
     const counts = new Map(
         buckets.map((date) => [
@@ -168,7 +198,7 @@ function buildMonthlyDataset(reservations) { // PIN
     };
 }
 
-function buildPackageDataset(reservations) { // CAN BE USED AS FALLBACK
+function buildPackageDataset(reservations) {
     const counts = new Map();
 
     reservations.forEach((reservation) => {
@@ -188,17 +218,13 @@ function buildPackageDataset(reservations) { // CAN BE USED AS FALLBACK
     const values = Array.from(counts.values());
 
     if (labels.length === 0) {
-        return {
-            labels: ['No Data'],
-            values: [1]
-        };
+        return { labels: ['No Data'], values: [1] };
     }
 
     return { labels, values };
 }
 
-async function renderBarChart(data) { //  CHANGED
-
+async function renderBarChart(data) {
     const labels = data.map(d => d.month);
     const values = data.map(d => d.count);
 
@@ -231,8 +257,7 @@ async function renderBarChart(data) { //  CHANGED
     });
 }
 
-async function renderPieChart(data) { //  CHANGED
-
+async function renderPieChart(data) {
     const labels = data.map(d => d.package);
     const values = data.map(d => d.count);
 
@@ -270,32 +295,29 @@ async function renderPieChart(data) { //  CHANGED
     });
 }
 
-async function renderDemandChart(year) { //  CHANGED
-
+async function renderDemandChart(year) {
     const filtered = fullData.filter(d => d.year === year);
 
     const allMonths = [
-    "Jan","Feb","Mar","Apr","May","Jun",
-    "Jul","Aug","Sep","Oct","Nov","Dec"
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec"
     ];
 
-    const labels = allMonths;
-
-        const dataMap = {};
+    const dataMap = {};
     filtered.forEach(d => {
-    dataMap[d.month_name] = d;
+        dataMap[d.month_name] = d;
     });
 
     const actual = allMonths.map(month => {
-    const d = dataMap[month];
-    return d ? d.y : 0;
+        const d = dataMap[month];
+        return d ? d.y : 0;
     });
 
     const forecast = allMonths.map(month => {
-    const d = dataMap[month];
-    return d && d.yhat !== null && d.yhat !== undefined
-        ? Math.round(d.yhat)
-        : null;
+        const d = dataMap[month];
+        return d && d.yhat !== null && d.yhat !== undefined
+            ? Math.round(d.yhat)
+            : null;
     });
 
     const ctx = document.getElementById('demandChart');
@@ -306,7 +328,7 @@ async function renderDemandChart(year) { //  CHANGED
     demandChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels,
+            labels: allMonths,
             datasets: [
                 {
                     label: 'Actual',
@@ -481,10 +503,7 @@ async function fetchReservations() {
         `)
         .order('created_at', { ascending: false });
 
-    if (error) {
-        throw error;
-    }
-
+    if (error) throw error;
     return data || [];
 }
 
@@ -523,78 +542,115 @@ async function fetchContracts(reservationIds) {
     }, {});
 }
 
+// Add this at the very top of loadDashboard(), before Promise.all
+async function warmUpBackend() {
+    try {
+        await Promise.all([
+      fetch(`${API}/health`),
+      fetch(`${API}/forecast`),
+      fetch(`${API}/analytics/monthly-reservations`),
+      fetch(`${API}/analytics/package-distribution`)
+        ]);
+    } catch {   
+        // silently ignore — just waking the server up
+    }
+}
+
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
 
     try {
-        fullData = await loadForecast(); // Preload forecast data for demand chart
-         if (demandYearSelect && fullData.length) {
+        await backendWarmup;
+
+        // FIXED: run all independent fetches at the same time
+        const [forecastData, reservations, monthlyData, packageData] = await Promise.all([
+            loadForecast(),
+            fetchReservations(),
+            loadMonthly(),
+            loadPackages()
+        ]);
+
+        fullData = forecastData;
+
+        // Populate year selector now that forecastData is ready
+        if (demandYearSelect && fullData.length) {
             const years = [...new Set(fullData.map(d => d.year))].sort();
-
-            demandYearSelect.innerHTML = "";
-
+            demandYearSelect.innerHTML = '';
             years.forEach(year => {
-                const option = document.createElement("option");
+                const option = document.createElement('option');
                 option.value = year;
                 option.textContent = year;
                 demandYearSelect.appendChild(option);
-        });
-
-        const currentYear = new Date().getFullYear().toString();
-
-        if (years.includes(currentYear)) {
-            demandYearSelect.value = currentYear;
-        } else {
-            demandYearSelect.value = years[years.length - 1];
+            });
+            const currentYear = new Date().getFullYear().toString();
+            demandYearSelect.value = years.includes(currentYear)
+                ? currentYear
+                : years[years.length - 1];
         }
-        //demandYearSelect.value = years[years.length - 1];
-    }
 
-        const reservations = await fetchReservations();
-        const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
+        // fetchContracts depends on reservations, so it runs after — but that's the only dependency
+        const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
         const contractsByReservationId = await fetchContracts(reservationIds);
+
         const replacementContracts = Object.values(contractsByReservationId)
-            .filter((contract) => String(contract?.review_status || '').toLowerCase() === 'pending_review' && contract?.resubmitted_at)
+            .filter((c) => String(c?.review_status || '').toLowerCase() === 'pending_review' && c?.resubmitted_at)
             .length;
 
-        updateStats(reservations, contractsByReservationId);
-        renderReservationsTable(reservations, contractsByReservationId);
-        await renderBarChart(await loadMonthly()); //  CHANGED
-        await renderPieChart(await loadPackages()); //  CHANGED
+        // FIXED: run all renders at the same time
+        await Promise.all([
+            renderBarChart(monthlyData),
+            renderPieChart(packageData),
+            (async () => {
+                updateStats(reservations, contractsByReservationId);
+                renderReservationsTable(reservations, contractsByReservationId);
+                const selectedYear = demandYearSelect?.value;
+                if (selectedYear) await renderDemandChart(selectedYear);
+            })()
+        ]);
 
-        const selectedYear = demandYearSelect?.value; //ADDED
-        if (selectedYear) {
-            await renderDemandChart(selectedYear); 
-        }
+        setDashboardMessage(
+            reservations.length
+                ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
+                : 'No reservations available yet.'
+        );
 
-        const summaryText = reservations.length
-            ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
-            : 'No reservations available yet.';
-
-        setDashboardMessage(summaryText);
     } catch (error) {
         console.error('Failed to load admin dashboard:', error);
         setDashboardMessage(
             `Failed to load reservations: ${error?.message || 'unknown error'}. If this admin account should see all bookings, check RLS policies and the admin role.`,
             true
         );
+
         updateStats([], {});
         renderReservationsTable([], {});
-        await renderBarChart([]); //CHANGED
-        await renderPieChart([]); //CHANGED
 
-        const fallbackYear = demandYearSelect?.value; // ADDED
-
-        if (fallbackYear) {
-            await renderDemandChart(fallbackYear);
-        }
+        await Promise.all([
+            renderBarChart([]),
+            renderPieChart([]),
+            (async () => {
+                const fallbackYear = demandYearSelect?.value;
+                if (fallbackYear) await renderDemandChart(fallbackYear);
+            })()
+        ]);
     }
 }
 
-async function validateAdminSession() {
-    const { session, profile } = await verifyAdminSession(supabase);
+// CHANGED: was verifyAdminSession — now accepts both admin and super_admin
+/*async function validateAdminSession() {
+    const { data, error } = await supabase.auth.getSession();
 
-    if (!session) {
+    if (error || !data.session) {
+        redirectToAdminLogin();
+        return null;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, staff_role, first_name, middle_name, last_name, email, phone_number, date_registered')
+        .eq('user_id', data.session.user.id)
+        .maybeSingle();
+
+    if (profileError || !profile || !ALLOWED_ROLES.includes(profile.role)) {
         await supabase.auth.signOut();
         redirectToAdminLogin();
         return null;
@@ -602,37 +658,49 @@ async function validateAdminSession() {
 
     populatePortalIdentity({
         profile,
-        session,
+        session: data.session,
         nameEl: sidebarName,
         emailEl: sidebarEmail,
         roleEl: sidebarRolePill,
         fallbackLabel: 'Admin'
     });
 
-    return session;
-}
+    // ADDED: apply nav visibility after identity is populated
+    applyRoleVisibility(profile.role);
+    setupInactivityLogout(profile.role);
 
-logoutBtn?.addEventListener('click', async () => {
+    return data.session;
+}*/
+
+/*logoutBtn?.addEventListener('click', async () => {
     await supabase.auth.signOut();
     redirectToAdminLogin();
-});
+});*/
 
 refreshDashboardBtn?.addEventListener('click', async () => {
     await loadDashboard();
 });
 
 demandYearSelect?.addEventListener('change', () => {
-    const selectedYear = demandYearSelect.value;
-    renderDemandChart(selectedYear);
+    renderDemandChart(demandYearSelect.value);
 });
 
-supabase.auth.onAuthStateChange((event) => {
+/*supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
         redirectToAdminLogin();
     }
-});
+});*/
 
-const session = await validateAdminSession();
-if (session) {
-    await loadDashboard();
-}
+
+
+const backendWarmup = warmUpBackend(); // ADDED: fire immediately, don't await — runs in background
+
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: ({ profile }) => {
+    setupInactivityLogout(profile.role);
+    loadDashboard();
+  }
+});

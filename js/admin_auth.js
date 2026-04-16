@@ -32,7 +32,14 @@ export function getPortalInitials(profile, fallback = 'P') {
   return initials || String(profile?.email || fallback).charAt(0).toUpperCase();
 }
 
-export function populatePortalIdentity({ profile, session, nameEl, emailEl, roleEl, fallbackLabel = 'Portal User' }) {
+export function populatePortalIdentity({
+  profile,
+  session,
+  nameEl,
+  emailEl,
+  roleEl,
+  fallbackLabel = 'Portal User'
+}) {
   const displayName = getPortalDisplayName(profile, fallbackLabel);
   const email = profile?.email || session?.user?.email || 'No email on file';
   const roleLabel = formatPortalRoleLabel(profile?.role, fallbackLabel);
@@ -47,19 +54,14 @@ export function populatePortalIdentity({ profile, session, nameEl, emailEl, role
 export async function verifyPortalSession(supabase, options = {}) {
   const requiredRole = normalizeRole(options.requiredRole || '');
   const { data, error } = await supabase.auth.getSession();
+
   if (error) {
-    return {
-      session: null,
-      message: 'Unable to verify the current session right now.'
-    };
+    return { session: null, message: 'Unable to verify the current session right now.' };
   }
 
   const session = data.session;
   if (!session) {
-    return {
-      session: null,
-      message: 'This account is not allowed to use the portal right now.'
-    };
+    return { session: null, message: 'This account is not allowed to use the portal right now.' };
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -69,26 +71,18 @@ export async function verifyPortalSession(supabase, options = {}) {
     .maybeSingle();
 
   if (profileError) {
-    return {
-      session: null,
-      message: `Unable to verify portal privileges: ${profileError.message}`
-    };
+    return { session: null, message: `Unable to verify portal privileges: ${profileError.message}` };
   }
 
   const actualRole = normalizeRole(profile?.role);
   if (!actualRole) {
-    return {
-      session: null,
-      message: 'This account signed in successfully, but no portal role was found in Supabase yet.'
-    };
+    return { session: null, message: 'This account signed in successfully, but no portal role was found in Supabase yet.' };
   }
 
   if (actualRole !== requiredRole) {
     return {
       session: null,
-      message: actualRole
-        ? `This account signed in successfully, but its profile role is \`${actualRole}\`, not \`${requiredRole}\`.`
-        : `This account signed in successfully, but its profile role is not \`${requiredRole}\` in Supabase yet.`
+      message: `This account signed in successfully, but its profile role is \`${actualRole}\`, not \`${requiredRole}\`.`
     };
   }
 
@@ -96,8 +90,48 @@ export async function verifyPortalSession(supabase, options = {}) {
 }
 
 export async function verifyAdminSession(supabase, options = {}) {
-  return verifyPortalSession(supabase, {
-    ...options,
-    requiredRole: 'admin'
-  });
+  return verifyPortalSession(supabase, { ...options, requiredRole: 'admin' });
+}
+
+export async function verifySuperAdminSession(supabase, options = {}) {
+  return verifyPortalSession(supabase, { ...options, requiredRole: 'super_admin' });
+}
+
+// ADDED: accepts an array of allowed roles instead of one exact role
+// Used by pages shared between admin and super_admin
+export async function verifyMultiRoleSession(supabase, allowedRoles = []) {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    return { session: null, message: 'Unable to verify the current session right now.' };
+  }
+
+  const session = data.session;
+  if (!session) {
+    return { session: null, message: 'No active session found.' };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, staff_role, first_name, middle_name, last_name, email, phone_number, date_registered')
+    .eq('user_id', session.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return { session: null, message: `Unable to verify portal privileges: ${profileError.message}` };
+  }
+
+  const actualRole = normalizeRole(profile?.role);
+  const normalized = allowedRoles.map(r => normalizeRole(r));
+
+  if (!actualRole || !normalized.includes(actualRole)) {
+    return {
+      session: null,
+      message: actualRole
+        ? `This account has role \`${actualRole}\`, which is not permitted here.`
+        : 'No portal role was found for this account.'
+    };
+  }
+
+  return { session, profile };
 }

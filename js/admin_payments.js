@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');

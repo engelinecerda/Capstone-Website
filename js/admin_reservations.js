@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 
 const tableMessage = document.getElementById('tableMessage');
@@ -561,23 +562,6 @@ async function confirmBlackout() {
   }
 }
 
-async function validateAdmin() {
-  const { session, profile } = await verifyAdminSession(supabase);
-  if (!session) {
-    await supabase.auth.signOut();
-    return redirectLogin();
-  }
-  adminSession = session;
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarNameEl,
-    emailEl: sidebarEmailEl,
-    roleEl: sidebarRolePillEl,
-    fallbackLabel: 'Admin'
-  });
-  return session;
-}
 
 function redirectLogin() {
   window.location.replace('./admin_login.html');
@@ -2273,26 +2257,35 @@ function escapeHtml(str) {
   }[m]));
 }
 
-logoutBtn?.addEventListener('click', async () => {
+/*logoutBtn?.addEventListener('click', async () => {
   await supabase.auth.signOut();
   redirectLogin();
-});
+});*/
 
 refreshBtn?.addEventListener('click', loadData);
 
-supabase.auth.onAuthStateChange((event) => {
+/*supabase.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') redirectLogin();
-});
+});*/
 
-(async function init() {
-  await validateAdmin();
-  setCalendarExpanded(false);
-  wireFilters();
-  wireTableActions();
-  wireReservationDetailsModal();
-  wireCalendarToggle();
-  wireCalendarNav();
-  wireBlackoutModal();
-  wireAssignmentModal();
-  await loadData();
-})();
+
+//  run immediately (UI setup)
+setCalendarExpanded(false);
+wireFilters();
+wireTableActions();
+wireReservationDetailsModal();
+wireCalendarToggle();
+wireCalendarNav();
+wireBlackoutModal();
+wireAssignmentModal();
+
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: ({ session, profile }) => {
+    adminSession = session; 
+    setupInactivityLogout(profile.role);
+    loadData();
+  }
+});
