@@ -480,6 +480,17 @@ This policy keeps the staff dashboard view-only and limits each staff account to
 
 ---
 
+## Step 10 - Enable reservation reviews
+
+Run these review migrations in order:
+
+1. `supabase/migrations/20260411_create_reviews.sql`
+2. `supabase/migrations/20260413_fix_review_policy_timezone.sql`
+
+The second migration keeps review eligibility aligned with the frontend by checking past event times in `Asia/Manila` instead of the database server timezone.
+
+---
+
 ### Step-by-step in Supabase Dashboard
 
 1. Open your Supabase project.

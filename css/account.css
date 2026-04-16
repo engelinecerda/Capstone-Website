@@ -23,6 +23,7 @@ body{
     display: flex;
     flex-direction: column;
     gap: 20px;
+    box-sizing: border-box;
 }
 
 .account-avatar {
@@ -82,12 +83,15 @@ body{
     display: flex;
     flex-direction: column;
     gap: 4px;
+    box-sizing: border-box;
 }
 
 .account-nav-item {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 12px;
+    min-height: 48px;
     padding: 12px 14px;
     border: none;
     background: transparent;
@@ -100,6 +104,9 @@ body{
     text-align: left;
     transition: all 0.2s ease;
     width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    line-height: 1.2;
 }
 
 .account-nav-item:hover {
@@ -2739,7 +2746,7 @@ body{
     background: #fffdf9;
     border: 1px solid #eadbcf;
     border-radius: 24px;
-    padding: 24px;
+    padding: 32px;
     position: relative;
     box-shadow: 0 24px 70px rgba(42, 20, 8, 0.16);
 }
@@ -2849,7 +2856,7 @@ body{
 
 .receipt-view {
     display: grid;
-    gap: 16px;
+    gap: 18px;
     margin-top: 18px;
 }
 
@@ -2863,7 +2870,7 @@ body{
 .receipt-panel-head,
 .receipt-panel-body,
 .receipt-panel-foot {
-    padding: 18px 20px;
+    padding: 20px 26px;
 }
 
 .receipt-panel-head {
@@ -3128,6 +3135,14 @@ body{
     color: #2f5fbf;
 }
 
+.reschedule-time-btn.disabled,
+.reschedule-time-btn:disabled {
+    cursor: not-allowed;
+    background: #f5f1eb;
+    border-color: #e3d8cd;
+    color: #9c8f84;
+}
+
 .res-status.completed {
     background-color: #eaf7ed;
     color: #166534;
@@ -3365,7 +3380,7 @@ body{
     }
 
     .account-modal-card {
-        padding: 20px;
+        padding: 22px;
     }
 
     .account-modal-actions {

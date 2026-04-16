@@ -60,7 +60,7 @@ function escapeHtml(value) {
 }
 
 function redirectLogin() {
-  window.location.replace('./admin_login.html');
+  window.location.replace('/admin/index.html');
 }
 
 async function validateAdmin() {

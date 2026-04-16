@@ -1,4 +1,24 @@
 import { customerSupabase as supabase } from './supabase.js';
+import {
+    buildCustomerPaymentUrl,
+    fetchPayments as fetchSharedPayments,
+    fetchReceipts as fetchSharedReceipts,
+    fetchRescheduleRequests as fetchSharedRescheduleRequests,
+    getPaymentSummary as getSharedPaymentSummary,
+    getReservationBalanceDetails as getSharedReservationBalanceDetails,
+    getReservationPayments as getSharedReservationPayments,
+    isReservationPaymentEnabled as isSharedReservationPaymentEnabled
+} from './customer_payments.js';
+import {
+    fetchBlackoutDates,
+    fetchCalendarAvailability,
+    fetchDateAvailability,
+    getAvailabilitySummaryMessage,
+    getBookingScope as getSharedBookingScope,
+    getCalendarRange,
+    getScopeLabel,
+    isScopeOccupied
+} from './reservation_availability.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -47,6 +67,7 @@ const PAYMENT_TYPE_META = {
 };
 const ONSITE_RESERVATION_FEE = 999;
 const PAYMENT_BALANCE_DUE_DAYS = 7;
+const BUSINESS_TIME_ZONE = 'Asia/Manila';
 
 const PAYMENT_STATUS_META = {
     pending_review: { label: 'Pending Review', key: 'pending' },
@@ -61,22 +82,14 @@ const RESCHEDULE_STATUS_META = {
     completed: { label: 'Completed', key: 'approved' }
 };
 
-const BOOKING_LIMITS = {
-    onsite_vip: 1,
-    onsite_main_hall: 1,
-    offsite: 1
-};
-
 const TIMES = [
     '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
     '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM'
 ];
 
-const BLACKOUT_DATE_COLUMNS = ['closed_date', 'date'];
-
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-    window.location.href = '../pages/login_signup.html';
+    window.location.href = '/login.html';
 }
 
 const user = session.user;
@@ -137,9 +150,11 @@ const state = {
         month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         selectedDate: '',
         selectedTime: '',
-        bookedReservations: [],
+        calendarAvailability: new Map(),
+        selectedDateAvailability: null,
         closedDates: new Set(),
-        blackoutDateColumn: null
+        blackoutDateColumn: null,
+        blackoutReasonColumn: null
     }
 };
 
@@ -188,7 +203,7 @@ function getReviewFeatureErrorMessage(error, action = 'use') {
     const combined = `${message} ${details}`;
 
     if (isMissingReviewsTableError(error) || isMissingColumnError(error, 'reservations', 'review_prompt_dismissed_at')) {
-        return 'The review feature is not fully set up in Supabase yet. Run the SQL in `supabase/migrations/20260411_create_reviews.sql` on the hosted project, then reload this page.';
+        return 'The review feature is not fully set up in Supabase yet. Apply the review migrations in `supabase/migrations/`, then reload this page.';
     }
 
     if (code === '23505' || combined.includes('duplicate key value') || combined.includes('unique (reservation_id)')) {
@@ -197,8 +212,8 @@ function getReviewFeatureErrorMessage(error, action = 'use') {
 
     if (combined.toLowerCase().includes('row-level security') || code === '42501') {
         return action === 'dismiss'
-            ? 'Supabase rejected this review prompt update. Apply the review SQL in `supabase/migrations/20260411_create_reviews.sql` and make sure this reservation belongs to the signed-in customer.'
-            : 'Supabase rejected this review submission. Apply the review SQL in `supabase/migrations/20260411_create_reviews.sql`, then make sure the reservation is completed or already past its event date/time before submitting again.';
+            ? 'Supabase rejected this review prompt update. Apply the review migrations in `supabase/migrations/` and make sure this reservation belongs to the signed-in customer.'
+            : 'Supabase rejected this review submission. Apply the review migrations in `supabase/migrations/`, then make sure the reservation is completed or already past its event date/time in Manila time before submitting again.';
     }
 
     return message || 'unknown error';
@@ -247,16 +262,35 @@ function formatDateKey(value) {
     return String(value || '').split('T')[0];
 }
 
+function getTimeZoneNowParts(timeZone = BUSINESS_TIME_ZONE) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    const parts = formatter.formatToParts(new Date()).reduce((map, part) => {
+        if (part.type !== 'literal') {
+            map[part.type] = part.value;
+        }
+        return map;
+    }, {});
+
+    return {
+        dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+        hours: Number(parts.hour || 0),
+        minutes: Number(parts.minute || 0)
+    };
+}
+
 function isDateBeforeToday(value) {
     const dateKey = formatDateKey(value);
     if (!dateKey) return false;
 
-    const today = new Date();
-    const todayKey = [
-        today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, '0'),
-        String(today.getDate()).padStart(2, '0')
-    ].join('-');
+    const todayKey = getTimeZoneNowParts().dateKey;
 
     return dateKey < todayKey;
 }
@@ -293,16 +327,33 @@ function getReservationEventDateTime(reservation) {
     return date;
 }
 
+function isReservationEventPast(reservation) {
+    const dateKey = formatDateKey(reservation?.event_date);
+    if (!dateKey) return false;
+
+    const nowParts = getTimeZoneNowParts();
+    if (dateKey < nowParts.dateKey) {
+        return true;
+    }
+
+    if (dateKey > nowParts.dateKey) {
+        return false;
+    }
+
+    const eventTimeParts = parseEventTimeToParts(reservation?.event_time) || { hours: 0, minutes: 0 };
+    const eventMinutes = (eventTimeParts.hours * 60) + eventTimeParts.minutes;
+    const currentMinutes = (nowParts.hours * 60) + nowParts.minutes;
+
+    return eventMinutes <= currentMinutes;
+}
+
 function getEffectiveReservationStatus(reservation) {
     const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
     if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
         return normalizedStatus;
     }
 
-    const eventDateTime = getReservationEventDateTime(reservation);
-    if (!eventDateTime) return normalizedStatus;
-
-    if (eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
+    if (isReservationEventPast(reservation) && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
         return 'completed';
     }
 
@@ -576,22 +627,24 @@ function buildReviewStarsMarkup(rating, { interactive = false } = {}) {
 }
 
 function getBookingScope(reservation) {
-    const locationType = String(reservation?.location_type || '').toLowerCase();
-    const packageName = String(reservation?.package?.package_name || '').toLowerCase();
-
-    if (locationType === 'offsite') return 'offsite';
-    if (locationType === 'onsite' && packageName.includes('main hall')) return 'onsite_main_hall';
-    if (locationType === 'onsite' && packageName.includes('vip')) return 'onsite_vip';
-    return null;
+    return getSharedBookingScope(
+        reservation?.location_type,
+        reservation?.package?.package_name || reservation?.package_name || ''
+    );
 }
 
-function getBookedCountForScope(dateKey, scope, reservationIdToExclude = null) {
-    return state.rescheduleModal.bookedReservations.filter((reservation) => {
-        const reservationDateKey = formatDateKey(reservation.event_date);
-        return reservationDateKey === dateKey
-            && getBookingScope(reservation) === scope
-            && String(reservation.reservation_id) !== String(reservationIdToExclude);
-    }).length;
+function getReservationDurationHours(reservation) {
+    const packageDuration = Number(reservation?.package?.duration_hours || 0);
+    if (packageDuration > 0) return packageDuration;
+
+    const packageName = String(reservation?.package?.package_name || '').toLowerCase();
+    if (packageName.includes('vip lite')) return 2;
+    if (packageName.includes('vip plus')) return 3;
+    if (packageName.includes('vip max')) return 4;
+    if (packageName.includes('main hall basic')) return 2;
+    if (packageName.includes('main hall plus')) return 3;
+    if (packageName.includes('catering')) return 4;
+    return 3;
 }
 
 function getReservationName(profile) {
@@ -1687,15 +1740,20 @@ function renderPendingPaymentOverview(reservation) {
 
 function buildReservationCard(reservation, view) {
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
-    const paymentSummary = getPaymentSummary(reservation);
-    const balance = getReservationBalanceDetails(reservation);
-    const paymentEntries = getReservationPayments(reservation.reservation_id);
-    const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
+    const paymentSummary = getSharedPaymentSummary(
+        reservation,
+        state.paymentsByReservationId,
+        state.reschedulesByReservationId,
+        { formatDate }
+    );
+    const balance = getSharedReservationBalanceDetails(reservation, state.paymentsByReservationId, { formatDate });
+    const paymentEntries = getSharedReservationPayments(state.paymentsByReservationId, reservation.reservation_id);
+    const paymentModuleEnabled = isSharedReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
     const contractMeta = getReservationContractMeta(reservation.reservation_id);
     const packageName = getReservationPackageName(reservation);
     const location = getReservationLocationLabel(reservation);
     const paymentActionLabel = balance.remainingBalance <= 0
-        ? 'View Payments'
+        ? 'View Payment'
         : balance.hasPartialPayment
             ? 'Pay Remaining Balance'
             : paymentEntries.length > 0 ? 'Manage Payment' : 'Continue Payment';
@@ -1784,7 +1842,7 @@ function buildReservationEmptyState(view) {
             <div class="empty-icon">Reservations</div>
             <h3>${copy.title}</h3>
             <p>${copy.message}</p>
-            ${view === 'active' ? '<a href="../pages/reservations.html" class="res-book-btn">Book an Event</a>' : ''}
+            ${view === 'active' ? '<a href="/reservations.html" class="res-book-btn">Book an Event</a>' : ''}
         </div>
     `;
 }
@@ -2008,10 +2066,15 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
     }
 
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
-    const paymentSummary = getPaymentSummary(reservation);
-    const balance = getReservationBalanceDetails(reservation);
-    const paymentEntries = getReservationPayments(reservation.reservation_id);
-    const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
+    const paymentSummary = getSharedPaymentSummary(
+        reservation,
+        state.paymentsByReservationId,
+        state.reschedulesByReservationId,
+        { formatDate }
+    );
+    const balance = getSharedReservationBalanceDetails(reservation, state.paymentsByReservationId, { formatDate });
+    const paymentEntries = getSharedReservationPayments(state.paymentsByReservationId, reservation.reservation_id);
+    const paymentModuleEnabled = isSharedReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
     const contract = getReservationContract(reservation.reservation_id);
     const contractMeta = getReservationContractMeta(reservation.reservation_id);
     const addOnName = getReservationAddOnName(reservation);
@@ -2139,7 +2202,7 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                                     hidden
                                 />
                             </label>
-                            <p class="payment-proof-note">Accepted formats: PDF, JPG, and PNG. Upload the corrected signed contract only.</p>
+                            <p class="payment-proof-note">Accepted formats: PDF, JPG, JPEG, and PNG. Maximum 10MB. Upload the corrected signed contract only.</p>
                         </div>
                         <div class="reservation-details-actions">
                             <button
@@ -2184,7 +2247,7 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                 <div class="reservation-inline-note">${escapeHtml(balance.helperText)}</div>
                 ${paymentModuleEnabled ? `
                     <div class="reservation-details-actions">
-                        <button type="button" class="res-primary-btn open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Open Payments</button>
+                        <button type="button" class="res-primary-btn open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Open Payment Page</button>
                     </div>
                 ` : '<div class="reservation-inline-note">Payments will unlock after admin approves this reservation.</div>'}
             </section>
@@ -2358,7 +2421,7 @@ function renderReservations() {
                 <div class="empty-icon">No reservations yet</div>
                 <h3>No reservations yet</h3>
                 <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
-                <a href="../pages/reservations.html" class="res-book-btn">Book an Event</a>
+                <a href="/reservations.html" class="res-book-btn">Book an Event</a>
             </div>
         `;
         return;
@@ -2581,8 +2644,17 @@ async function uploadPaymentProof(file) {
         throw new Error('Proof file must be 10MB or smaller.');
     }
 
-    if (!String(file.type || '').startsWith('image/')) {
-        throw new Error('Please upload an image or screenshot for the payment proof.');
+    if (Number(file.size || 0) <= 0) {
+        throw new Error('The selected proof file is empty. Please choose a valid image.');
+    }
+
+    const mimeType = String(file.type || '').toLowerCase();
+    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+    const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+    if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+        throw new Error('Please upload the proof of payment as a JPG, JPEG, PNG, or WEBP image.');
     }
 
     const formData = new FormData();
@@ -2613,9 +2685,17 @@ async function uploadContractFile(file) {
         throw new Error('Contract file must be 10MB or smaller.');
     }
 
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(String(file.type || '').toLowerCase())) {
-        throw new Error('Please upload the signed contract as a PDF, JPG, or PNG file.');
+    if (Number(file.size || 0) <= 0) {
+        throw new Error('The selected contract file is empty. Please choose a valid file.');
+    }
+
+    const mimeType = String(file.type || '').toLowerCase();
+    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']);
+    const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
+
+    if (!allowedTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+        throw new Error('Please upload the signed contract as a PDF, JPG, JPEG, or PNG file.');
     }
 
     const formData = new FormData();
@@ -2813,7 +2893,7 @@ async function loadReservations() {
             special_requests,
             status,
             created_at,
-            package:package_id ( package_name, package_type ),
+            package:package_id ( package_name, package_type, duration_hours ),
             add_on:add_on_id ( package_name, package_type )
         `;
         const reservationSelectWithReviewPrompt = `
@@ -2849,8 +2929,8 @@ async function loadReservations() {
         const reservationIds = state.reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
 
         state.contractsByReservationId = await fetchContracts(reservationIds);
-        state.paymentsByReservationId = await fetchPayments(reservationIds);
-        state.reschedulesByReservationId = await fetchRescheduleRequests(reservationIds);
+        state.paymentsByReservationId = await fetchSharedPayments(supabase, reservationIds);
+        state.reschedulesByReservationId = await fetchSharedRescheduleRequests(supabase, reservationIds);
         state.reviewsByReservationId = await fetchReviews(reservationIds);
 
         const paymentIds = Object.values(state.paymentsByReservationId)
@@ -2858,7 +2938,7 @@ async function loadReservations() {
             .map((payment) => payment.payment_id)
             .filter(Boolean);
 
-        state.receiptsByPaymentId = await fetchReceipts(paymentIds);
+        state.receiptsByPaymentId = await fetchSharedReceipts(supabase, paymentIds);
         renderReservations();
         renderPaymentsModule();
         if (state.reservationDetailsReservationId) {
@@ -2949,27 +3029,6 @@ function closeReceiptModal() {
     receiptModalBackdrop?.setAttribute('aria-hidden', 'true');
 }
 
-async function resolveBlackoutDateColumn() {
-    if (state.rescheduleModal.blackoutDateColumn) return state.rescheduleModal.blackoutDateColumn;
-
-    let lastError = null;
-    for (const column of BLACKOUT_DATE_COLUMNS) {
-        const { error } = await supabase
-            .from('calendar_blackouts')
-            .select(column)
-            .limit(1);
-
-        if (!error) {
-            state.rescheduleModal.blackoutDateColumn = column;
-            return column;
-        }
-
-        lastError = error;
-    }
-
-    throw lastError || new Error('Unable to determine blackout date column.');
-}
-
 function setRescheduleModalMessage(message, isError = false) {
     if (!rescheduleModalMessage) return;
     rescheduleModalMessage.textContent = message;
@@ -2982,44 +3041,66 @@ function formatDateForInput(value) {
 }
 
 async function loadRescheduleAvailability(reservation) {
-    const blackoutDateColumn = await resolveBlackoutDateColumn();
-
-    const [{ data: blackoutRows, error: blackoutError }, { data: approvedReservations, error: reservationError }] = await Promise.all([
-        supabase
-            .from('calendar_blackouts')
-            .select(blackoutDateColumn),
-        supabase
-            .from('reservations')
-            .select(`
-                reservation_id,
-                event_date,
-                location_type,
-                status,
-                package:package_id ( package_name )
-            `)
-            .eq('status', 'approved')
+    const month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const range = getCalendarRange(month);
+    const [blackoutData, calendarAvailability] = await Promise.all([
+        fetchBlackoutDates(supabase, state.rescheduleModal),
+        fetchCalendarAvailability(supabase, {
+            fromDate: range.fromDate,
+            toDate: range.toDate
+        })
     ]);
 
-    if (blackoutError) throw blackoutError;
-    if (reservationError) throw reservationError;
-
-    state.rescheduleModal.bookedReservations = approvedReservations || [];
-    state.rescheduleModal.closedDates = new Set((blackoutRows || []).map((row) => row[blackoutDateColumn]).filter(Boolean));
-    state.rescheduleModal.blackoutDateColumn = blackoutDateColumn;
-    state.rescheduleModal.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    state.rescheduleModal.closedDates = blackoutData.closedDates;
+    state.rescheduleModal.blackoutDateColumn = blackoutData.blackoutDateColumn;
+    state.rescheduleModal.blackoutReasonColumn = blackoutData.blackoutReasonColumn;
+    state.rescheduleModal.calendarAvailability = calendarAvailability;
+    state.rescheduleModal.month = month;
     state.rescheduleModal.selectedDate = '';
     state.rescheduleModal.selectedTime = reservation.event_time || '';
+    state.rescheduleModal.selectedDateAvailability = null;
+}
+
+async function loadRescheduleCalendarMonth() {
+    const range = getCalendarRange(state.rescheduleModal.month);
+    state.rescheduleModal.calendarAvailability = await fetchCalendarAvailability(supabase, {
+        fromDate: range.fromDate,
+        toDate: range.toDate
+    });
+}
+
+async function loadRescheduleSelectedDateAvailability(reservation) {
+    if (!state.rescheduleModal.selectedDate) {
+        state.rescheduleModal.selectedDateAvailability = null;
+        return null;
+    }
+
+    const availability = await fetchDateAvailability(supabase, {
+        eventDate: state.rescheduleModal.selectedDate,
+        scope: getBookingScope(reservation),
+        durationHours: getReservationDurationHours(reservation),
+        excludeReservationId: reservation.reservation_id
+    });
+    state.rescheduleModal.selectedDateAvailability = availability;
+    return availability;
 }
 
 function renderRescheduleTimes() {
     if (!rescheduleTimeGrid) return;
 
     const selectedTime = state.rescheduleModal.selectedTime;
+    const selectedAvailability = state.rescheduleModal.selectedDateAvailability || {
+        occupiedScopes: [],
+        scopeTaken: false,
+        blockedTimes: []
+    };
+    const blockedTimes = new Set(selectedAvailability.blockedTimes || []);
     rescheduleTimeGrid.innerHTML = TIMES.map((time) => `
         <button
             type="button"
-            class="reschedule-time-btn ${selectedTime === time ? 'active' : ''}"
+            class="reschedule-time-btn ${selectedTime === time ? 'active' : ''} ${blockedTimes.has(time) || !state.rescheduleModal.selectedDate ? 'disabled' : ''}"
             data-time="${escapeHtml(time)}"
+            ${blockedTimes.has(time) || !state.rescheduleModal.selectedDate ? 'disabled' : ''}
         >
             ${escapeHtml(time)}
         </button>
@@ -3039,7 +3120,6 @@ function renderRescheduleCalendar() {
     const daysInMonth = end.getDate();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const reservationScope = getBookingScope(reservation);
     const currentReservationDate = formatDateKey(reservation.event_date);
 
     rescheduleMonthLabel.textContent = month.toLocaleDateString('en-PH', {
@@ -3061,9 +3141,12 @@ function renderRescheduleCalendar() {
         ].join('-');
         const isPastOrToday = date <= today;
         const isClosed = state.rescheduleModal.closedDates.has(dateKey);
-        const approvedCount = reservationScope ? getBookedCountForScope(dateKey, reservationScope, reservation.reservation_id) : 0;
-        const bookingLimit = BOOKING_LIMITS[reservationScope] || 1;
-        const isBooked = reservationScope ? approvedCount >= bookingLimit : false;
+        const dateAvailability = state.rescheduleModal.calendarAvailability.get(dateKey) || {
+            occupiedScopes: [],
+            isFullyBooked: false
+        };
+        const reservationScope = getBookingScope(reservation);
+        const isBooked = reservationScope ? isScopeOccupied(dateAvailability.occupiedScopes, reservationScope) : false;
         const isCurrent = currentReservationDate === dateKey;
         const isAvailable = !isPastOrToday && !isClosed && !isBooked && !isCurrent;
         const isSelected = state.rescheduleModal.selectedDate === dateKey;
@@ -3078,7 +3161,7 @@ function renderRescheduleCalendar() {
             label = 'Closed';
         } else if (isBooked) {
             classNames.push('booked');
-            label = 'Fully Booked';
+            label = getAvailabilitySummaryMessage(dateAvailability.occupiedScopes, reservationScope);
         } else {
             classNames.push('disabled');
             label = isCurrent ? 'Current booking date' : 'Unavailable';
@@ -3107,7 +3190,8 @@ function closeRescheduleModal() {
     state.rescheduleModal.reservationId = null;
     state.rescheduleModal.selectedDate = '';
     state.rescheduleModal.selectedTime = '';
-    state.rescheduleModal.bookedReservations = [];
+    state.rescheduleModal.calendarAvailability = new Map();
+    state.rescheduleModal.selectedDateAvailability = null;
     state.rescheduleModal.closedDates = new Set();
     rescheduleModalBackdrop?.classList.add('hidden');
     rescheduleModalBackdrop?.setAttribute('aria-hidden', 'true');
@@ -3132,7 +3216,7 @@ async function openRescheduleModal(reservationId) {
         await loadRescheduleAvailability(reservation);
         renderRescheduleCalendar();
         renderRescheduleTimes();
-        setRescheduleModalMessage('Choose a future available date and your new start time.');
+        setRescheduleModalMessage(`Choose a future available date for the ${getScopeLabel(getBookingScope(reservation))} booking slot, then select your new start time.`);
     } catch (error) {
         setRescheduleModalMessage(`Failed to load availability: ${error.message}`, true);
     }
@@ -3156,6 +3240,13 @@ async function submitRescheduleRequest() {
     setRescheduleModalMessage('Submitting your reschedule request...');
 
     try {
+        const latestAvailability = await loadRescheduleSelectedDateAvailability(reservation);
+        if (latestAvailability?.scopeTaken) {
+            state.rescheduleModal.selectedTime = '';
+            renderRescheduleTimes();
+            throw new Error(getAvailabilitySummaryMessage(latestAvailability.occupiedScopes, getBookingScope(reservation)));
+        }
+
         const payload = {
             reservation_id: reservation.reservation_id,
             user_id: user.id,
@@ -3368,15 +3459,37 @@ async function submitReplacementContract(reservationId) {
 }
 
 function activateAccountSection(sectionKey) {
+    const normalizedSection = ['profile', 'reservations'].includes(String(sectionKey || '').toLowerCase())
+        ? String(sectionKey).toLowerCase()
+        : 'profile';
     const navButtons = document.querySelectorAll('.account-nav-item[data-section]');
     const sections = document.querySelectorAll('.account-section');
 
     navButtons.forEach((navButton) => {
-        navButton.classList.toggle('active', navButton.dataset.section === sectionKey);
+        navButton.classList.toggle('active', navButton.dataset.section === normalizedSection);
     });
     sections.forEach((section) => {
-        section.classList.toggle('active', section.id === `section-${sectionKey}`);
+        section.classList.toggle('active', section.id === `section-${normalizedSection}`);
     });
+
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (normalizedSection === 'profile') {
+            url.searchParams.delete('section');
+        } else {
+            url.searchParams.set('section', normalizedSection);
+        }
+        window.history.replaceState({}, '', url);
+    }
+}
+
+function getRequestedAccountSection() {
+    if (typeof window === 'undefined') return 'profile';
+
+    const section = new URLSearchParams(window.location.search).get('section');
+    return ['profile', 'reservations'].includes(String(section || '').toLowerCase())
+        ? String(section).toLowerCase()
+        : 'profile';
 }
 
 function wireReservationActions() {
@@ -3413,9 +3526,7 @@ function wireReservationActions() {
         if (openPaymentsBtn) {
             const reservationId = openPaymentsBtn.dataset.reservationId;
             closeReservationDetailsModal();
-            activateAccountSection('payments');
-            const targetCard = paymentsList?.querySelector(`[data-payment-reservation-id="${reservationId}"]`);
-            targetCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window.location.href = buildCustomerPaymentUrl(reservationId);
         }
     });
 }
@@ -3434,9 +3545,7 @@ function wireReservationDetailsModal() {
         if (openPaymentsBtn) {
             const reservationId = openPaymentsBtn.dataset.reservationId;
             closeReservationDetailsModal();
-            activateAccountSection('payments');
-            const targetCard = paymentsList?.querySelector(`[data-payment-reservation-id="${reservationId}"]`);
-            targetCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window.location.href = buildCustomerPaymentUrl(reservationId);
             return;
         }
 
@@ -3552,34 +3661,49 @@ function wireRescheduleModal() {
         if (event.target === rescheduleModalBackdrop) closeRescheduleModal();
     });
 
-    reschedulePrevMonth?.addEventListener('click', () => {
+    reschedulePrevMonth?.addEventListener('click', async () => {
+        if (!state.rescheduleModal.reservationId) return;
         state.rescheduleModal.month = new Date(
             state.rescheduleModal.month.getFullYear(),
             state.rescheduleModal.month.getMonth() - 1,
             1
         );
+        await loadRescheduleCalendarMonth();
         renderRescheduleCalendar();
     });
 
-    rescheduleNextMonth?.addEventListener('click', () => {
+    rescheduleNextMonth?.addEventListener('click', async () => {
+        if (!state.rescheduleModal.reservationId) return;
         state.rescheduleModal.month = new Date(
             state.rescheduleModal.month.getFullYear(),
             state.rescheduleModal.month.getMonth() + 1,
             1
         );
+        await loadRescheduleCalendarMonth();
         renderRescheduleCalendar();
     });
 
-    rescheduleCalendarGrid?.addEventListener('click', (event) => {
+    rescheduleCalendarGrid?.addEventListener('click', async (event) => {
         const dayButton = event.target.closest('.reschedule-day.available');
         if (!dayButton) return;
+        const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
+        if (!reservation) return;
         state.rescheduleModal.selectedDate = dayButton.dataset.date || '';
+        state.rescheduleModal.selectedTime = reservation.event_time || '';
+        const availability = await loadRescheduleSelectedDateAvailability(reservation);
         renderRescheduleCalendar();
+        renderRescheduleTimes();
+        setRescheduleModalMessage(
+            availability?.scopeTaken
+                ? getAvailabilitySummaryMessage(availability.occupiedScopes, getBookingScope(reservation))
+                : `Selected ${formatDate(state.rescheduleModal.selectedDate)} for your ${getScopeLabel(getBookingScope(reservation))} booking slot.`
+        );
     });
 
     rescheduleTimeGrid?.addEventListener('click', (event) => {
         const timeButton = event.target.closest('.reschedule-time-btn');
         if (!timeButton) return;
+        if (timeButton.hasAttribute('disabled')) return;
         state.rescheduleModal.selectedTime = timeButton.dataset.time || '';
         renderRescheduleTimes();
     });
@@ -3807,6 +3931,8 @@ function wireAccountNavigation() {
             activateAccountSection(button.dataset.section);
         });
     });
+
+    activateAccountSection(getRequestedAccountSection());
 }
 
 function wireProfileForm() {
@@ -3882,7 +4008,7 @@ function wireProfileForm() {
                 return;
             }
 
-            const emailRedirectTo = new URL('../pages/account.html', window.location.href).href;
+            const emailRedirectTo = new URL('/account.html', window.location.href).href;
             const { error: emailError } = await supabase.auth.updateUser({
                 email: requestedEmail,
                 options: {
@@ -3978,12 +4104,12 @@ function wirePasswordForm() {
 function wireLogout() {
     document.getElementById('logout-btn')?.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        window.location.href = '../pages/login_signup.html';
+        window.location.href = '/login.html';
     });
 
     supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_OUT') {
-            window.location.href = '../pages/login_signup.html';
+            window.location.href = '/login.html';
         }
     });
 

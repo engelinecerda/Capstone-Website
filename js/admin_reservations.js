@@ -2,6 +2,14 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
+import {
+  fetchDateAvailability,
+  getAvailabilitySummaryMessage,
+  getBookingScope as getSharedBookingScope,
+  getOccupiedScopesFromReservations,
+  getScopeLabel as getSharedScopeLabel,
+  isDateFullyBooked as isFullyBookedFromScopes
+} from './reservation_availability.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -63,11 +71,6 @@ const assignmentReservationSummary = document.getElementById('assignmentReservat
 const assignmentReservationMeta = document.getElementById('assignmentReservationMeta');
 const assignmentSelectionCount = document.getElementById('assignmentSelectionCount');
 const assignmentNoteInput = document.getElementById('assignmentNoteInput');
-const BOOKING_LIMITS = {
-  onsite_vip: 1,
-  onsite_main_hall: 1,
-  offsite: 1
-};
 const PAYMENT_METHOD_LABELS = {
   card: 'Card',
   bancnet: 'BancNet',
@@ -481,6 +484,7 @@ function configureBlackoutModal(action) {
   }
   if (blackoutReasonField) {
     blackoutReasonField.hidden = isReopen;
+    blackoutReasonField.setAttribute('aria-hidden', String(isReopen));
   }
   if (blackoutReasonLabel) {
     blackoutReasonLabel.textContent = 'Reason for closing this date';
@@ -564,7 +568,7 @@ async function confirmBlackout() {
 
 
 function redirectLogin() {
-  window.location.replace('./admin_login.html');
+  window.location.replace('/admin/index.html');
 }
 
 function formatStatusPill(status) {
@@ -578,32 +582,14 @@ function formatStatusPill(status) {
 }
 
 function getBookingScope(reservation) {
-  const locationType = (reservation?.location_type || '').toLowerCase();
-  const packageName = (reservation?.package?.package_name || '').toLowerCase();
-
-  if (locationType === 'offsite') return 'offsite';
-  if (locationType === 'onsite' && packageName.includes('main hall')) return 'onsite_main_hall';
-  if (locationType === 'onsite' && packageName.includes('vip')) return 'onsite_vip';
-  return null;
+  return getSharedBookingScope(
+    reservation?.location_type,
+    reservation?.package?.package_name || reservation?.package_name || ''
+  );
 }
 
 function getScopeLabel(scope) {
-  return {
-    onsite_vip: 'VIP lounge',
-    onsite_main_hall: 'Main Hall',
-    offsite: 'offsite service'
-  }[scope] || 'selected booking type';
-}
-
-function countApprovedReservationsForScope(dateKey, scope, excludeReservationId = null) {
-  return reservationsCache.filter((reservation) => {
-    const reservationDateKey = String(reservation.event_date || '').split('T')[0];
-    const reservationStatus = (reservation.status || '').toLowerCase();
-    return reservationDateKey === dateKey
-      && reservationStatus === 'approved'
-      && getBookingScope(reservation) === scope
-      && String(reservation.reservation_id) !== String(excludeReservationId);
-  }).length;
+  return getSharedScopeLabel(scope);
 }
 
 function getApprovalLimitMessage(reservation) {
@@ -613,9 +599,8 @@ function getApprovalLimitMessage(reservation) {
   const dateKey = String(reservation.event_date || '').split('T')[0];
   if (!dateKey) return 'Cannot approve this reservation because it has no event date.';
 
-  const limit = BOOKING_LIMITS[scope] || 1;
-  const approvedCount = countApprovedReservationsForScope(dateKey, scope, reservation.reservation_id);
-  if (approvedCount < limit) return '';
+  const occupiedScopes = getOccupiedScopesFromReservations(reservationsCache, dateKey, reservation.reservation_id);
+  if (!occupiedScopes.includes(scope)) return '';
 
   const formattedDate = new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-PH', {
     year: 'numeric',
@@ -623,7 +608,21 @@ function getApprovalLimitMessage(reservation) {
     day: 'numeric'
   });
 
-  return `Cannot approve this reservation. The ${getScopeLabel(scope)} is already full on ${formattedDate}.`;
+  return `Cannot approve this reservation. ${getAvailabilitySummaryMessage(occupiedScopes, scope).replace('on this date.', `on ${formattedDate}.`)}`;
+}
+
+function getReservationDurationHours(reservation) {
+  const packageDuration = Number(reservation?.package?.duration_hours || 0);
+  if (packageDuration > 0) return packageDuration;
+
+  const packageName = String(reservation?.package?.package_name || '').toLowerCase();
+  if (packageName.includes('vip lite')) return 2;
+  if (packageName.includes('vip plus')) return 3;
+  if (packageName.includes('vip max')) return 4;
+  if (packageName.includes('main hall basic')) return 2;
+  if (packageName.includes('main hall plus')) return 3;
+  if (packageName.includes('catering')) return 4;
+  return 3;
 }
 
 function isMissingColumnError(error, columnName) {
@@ -1107,7 +1106,7 @@ function renderReservationDetailsModal() {
 
     const paymentLinks = `
       <div class="details-action-row">
-        <a class="action-btn view" href="./admin_payments.html?reservation=${encodeURIComponent(reservation.reservation_id)}">Open Payments</a>
+        <a class="action-btn view" href="/admin/payments.html?reservation=${encodeURIComponent(reservation.reservation_id)}">Open Payments</a>
         ${pendingPayment?.proof_url ? `<a class="action-btn view" href="${pendingPayment.proof_url}" target="_blank" rel="noopener noreferrer">View Proof</a>` : ''}
       </div>
     `;
@@ -1326,7 +1325,7 @@ async function fetchReservations() {
       special_requests,
       total_price,
       created_at,
-      package:package_id ( package_name )
+      package:package_id ( package_name, duration_hours )
     `)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -1639,6 +1638,26 @@ async function handlePaymentReview(reservationId, paymentId, nextStatus) {
     throw new Error('Payment record could not be found.');
   }
 
+  if (nextStatus === 'approved' && payment.payment_type === 'reschedule_fee' && payment.reschedule_request_id) {
+    const request = getReservationRescheduleRequests(reservation)
+      .find((entry) => String(entry.reschedule_request_id) === String(payment.reschedule_request_id));
+
+    if (!request) {
+      throw new Error('Linked reschedule request could not be found.');
+    }
+
+    const availability = await fetchDateAvailability(supabase, {
+      eventDate: request.requested_date,
+      scope: getBookingScope(reservation),
+      durationHours: getReservationDurationHours(reservation),
+      excludeReservationId: reservation.reservation_id
+    });
+
+    if (availability.scopeTaken) {
+      throw new Error(getAvailabilitySummaryMessage(availability.occupiedScopes, getBookingScope(reservation)));
+    }
+  }
+
   const updatePayload = {
     payment_status: nextStatus,
     verified_at: new Date().toISOString()
@@ -1652,8 +1671,6 @@ async function handlePaymentReview(reservationId, paymentId, nextStatus) {
   if (paymentError) throw paymentError;
 
   if (nextStatus === 'approved') {
-    await ensureReceiptForPayment(paymentId);
-
     if (payment.payment_type === 'reschedule_fee' && payment.reschedule_request_id) {
       const request = getReservationRescheduleRequests(reservation)
         .find((entry) => String(entry.reschedule_request_id) === String(payment.reschedule_request_id));
@@ -1671,7 +1688,16 @@ async function handlePaymentReview(reservationId, paymentId, nextStatus) {
         })
         .eq('reservation_id', reservationId);
 
-      if (reservationError) throw reservationError;
+      if (reservationError) {
+        await supabase
+          .from('payment')
+          .update({
+            payment_status: 'pending_review',
+            verified_at: null
+          })
+          .eq('payment_id', paymentId);
+        throw reservationError;
+      }
 
       const { error: requestError } = await supabase
         .from('reschedule_requests')
@@ -1683,10 +1709,32 @@ async function handlePaymentReview(reservationId, paymentId, nextStatus) {
 
       if (requestError) throw requestError;
     }
+
+    await ensureReceiptForPayment(paymentId);
   }
 }
 
 async function handleRescheduleReview(requestId, nextStatus) {
+  const reservation = reservationsCache.find((entry) => (
+    getReservationRescheduleRequests(entry).some((request) => String(request.reschedule_request_id) === String(requestId))
+  ));
+  const request = reservation
+    ? getReservationRescheduleRequests(reservation).find((entry) => String(entry.reschedule_request_id) === String(requestId))
+    : null;
+
+  if (nextStatus === 'approved_pending_payment' && reservation && request) {
+    const availability = await fetchDateAvailability(supabase, {
+      eventDate: request.requested_date,
+      scope: getBookingScope(reservation),
+      durationHours: getReservationDurationHours(reservation),
+      excludeReservationId: reservation.reservation_id
+    });
+
+    if (availability.scopeTaken) {
+      throw new Error(getAvailabilitySummaryMessage(availability.occupiedScopes, getBookingScope(reservation)));
+    }
+  }
+
   const updatePayload = {
     status: nextStatus,
     reviewed_at: new Date().toISOString()
@@ -1990,10 +2038,10 @@ function bindCalendarAction(cell, handler) {
   });
 }
 
-function renderCalendar(approvedDates = []) {
+function renderCalendar(bookedDates = []) {
   if (!calendarGrid) return;
   const start = startOfMonth(currentMonth);
-  const approvedSet = new Set(approvedDates.map(d => d.split('T')[0]));
+  const bookedSet = new Set(bookedDates.map(d => d.split('T')[0]));
   const closedSet = blackouts;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -2020,7 +2068,8 @@ function renderCalendar(approvedDates = []) {
     const isToday = iso === todayIso;
     const cell = document.createElement('div');
     cell.className = 'calendar-cell';
-    const booked = approvedSet.has(iso);
+    const occupiedScopes = getOccupiedScopesFromReservations(reservationsCache, iso);
+    const booked = bookedSet.has(iso);
     const closed = closedSet.has(iso);
     const formattedDate = formatBlackoutDate(iso);
     let statusKey = 'open';
@@ -2042,7 +2091,9 @@ function renderCalendar(approvedDates = []) {
       cell.classList.add('booked');
       statusKey = 'booked';
       statusLabel = 'Booked';
-      titleText = `${formattedDate} is fully booked.`;
+      titleText = isFullyBookedFromScopes(occupiedScopes)
+        ? `${formattedDate} is fully booked.`
+        : `${formattedDate} has active bookings. ${getAvailabilitySummaryMessage(occupiedScopes)}`;
     } else {
       cell.classList.add('available');
     }
@@ -2123,9 +2174,13 @@ async function toggleBlackout(dateIso) {
 }
 
 function approvedDatesFromCache() {
-  return reservationsCache
-    .filter(r => (r.status || '').toLowerCase() === 'approved' && r.event_date)
-    .map(r => r.event_date);
+  const dates = new Set(
+    reservationsCache
+      .map((reservation) => formatDateKey(reservation.event_date))
+      .filter(Boolean)
+  );
+
+  return Array.from(dates).filter((dateKey) => getOccupiedScopesFromReservations(reservationsCache, dateKey).length > 0);
 }
 
 async function loadCalendar() {

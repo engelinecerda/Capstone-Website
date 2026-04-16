@@ -1,0 +1,285 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Account - ELI Coffee Events Cafe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/account.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar__container">
+      <a href="/index.html">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+      </a>
+      <div class="navbar__toggle" id="mobile-menu">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </div>
+      <ul class="navbar__menu">
+        <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
+        <li class="navbar__btn"></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="account-page">
+    <aside class="account-sidebar">
+      <div class="account-avatar">
+        <div class="avatar-circle">&#128100;</div>
+        <h3 id="sidebar-name">Loading...</h3>
+        <p id="sidebar-email">...</p>
+        <span class="role-badge">Customer</span>
+      </div>
+
+      <nav class="account-nav">
+        <button class="account-nav-item active" data-section="profile">
+          <span>&#128100;</span> My Profile
+        </button>
+        <button class="account-nav-item" data-section="reservations">
+          <span>&#128197;</span> My Reservations
+        </button>
+        <button class="account-nav-item logout" id="logout-btn">
+          <span>&#128682;</span> Logout
+        </button>
+      </nav>
+    </aside>
+
+    <main class="account-main">
+      <section class="account-section active" id="section-profile">
+        <div class="section-header">
+          <h2>My Profile</h2>
+          <p>Update your personal information and account password</p>
+        </div>
+
+        <div class="profile-panels">
+          <div class="profile-subsection">
+            <div class="subsection-header">
+              <h3>Personal Information</h3>
+              <p>Keep your phone number and email address up to date for reservations and contact details.</p>
+            </div>
+
+            <form class="account-form" id="profile-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>First Name</label>
+                  <input type="text" id="profile-first-name" placeholder="First Name" readonly required>
+                </div>
+                <div class="form-group">
+                  <label>Middle Name</label>
+                  <input type="text" id="profile-middle-name" placeholder="Middle Name" readonly>
+                </div>
+                <div class="form-group">
+                  <label>Last Name</label>
+                  <input type="text" id="profile-last-name" placeholder="Last Name" readonly required>
+                </div>
+              </div>
+
+              <p class="field-note">Name changes are not available on this page.</p>
+
+              <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="profile-email" placeholder="Email" required>
+                <p class="field-note">If you change your email, confirm the messages sent to your email addresses before the new login email becomes active.</p>
+                <p class="field-note pending-email-note" id="pending-email-note" hidden></p>
+              </div>
+
+              <div class="form-row form-row-two">
+                <div class="form-group">
+                  <label>Phone Number</label>
+                  <input type="tel" id="profile-phone" placeholder="Phone Number">
+                </div>
+
+                <div class="form-group">
+                  <label>Date Registered</label>
+                  <input type="text" id="profile-date" disabled>
+                </div>
+              </div>
+
+              <p class="form-msg" id="profile-msg"></p>
+              <button type="submit" class="save-btn">Save Changes</button>
+            </form>
+          </div>
+
+          <div class="profile-subsection">
+            <div class="subsection-header">
+              <h3>Change Password</h3>
+              <p>Update your password here instead of using a separate sidebar tab.</p>
+            </div>
+
+            <form class="account-form" id="password-form">
+              <div class="form-group">
+                <label>Current Password</label>
+                <input type="password" id="current-password" placeholder="Current password" required>
+              </div>
+
+              <div class="form-group">
+                <label>New Password</label>
+                <input type="password" id="new-password" placeholder="New password" required>
+                <p class="field-note">Must be at least 8 characters long</p>
+              </div>
+
+              <div class="form-group">
+                <label>Confirm New Password</label>
+                <input type="password" id="confirm-new-password" placeholder="Confirm new password" required>
+              </div>
+              <button type="submit" class="save-btn">Update Password</button>
+              <p class="form-msg" id="password-msg"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="account-section" id="section-reservations">
+        <div class="section-header">
+          <h2>My Reservations</h2>
+          <p>Track all your event bookings</p>
+        </div>
+        <div id="reservations-list">
+          <div class="empty-state">
+            <div class="empty-icon">&#128172;</div>
+            <h3>No reservations yet</h3>
+            <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="receipt-modal-backdrop" aria-hidden="true">
+    <div class="account-modal-card receipt-modal-card" role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
+      <button type="button" class="account-modal-close" id="receipt-modal-close" aria-label="Close receipt view">x</button>
+      <p class="account-modal-eyebrow">Acknowledgement Receipt</p>
+      <h2 class="account-modal-title" id="receipt-modal-title">Receipt Details</h2>
+      <div class="receipt-view" id="receipt-view"></div>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="receipt-modal-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="reservation-details-backdrop" aria-hidden="true">
+    <div class="account-modal-card reservation-details-modal-card" role="dialog" aria-modal="true" aria-labelledby="reservation-details-title">
+      <button type="button" class="account-modal-close" id="reservation-details-close" aria-label="Close reservation details">x</button>
+      <p class="account-modal-eyebrow">Reservation Details</p>
+      <h2 class="account-modal-title" id="reservation-details-title">Booking Overview</h2>
+      <p class="account-modal-copy">Review your booking information, payment progress, and uploaded contract in one place.</p>
+      <div class="reservation-details-view" id="reservation-details-view"></div>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="reservation-details-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="reschedule-modal-backdrop" aria-hidden="true">
+    <div class="account-modal-card reschedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title">
+      <button type="button" class="account-modal-close" id="reschedule-modal-close" aria-label="Close reschedule dialog">x</button>
+      <p class="account-modal-eyebrow">Reschedule Request</p>
+      <h2 class="account-modal-title" id="reschedule-modal-title">Choose a New Date and Time</h2>
+      <p class="account-modal-copy">Pick an available date first, then select a new start time for your event.</p>
+
+      <div class="reschedule-current-block">
+        <span class="reschedule-current-label">Current booking</span>
+        <strong class="reschedule-current-value" id="reschedule-current-value">Loading...</strong>
+      </div>
+
+      <div class="reschedule-calendar-panel">
+        <div class="reschedule-calendar-head">
+          <button type="button" class="reschedule-nav-btn" id="reschedule-prev-month" aria-label="Previous month">&lsaquo;</button>
+          <span class="reschedule-month-label" id="reschedule-month-label">Loading...</span>
+          <button type="button" class="reschedule-nav-btn" id="reschedule-next-month" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <div class="reschedule-weekdays" aria-hidden="true">
+          <span>Su</span>
+          <span>Mo</span>
+          <span>Tu</span>
+          <span>We</span>
+          <span>Th</span>
+          <span>Fr</span>
+          <span>Sa</span>
+        </div>
+        <div class="reschedule-calendar-grid" id="reschedule-calendar-grid"></div>
+        <div class="reschedule-legend">
+          <span class="reschedule-legend-item"><span class="reschedule-swatch available"></span>Available</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch booked"></span>Fully Booked</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch closed"></span>Closed</span>
+        </div>
+      </div>
+
+      <div class="reschedule-time-section">
+        <label class="reschedule-section-label">New time</label>
+        <div class="reschedule-time-grid" id="reschedule-time-grid"></div>
+      </div>
+
+      <p class="account-modal-message" id="reschedule-modal-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="reschedule-modal-cancel">Cancel</button>
+        <button type="button" class="account-modal-btn primary" id="reschedule-modal-submit">Submit Reschedule Request</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="review-prompt-backdrop" aria-hidden="true">
+    <div class="account-modal-card review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-prompt-title">
+      <button type="button" class="account-modal-close" id="review-prompt-close" aria-label="Close review prompt">x</button>
+      <p class="account-modal-eyebrow">Completed Reservation</p>
+      <h2 class="account-modal-title" id="review-prompt-title">Share Your Experience</h2>
+      <p class="account-modal-copy">Your reservation is complete. Leave a quick review if you would like to help us understand how the event went.</p>
+
+      <div class="review-reservation-summary" id="review-prompt-reservation-meta"></div>
+
+      <div class="review-form-shell">
+        <div class="review-field-block">
+          <span class="review-field-label">Rating</span>
+          <div class="review-rating-picker" id="review-prompt-rating" role="radiogroup" aria-label="Rate your reservation from 1 to 5 stars">
+            <button type="button" class="review-star-btn" data-rating-value="1" role="radio" aria-checked="false" aria-label="1 star">&#9733;</button>
+            <button type="button" class="review-star-btn" data-rating-value="2" role="radio" aria-checked="false" aria-label="2 stars">&#9733;</button>
+            <button type="button" class="review-star-btn" data-rating-value="3" role="radio" aria-checked="false" aria-label="3 stars">&#9733;</button>
+            <button type="button" class="review-star-btn" data-rating-value="4" role="radio" aria-checked="false" aria-label="4 stars">&#9733;</button>
+            <button type="button" class="review-star-btn" data-rating-value="5" role="radio" aria-checked="false" aria-label="5 stars">&#9733;</button>
+          </div>
+          <p class="review-rating-copy" id="review-prompt-rating-copy">Choose a rating before you submit.</p>
+        </div>
+
+        <label class="review-field-block" for="review-prompt-comment">
+          <span class="review-field-label">Comment</span>
+          <textarea id="review-prompt-comment" class="review-comment-input" rows="5" maxlength="800" placeholder="Optional: tell us what went well or what could be improved."></textarea>
+        </label>
+      </div>
+
+      <p class="account-modal-message" id="review-prompt-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="review-prompt-dismiss">Not Now</button>
+        <button type="button" class="account-modal-btn primary" id="review-prompt-submit">Submit Review</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
+    <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
+      <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
+      <div class="submission-feedback-icon" aria-hidden="true">&#10003;</div>
+      <p class="account-modal-eyebrow" id="submission-feedback-eyebrow">Contract Resubmitted</p>
+      <h2 class="account-modal-title" id="submission-feedback-title">Replacement Contract Submitted</h2>
+      <p class="account-modal-copy" id="submission-feedback-copy">Your corrected signed contract was sent to the admin for review.</p>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn primary" id="submission-feedback-dismiss">Okay</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/navbar.js"></script>
+  <script type="module" src="/js/account.js"></script>
+</body>
+</html>
+
