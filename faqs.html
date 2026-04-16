@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" a href="/css/styles.css">
+    <link rel="stylesheet" a href="/css/faqs.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    
+    
+
+
+
+    <title>ELI Coffee Events Cafe</title>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar__container">
+            <a href="/index.html">
+                <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+            </a>
+
+            <div class="navbar__toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+
+        
+        <ul class="navbar__menu">
+            <li class="navbar__item">
+                <a href="/index.html" class="navbar__links">
+                    Home
+                </a>
+            </li>
+            <li class="navbar__item">
+                <a href="/packages.html" class="navbar__links">
+                    Packages
+                </a>
+            </li>
+            <li class="navbar__item">
+                <a href="/reservations.html" class="navbar__links">
+                    Reservations
+                </a>
+            </li>
+            <li class="navbar__item">
+                <a href="/faqs.html" class="navbar__links">
+                    FAQs
+                </a>
+            </li>
+            <li class="navbar__item">
+                <a href="/about.html" class="navbar__links">
+                    About
+                </a>
+            </li>
+         
+            <li class="navbar__btn"></li>
+        </ul>
+        </div>
+    </nav>
+
+<div class="faqs-title">
+    <h1>Frequently Asked Questions</h1>
+    <p>Find answers to common questions about our services.</p>
+  </div>
+
+
+  <div class="wrapper">
+  <div class="faq">
+    <button class="faq-header">Do you accept walk-in reservations? <i class="fa-solid fa-chevron-down"></i></button>
+    <div class="faq-body">
+      <p>We highly recommend booking in advance to secure your spot, but we do accept walk-ins if tables are available.</p>
+    </div>
+  </div>
+
+  <div class="faq">
+    <button class="faq-header">Can I host private events at ELI Coffee? <i class="fa-solid fa-chevron-down"></i></button>
+    <div class="faq-body">
+      <p>Yes! Our cafÃ© is designed for events. We offer packages for birthdays, meetings, and special gatherings. Contact us to customize your event.</p>
+    </div>
+  </div>
+
+  <div class="faq">
+    <button class="faq-header">Do you offer catering services? <i class="fa-solid fa-chevron-down"></i></button>
+    <div class="faq-body">
+      <p>We provide catering for small and large events. Our menu can be tailored to suit your occasion, from coffee and pastries to full meals.</p>
+    </div>
+  </div>
+
+  <div class="faq">
+    <button class="faq-header">Is there parking available? <i class="fa-solid fa-chevron-down"></i></button>
+    <div class="faq-body">
+      <p>Yes, we have designated parking spaces for guests. For larger events, we can assist with additional parking arrangements nearby.</p>
+    </div>
+  </div>
+
+  <div class="faq">
+    <button class="faq-header">Do you have Wi-Fi for customers? <i class="fa-solid fa-chevron-down"></i></button>
+    <div class="faq-body">
+      <p>Absolutely! Free Wi-Fi is available for all guests, making our cafÃ© a great spot for meetings, study sessions, or remote work.</p>
+    </div>
+  </div>
+
+  <div class="faq">
+    <button class="faq-header">What payment methods do you accept? <i class="fa-solid fa-chevron-down"></i></button>
+    <div class="faq-body">
+      <p>We accept cash, major credit/debit cards, and popular e-wallets like GCash and Maya for your convenience.</p>
+    </div>
+  </div>
+</div>
+
+  
+
+  <script>
+    const faqs = document.querySelectorAll(".faq-header");
+    faqs.forEach(header => {
+      header.addEventListener("click", () => {
+        const faq = header.parentElement;
+        faq.classList.toggle("active");
+      });
+    });
+  </script>
+
+<footer class="footer">
+    <div class="footer-top">
+        <div class="footer-brand">
+            <img src="/images/eli coffee binangonan logo.png" alt="ELI Coffee Logo" class="footer-logo">
+            <p>Your go-to events cafe in Binangonan, Rizal.</p>
+        </div>
+
+        <div class="footer-contact">
+            <h3>Contact Us</h3>
+            <p> 
+                <i class="fa-solid fa-phone"></i>
+                0917 562 0306 | 0917 562 0308
+            </p>
+            <p>
+                <i class="fa-solid fa-at"></i>
+                elicoffeetea@gmail.com
+            </p>
+        </div>
+
+        <div class="footer-social">
+            <h3>Follow Us</h3>
+            <p>
+                <i class="fa-brands fa-square-facebook"></i>
+                Facebook: @elicoffeeph
+            </p>
+            <p>
+                <i class="fa-brands fa-instagram"></i>
+                 Instagram: @elicoffeeph</p>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <p>&copy; 2024 ELI Coffee Events Cafe. All rights reserved.</p>
+    </div>
+</footer>
+
+
+<script type="module" src="/js/navbar.js"></script>
+
+</body>
+</html>
+

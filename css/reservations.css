@@ -193,6 +193,40 @@
         .res-step.active { display: block; }
         .res-step h2 { color: #2A1408; font-size: 22px; margin-bottom: 6px; font-weight: 700; }
         .res-step > p { color: #777; font-size: 14px; margin-bottom: 20px; }
+        .smart-step-section {
+            margin-top: 24px;
+            padding-top: 22px;
+            border-top: 1px solid #f0e5db;
+        }
+        .smart-step-section:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+        .smart-step-heading {
+            margin-bottom: 16px;
+        }
+        .smart-step-kicker {
+            display: inline-block;
+            margin-bottom: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6B3A1F;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .smart-step-heading h3 {
+            margin: 0 0 6px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #2A1408;
+        }
+        .smart-step-heading p {
+            margin: 0;
+            font-size: 13px;
+            color: #7b6a5d;
+            line-height: 1.6;
+        }
 
         /* Inputs */
         .res-input {
@@ -348,6 +382,18 @@
             transform: translateY(-1px);
             border-color: #c5a890;
             box-shadow: 0 8px 18px rgba(104, 67, 37, 0.08);
+        }
+        .availability-day.context-disabled {
+            background: #f8f5f1;
+            border-color: #e9ded3;
+            color: #b19f8f;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .availability-day.context-disabled:hover {
+            transform: none;
+            border-color: #e9ded3;
+            box-shadow: none;
         }
         .availability-day.past {
             background: #f8f5f1;
@@ -883,6 +929,22 @@
         .time-card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; color: #2A1408; transition: all 0.2s; }
         .time-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
         .time-card.active { border-color: #6B3A1F; background: #FFEDE0; }
+        .time-card.disabled {
+            cursor: not-allowed;
+            background: #f5f1eb;
+            color: #9c8f84;
+            border-color: #e3d8cd;
+        }
+        .time-card.disabled:hover {
+            border-color: #e3d8cd;
+            background: #f5f1eb;
+        }
+        .time-status-note {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #6B3A1F;
+            line-height: 1.6;
+        }
 
         /* Summary */
         .summary-box { background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 22px 24px; width: 100%; box-sizing: border-box; }
@@ -914,6 +976,168 @@
         .contract-upload label { display: block; font-size: 14px; font-weight: 600; color: #2A1408; margin-bottom: 8px; }
         .contract-upload input[type="file"] { width: 100%; border: 2px dashed #e0d0c0; border-radius: 10px; padding: 16px; background: #FFF8F0; cursor: pointer; box-sizing: border-box; font-family: inherit; }
         .contract-note { font-size: 12px; color: #aaa; margin-top: 6px; }
+        .contract-file-status {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #7b6a5d;
+            line-height: 1.5;
+        }
+        .contract-file-status.error {
+            color: #b42318;
+        }
+        .contract-file-status.success {
+            color: #166534;
+        }
+        .contract-agreement-box {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border: 1px solid #ead9ca;
+            border-radius: 12px;
+            background: #fffaf5;
+        }
+        .contract-agreement-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .contract-agreement-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: #6B3A1F;
+            flex-shrink: 0;
+        }
+        .contract-agreement-copy {
+            font-size: 14px;
+            color: #2A1408;
+            line-height: 1.6;
+        }
+        .contract-policy-link {
+            border: none;
+            background: none;
+            padding: 0;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            color: #6B3A1F;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .contract-policy-link:hover {
+            color: #2A1408;
+        }
+        .contract-inline-message {
+            min-height: 20px;
+            margin-top: 10px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #7b6a5d;
+        }
+        .contract-inline-message.error {
+            color: #b42318;
+        }
+        .contract-inline-message.success {
+            color: #166534;
+        }
+        .policy-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(42, 20, 8, 0.56);
+            z-index: 1200;
+        }
+        .policy-modal-backdrop.hidden {
+            display: none !important;
+        }
+        .policy-modal-card {
+            width: min(760px, 100%);
+            max-height: min(88vh, 820px);
+            overflow: auto;
+            position: relative;
+            border-radius: 18px;
+            padding: 28px 24px 22px;
+            background: #fff;
+            box-shadow: 0 24px 60px rgba(42, 20, 8, 0.22);
+        }
+        .policy-modal-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 38px;
+            height: 38px;
+            border: 1px solid #e4d5c9;
+            border-radius: 999px;
+            background: #fffaf5;
+            color: #6B3A1F;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .policy-modal-eyebrow {
+            margin: 0 0 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8b735e;
+        }
+        .policy-modal-title {
+            margin: 0 0 18px;
+            font-size: 24px;
+            color: #2A1408;
+        }
+        .policy-modal-content {
+            display: grid;
+            gap: 18px;
+        }
+        .policy-section h4 {
+            margin: 0 0 8px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #6B3A1F;
+        }
+        .policy-section p,
+        .policy-section li {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #4a3427;
+        }
+        .policy-section ul {
+            margin: 10px 0 0;
+            padding-left: 20px;
+            display: grid;
+            gap: 6px;
+        }
+        .policy-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid #eee2d8;
+        }
+        .policy-btn {
+            border-radius: 10px;
+            padding: 11px 18px;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .policy-btn-secondary {
+            border: 1px solid #e4d5c9;
+            background: #fff;
+            color: #6B3A1F;
+        }
+        .policy-btn-primary {
+            border: none;
+            background: #6B3A1F;
+            color: #fff;
+        }
 
         /* Buttons */
         .reservation-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
@@ -940,4 +1164,8 @@
             .availability-weekdays,
             .availability-grid { gap: 6px; }
             .availability-day { min-height: 40px; font-size: 14px; }
+            .policy-modal-backdrop { padding: 16px; }
+            .policy-modal-card { padding: 24px 16px 18px; }
+            .policy-modal-actions { flex-direction: column-reverse; }
+            .policy-btn { width: 100%; }
         }

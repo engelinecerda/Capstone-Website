@@ -1,0 +1,66 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservation Payment - ELI Coffee Events Cafe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/account.css">
+  <link rel="stylesheet" href="/css/payment.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar__container">
+      <a href="/index.html">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+      </a>
+      <div class="navbar__toggle" id="mobile-menu">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </div>
+      <ul class="navbar__menu">
+        <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
+        <li class="navbar__btn"></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main class="payment-page">
+    <div class="payment-page-shell">
+      <div class="payment-page-topbar">
+        <a class="payment-back-link" id="payment-back-link" href="/account.html?section=reservations">&larr; Back to My Reservations</a>
+      </div>
+
+      <div id="payment-page-app" class="payment-page-app">
+        <section class="payment-screen-card loading">
+          <p class="payment-screen-kicker">Loading</p>
+          <h1 class="payment-screen-title">Preparing your reservation payment page</h1>
+          <p class="payment-screen-copy">Please wait while we load your reservation details and payment records.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="account-modal-backdrop hidden" id="receipt-modal-backdrop" aria-hidden="true">
+    <div class="account-modal-card receipt-modal-card" role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
+      <button type="button" class="account-modal-close" id="receipt-modal-close" aria-label="Close receipt view">x</button>
+      <p class="account-modal-eyebrow">Acknowledgement Receipt</p>
+      <h2 class="account-modal-title" id="receipt-modal-title">Receipt Details</h2>
+      <div class="receipt-view" id="receipt-view"></div>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="receipt-modal-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/navbar.js"></script>
+  <script type="module" src="/js/payment.js"></script>
+</body>
+</html>
+

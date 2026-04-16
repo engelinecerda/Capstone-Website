@@ -41,13 +41,16 @@ create policy "insert own completed reservation review"
           or (
             lower(coalesce(r.status, '')) in ('approved', 'confirmed', 'rescheduled')
             and (
-              r.event_date < current_date
+              r.event_date < timezone('Asia/Manila', now())::date
               or (
-                r.event_date = current_date
+                r.event_date = timezone('Asia/Manila', now())::date
                 and coalesce(
-                  to_timestamp(trim(coalesce(r.event_time, '12:00 AM')), 'HH12:MI AM')::time,
+                  to_timestamp(
+                    coalesce(nullif(trim(coalesce(r.event_time, '')), ''), '12:00 AM'),
+                    'HH12:MI AM'
+                  )::time,
                   time '00:00'
-                ) <= localtime
+                ) <= timezone('Asia/Manila', now())::time
               )
             )
           )

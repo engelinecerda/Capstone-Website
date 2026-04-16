@@ -23,7 +23,7 @@ const statCustomersWithPhone = document.getElementById('statCustomersWithPhone')
 let allCustomers = [];
 
 function redirectToAdminLogin() {
-  window.location.replace('./admin_login.html');
+  window.location.replace('/admin/index.html');
 }
 
 function setCustomersMessage(message, isError = false) {

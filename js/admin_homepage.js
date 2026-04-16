@@ -52,7 +52,7 @@ async function loadPackages() { //  ADDED
 }
 
 function redirectToAdminLogin() {
-    window.location.replace('./admin_login.html');
+    window.location.replace('/admin/index.html');
 }
 
 function setDashboardMessage(message, isError = false) {
