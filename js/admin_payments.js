@@ -960,10 +960,21 @@ supabase.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') redirectLogin();
 });
 
-(async function init() {
-  await validateAdmin();
-  wireFilters();
-  wireTableActions();
-  wireModals();
-  await loadData();
-})();
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
+
+    // Setup inactivity (same as homepage)
+    setupInactivityLogout(profile.role);
+
+    // Attach UI event listeners
+    wireFilters();
+    wireTableActions();
+    wireModals();
+
+    // Load data ONCE
+    await loadData();
+  }
+});

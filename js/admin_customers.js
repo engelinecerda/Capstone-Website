@@ -331,47 +331,20 @@ async function loadCustomers() {
   }
 }
 
-async function validateAdminSession() {
-  const { session, profile } = await verifyAdminSession(supabase);
+wireLogoutButton();
+watchAuthState();
 
-  if (!session) {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-    return null;
-  }
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
 
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarName,
-    emailEl: sidebarEmail,
-    roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
-  });
+    // Setup inactivity
+    setupInactivityLogout(profile.role);
 
-  return session;
-}
+    // Attach UI listeners (IMPORTANT)
+    refreshCustomersBtn?.addEventListener('click', loadCustomers);
+    searchInput?.addEventListener('input', applyFilters);
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectToAdminLogin();
-});
-
-refreshCustomersBtn?.addEventListener('click', async () => {
-  await loadCustomers();
-});
-
-searchInput?.addEventListener('input', () => {
-  applyFilters();
-});
-
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') {
-    redirectToAdminLogin();
+    // Load data
+    await loadCustomers();
   }
 });
-
-const session = await validateAdminSession();
-if (session) {
-  await loadCustomers();
-}

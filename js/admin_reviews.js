@@ -338,48 +338,23 @@ async function loadReviews() {
   }
 }
 
-async function validateAdminSession() {
-  const { session, profile } = await verifyAdminSession(supabase);
+wireLogoutButton();
+watchAuthState();
 
-  if (!session) {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-    return null;
-  }
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
 
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarName,
-    emailEl: sidebarEmail,
-    roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
-  });
+    // Save session (you use this later)
+    adminSession = session;
 
-  adminSession = session;
-  return session;
-}
+    // Setup inactivity
+    setupInactivityLogout(profile.role);
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectToAdminLogin();
-});
+    // Wire UI
+    searchInput?.addEventListener('input', applyFilters);
+    refreshReviewsBtn?.addEventListener('click', loadReviews);
 
-refreshReviewsBtn?.addEventListener('click', async () => {
-  await loadReviews();
-});
-
-searchInput?.addEventListener('input', () => {
-  applyFilters();
-});
-
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') {
-    redirectToAdminLogin();
+    // Load data
+    await loadReviews();
   }
 });
-
-const session = await validateAdminSession();
-if (session) {
-  await loadReviews();
-}

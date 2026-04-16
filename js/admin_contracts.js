@@ -936,3 +936,21 @@ supabase.auth.onAuthStateChange((event) => {
   wireModals();
   await loadData();
 })();
+
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
+
+    //  Set inactivity (super admin)
+    setupInactivityLogout(profile.role);
+
+    wireFilters();
+    wireTableActions();
+    wireModals();
+    
+    // Load your data (ONLY ONCE)
+    await loadData();
+  }
+});
