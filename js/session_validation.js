@@ -29,7 +29,7 @@ export function applyRoleVisibility(role) {
 // Call this at the top of every admin/super_admin page.
 // Returns { session, profile } on success, null on failure (and redirects).
 export async function validateAdminSession({
-  redirectTo = './admin_login.html',
+  redirectTo = '/admin/index.html',
   nameElId = 'sidebarName',
   emailElId = 'sidebarEmail',
   roleElId = 'sidebarRolePill',
@@ -91,7 +91,7 @@ export async function validateAdminSession({
 
 // ─── Auth state watcher ───────────────────────────────────────────────────────
 // Call once per page. Redirects to login if session is signed out.
-export function watchAuthState(redirectTo = './admin_login.html') {
+export function watchAuthState(redirectTo = '/admin/index.html') {
   supabase.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') {
     localStorage.removeItem('profile'); //  clear cache
@@ -104,7 +104,7 @@ export function watchAuthState(redirectTo = './admin_login.html') {
 // Wire this to your logout button.
 export function wireLogoutButton(
   buttonId = 'logoutBtn',
-  redirectTo = './admin_login.html'
+  redirectTo = '/admin/index.html'
 ) {
   const btn = document.getElementById(buttonId);
 

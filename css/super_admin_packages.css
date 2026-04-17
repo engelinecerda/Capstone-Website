@@ -848,6 +848,33 @@ body {
 
 .choose-file-btn:hover { background: #f6ece1; border-color: #d9c2aa; }
 
+.image-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.remove-image-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #b91c1c;
+  transition: background .15s;
+}
+
+.remove-image-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+.remove-image-btn.hidden { display: none; }
+
 .file-name {
   font-size: 12.5px;
   color: var(--muted);

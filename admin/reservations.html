@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reservation Management - Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/admin_reservations.css">
+  <link rel="stylesheet" href="../css/super_admin_only.css">
+  <link rel="stylesheet" href="../css/admin_reservations.css">
 </head>
 <body>
   <aside class="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-header">
-        <p class="sidebar-title">Admin Panel</p>
+        <p class="sidebar-title" id="sidebarTitle">Loading...</p>
         <p class="sidebar-sub">ELI Coffee Events</p>
       </div>
     </div>
@@ -20,7 +21,7 @@
         <div class="sidebar-profile-copy">
           <p class="sidebar-name" id="sidebarName">Loading...</p>
           <p class="sidebar-email" id="sidebarEmail">Checking session...</p>
-          <span class="sidebar-role-pill" id="sidebarRolePill">Admin</span>
+          <span class="sidebar-role-pill" id="sidebarRolePill">Loading...</span>
         </div>
       </div>
 
@@ -65,6 +66,28 @@
           </span>
           <span class="nav-label">Customers</span>
         </a>
+        </nav>
+      <!-- SUPER ADMIN ONLY -->
+        <a href="/super admin/super_admin_packages.html" class="nav-item super-admin-only">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
+          </span>
+          <span class="nav-label">Packages</span>
+        </a>
+
+        <a href="/super admin/super_admin_backup.html" class="nav-item super-admin-only">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </span>
+          <span class="nav-label">Backup & Restore</span>
+        </a>
+
+        <a href="/super admin/super_admin_accounts.html" class="nav-item super-admin-only">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="nav-label">Accounts Management</span>
+        </a>
       </nav>
       <div class="sidebar-bottom-nav">
         <a href="/admin/profile.html" class="nav-item">
@@ -87,7 +110,7 @@
     <section class="page-shell">
       <header class="page-header">
         <div>
-          <h1 class="page-title">Reservation Management <span class="admin-badge">Admin</span></h1>
+          <h1 class="page-title">Reservation Management <span class="admin-badge" id="adminBadge">Loading...</span></h1>
           <p class="page-sub">Review bookings, update statuses, and manage day availability without leaving the page.</p>
         </div>
       </header>
@@ -379,7 +402,6 @@
     </div>
   </div>
 
-  <script type="module" src="/js/admin_reservations.js"></script>
+  <script type="module" src="../js/admin_reservations.js"></script>
 </body>
 </html>
-
