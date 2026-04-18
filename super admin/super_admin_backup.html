@@ -1,3 +1,4 @@
+<!-- super admin layoout reference for the side navigations -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,8 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Backup Module - ELI Coffee Events</title>
   <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/super_admin_only.css">
-  <link rel="stylesheet" href="../css/super_admin_backup.css">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/super_admin_backup.css">
+  <!-- Google Identity Services (token model, no redirect needed) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -29,41 +32,41 @@
       </div>
 
       <nav class="sidebar-nav">
-        <a href="../admin/dashboard.html" class="nav-item">
+        <a href="/admin/dashboard.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </span>
           <span class="nav-label">Dashboard</span>
         </a>
-        <a href="../admin/reservations.html" class="nav-item">
+        <a href="/admin/reservations.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </span>
           <span class="nav-label">Reservations</span>
           <span class="nav-badge" id="navReservationCount" hidden>0</span>
         </a>
-        <a href="../admin/contracts.html" class="nav-item">
+        <a href="/admin/contracts.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </span>
           <span class="nav-label">Contracts</span>
           <span class="nav-badge" id="navContractCount" hidden>0</span>
         </a>
-        <a href="../admin/payments.html" class="nav-item">
+        <a href="/admin/payments.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
           </span>
           <span class="nav-label">Payments</span>
           <span class="nav-badge" id="navPaymentCount" hidden>0</span>
         </a>
-        <a href="../admin/reviews.html" class="nav-item">
+        <a href="/admin/reviews.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
           </span>
           <span class="nav-label">Reviews</span>
           <span class="nav-badge" id="navReviewCount" hidden>0</span>
         </a>
-        <a href="../admin/customers.html" class="nav-item">
+        <a href="/admin/customers.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </span>
@@ -71,19 +74,19 @@
         </a>
 
         <!-- SUPER ADMIN ONLY -->
-        <a href="../super admin/super_admin_packages.html" class="nav-item">
+        <a href="/super admin/super_admin_packages.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
           </span>
           <span class="nav-label">Packages</span>
         </a>
-        <a href="../super admin/super_admin_backup.html" class="nav-item active">
+        <a href="/super admin/super_admin_backup.html" class="nav-item active">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15"/></svg>
           </span>
           <span class="nav-label">Backup &amp; Restore</span>
         </a>
-        <a href="../super admin/super_admin_accounts.html" class="nav-item">
+        <a href="/super admin/super_admin_accounts.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </span>
@@ -92,7 +95,7 @@
       </nav>
 
       <div class="sidebar-bottom-nav">
-        <a href="../admin/profile.html" class="nav-item">
+        <a href="/admin/profile.html" class="nav-item">
           <span class="nav-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
           </span>
@@ -114,15 +117,38 @@
 
       <div class="page-header">
         <div>
-          <h1 class="page-title">Backup Module</h1>
+          <h1 class="page-title">Backup Module <span class="admin-badge" id="adminBadge">Loading...</span></h1>
           <p class="page-sub">Manage system database backups and restore operations</p>
+        </div>
+      </div>
+
+      <!-- Google Drive Auth Banner -->
+      <div class="auth-banner" id="authBanner">
+        <div class="auth-banner-left">
+          <div class="auth-banner-icon">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17.92z"/></svg>
+          </div>
+          <div>
+            <div class="auth-banner-title">Connect Google Drive</div>
+            <div class="auth-banner-sub">Backups are saved as JSON files to your Google Drive account</div>
+          </div>
+        </div>
+        <div class="auth-banner-right">
+          <span class="auth-status" id="googleAuthStatus">Not connected</span>
+          <button type="button" class="btn-google" id="googleAuthBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Connect Google Drive
+          </button>
         </div>
       </div>
 
       <!-- Action Cards Row -->
       <div class="action-cards-row">
-
-        <!-- Create Backup -->
         <div class="action-card">
           <div class="action-card-top">
             <div class="action-card-icon">
@@ -130,16 +156,15 @@
             </div>
             <div>
               <h2 class="action-card-title">Create Backup</h2>
-              <p class="action-card-sub">Perform a manual system backup now</p>
+              <p class="action-card-sub">Export all tables to a JSON file on Google Drive</p>
             </div>
           </div>
-          <button type="button" class="btn-primary btn-full" id="createBackupBtn">
+          <button type="button" class="btn-primary btn-full" id="createBackupBtn" disabled>
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
             Create System Backup
           </button>
         </div>
 
-        <!-- Restore System -->
         <div class="action-card">
           <div class="action-card-top">
             <div class="action-card-icon">
@@ -147,12 +172,12 @@
             </div>
             <div>
               <h2 class="action-card-title">Restore System</h2>
-              <p class="action-card-sub">Restore from a previous backup</p>
+              <p class="action-card-sub">Restore all tables from a previous backup file</p>
             </div>
           </div>
-          <button type="button" class="btn-outline btn-full" id="restoreSystemBtn">
+          <button type="button" class="btn-outline btn-full" id="restoreSystemBtn" disabled>
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-            Restore Database
+            Restore Latest Backup
           </button>
         </div>
       </div>
@@ -161,10 +186,9 @@
       <p class="page-message" id="pageMessage"></p>
 
       <!-- Backup Status -->
-      <div class="card" id="statusCard">
+      <div class="card">
         <h2 class="section-title">Backup Status</h2>
         <p class="section-sub">Current backup configuration and status</p>
-
         <div class="status-grid">
           <div class="status-item">
             <span class="status-label">Last Backup</span>
@@ -181,8 +205,8 @@
           </div>
           <div class="status-item">
             <span class="status-label">Storage Location</span>
-            <span class="status-value" id="storageLocation">Cloud Storage (Azure)</span>
-            <span class="status-caption">Remote storage</span>
+            <span class="status-value" id="storageLocation">Google Drive</span>
+            <span class="status-caption">JSON file export</span>
           </div>
         </div>
       </div>
@@ -190,20 +214,15 @@
       <!-- Backup History -->
       <div class="card">
         <h2 class="section-title">Backup History</h2>
-        <p class="section-sub">View and manage previous system backups</p>
-
-        <div class="history-list" id="historyList">
-          <!-- populated by JS -->
-        </div>
-
-        <p class="empty-history hidden" id="emptyHistory">No backups found.</p>
+        <p class="section-sub">View, download, restore, or delete previous backups from Google Drive</p>
+        <div class="history-list" id="historyList"></div>
+        <p class="empty-history hidden" id="emptyHistory">No backups found. Connect Google Drive and create your first backup.</p>
       </div>
 
       <!-- Backup Settings -->
       <div class="card">
         <h2 class="section-title">Backup Settings</h2>
-        <p class="section-sub">Configure backup retention and storage</p>
-
+        <p class="section-sub">Configure backup retention policy</p>
         <div class="settings-list">
           <div class="settings-row">
             <div>
@@ -215,9 +234,14 @@
           <div class="settings-row">
             <div>
               <div class="settings-row-title">Storage Location</div>
-              <div class="settings-row-sub" id="storageLocationSetting">Cloud Storage (Azure)</div>
+              <div class="settings-row-sub">Google Drive — folder: ELI Coffee Backups</div>
             </div>
-            <button type="button" class="btn-outline-sm" id="changeStorageBtn">Change</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Backup Format</div>
+              <div class="settings-row-sub">JSON export of all 14 database tables</div>
+            </div>
           </div>
         </div>
       </div>
@@ -231,14 +255,23 @@
       <div class="modal-header">
         <div>
           <h2 class="modal-title">Create System Backup</h2>
-          <p class="modal-sub">This will create a full system backup now</p>
+          <p class="modal-sub">All 14 tables will be exported and saved to Google Drive</p>
         </div>
         <button type="button" class="modal-close" id="confirmBackupClose" aria-label="Close">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
       <div class="modal-body">
-        <p class="confirm-copy">Are you sure you want to create a full system backup now? This may take a few minutes.</p>
+        <p class="confirm-copy">This will read all database tables and save a JSON backup file to your connected Google Drive. This may take a moment depending on the size of your data.</p>
+        <div class="progress-wrap hidden" id="backupProgressWrap">
+          <div class="progress-header">
+            <span class="progress-label" id="backupProgressLabel">Preparing…</span>
+            <span class="progress-pct" id="backupProgressPct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar" id="backupProgressBar" style="width:0%"></div>
+          </div>
+        </div>
         <p class="modal-message hidden" id="confirmBackupMessage"></p>
       </div>
       <div class="modal-footer">
@@ -266,9 +299,18 @@
       <div class="modal-body">
         <div class="restore-warning">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>This will overwrite all current data. This action cannot be undone.</span>
+          <span>This will upsert all rows from the backup into every table. Existing records will be overwritten. This cannot be undone.</span>
         </div>
         <p class="confirm-copy" id="restoreCopy">Restore from selected backup?</p>
+        <div class="progress-wrap hidden" id="restoreProgressWrap">
+          <div class="progress-header">
+            <span class="progress-label" id="restoreProgressLabel">Preparing…</span>
+            <span class="progress-pct" id="restoreProgressPct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar" id="restoreProgressBar" style="width:0%"></div>
+          </div>
+        </div>
         <p class="modal-message hidden" id="restoreMessage"></p>
       </div>
       <div class="modal-footer">
@@ -289,8 +331,7 @@
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <div class="modal-body" id="settingsModalBody">
-      </div>
+      <div class="modal-body" id="settingsModalBody"></div>
       <div class="modal-footer">
         <button type="button" class="btn-cancel" id="settingsCancel">Cancel</button>
         <button type="button" class="btn-primary" id="settingsSave">Save Changes</button>
@@ -298,6 +339,6 @@
     </div>
   </div>
 
-  <script type="module" src="../js/super_admin_backup.js"></script>
+  <script type="module" src="/js/super_admin_backup.js"></script>
 </body>
 </html>

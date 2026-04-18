@@ -1,3 +1,4 @@
+//admin_login.js
 import { portalSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
 
@@ -89,6 +90,24 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         return;
     }
 
+    // CHECK STATUS
+    const { data: profileCheck, error: lockError } = await supabase
+        .from('profiles')
+        .select('is_locked')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+    if (lockError || !profileCheck) {
+        await supabase.auth.signOut();
+        setMessage('Unable to verify account status.', 'error');
+        return;
+    }
+
+    if (profileCheck.is_locked === true) {
+        await supabase.auth.signOut();
+        setMessage('Your account has been locked by the administrator.', 'error');
+        return;
+    }
     const { session, profile, message } = await verifyPortalSession(supabase, { requiredRole: selectedRole });
     if (!session) {
         await supabase.auth.signOut();

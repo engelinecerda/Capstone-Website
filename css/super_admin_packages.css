@@ -224,6 +224,16 @@ body {
   line-height: 1.2;
 }
 
+.admin-badge {
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
 .page-sub {
   font-size: 13px;
   color: var(--muted);

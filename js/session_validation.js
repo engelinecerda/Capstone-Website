@@ -1,3 +1,5 @@
+
+//session_validation.js
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 

@@ -1,3 +1,5 @@
+//admin_auth.js
+
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
 }
