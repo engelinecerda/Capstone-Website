@@ -1,3 +1,4 @@
+// app.js
 const menuToggle = document.getElementById('mobile-menu');
 const menu = document.querySelector('.navbar__menu');
 

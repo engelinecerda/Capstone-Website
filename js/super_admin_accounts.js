@@ -26,7 +26,7 @@
         `<tr><td colspan="8"><div class="table-empty"><p style="color:var(--muted);">Loading accounts…</p></div></td></tr>`;
 
       const { data, error } = await supabase
-        .from('profiles_with_auth')
+        .from('profiles')
         .select('*')
         //.select('user_id, first_name, middle_name, last_name, email, phone_number, role, staff_role, date_registered, is_locked')
         .in('role', ['admin', 'staff'])
@@ -52,9 +52,9 @@
     function updateStats() {
       const total  = allAccounts.length;
 
-      const activeAccounts = allAccounts.filter(a => a._status === 'active');
-      const admins = activeAccounts.filter(a => a.role === 'admin').length;
-      const staff  = activeAccounts.filter(a => a.role === 'staff').length;
+      //const activeAccounts = allAccounts.filter(a => a._status === 'active');
+      const admins = allAccounts.filter(a => a.role === 'admin').length;
+      const staff  = allAccounts.filter(a => a.role === 'staff').length;
       document.getElementById('statTotal').textContent    = total;
       document.getElementById('statTotalSub').textContent = `${admins} admin${admins !== 1 ? 's' : ''}, ${staff} staff`;
       document.getElementById('statAdmins').textContent   = admins;
@@ -386,7 +386,7 @@
       const idx = allAccounts.findIndex(x => x.user_id === a.user_id);
       if (idx !== -1) allAccounts[idx]._status = statusMap[a.user_id];
 
-      updateStats();
+      //updateStats();
       applyFilters();
       closeConfirmModal();
     };

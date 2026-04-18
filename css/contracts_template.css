@@ -1,0 +1,453 @@
+/* =============================================================
+   ELI Coffee Events — Contract Template Modal Styles
+   File: css/admin_contracts_template.css
+   Imports: admin_contracts.css (already loaded on the page)
+   ============================================================= */
+
+/* ── Page header row ───────────────────────────────────────── */
+/* Wraps the title block + Add Template button in a flex row   */
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+/* ── Add Template trigger button ───────────────────────────── */
+.btn-add-template {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  background: #5a3b24; /* dark brown like your design */
+  color: #fff;
+
+  border: none;
+  border-radius: 999px; /* makes it fully pill-shaped */
+
+  padding: 14px 26px; /* bigger = closer to your screenshot */
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 600;
+
+  cursor: pointer;
+  white-space: nowrap;
+
+  transition: all 0.2s ease;
+}
+
+/* hover effect */
+.btn-add-template:hover {
+  background: #6b4a2f;
+  transform: translateY(-1px);
+}
+
+/* optional: subtle click press */
+.btn-add-template:active {
+  transform: translateY(0);
+}
+.btn-add-template:hover { background: var(--primary-hover); }
+
+/* ── Modal overlay ─────────────────────────────────────────── */
+.tmpl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 21, 11, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 24px;
+}
+.tmpl-overlay.hidden { display: none; }
+
+/* ── Modal card ────────────────────────────────────────────── */
+.tmpl-modal {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 540px;
+  box-shadow: 0 20px 60px rgba(32, 21, 11, 0.18);
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  overflow: hidden;
+}
+
+/* ── Modal header ──────────────────────────────────────────── */
+.tmpl-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 22px 24px 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.tmpl-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tmpl-modal-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.tmpl-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.tmpl-modal-close:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ── Modal body ────────────────────────────────────────────── */
+.tmpl-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Modal footer ──────────────────────────────────────────── */
+.tmpl-modal-footer {
+  padding: 16px 24px 22px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+
+/* ── Form grid ─────────────────────────────────────────────── */
+.tmpl-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.tmpl-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tmpl-form-group.full {
+  grid-column: 1 / -1;
+}
+
+/* ── Labels ────────────────────────────────────────────────── */
+.tmpl-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.tmpl-label-opt {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Inputs / selects / textarea ───────────────────────────── */
+.tmpl-input,
+.tmpl-select,
+.tmpl-textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.tmpl-input:focus,
+.tmpl-select:focus,
+.tmpl-textarea:focus {
+  border-color: var(--primary);
+}
+
+.tmpl-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.tmpl-select {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2373685f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  padding-right: 30px;
+}
+
+.tmpl-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.tmpl-hint code {
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: 'Courier New', monospace;
+  color: var(--text);
+}
+
+/* ── Source tabs (Upload / Paste URL) ──────────────────────── */
+.tmpl-source-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--bg);
+  padding: 3px;
+  margin-bottom: 12px;
+}
+
+.tmpl-source-tab {
+  flex: 1;
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 7px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tmpl-source-tab.active {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Source panels ─────────────────────────────────────────── */
+.tmpl-source-panel         { display: none; }
+.tmpl-source-panel.active  { display: block; }
+
+/* ── Drag-and-drop file zone ───────────────────────────────── */
+.tmpl-file-zone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 22px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--bg);
+}
+
+.tmpl-file-zone:hover,
+.tmpl-file-zone.drag-over {
+  border-color: var(--primary);
+  background: #f0e8de;
+}
+
+.tmpl-file-zone input[type="file"] {
+  display: none;
+}
+
+.tmpl-file-zone-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  color: var(--muted);
+}
+
+.tmpl-file-zone-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tmpl-file-zone-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ── Chosen file row ───────────────────────────────────────── */
+.tmpl-file-chosen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.tmpl-file-chosen.hidden { display: none; }
+
+.tmpl-file-chosen svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.tmpl-file-chosen span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tmpl-file-chosen button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.tmpl-file-chosen button:hover { color: var(--danger); }
+
+/* ── Upload progress bar ───────────────────────────────────── */
+.tmpl-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tmpl-progress-wrap.hidden { display: none; }
+
+.tmpl-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tmpl-progress-label {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.tmpl-progress-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.tmpl-progress-track {
+  background: var(--bg);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 8px;
+  border: 1px solid var(--border);
+}
+
+.tmpl-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 8px;
+  transition: width 0.25s ease;
+  min-width: 0;
+}
+
+/* ── Feedback message ──────────────────────────────────────── */
+.tmpl-msg {
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  color: var(--danger);
+  border: 1px solid #fecaca;
+  line-height: 1.5;
+}
+
+.tmpl-msg.hidden  { display: none; }
+.tmpl-msg.success { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.tmpl-msg.info    { background: #eef4ff; color: #1d4ed8; border-color: #bfdbfe; }
+
+/* ── Footer buttons ────────────────────────────────────────── */
+.tmpl-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tmpl-btn-cancel:hover { background: var(--bg); }
+
+.tmpl-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary);
+  color: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tmpl-btn-save:hover    { background: var(--primary-hover); }
+.tmpl-btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .tmpl-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .tmpl-form-group.full {
+    grid-column: 1;
+  }
+  .page-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
