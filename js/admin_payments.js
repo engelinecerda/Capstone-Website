@@ -948,6 +948,12 @@ validateAdminSession({
     setupInactivityLogout(profile.role);
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
     
+    if (profile.role === 'super_admin') {
+      document.body.classList.add('is-super-admin');
+    } else {
+      document.body.classList.remove('is-super-admin');
+    }
+
     // Attach UI event listeners
     wireFilters();
     wireTableActions();

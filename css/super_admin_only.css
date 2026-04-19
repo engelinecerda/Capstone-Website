@@ -1,7 +1,35 @@
+/* ══════════════════════════════════════════════════════════════
+   SUPER ADMIN ONLY — Visibility Control
+   ══════════════════════════════════════════════════════════════ */
+
+/* Hide everything by default */
 .super-admin-only {
-    display: none;
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
-.show-super-admin {
-    display: flex;
+/* Show when body has is-super-admin */
+body.is-super-admin .super-admin-only {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Sections should use block-like flex */
+body.is-super-admin section.super-admin-only {
+  display: flex !important;
+  flex-direction: column;
+}
+
+/* Keep hidden class respected even for super admin */
+body.is-super-admin .super-admin-only.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Sidebar nav items should use flex */
+body.is-super-admin a.super-admin-only.nav-item {
+  display: flex !important;
 }

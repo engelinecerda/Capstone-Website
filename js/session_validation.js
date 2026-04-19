@@ -11,6 +11,12 @@ const ALLOWED_ROLES = ['admin', 'super_admin'];
 export function applyRoleVisibility(role) {
   const isSuperAdmin = role === 'super_admin';
 
+   document.body.classList.remove('is-super-admin');
+  if (isSuperAdmin) {
+    document.body.classList.add('is-super-admin');
+  }
+
+
   document.querySelectorAll('.super-admin-only').forEach(el => {
     el.style.display = isSuperAdmin ? 'flex' : 'none';
   });
