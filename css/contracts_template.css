@@ -1,11 +1,26 @@
-/* =============================================================
-   ELI Coffee Events — Contract Template Modal Styles
-   File: css/admin_contracts_template.css
-   Imports: admin_contracts.css (already loaded on the page)
-   ============================================================= */
+:root {
+  --bg: #f5efe7;
+  --panel-bg: #ffffff;
+  --sidebar-bg: #fffaf5;
+  --sidebar-w: 250px;
+  --active-bg: #4e3624;
+  --active-text: #ffffff;
+  --nav-text: #20150b;
+  --nav-hover: #ffffff;
+  --badge-bg: #2d1f14;
+  --badge-text: #ffffff;
+  --border: #eadfd2;
+  --text: #20150b;
+  --muted: #73685f;
+  --font: 'Kumbh Sans', sans-serif;
+  --accent-soft: #fbf6f0;
+  --accent-line: #ddccbc;
+  --accent-green: #d9f3df;
+  --accent-green-text: #166534;
+  --accent-blue: #eff6ff;
+  --accent-blue-text: #1d4ed8;
+}
 
-/* ── Page header row ───────────────────────────────────────── */
-/* Wraps the title block + Add Template button in a flex row   */
 .page-header-row {
   display: flex;
   align-items: flex-start;
@@ -15,39 +30,24 @@
   margin-bottom: 24px;
 }
 
-/* ── Add Template trigger button ───────────────────────────── */
 .btn-add-template {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-
-  background: #5a3b24;
+  gap: 8px;
+  background: #4e3624;
   color: #fff;
-
   border: none;
-  border-radius: 999px;
-
-  padding: 14px 26px;
-  font-family: var(--font);
-  font-size: 16px;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font: inherit;
+  font-size: 14px;
   font-weight: 600;
-
   cursor: pointer;
+  transition: background .15s;
   white-space: nowrap;
-
-  transition: all 0.2s ease;
 }
 
-.btn-add-template:hover {
-  filter: brightness(1.5); /* ← lightens whatever color is set, no override needed */
-  transform: translateY(-1px);
-}
-
-.btn-add-template:active {
-  transform: translateY(0);
-  filter: brightness(1.1);
-}
+.btn-add-template:hover { background: #3a2718; }
 
 /* ── Modal overlay ─────────────────────────────────────────── */
 .tmpl-overlay {
@@ -115,10 +115,7 @@
   flex-shrink: 0;
   transition: color 0.15s, background 0.15s;
 }
-.tmpl-modal-close:hover {
-  color: var(--text);
-  background: var(--bg);
-}
+.tmpl-modal-close:hover { color: var(--text); background: var(--bg); }
 
 /* ── Modal body ────────────────────────────────────────────── */
 .tmpl-modal-body {
@@ -153,9 +150,7 @@
   gap: 5px;
 }
 
-.tmpl-form-group.full {
-  grid-column: 1 / -1;
-}
+.tmpl-form-group.full { grid-column: 1 / -1; }
 
 /* ── Labels ────────────────────────────────────────────────── */
 .tmpl-label {
@@ -191,9 +186,7 @@
 
 .tmpl-input:focus,
 .tmpl-select:focus,
-.tmpl-textarea:focus {
-  border-color: var(--primary);
-}
+.tmpl-textarea:focus { border-color: var(--primary); }
 
 .tmpl-textarea {
   resize: vertical;
@@ -226,7 +219,7 @@
   color: var(--text);
 }
 
-/* ── Source tabs (Upload / Paste URL) ──────────────────────── */
+/* ── Source tabs ───────────────────────────────────────────── */
 .tmpl-source-tabs {
   display: flex;
   border: 1px solid var(--border);
@@ -258,10 +251,10 @@
 }
 
 /* ── Source panels ─────────────────────────────────────────── */
-.tmpl-source-panel         { display: none; }
-.tmpl-source-panel.active  { display: block; }
+.tmpl-source-panel        { display: none; }
+.tmpl-source-panel.active { display: block; }
 
-/* ── Drag-and-drop file zone ───────────────────────────────── */
+/* ── File zone ─────────────────────────────────────────────── */
 .tmpl-file-zone {
   border: 2px dashed var(--border);
   border-radius: 10px;
@@ -278,9 +271,7 @@
   background: #f0e8de;
 }
 
-.tmpl-file-zone input[type="file"] {
-  display: none;
-}
+.tmpl-file-zone input[type="file"] { display: none; }
 
 .tmpl-file-zone-icon {
   display: flex;
@@ -317,18 +308,8 @@
 }
 
 .tmpl-file-chosen.hidden { display: none; }
-
-.tmpl-file-chosen svg {
-  color: var(--primary);
-  flex-shrink: 0;
-}
-
-.tmpl-file-chosen span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.tmpl-file-chosen svg { color: var(--primary); flex-shrink: 0; }
+.tmpl-file-chosen span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .tmpl-file-chosen button {
   background: none;
@@ -340,16 +321,14 @@
   align-items: center;
   transition: color 0.15s;
 }
-
 .tmpl-file-chosen button:hover { color: var(--danger); }
 
-/* ── Upload progress bar ───────────────────────────────────── */
+/* ── Progress bar ──────────────────────────────────────────── */
 .tmpl-progress-wrap {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
 .tmpl-progress-wrap.hidden { display: none; }
 
 .tmpl-progress-header {
@@ -358,16 +337,8 @@
   align-items: center;
 }
 
-.tmpl-progress-label {
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
-.tmpl-progress-pct {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary);
-}
+.tmpl-progress-label { font-size: 12.5px; color: var(--muted); }
+.tmpl-progress-pct   { font-size: 12px; font-weight: 600; color: var(--primary); }
 
 .tmpl-progress-track {
   background: var(--bg);
@@ -395,7 +366,6 @@
   border: 1px solid #fecaca;
   line-height: 1.5;
 }
-
 .tmpl-msg.hidden  { display: none; }
 .tmpl-msg.success { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
 .tmpl-msg.info    { background: #eef4ff; color: #1d4ed8; border-color: #bfdbfe; }
@@ -415,15 +385,16 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.tmpl-btn-cancel:hover { background: var(--bg); }
+.tmpl-btn-cancel:hover { 
+  background: var(--bg); 
+}
 
 .tmpl-btn-save {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--primary);
+  background: #4e3624;
   color: #fff;
-  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 18px;
@@ -433,19 +404,186 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.tmpl-btn-save:hover    { background: var(--primary-hover); }
-.tmpl-btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.tmpl-btn-save:hover    { 
+  background: #3a2718; 
+}
+.tmpl-btn-save:disabled { 
+  opacity: 0.5; cursor: not-allowed; 
+}
+
+/* ── Header button group ───────────────────────────────────── */
+.header-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── View Templates toggle button ──────────────────────────── */
+.btn-toggle-templates {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.btn-toggle-templates:hover { 
+  background: var(--bg);  
+  border-color: var(--primary);
+}
+
+.btn-toggle-templates.showing-templates {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.btn-toggle-templates.showing-templates:hover {
+  background: var(--bg);  
+  border-color: var(--primary);
+}
+
+/* ── Templates section — single merged block ───────────────── */
+.templates-section {
+  display: block;
+  margin-top: 20px;
+}
+
+.templates-section.hidden {
+  display: none !important;
+}
+
+/* ── Template status pills ─────────────────────────────────── */
+.tmpl-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tmpl-status-pill.active {
+  background: var(--active-pill-bg);
+  color: var(--active-pill-txt);
+}
+
+.tmpl-status-pill.inactive {
+  background: var(--archived-pill-bg);
+  color: var(--archived-pill-txt);
+}
+
+/* ── Section toggle visibility ─────────────────────────────── */
+.section-hidden {
+  display: none !important;
+}
+
+/* ── Templates toolbar ─────────────────────────────────────── */
+.tmpl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+/* Search — grows to fill all available space */
+.tmpl-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  flex: 1;              /* ← takes up all remaining width */
+}
+
+.tmpl-search-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+
+.tmpl-search-input {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  width: 100%;
+  outline: none;
+}
+
+.tmpl-search-input::placeholder { color: var(--muted); }
+
+/* Refresh — icon-only circle button on the far right */
+.tmpl-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  padding: 0;
+}
+
+.tmpl-refresh-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
 
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 540px) {
-  .tmpl-form-grid {
-    grid-template-columns: 1fr;
+  .tmpl-toolbar {
+    flex-wrap: wrap;
   }
-  .tmpl-form-group.full {
-    grid-column: 1;
+
+  .tmpl-search-wrap {
+    flex: 1 1 100%;
   }
-  .page-header-row {
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .tmpl-form-grid       { grid-template-columns: 1fr; }
+  .tmpl-form-group.full { grid-column: 1; }
+
+  .header-btn-group {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .btn-toggle-templates,
+  .btn-add-template {
+    width: 100%;
+    justify-content: center;
   }
 }

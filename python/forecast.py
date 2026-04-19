@@ -46,7 +46,16 @@ output = forecast_data.to_dict(orient='records')
 # 5. Store in JSONB
 
 # DELETION OF OLD FORECASTS CAN BE ADDED HERE (OPTIONAL)
-        
+#existing = supabase.table("reservation_forecast").select("forecast_id").execute()
+
+#if existing.data and len(existing.data) > 0:
+    # Delete all existing forecast rows
+#    for row in existing.data:
+#        supabase.table("reservation_forecast").delete().eq("forecast_id", row["forecast_id"]).execute()
+#    print("Old forecast(s) deleted.")
+#else:
+#    print("No existing forecast found. Proceeding to store.")
+
 supabase.table("reservation_forecast").insert({
     "forecast_data": output
 }).execute()

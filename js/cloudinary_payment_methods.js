@@ -1,12 +1,12 @@
-// js/cloudinary.js
-export const CLOUDINARY_CLOUD_NAME    = 'dgneg418t';     
-export const CLOUDINARY_UPLOAD_PRESET = 'eli_coffee_contract_templates'; 
+// js/cloudinary_payment_methods.js
+export const CLOUDINARY_CLOUD_NAME    = 'dgneg418t';
+export const CLOUDINARY_UPLOAD_PRESET = 'payment_methods';
 
-// Default folder inside Cloudinary where contract templates are stored.
-export const CLOUDINARY_TEMPLATES_FOLDER = 'eli-coffee-contract-templates';
+// Default folder inside Cloudinary where QR images are stored.
+export const CLOUDINARY_PM_FOLDER = 'payment_method';
 
-// Cloudinary treats PDFs and Office documents as "raw" resources.
-const RESOURCE_TYPE = 'raw';
+// QR codes are images, so resource type is 'image' (not 'raw' like PDFs).
+const RESOURCE_TYPE = 'image';
 
 /**
  * Upload a File to Cloudinary via the unsigned upload API.
@@ -32,39 +32,32 @@ export function uploadToCloudinary(file, options = {}) {
     return Promise.reject(
       new Error(
         'Cloudinary is not configured. ' +
-        'Open js/cloudinary.js and set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.'
+        'Open js/cloudinary_payment_methods.js and set CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.'
       )
     );
   }
 
-  const folder   = options.folder   ?? CLOUDINARY_TEMPLATES_FOLDER;
+  const folder   = options.folder   ?? CLOUDINARY_PM_FOLDER;
   const publicId = options.publicId ?? null;
 
   const endpoint =
     `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${RESOURCE_TYPE}/upload`;
 
   const formData = new FormData();
-  formData.append('file',           file);
-  formData.append('upload_preset',  CLOUDINARY_UPLOAD_PRESET);
+  formData.append('file',          file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
   if (publicId) {
     formData.append('public_id', publicId);
   } else {
     formData.append('folder', folder);
   }
-  //formData.append('access_mode',    'public');  
-  
-  
 
-  // Store the original filename as a context tag for easy identification in the
-  // Cloudinary Media Library.
+  // Store the original filename as a context tag for identification
   const baseName = file.name
     .replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9._-]/g, '_');
   formData.append('context', `original_filename=${baseName}`);
-
-  if (publicId) {
-    formData.append('public_id', publicId);
-  }
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

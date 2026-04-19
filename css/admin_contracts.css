@@ -1,5 +1,7 @@
 @import url('./admin_reservations.css');
 
+#admin_contracts.css
+
 .stat-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -36,6 +38,28 @@
   font-size: 12px;
   color: var(--muted);
   line-height: 1.45;
+}
+
+/* Center the actions column */
+.reservation-table td:last-child .action-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+/* Delete button style */
+.action-btn.delete-tmpl-btn {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.action-btn.delete-tmpl-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 @media (max-width: 1180px) {

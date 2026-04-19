@@ -1,7 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
-import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -303,13 +303,7 @@ async function loadCustomers() {
     allCustomers = mergeCustomersWithActivity(profiles, reservations);
 
     updateStats(allCustomers);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
+    initAdminSidebarBadges(supabase)
 
     applyFilters();
   } catch (error) {
@@ -317,13 +311,7 @@ async function loadCustomers() {
     allCustomers = [];
     updateStats([]);
     renderCustomers([]);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    initAdminSidebarBadges(supabase)
     setCustomersMessage(
       `Failed to load registered customers: ${error?.message || 'unknown error'}. If the admin account should see all profiles, check the RLS policies for the profiles table.`,
       true

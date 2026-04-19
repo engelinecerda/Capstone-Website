@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿<!--contracts.html-->
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -110,18 +111,30 @@
   <!-- ── MAIN ── -->
   <main class="main">
     <section class="page-shell">
-
-      <!-- Page header — flex row so the Add Template button sits top-right -->
       <header class="page-header-row">
         <div>
           <h1 class="page-title">Contracts <span class="admin-badge" id="adminBadge">Loading...</span></h1>
           <p class="page-sub">A dedicated review queue for uploaded reservation contracts, replacement submissions, and approval decisions.</p>
         </div>
-        <!-- Shown only to super_admin via applyRoleVisibility() in session_validation.js -->
-        <button type="button" class="btn-add-template super-admin-only" id="addTemplateBtn">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Template
-        </button>
+
+        <div class="header-btn-group super-admin-only">
+          <button type="button" class="btn-toggle-templates" id="toggleTemplatesBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <span id="toggleTemplatesLabel">View Templates</span>
+          </button>
+          <button type="button" class="btn-add-template super-admin-only" id="addTemplateBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Template
+          </button>
+        </div>
       </header>
 
       <section class="stat-row">
@@ -207,6 +220,36 @@
         </div>
       </section>
 
+            <!-- ══ CONTRACT TEMPLATES SECTION ══ -->
+      <section class="card table-card templates-section hidden" id="templatesSection">
+        <div class="table-head">
+          <div>
+            <h2 class="card-title">Contract Templates</h2>
+            <p class="card-sub">All contract templates uploaded by super admins, linked to packages.</p>
+          </div>
+        </div>
+        <p class="dashboard-message" id="templatesMessage">Loading templates...</p>
+        <div class="table-wrap">
+          <table class="reservation-table">
+            <thead>
+              <tr>
+                <th>Template Name</th>
+                <th>Package</th>
+                <th>Version</th>
+                <th>Status</th>
+                <th>Description</th>
+                <th>Added</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="templatesBody">
+              <tr class="empty-row">
+                <td colspan="7">No templates found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </main>
 

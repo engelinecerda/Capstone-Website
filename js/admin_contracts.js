@@ -1,3 +1,4 @@
+// admin/contracts.js
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -645,7 +646,7 @@ function setContractDetailsMessage(message = '', isError = false) {
   if (!contractDetailsMessage) return;
   contractDetailsMessage.textContent = message;
   contractDetailsMessage.classList.toggle('error', isError);
-}
+} 
 
 function closeContractDetailsModal() {
   activeContractReservationId = null;
