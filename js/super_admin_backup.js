@@ -13,6 +13,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID   = '840885111053-9o5sunpcth34kfv4c1fc74fp0h9nn2ub.apps.googleusercontent.com'; // ← replace
@@ -678,6 +679,7 @@ function init() {
     onSuccess: async ({ session, profile }) => {
       currentAdminId = session.user.id;
       setupInactivityLogout(profile.role);
+      initAdminSidebarBadges(supabase);
 
       // Disable buttons first
       createBackupBtn.disabled  = true;

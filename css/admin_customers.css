@@ -194,6 +194,10 @@ body {
   font-weight: 600;
 }
 
+.nav-badge[hidden] {
+  display: none !important;
+}
+
 .nav-item.active .nav-badge {
   background: rgba(255, 255, 255, 0.25);
 }

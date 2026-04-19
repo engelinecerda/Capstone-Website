@@ -133,21 +133,16 @@ def monthly_reservations():
 # =========================
 @app.get("/analytics/package-distribution")
 def package_distribution():
-
     res = supabase.table("reservations") \
-        .select("package!reservations_package_id_fkey(package_type)") \
+        .select("location_type") \
+        .not_.in_("status", ["declined", "cancelled"]) \
         .execute()
 
     counts = {}
-
     for r in res.data:
-        pkg = r.get("package")
-
-        if pkg and pkg.get("package_type"):
-            name = pkg["package_type"]
-        else:
-            name = "Unknown"
-
+        name = r.get("location_type") or "Unknown"
+        # Capitalize for display: "onsite" -> "Onsite"
+        name = name.capitalize()
         counts[name] = counts.get(name, 0) + 1
 
     return [{"package": k, "count": v} for k, v in counts.items()]

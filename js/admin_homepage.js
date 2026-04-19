@@ -2,6 +2,7 @@ import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -12,7 +13,6 @@ const logoutBtn = document.getElementById('logoutBtn');
 const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
-const navReservationCount = document.getElementById('navReservationCount');
 const demandYearSelect = document.getElementById('demandYear');
 const API = "https://capstone-website-papg.onrender.com";
 
@@ -36,34 +36,8 @@ const chipTargets = {
 let barChart;
 let pieChart;
 let demandChart;
-
 let fullData = [];
-
-/*const ALLOWED_ROLES = ['admin', 'super_admin'];
-
-function applyRoleVisibility(role) {
-    const isSuperAdmin = role === 'super_admin';
-
-    document.querySelectorAll('.super-admin-only').forEach(el => {
-        if (isSuperAdmin) { 
-            el.classList.add("show-super-admin");
-        }
-    });
-
-    if (badge) {
-        badge.textContent = isSuperAdmin ? "Super Admin" : "Admin";
-    }
-
-    //  UPDATE SIDEBAR TITLE
-    if (sidebarTitle) {
-        sidebarTitle.textContent = isSuperAdmin ? "Super Admin Panel" : "Admin Panel";
-    }
-
-    //  ROLE PILL 
-    if (sidebarRolePill) {
-        sidebarRolePill.textContent = isSuperAdmin ? "Super Admin" : "Admin";
-    }  
-}*/
+let refreshSidebarBadges = () => {};
 
 
 async function loadForecast() {
@@ -82,7 +56,7 @@ async function loadPackages() {
 }
 
 function redirectToAdminLogin() {
-    window.location.replace('/admin/index.html');
+    window.location.replace('./admin_login.html');
 }
 
 function setDashboardMessage(message, isError = false) {
@@ -415,7 +389,6 @@ function updateStats(reservations, contractsByReservationId = {}) {
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
     if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
-    if (navReservationCount) navReservationCount.textContent = String(totals.pending);
 
     if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
     if (chipTargets.approved) chipTargets.approved.textContent = String(totals.approved);
@@ -542,140 +515,107 @@ async function fetchContracts(reservationIds) {
     }, {});
 }
 
-// Add this at the very top of loadDashboard(), before Promise.all
-async function warmUpBackend() {
-    try {
-        await Promise.all([
-      fetch(`${API}/health`),
-      fetch(`${API}/forecast`),
-      fetch(`${API}/analytics/monthly-reservations`),
-      fetch(`${API}/analytics/package-distribution`)
-        ]);
-    } catch {   
-        // silently ignore — just waking the server up
-    }
-}
-
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
 
-    try {
-        await backendWarmup;
+    // Reset UI to a clean loading state
+    updateStats([], {});
+    renderReservationsTable([], {});
 
-        // FIXED: run all independent fetches at the same time
-        const [forecastData, reservations, monthlyData, packageData] = await Promise.all([
-            loadForecast(),
-            fetchReservations(),
-            loadMonthly(),
-            loadPackages()
-        ]);
+    let reservationsCount = 0;
+    let replacementContracts = 0;
+    let hasError = false;
 
-        fullData = forecastData;
+    // ---------- FAST PATH: Supabase (reservations + contracts + table + stats) ----------
+    const fastPath = (async () => {
+        try {
+            const reservations = await fetchReservations();
+            reservationsCount = reservations.length;
 
-        // Populate year selector now that forecastData is ready
-        if (demandYearSelect && fullData.length) {
-            const years = [...new Set(fullData.map(d => d.year))].sort();
-            demandYearSelect.innerHTML = '';
-            years.forEach(year => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                demandYearSelect.appendChild(option);
-            });
-            const currentYear = new Date().getFullYear().toString();
-            demandYearSelect.value = years.includes(currentYear)
-                ? currentYear
-                : years[years.length - 1];
+            // Paint the table immediately with reservations (no contracts yet).
+            updateStats(reservations, {});
+            renderReservationsTable(reservations, {});
+
+            // Refresh sidebar badges in parallel — don't block the contract fetch
+            refreshSidebarBadges();
+
+            // Now enrich with contracts.
+            const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
+            const contractsByReservationId = await fetchContracts(reservationIds);
+
+            replacementContracts = Object.values(contractsByReservationId)
+                .filter((c) =>
+                    String(c?.review_status || '').toLowerCase() === 'pending_review'
+                    && c?.resubmitted_at
+                )
+                .length;
+
+            // Re-render with contract data merged in.
+            updateStats(reservations, contractsByReservationId);
+            renderReservationsTable(reservations, contractsByReservationId);
+        } catch (error) {
+            console.error('Failed to load reservations/contracts:', error);
+            hasError = true;
+            setDashboardMessage(
+                `Failed to load reservations: ${error?.message || 'unknown error'}. If this admin account should see all bookings, check RLS policies and the admin role.`,
+                true
+            );
         }
+    })();
 
-        // fetchContracts depends on reservations, so it runs after — but that's the only dependency
-        const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
-        const contractsByReservationId = await fetchContracts(reservationIds);
+    // ---------- SLOW PATH: Render backend charts (fire-and-render independently) ----------
+    const monthlyPromise = loadMonthly()
+        .then((data) => renderBarChart(data))
+        .catch((error) => {
+            console.error('Failed to load monthly chart:', error);
+            return renderBarChart([]);
+        });
 
-        const replacementContracts = Object.values(contractsByReservationId)
-            .filter((c) => String(c?.review_status || '').toLowerCase() === 'pending_review' && c?.resubmitted_at)
-            .length;
+    const packagePromise = loadPackages()
+        .then((data) => renderPieChart(data))
+        .catch((error) => {
+            console.error('Failed to load package chart:', error);
+            return renderPieChart([]);
+        });
 
-        // FIXED: run all renders at the same time
-        await Promise.all([
-            renderBarChart(monthlyData),
-            renderPieChart(packageData),
-            (async () => {
-                updateStats(reservations, contractsByReservationId);
-                renderReservationsTable(reservations, contractsByReservationId);
-                const selectedYear = demandYearSelect?.value;
-                if (selectedYear) await renderDemandChart(selectedYear);
-            })()
-        ]);
+    const forecastPromise = loadForecast()
+        .then(async (data) => {
+            fullData = Array.isArray(data) ? data : [];
 
+            if (demandYearSelect && fullData.length) {
+                const years = [...new Set(fullData.map((d) => d.year))].sort();
+                demandYearSelect.innerHTML = '';
+                years.forEach((year) => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    demandYearSelect.appendChild(option);
+                });
+
+                const currentYear = new Date().getFullYear().toString();
+                demandYearSelect.value = years.includes(currentYear)
+                    ? currentYear
+                    : years[years.length - 1];
+            }
+
+            const selectedYear = demandYearSelect?.value;
+            if (selectedYear) await renderDemandChart(selectedYear);
+        })
+        .catch((error) => {
+            console.error('Failed to load forecast:', error);
+        });
+
+    // ---------- WAIT FOR EVERYTHING, THEN FINAL STATUS ----------
+    await Promise.allSettled([fastPath, monthlyPromise, packagePromise, forecastPromise]);
+
+    if (!hasError) {
         setDashboardMessage(
-            reservations.length
-                ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
+            reservationsCount
+                ? `Showing ${Math.min(reservationsCount, 10)} of ${reservationsCount} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
                 : 'No reservations available yet.'
         );
-
-    } catch (error) {
-        console.error('Failed to load admin dashboard:', error);
-        setDashboardMessage(
-            `Failed to load reservations: ${error?.message || 'unknown error'}. If this admin account should see all bookings, check RLS policies and the admin role.`,
-            true
-        );
-
-        updateStats([], {});
-        renderReservationsTable([], {});
-
-        await Promise.all([
-            renderBarChart([]),
-            renderPieChart([]),
-            (async () => {
-                const fallbackYear = demandYearSelect?.value;
-                if (fallbackYear) await renderDemandChart(fallbackYear);
-            })()
-        ]);
     }
 }
-
-// CHANGED: was verifyAdminSession — now accepts both admin and super_admin
-/*async function validateAdminSession() {
-    const { data, error } = await supabase.auth.getSession();
-
-    if (error || !data.session) {
-        redirectToAdminLogin();
-        return null;
-    }
-
-    const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, staff_role, first_name, middle_name, last_name, email, phone_number, date_registered')
-        .eq('user_id', data.session.user.id)
-        .maybeSingle();
-
-    if (profileError || !profile || !ALLOWED_ROLES.includes(profile.role)) {
-        await supabase.auth.signOut();
-        redirectToAdminLogin();
-        return null;
-    }
-
-    populatePortalIdentity({
-        profile,
-        session: data.session,
-        nameEl: sidebarName,
-        emailEl: sidebarEmail,
-        roleEl: sidebarRolePill,
-        fallbackLabel: 'Admin'
-    });
-
-    // ADDED: apply nav visibility after identity is populated
-    applyRoleVisibility(profile.role);
-    setupInactivityLogout(profile.role);
-
-    return data.session;
-}*/
-
-/*logoutBtn?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-});*/
 
 refreshDashboardBtn?.addEventListener('click', async () => {
     await loadDashboard();
@@ -685,22 +625,15 @@ demandYearSelect?.addEventListener('change', () => {
     renderDemandChart(demandYearSelect.value);
 });
 
-/*supabase.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT') {
-        redirectToAdminLogin();
-    }
-});*/
-
-
-
-const backendWarmup = warmUpBackend(); // ADDED: fire immediately, don't await — runs in background
-
 wireLogoutButton();
 watchAuthState();
 
+const dashboardPromise = loadDashboard();
+
 validateAdminSession({
-  onSuccess: ({ profile }) => {
-    setupInactivityLogout(profile.role);
-    loadDashboard();
-  }
+    onSuccess: ({ profile }) => {
+        setupInactivityLogout(profile.role);
+        refreshSidebarBadges = initAdminSidebarBadges(supabase);
+        loadDashboard();
+    }
 });

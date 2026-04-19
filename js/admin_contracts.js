@@ -1,7 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
-import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
+import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -13,10 +13,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const contractsBody = document.getElementById('contractsBody');
 const chipsRow = document.getElementById('chipsRow');
-const navReservationCount = document.getElementById('navReservationCount');
-const navContractCount = document.getElementById('navContractCount');
-const navPaymentCount = document.getElementById('navPaymentCount');
-const navReviewCount = document.getElementById('navReviewCount');
+
 
 const statPendingContracts = document.getElementById('statPendingContracts');
 const statReplacementContracts = document.getElementById('statReplacementContracts');
@@ -38,6 +35,7 @@ let contractsCache = [];
 let allReservationsCount = 0;
 let activeContractReservationId = null;
 let contractDetailsFlash = null;
+let refreshSidebarBadges = () => {};
 
 function countPendingReservations(reservations) {
   return reservations.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
@@ -61,24 +59,6 @@ function escapeHtml(value) {
 
 function redirectLogin() {
   window.location.replace('/admin/index.html');
-}
-
-async function validateAdmin() {
-  const { session, profile } = await verifyAdminSession(supabase);
-  if (!session) {
-    await supabase.auth.signOut();
-    return redirectLogin();
-  }
-
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarNameEl,
-    emailEl: sidebarEmailEl,
-    roleEl: sidebarRolePillEl,
-    fallbackLabel: 'Admin'
-  });
-  return session;
 }
 
 function formatDate(value) {
@@ -352,7 +332,7 @@ function renderStats(list) {
   if (statRequestedContracts) statRequestedContracts.textContent = String(counts.resubmissionRequested);
   if (statVerifiedContracts) statVerifiedContracts.textContent = String(counts.approved);
   if (statTotalContracts) statTotalContracts.textContent = String(counts.total);
-  setBadgeCount(navContractCount, counts.pending + counts.resubmitted);
+
 
   if (!chipsRow) return;
 
@@ -826,13 +806,7 @@ async function loadData() {
   try {
     const reservations = await fetchReservations();
     allReservationsCount = reservations.length;
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
+    await refreshSidebarBadges();
 
     contractsCache = reservations
       .filter((reservation) => getContractReviewMeta(reservation).hasFile)
@@ -849,13 +823,7 @@ async function loadData() {
     }
   } catch (error) {
     setMessage(tableMessage, `Failed to load contracts: ${error.message}`, true);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    await refreshSidebarBadges().catch(() => {});
     renderStats([]);
     renderTable([]);
   }
@@ -918,24 +886,8 @@ function wireModals() {
   });
 }
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectLogin();
-});
-
 refreshBtn?.addEventListener('click', loadData);
 
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') redirectLogin();
-});
-
-(async function init() {
-  await validateAdmin();
-  wireFilters();
-  wireTableActions();
-  wireModals();
-  await loadData();
-})();
 
 wireLogoutButton();
 watchAuthState();
@@ -945,7 +897,7 @@ validateAdminSession({
 
     //  Set inactivity (super admin)
     setupInactivityLogout(profile.role);
-
+    refreshSidebarBadges = initAdminSidebarBadges(supabase);
     wireFilters();
     wireTableActions();
     wireModals();

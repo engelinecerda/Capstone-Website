@@ -1,7 +1,4 @@
-/* ============================================================
-   ELI Coffee Events — Super Admin Backup Module
-   ============================================================ */
-
+#super_admin_backup.css
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -80,14 +77,21 @@ body {
   font-weight: 700;
 }
 
-.sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
 
 .nav-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   width: 100%;
-  padding: 10px 14px;
+  min-height: 48px;
+  padding: 13px 14px;
   border-radius: 12px;
   color: var(--nav-text);
   text-decoration: none;
@@ -96,28 +100,53 @@ body {
   transition: background .15s, color .15s, border-color .15s;
   border: 1px solid transparent;
   background: transparent;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
-.nav-item:hover { background: var(--nav-hover); border-color: var(--border); }
-.nav-item.active { background: var(--active-bg); color: var(--active-text); }
-.nav-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.nav-label { flex: 1 1 auto; }
+.nav-item:hover {
+  background: var(--nav-hover);
+  border-color: var(--border);
+}
+
+.nav-item.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+}
+
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 
 .nav-badge {
   margin-left: auto;
-  background: var(--badge-bg);
-  color: var(--badge-text);
-  font-size: 11px;
-  font-weight: 600;
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
   display: grid;
   place-items: center;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.nav-item.active .nav-badge { background: rgba(255,255,255,.25); }
+.nav-badge[hidden] {
+  display: none !important;
+}
+
+.nav-item.active .nav-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
 
 .nav-item-button {
   width: 100%;
@@ -130,11 +159,12 @@ body {
 
 .sidebar-bottom-nav {
   margin-top: auto;
-  padding-top: 18px;
   border-top: 1px solid var(--border);
+  padding-top: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  align-items: stretch;
 }
 
 /* ── MAIN ── */

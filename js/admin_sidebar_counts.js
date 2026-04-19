@@ -170,3 +170,36 @@ export async function refreshAdminSidebarCounts({
     reviewCount
   };
 }
+/**
+ * Auto-wire sidebar badges for an admin page.
+ * Looks up the standard badge elements by ID, refreshes counts immediately,
+ * and refreshes again whenever the tab regains focus.
+ *
+ * Returns a function you can call manually to force a refresh.
+ */
+export function initAdminSidebarBadges(supabase) {
+  const badgeEls = {
+    reservationBadgeEl: document.getElementById('navReservationCount'),
+    paymentBadgeEl: document.getElementById('navPaymentCount'),
+    contractBadgeEl: document.getElementById('navContractCount'),
+    reviewBadgeEl: document.getElementById('navReviewCount')
+  };
+
+  async function refresh() {
+    try {
+      await refreshAdminSidebarCounts({ supabase, ...badgeEls });
+    } catch (error) {
+      console.error('Failed to refresh sidebar badge counts:', error);
+    }
+  }
+
+  // Initial load
+  refresh();
+
+  // Refresh when tab regains focus
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refresh();
+  });
+
+  return refresh;
+}

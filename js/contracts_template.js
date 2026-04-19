@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { portalSupabase as supabase } from './supabase.js';
-import { uploadToCloudinary }         from './cloudinary.js';
+import { uploadToCloudinary }         from './cloudinary_contract_templates.js';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const addTemplateBtn    = document.getElementById('addTemplateBtn');

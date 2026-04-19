@@ -5,6 +5,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 // ─── Cloudinary config ────────────────────────────────────────────────────────
 const CLOUDINARY_UPLOAD_URL    = 'https://api.cloudinary.com/v1_1/dgneg418t/image/upload';
@@ -503,6 +504,7 @@ function init() {
   validateAdminSession({
     onSuccess: ({ profile }) => {
       setupInactivityLogout(profile.role);
+      initAdminSidebarBadges(supabase);
       loadPackagesFromSupabase();
     }
   });

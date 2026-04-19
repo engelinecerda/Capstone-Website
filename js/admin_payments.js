@@ -1,7 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
-import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
+import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -12,10 +12,7 @@ const statusDropdown = document.getElementById('statusDropdown');
 const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
-const navReservationCount = document.getElementById('navReservationCount');
-const navPaymentCount = document.getElementById('navPaymentCount');
-const navContractCount = document.getElementById('navContractCount');
-const navReviewCount = document.getElementById('navReviewCount');
+
 const paymentDetailsModal = document.getElementById('paymentDetailsModal');
 const paymentDetailsClose = document.getElementById('paymentDetailsClose');
 const paymentDetailsDismiss = document.getElementById('paymentDetailsDismiss');
@@ -52,6 +49,7 @@ const PAYMENT_TYPE_LABELS = {
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 
 let adminSession = null;
+let refreshSidebarBadges = () => {};
 let paymentsCache = [];
 let reservationMap = {};
 let receiptMap = {};
@@ -322,7 +320,7 @@ function renderStats(list) {
   document.getElementById('stat-approved').textContent = counts.approved;
   document.getElementById('stat-rejected').textContent = counts.rejected;
   document.getElementById('stat-total').textContent = counts.total;
-  setBadgeCount(navPaymentCount, counts.pending_review);
+  
 }
 
 function matchesSearch(payment, term) {
@@ -828,13 +826,7 @@ async function loadData() {
       Array.from(new Set(paymentsCache.map((payment) => payment.reschedule_request_id).filter(Boolean)))
     );
 
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
+    await refreshSidebarBadges();
 
     filterAndRender();
     if (activePaymentReviewId) {
@@ -846,13 +838,7 @@ async function loadData() {
     }
   } catch (error) {
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    await refreshSidebarBadges();
     renderTable([]);
   }
 }
@@ -949,16 +935,8 @@ function wireModals() {
   });
 }
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectLogin();
-});
-
 refreshBtn?.addEventListener('click', loadData);
 
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') redirectLogin();
-});
 
 wireLogoutButton();
 watchAuthState();
@@ -968,7 +946,8 @@ validateAdminSession({
 
     // Setup inactivity (same as homepage)
     setupInactivityLogout(profile.role);
-
+    refreshSidebarBadges = initAdminSidebarBadges(supabase);
+    
     // Attach UI event listeners
     wireFilters();
     wireTableActions();

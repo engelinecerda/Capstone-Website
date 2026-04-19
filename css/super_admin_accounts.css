@@ -110,6 +110,11 @@
       display: grid;
       place-items: center;
     }
+
+.nav-badge[hidden] {
+  display: none !important;
+}
+
     .nav-item.active .nav-badge { background: rgba(255,255,255,.25); }
 
     .nav-item-button {
