@@ -126,6 +126,12 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* ── Actions column centered on desktop ─────────────────────── */
+.pm-table th:last-child,
+.pm-table td:last-child {
+  text-align: center;
+}
+
 .pm-table tbody td {
   border-bottom: 1px solid var(--border);
 }
@@ -186,11 +192,37 @@
 /* ── Action cell ────────────────────────────────────────────── */
 .pm-action-cell {
   display: flex;
+  flex-direction: row;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 0;
 }
 
+/* ── View QR button ─────────────────────────────────────────── */
+.pm-action-cell .action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pm-action-cell .action-btn:hover {
+  background: var(--bg);
+  border-color: #a89279;
+}
+
+/* ── Delete button ──────────────────────────────────────────── */
 .pm-delete-btn {
   display: inline-flex;
   align-items: center;
@@ -762,6 +794,38 @@
     color: var(--muted);
     line-height: 1.45;
     padding-top: 2px;
+  }
+
+  /* ── Fix Actions cell in responsive card layout ─────────── */
+  .pm-table tbody td[data-label="Actions"] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pm-table tbody td[data-label="Actions"]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.45;
+    padding-top: 2px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .pm-table tbody td[data-label="Actions"] .pm-action-cell {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding-top: 4px;
   }
 }
 

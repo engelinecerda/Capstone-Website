@@ -316,15 +316,15 @@ function renderMethodRows(list) {
           <span class="table-sub">${escHtml(added)}</span>
         </td>
         <td data-label="Actions">
-          <div class="pm-action-cell" style="justify-content: center;">
+          <div class="pm-action-cell">
             ${method.qr_image
               ? `<a class="action-btn" href="${escHtml(method.qr_image)}" target="_blank" rel="noopener noreferrer">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  View QR
-                </a>`
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    View QR
+                  </a>`
               : ''
             }
             <button
