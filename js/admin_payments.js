@@ -944,7 +944,7 @@ watchAuthState();
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {
 
-    // Setup inactivity (same as homepage)
+    
     setupInactivityLogout(profile.role);
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
     
@@ -954,12 +954,12 @@ validateAdminSession({
       document.body.classList.remove('is-super-admin');
     }
 
-    // Attach UI event listeners
+   
     wireFilters();
     wireTableActions();
     wireModals();
 
-    // Load data ONCE
+    
     await loadData();
   }
 });

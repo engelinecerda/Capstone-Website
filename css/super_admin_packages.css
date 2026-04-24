@@ -1,6 +1,6 @@
 /* ============================================================
    ELI Coffee Events — Super Admin Package Management
-   Matches the existing admin dashboard design system exactly
+   Two-level view: Categories → Packages
    ============================================================ */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,7 +25,6 @@
   --danger:      #b91c1c;
   --danger-bg:   #fef2f2;
   --danger-hover:#991b1b;
-
   --active-pill-bg:  #bbf7d0;
   --active-pill-txt: #15803d;
   --archived-pill-bg: #e5e7eb;
@@ -43,7 +42,9 @@ body {
   overflow-x: hidden;
 }
 
-/* ── SIDEBAR ── */
+/* ══════════════════════════════════════════════════════════════
+   SIDEBAR
+   ══════════════════════════════════════════════════════════════ */
 .sidebar {
   width: var(--sidebar-w);
   background: var(--sidebar-bg);
@@ -182,13 +183,8 @@ body {
   font-weight: 600;
 }
 
-.nav-badge[hidden] {
-  display: none !important;
-}
-
-.nav-item.active .nav-badge {
-  background: rgba(255, 255, 255, 0.25);
-}
+.nav-badge[hidden] { display: none !important; }
+.nav-item.active .nav-badge { background: rgba(255, 255, 255, 0.25); }
 
 .nav-item-button {
   width: 100%;
@@ -208,7 +204,10 @@ body {
   gap: 8px;
   align-items: stretch;
 }
-/* ── MAIN ── */
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN CONTENT AREA
+   ══════════════════════════════════════════════════════════════ */
 .main {
   margin-left: var(--sidebar-w);
   width: calc(100% - var(--sidebar-w));
@@ -252,7 +251,67 @@ body {
   font-weight: 400;
 }
 
-/* ── BUTTONS ── */
+/* ══════════════════════════════════════════════════════════════
+   BREADCRUMB BAR
+   ══════════════════════════════════════════════════════════════ */
+.breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+}
+
+.btn-back:hover {
+  background: var(--bg);
+  border-color: #d9c2aa;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.breadcrumb-link {
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .15s;
+}
+
+.breadcrumb-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.breadcrumb-current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BUTTONS
+   ══════════════════════════════════════════════════════════════ */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -271,6 +330,7 @@ body {
 }
 
 .btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-cancel {
   display: inline-flex;
@@ -307,6 +367,7 @@ body {
 }
 
 .btn-danger:hover { background: var(--danger-hover); }
+.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-toggle {
   display: inline-flex;
@@ -329,7 +390,9 @@ body {
 .btn-toggle.showing-active { background: #fff; color: var(--text); border: 1px solid var(--border); }
 .btn-toggle.showing-active:hover { background: var(--bg); }
 
-/* ── STAT CARDS ── */
+/* ══════════════════════════════════════════════════════════════
+   STAT CARDS
+   ══════════════════════════════════════════════════════════════ */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -344,9 +407,7 @@ body {
   padding: 22px 22px 20px;
 }
 
-.stat-top {
-  margin-bottom: 12px;
-}
+.stat-top { margin-bottom: 12px; }
 
 .stat-label {
   font-size: 13px;
@@ -368,7 +429,9 @@ body {
   color: var(--muted);
 }
 
-/* ── FILTER BAR ── */
+/* ══════════════════════════════════════════════════════════════
+   FILTER BAR
+   ══════════════════════════════════════════════════════════════ */
 .filter-bar {
   display: flex;
   align-items: center;
@@ -434,17 +497,22 @@ body {
   cursor: pointer;
 }
 
-/* ── PAGE MESSAGE ── */
+/* ══════════════════════════════════════════════════════════════
+   PAGE MESSAGE
+   ══════════════════════════════════════════════════════════════ */
 .page-message {
   font-size: 13px;
   color: var(--muted);
   margin-bottom: 12px;
   min-height: 20px;
 }
+
 .page-message.error { color: var(--danger); }
 .page-message.success { color: #15803d; }
 
-/* ── CARD ── */
+/* ══════════════════════════════════════════════════════════════
+   CARD / SECTION
+   ══════════════════════════════════════════════════════════════ */
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -473,7 +541,9 @@ body {
   margin-top: 3px;
 }
 
-/* ── TABLE ── */
+/* ══════════════════════════════════════════════════════════════
+   TABLE
+   ══════════════════════════════════════════════════════════════ */
 .table-wrap { overflow-x: auto; }
 
 .pkg-table {
@@ -497,7 +567,11 @@ body {
   letter-spacing: 0.04em;
 }
 
-.pkg-table td { font-size: 13px; color: var(--text); }
+.pkg-table td {
+  font-size: 13px;
+  color: var(--text);
+}
+
 .pkg-table tbody tr:last-child td { border-bottom: none; }
 .pkg-table tbody tr:hover td { background: #fdf9f5; }
 
@@ -509,12 +583,22 @@ body {
   border-bottom: none;
 }
 
-/* Package cell */
+/* Package / Category cell */
 .pkg-cell {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
+.pkg-cell.clickable-cat {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background .15s;
+}
+
+.pkg-cell.clickable-cat:hover { background: #f6ece1; }
 
 .pkg-thumb {
   width: 44px;
@@ -563,6 +647,20 @@ body {
   white-space: nowrap;
 }
 
+/* Count pill (for category rows) */
+.count-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f0f4ff;
+  border: 1px solid #d0d9ed;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b5998;
+  white-space: nowrap;
+}
+
 /* Status pills */
 .status-pill {
   display: inline-flex;
@@ -584,7 +682,9 @@ body {
   color: var(--archived-pill-txt);
 }
 
-/* Action buttons in table */
+/* ══════════════════════════════════════════════════════════════
+   ACTION BUTTONS IN TABLE
+   ══════════════════════════════════════════════════════════════ */
 .action-cell {
   display: flex;
   align-items: center;
@@ -611,6 +711,22 @@ body {
 
 .action-btn:hover { background: var(--bg); }
 
+.action-btn.view {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.action-btn.view:hover { background: #dbeafe; }
+
+.action-btn.edit {
+  color: var(--primary);
+  border-color: #d9c2aa;
+  background: #fdf7f0;
+}
+
+.action-btn.edit:hover { background: #f6ece1; }
+
 .action-btn.archive {
   color: var(--muted);
 }
@@ -623,15 +739,9 @@ body {
 
 .action-btn.restore:hover { background: #dcfce7; }
 
-.action-btn.edit {
-  color: var(--primary);
-  border-color: #d9c2aa;
-  background: #fdf7f0;
-}
-
-.action-btn.edit:hover { background: #f6ece1; }
-
-/* ── MODAL OVERLAY ── */
+/* ══════════════════════════════════════════════════════════════
+   MODAL OVERLAY
+   ══════════════════════════════════════════════════════════════ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -644,11 +754,11 @@ body {
   overflow-y: auto;
 }
 
-.modal-overlay.hidden {
-  display: none;
-}
+.modal-overlay.hidden { display: none; }
 
-/* ── MODAL ── */
+/* ══════════════════════════════════════════════════════════════
+   MODAL
+   ══════════════════════════════════════════════════════════════ */
 .modal {
   background: #fff;
   border-radius: 16px;
@@ -668,13 +778,12 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 22px 24px 0;
+  padding: 22px 24px 16px;
   gap: 12px;
   position: sticky;
   top: 0;
   background: #fff;
   z-index: 1;
-  padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -798,13 +907,16 @@ body {
 }
 
 .modal-message.hidden { display: none; }
+
 .modal-message.success {
   background: #f0fdf4;
   color: #15803d;
   border-color: #bbf7d0;
 }
 
-/* ── IMAGE UPLOAD ── */
+/* ══════════════════════════════════════════════════════════════
+   IMAGE UPLOAD
+   ══════════════════════════════════════════════════════════════ */
 .image-upload-area {
   border: 2px dashed var(--border);
   border-radius: 12px;
@@ -818,7 +930,10 @@ body {
   transition: border-color .2s, background .2s;
 }
 
-.image-upload-area:hover { border-color: #c9b09a; background: #f9f3ec; }
+.image-upload-area:hover {
+  border-color: #c9b09a;
+  background: #f9f3ec;
+}
 
 .image-upload-placeholder {
   display: flex;
@@ -867,7 +982,10 @@ body {
   transition: background .15s;
 }
 
-.choose-file-btn:hover { background: #f6ece1; border-color: #d9c2aa; }
+.choose-file-btn:hover {
+  background: #f6ece1;
+  border-color: #d9c2aa;
+}
 
 .image-actions {
   display: flex;
@@ -893,7 +1011,11 @@ body {
   transition: background .15s;
 }
 
-.remove-image-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+.remove-image-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
 .remove-image-btn.hidden { display: none; }
 
 .file-name {
@@ -901,14 +1023,18 @@ body {
   color: var(--muted);
 }
 
-/* Confirm modal */
+/* ══════════════════════════════════════════════════════════════
+   CONFIRM MODAL
+   ══════════════════════════════════════════════════════════════ */
 .confirm-copy {
   font-size: 14px;
   color: var(--text);
   line-height: 1.6;
 }
 
-/* ── RESPONSIVE ── */
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .modal-row-three { grid-template-columns: 1fr 1fr; }
@@ -924,4 +1050,5 @@ body {
   .page-header { flex-direction: column; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-right { flex-direction: column; align-items: stretch; }
+  .breadcrumb-bar { flex-direction: column; align-items: flex-start; }
 }

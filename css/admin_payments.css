@@ -601,3 +601,61 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── PAYMENT METHODS TABLE — RESPONSIVE CARD LAYOUT ── */
+@media (max-width: 1450px) {
+  .pm-table {
+    display: block;
+    width: 100%;
+  }
+
+  .pm-table thead {
+    display: none;
+  }
+
+  .pm-table tbody {
+    display: grid;
+    gap: 14px;
+  }
+
+  .pm-table tbody tr {
+    display: grid;
+    gap: 0;
+  }
+
+  .pm-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(120px, 148px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    width: 100%;
+    padding: 14px 16px;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-top: none;
+    border-bottom: none;
+    border-radius: 0;
+  }
+
+  .pm-table tbody td:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+  }
+
+  .pm-table tbody td:last-child {
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 18px 18px;
+  }
+
+  .pm-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.45;
+    padding-top: 2px;
+  }
+}

@@ -342,8 +342,7 @@ function renderMethodRows(list) {
             </button>
           </div>
         </td>
-      </tr>
-    `;
+      </tr>`;
   }).join('');
 }
 

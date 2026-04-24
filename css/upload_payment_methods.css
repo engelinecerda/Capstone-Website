@@ -129,7 +129,7 @@
 /* ── Actions column centered on desktop ─────────────────────── */
 .pm-table th:last-child,
 .pm-table td:last-child {
-  text-align: center;
+  text-align: left;
 }
 
 .pm-table tbody td {
@@ -780,6 +780,7 @@
   }
 
   .pm-table tbody td:last-child {
+    text-align: left;
     border-bottom: 1px solid var(--border);
     border-radius: 0 0 18px 18px;
   }
@@ -798,10 +799,10 @@
 
   /* ── Fix Actions cell in responsive card layout ─────────── */
   .pm-table tbody td[data-label="Actions"] {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    display: grid !important;
+    grid-template-columns: minmax(110px, 144px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: center !important;
   }
 
   .pm-table tbody td[data-label="Actions"]::before {
@@ -813,22 +814,33 @@
     text-transform: uppercase;
     color: var(--muted);
     line-height: 1.45;
-    padding-top: 2px;
-    width: 100%;
-    text-align: center;
+    padding-top: 0;
+    align-self: center;
+    width: auto;
+    text-align: left;
   }
 
   .pm-table tbody td[data-label="Actions"] .pm-action-cell {
     display: flex;
     flex-direction: row;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding-top: 4px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .pm-table tbody td[data-label="Actions"] .pm-action-cell .action-btn,
+  .pm-table tbody td[data-label="Actions"] .pm-action-cell .pm-delete-btn {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+    padding: 10px 14px;
+    font-size: 13px;
+    border-radius: 10px;
   }
 }
-
 /* ── Force header layout — prevent title from pushing buttons down ── */
 .page-shell > .page-header {
   display: flex !important;
