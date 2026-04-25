@@ -73,6 +73,8 @@ const catModalSave       = document.getElementById('catModalSave');
 const catModalSaveLabel  = document.getElementById('catModalSaveLabel');
 const catModalMessage    = document.getElementById('catModalMessage');
 const catNameInput       = document.getElementById('catNameInput');
+const catDescriptionInput = document.getElementById('catDescriptionInput');  
+const catInclusionsInput  = document.getElementById('catInclusionsInput'); 
 const catImageInput      = document.getElementById('catImageInput');
 const catImagePreview    = document.getElementById('catImagePreview');
 const catImagePlaceholder= document.getElementById('catImagePlaceholder');
@@ -415,6 +417,8 @@ function openAddCategoryModal() {
   catModalSub.textContent       = 'Create a new package category';
   catModalSaveLabel.textContent = 'Add Category';
   catNameInput.value = '';
+  catDescriptionInput.value = '';   
+  catInclusionsInput.value  = '';
   catImageInput.value = '';
   clearImageUI(catImagePreview, catImagePlaceholder, catFileName, catImageInput);
   catRemoveImageBtn.classList.add('hidden');
@@ -432,6 +436,8 @@ function openEditCategoryModal(catId) {
   catModalSub.textContent       = 'Update category details';
   catModalSaveLabel.textContent = 'Save Changes';
   catNameInput.value = cat.category_name || '';
+  catDescriptionInput.value = cat.description || '';                      
+  catInclusionsInput.value  = cat.package_category_inclusions || ''; 
 
   if (cat.category_image) {
     catImagePreview.src = cat.category_image;
@@ -471,6 +477,9 @@ catRemoveImageBtn.addEventListener('click', () => {
 // Category save
 catModalSave.addEventListener('click', async () => {
   const name = catNameInput.value.trim();
+  const description = catDescriptionInput.value.trim();                   
+  const inclusions  = catInclusionsInput.value.trim(); 
+
   if (!name) { setModalMsg(catModalMessage, 'Category name is required.'); return; }
 
   catModalSave.disabled = true;
@@ -488,7 +497,11 @@ catModalSave.addEventListener('click', async () => {
       imageUrl = null; // explicitly clear
     }
 
-    const payload = { category_name: name };
+    const payload = { 
+      category_name: name,
+      description: description,
+      package_category_inclusions: inclusions
+    };
     if (imageUrl !== undefined) payload.category_image = imageUrl;
 
     if (editingCategoryId) {

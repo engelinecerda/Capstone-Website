@@ -352,10 +352,22 @@
             <span class="file-name" id="catFileName">No file chosen</span>
           </div>
         </div>
+        <!-- Category name field -->
         <div class="modal-field">
           <label class="modal-label" for="catNameInput">Category Name *</label>
           <input type="text" id="catNameInput" class="modal-input" placeholder="E.g., Birthday Packages">
         </div>
+        <!-- Description field -->
+        <div class="modal-field">
+          <label class="modal-label" for="catDescriptionInput">Description *</label>
+          <textarea id="catDescriptionInput" class="modal-textarea" rows="4" placeholder="Venue and catering package for intimate weddings and simple celebrations..."></textarea>
+        </div>
+        <!-- Inclusions field -->
+        <div class="modal-field">
+          <label class="modal-label" for="catInclusionsInput">Inclusions</label>
+          <textarea id="catInclusionsInput" class="modal-textarea" rows="4" placeholder="E.g., Main Hall access, 3 hours use, buffet setup, drinks, lights and sounds..."></textarea>
+          <span class="modal-hint">List what's included in this category. One item per line or comma-separated.</span>
+        </div>  
         <p class="modal-message hidden" id="catModalMessage"></p>
       </div>
       <div class="modal-footer">
@@ -420,6 +432,7 @@
         <div class="modal-field">
           <label class="modal-label" for="pkgDescription">Description *</label>
           <textarea id="pkgDescription" class="modal-textarea" rows="3" placeholder="Brief description of the package..."></textarea>
+          <span class="modal-hint">List what's included in this package. One item per line or comma-separated.</span>
         </div>
 
         <div class="modal-row modal-row-three">

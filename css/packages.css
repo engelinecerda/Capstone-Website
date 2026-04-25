@@ -471,6 +471,57 @@ body {
   font-family: 'Kumbh Sans', sans-serif;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   MODAL — Category Description
+   ══════════════════════════════════════════════════════════════ */
+
+.pkg-modal-cat-desc {
+  font-size: 15px;
+  color: #73685f;
+  line-height: 1.7;
+  margin-top: 8px;
+  font-weight: 400;
+  font-family: 'Kumbh Sans', sans-serif;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eadfd2;
+}
+
+.pkg-modal-cat-desc.hidden {
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODAL — Category Inclusions
+   ══════════════════════════════════════════════════════════════ */
+
+.pkg-modal-inclusions {
+  margin-top: 24px;
+  padding-bottom: 8px;
+}
+
+.pkg-modal-inclusions .pkg-modal-section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #4e3624;
+  margin-bottom: 14px;
+}
+
+.pkg-modal-inclusions-list {
+  list-style: disc;
+  padding-left: 22px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pkg-modal-inclusions-list li {
+  font-size: 14.5px;
+  color: #20150b;
+  line-height: 1.7;
+  font-weight: 400;
+  font-family: 'Kumbh Sans', sans-serif;
+}
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -513,6 +564,15 @@ body {
   .pkg-modal-card {
     padding: 14px 16px;
   }
+
+  .pkg-modal-cat-desc {
+    font-size: 14px;
+  }
+
+  .pkg-modal-inclusions-list li {
+    font-size: 13.5px;
+  }
+
 }
 
 @media (max-width: 420px) {

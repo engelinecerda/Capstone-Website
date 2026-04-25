@@ -18,6 +18,9 @@ const retryBtn            = document.getElementById('retryBtn');
 const modal              = document.getElementById('packageCategoryModal');
 const modalCloseBtn      = document.getElementById('modalCloseBtn');
 const pkgModalCatName    = document.getElementById('pkgModalCatName');
+const pkgModalCatDesc    = document.getElementById('pkgModalCatDesc');
+const pkgModalInclusions     = document.getElementById('pkgModalInclusions');
+const pkgModalInclusionsList = document.getElementById('pkgModalInclusionsList');
 const pkgModalLoading    = document.getElementById('pkgModalLoading');
 const pkgModalEmpty      = document.getElementById('pkgModalEmpty');
 const pkgModalList       = document.getElementById('pkgModalList');
@@ -163,6 +166,8 @@ function buildBulletList(items) {
   return html;
 }
 
+
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE STATES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -269,31 +274,94 @@ function buildCategoryCardImage(cat) {
 }
 
 function renderCategoryCards(categories) {
-  categoriesContainer.innerHTML = categories.map(cat => `
-    <div class="card" data-category-id="${cat.package_category_id}" data-category-name="${escapeHtml(cat.category_name)}">
-      ${buildCategoryCardImage(cat)}
-      <div class="card-body">
-        <div class="card-title"><h3>${escapeHtml(cat.category_name)}</h3></div>
-        <p>Tap to view available packages</p>
+  categoriesContainer.innerHTML = categories.map(cat => {
+    const desc = cat.description || '';
+    const inclusions = cat.package_category_inclusions || '';
+    const displayText = desc ? escapeHtml(desc) : 'Tap to view available packages';
+
+    return `
+      <div class="card" 
+           data-category-id="${cat.package_category_id}" 
+           data-category-name="${escapeHtml(cat.category_name)}"
+           data-category-desc="${escapeHtml(desc)}"
+           data-category-inclusions="${escapeHtml(inclusions)}">
+        ${buildCategoryCardImage(cat)}
+        <div class="card-body">
+          <div class="card-title"><h3>${escapeHtml(cat.category_name)}</h3></div>
+          <p>${displayText}</p>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   categoriesContainer.querySelectorAll('.card[data-category-id]').forEach(card => {
     card.addEventListener('click', () => {
-      openCategoryModal(card.dataset.categoryId, card.dataset.categoryName);
+      openCategoryModal(
+        card.dataset.categoryId,
+        card.dataset.categoryName,
+        card.dataset.categoryDesc || '',
+        card.dataset.categoryInclusions || ''
+      );
     });
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INCLUSIONS PARSER
+// Splits inclusions text into individual items by newline or comma
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function parseInclusions(text) {
+  if (!text || !text.trim()) return [];
+
+  // First try splitting by newlines
+  let items = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
+
+  // If only one line, try splitting by commas
+  if (items.length === 1) {
+    const commaSplit = items[0].split(',').map(s => s.trim()).filter(s => s.length > 0);
+    if (commaSplit.length > 1) {
+      items = commaSplit;
+    }
+  }
+
+  return items;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOAD & RENDER PACKAGES IN MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function openCategoryModal(categoryId, categoryName) {
+async function openCategoryModal(categoryId, categoryName, categoryDesc, categoryInclusions) {
   pkgModalCatName.textContent  = categoryName;
   pkgModalCards.innerHTML      = '';
   pkgModalAddOnCards.innerHTML = '';
+
+  // Show description under category name
+  if (pkgModalCatDesc) {
+    if (categoryDesc && categoryDesc.trim()) {
+      pkgModalCatDesc.textContent = categoryDesc;
+      pkgModalCatDesc.classList.remove('hidden');
+    } else {
+      pkgModalCatDesc.textContent = '';
+      pkgModalCatDesc.classList.add('hidden');
+    }
+  }
+
+  // Show inclusions section
+  if (pkgModalInclusions && pkgModalInclusionsList) {
+    const inclusionItems = parseInclusions(categoryInclusions);
+    if (inclusionItems.length > 0) {
+      pkgModalInclusionsList.innerHTML = inclusionItems
+        .map(item => `<li>${escapeHtml(item)}</li>`)
+        .join('');
+      pkgModalInclusions.classList.remove('hidden');
+    } else {
+      pkgModalInclusionsList.innerHTML = '';
+      pkgModalInclusions.classList.add('hidden');
+    }
+  }
+
   showModalLoading();
   openModal();
 
