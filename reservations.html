@@ -1116,7 +1116,7 @@
         };
     }
 
-    // â”€â”€ Load packages from Supabase â”€â”€
+    // ── Load packages from Supabase ──
     async function loadPackages() {
         const { data: pkgs, error } = await supabase
             .from('package')
@@ -1209,7 +1209,7 @@
         return S.cateringCart.filter(item => item && item.pax).length;
     }
 
-    // â”€â”€ Step order: Time Slot (rs5) now comes BEFORE Your Details (rs4) â”€â”€
+    // ── Step order: Time Slot (rs5) now comes BEFORE Your Details (rs4) ──
     const STEP_IDS = ['rs1','rs4','rs6','rs7'];
 
     let cur = 1;
