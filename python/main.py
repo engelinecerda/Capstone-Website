@@ -62,7 +62,7 @@ def get_forecast():
     }
 
     # Actual data
-    res = supabase.table("reservations").select("event_date").execute()
+    res = supabase.table("reservations").select("event_date").eq("status", "completed").execute()
 
     actual_map = {}
     years = set()
