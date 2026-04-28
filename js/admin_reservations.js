@@ -10,6 +10,7 @@ import {
   getScopeLabel as getSharedScopeLabel,
   isDateFullyBooked as isFullyBookedFromScopes
 } from './reservation_availability.js';
+import { logAudit } from './audit_logger.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -1913,6 +1914,8 @@ async function performReservationAction(action, button) {
   const reservationId = button.dataset.reservationId || button.dataset.id;
   const reservation = getReservationById(reservationId);
   const previousStatus = reservation?.status || null;
+  const customerName = reservation?.contact_name || 'Unknown';
+  const packageName = reservation?.package?.package_name || 'Unknown';
 
   if (action === 'assign-employee') {
     closeReservationDetailsModal();
@@ -1930,42 +1933,90 @@ async function performReservationAction(action, button) {
       throw new Error(approvalState.reason);
     }
     await updateReservationStatus(reservationId, 'approved', previousStatus);
+    await logAudit({
+      action: 'Approved Reservation',
+      category: 'reservation',
+      details: `Reservation approved for ${customerName} - ${packageName} (was: ${previousStatus || 'unknown'})`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Reservation approved.' };
   }
 
   if (action === 'decline') {
     await updateReservationStatus(reservationId, 'declined', previousStatus);
+    await logAudit({
+      action: 'Declined Reservation',
+      category: 'reservation',
+      details: `Reservation declined for ${customerName} - ${packageName} (was: ${previousStatus || 'unknown'})`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Reservation declined.' };
   }
 
   if (action === 'verify-contract') {
     await markReservationContractVerified(reservationId);
+    await logAudit({
+      action: 'Verified Contract',
+      category: 'contract',
+      details: `Contract verified for ${customerName} - ${packageName}`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Contract verified. You can now approve the reservation.' };
   }
 
   if (action === 'request-contract-resubmission') {
     const noteInput = reservationContractSection?.querySelector(`[data-contract-review-note="${reservationId}"]`);
     await requestReservationContractResubmission(reservationId, noteInput?.value || '');
+    await logAudit({
+      action: 'Requested Contract Resubmission',
+      category: 'contract',
+      details: `Resubmission requested for ${customerName} - ${packageName}. Note: ${noteText.trim() || 'No note'}`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Customer has been asked to re-upload the signed contract.' };
   }
 
   if (action === 'approve-reschedule') {
     await handleRescheduleReview(button.dataset.requestId, 'approved_pending_payment');
+    await logAudit({
+      action: 'Approved Reschedule Request',
+      category: 'reschedule',
+      details: `Reschedule approved for ${customerName} - ${packageName}`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Reschedule request approved.' };
   }
 
   if (action === 'reject-reschedule') {
     await handleRescheduleReview(button.dataset.requestId, 'rejected');
+    await logAudit({
+      action: 'Rejected Reschedule Request',
+      category: 'reschedule',
+      details: `Reschedule rejected for ${customerName} - ${packageName}`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Reschedule request rejected.' };
   }
 
   if (action === 'approve-payment') {
     await handlePaymentReview(reservationId, button.dataset.paymentId, 'approved');
+    await logAudit({
+      action: 'Approved Payment',
+      category: 'payment',
+      details: `Payment approved for ${customerName} - ${packageName}`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Payment approved.' };
   }
 
   if (action === 'reject-payment') {
     await handlePaymentReview(reservationId, button.dataset.paymentId, 'rejected');
+    await logAudit({
+      action: 'Rejected Payment',
+      category: 'payment',
+      details: `Payment rejected for ${customerName} - ${packageName}`,
+      entityId: reservationId
+    });
     return { shouldReload: true, message: 'Payment rejected.' };
   }
 

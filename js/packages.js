@@ -3,9 +3,11 @@
 
 import { portalSupabase as supabase } from './supabase.js';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const CATEGORY_TABLE = '(TEST) package_category';
+// ─── Constants & Supabase Tables ────────────────────────────────────────────────────────────────
+const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
+const TIER_TABLE     = 'package_tier';
+const TIER_VISIBLE_COUNT = 5; 
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const packagesLoading     = document.getElementById('packagesLoading');
@@ -43,8 +45,6 @@ function hide(el) { el.classList.add('hidden'); }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SMART DESCRIPTION PARSER
-// Automatically detects structure from plain text.
-// No special typing format required from admin.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function buildDescriptionHtml(text) {
@@ -166,7 +166,105 @@ function buildBulletList(items) {
   return html;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// INCLUSIONS PARSER
+// Detects section headers (lines ending with :) for grouped layout
+// Falls back to flat bullet list for plain text
+// ═══════════════════════════════════════════════════════════════════════════════
 
+function parseInclusionsStructured(text) {
+  if (!text || !text.trim()) return { type: 'empty', sections: [], items: [] };
+
+  const lines = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
+
+  // Check if any line looks like a section header (ends with :)
+  const hasHeaders = lines.some(line => /^.{1,50}:\s*$/.test(line) || (line.endsWith(':') && line.length <= 50));
+
+  if (hasHeaders) {
+    // Parse into grouped sections
+    const sections = [];
+    let currentSection = null;
+
+    for (const line of lines) {
+      if (line.endsWith(':') && line.length <= 50) {
+        // New section header
+        if (currentSection) sections.push(currentSection);
+        currentSection = {
+          title: line.replace(/:\s*$/, '').trim(),
+          items: []
+        };
+      } else if (currentSection) {
+        // Item under current section — split by comma if short items
+        const subItems = splitInclusionLine(line);
+        currentSection.items.push(...subItems);
+      } else {
+        // Item before any header — create unnamed section
+        if (!currentSection) {
+          currentSection = { title: '', items: [] };
+        }
+        const subItems = splitInclusionLine(line);
+        currentSection.items.push(...subItems);
+      }
+    }
+
+    if (currentSection) sections.push(currentSection);
+
+    // If we got real titled sections, return grouped
+    const titledSections = sections.filter(s => s.title);
+    if (titledSections.length > 0) {
+      return { type: 'grouped', sections };
+    }
+  }
+
+  // Flat list fallback
+  let items = [];
+  for (const line of lines) {
+    const subItems = splitInclusionLine(line);
+    items.push(...subItems);
+  }
+
+  return { type: 'flat', sections: [], items };
+}
+
+function splitInclusionLine(line) {
+  // Try comma split for short items
+  if (line.includes(',')) {
+    const parts = line.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    const avgLen = parts.reduce((sum, p) => sum + p.length, 0) / parts.length;
+    if (parts.length >= 2 && avgLen < 50) {
+      return parts;
+    }
+  }
+  return [line];
+}
+function buildInclusionsHtml(text) {
+  const parsed = parseInclusionsStructured(text);
+
+  if (parsed.type === 'empty') return '';
+
+  if (parsed.type === 'grouped') {
+    // Render as 3-column grid with cards
+    const groupCards = parsed.sections.map(section => {
+      if (!section.title && section.items.length === 0) return '';
+
+      const titleHtml = section.title
+        ? `<h4 class="inclusions-group-title">${escapeHtml(section.title)}</h4>`
+        : '';
+
+      const listHtml = section.items.length > 0
+        ? `<ul class="inclusions-group-list">${section.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+        : '';
+
+      return `<div class="inclusions-group">${titleHtml}${listHtml}</div>`;
+    }).join('');
+
+    return `<div class="inclusions-grid">${groupCards}</div>`;
+  }
+
+  // Flat list
+  if (parsed.items.length === 0) return '';
+  return `<ul class="pkg-modal-inclusions-list">${parsed.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE STATES
@@ -307,61 +405,35 @@ function renderCategoryCards(categories) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INCLUSIONS PARSER
-// Splits inclusions text into individual items by newline or comma
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function parseInclusions(text) {
-  if (!text || !text.trim()) return [];
-
-  // First try splitting by newlines
-  let items = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
-
-  // If only one line, try splitting by commas
-  if (items.length === 1) {
-    const commaSplit = items[0].split(',').map(s => s.trim()).filter(s => s.length > 0);
-    if (commaSplit.length > 1) {
-      items = commaSplit;
-    }
-  }
-
-  return items;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // LOAD & RENDER PACKAGES IN MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function openCategoryModal(categoryId, categoryName, categoryDesc, categoryInclusions) {
-  pkgModalCatName.textContent  = categoryName;
-  pkgModalCards.innerHTML      = '';
+  // ── Set header ──
+  pkgModalCatName.textContent = categoryName;
+
+  // ── Set category description ──
+  if (categoryDesc && categoryDesc.trim()) {
+    pkgModalCatDesc.textContent = categoryDesc;
+    show(pkgModalCatDesc);
+  } else {
+    pkgModalCatDesc.textContent = '';
+    hide(pkgModalCatDesc);
+  }
+
+    // ── Set category inclusions ──
+  const inclusionsHtml = buildInclusionsHtml(categoryInclusions);
+  if (inclusionsHtml) {
+    pkgModalInclusionsList.innerHTML = inclusionsHtml;
+    show(pkgModalInclusions);
+  } else {
+    pkgModalInclusionsList.innerHTML = '';
+    hide(pkgModalInclusions);
+  }
+
+  // ── Reset content ──
+  pkgModalCards.innerHTML = '';
   pkgModalAddOnCards.innerHTML = '';
-
-  // Show description under category name
-  if (pkgModalCatDesc) {
-    if (categoryDesc && categoryDesc.trim()) {
-      pkgModalCatDesc.textContent = categoryDesc;
-      pkgModalCatDesc.classList.remove('hidden');
-    } else {
-      pkgModalCatDesc.textContent = '';
-      pkgModalCatDesc.classList.add('hidden');
-    }
-  }
-
-  // Show inclusions section
-  if (pkgModalInclusions && pkgModalInclusionsList) {
-    const inclusionItems = parseInclusions(categoryInclusions);
-    if (inclusionItems.length > 0) {
-      pkgModalInclusionsList.innerHTML = inclusionItems
-        .map(item => `<li>${escapeHtml(item)}</li>`)
-        .join('');
-      pkgModalInclusions.classList.remove('hidden');
-    } else {
-      pkgModalInclusionsList.innerHTML = '';
-      pkgModalInclusions.classList.add('hidden');
-    }
-  }
-
   showModalLoading();
   openModal();
 
@@ -379,6 +451,29 @@ async function openCategoryModal(categoryId, categoryName, categoryDesc, categor
       showModalEmpty();
       return;
     }
+
+    // ── Fetch active tiers for all packages in this category ──
+    const packageIds = data.map(p => p.package_id);
+    let tierMap = {};
+
+    try {
+      const { data: tiers } = await supabase
+        .from(TIER_TABLE)
+        .select('*')
+        .in('package_id', packageIds)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      (tiers || []).forEach(t => {
+        if (!tierMap[t.package_id]) tierMap[t.package_id] = [];
+        tierMap[t.package_id].push(t);
+      });
+    } catch (tierErr) {
+      console.warn('Could not load tiers:', tierErr);
+    }
+
+    // ── Attach tiers to packages ──
+    data.forEach(pkg => { pkg._tiers = tierMap[pkg.package_id] || []; });
 
     const mainPackages  = data.filter(p => p.package_type === 'main');
     const addOnPackages = data.filter(p => p.package_type === 'add on');
@@ -409,12 +504,38 @@ async function openCategoryModal(categoryId, categoryName, categoryDesc, categor
       showModalContent(mainPackages.length > 0, addOnPackages.length > 0);
     }
 
+    // ── Wire tier toggle buttons ──
+    wireTierToggleButtons();
+
   } catch (err) {
     console.error('Failed to load packages:', err);
     pkgModalCards.innerHTML = `<div class="pkg-modal-error"><p>Failed to load packages. Please try again.</p></div>`;
     showModalContent(true, false);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIER TOGGLE BUTTONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function wireTierToggleButtons() {
+  modal.querySelectorAll('.tier-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      const extra = btn.nextElementSibling;
+      btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      btn.textContent = expanded ? 'View full inclusions' : 'Hide full inclusions';
+      if (extra) {
+        if (expanded) extra.setAttribute('hidden', '');
+        else extra.removeAttribute('hidden');
+      }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUILD PACKAGE CARD
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function buildPackageCard(pkg) {
   const pills = [];
@@ -442,6 +563,9 @@ function buildPackageCard(pkg) {
 
   const descHtml = buildDescriptionHtml(pkg.description);
 
+  // ── Build tier cards ──
+  const tiersHtml = buildTiersHtml(pkg._tiers || []);
+
   return `
     <div class="pkg-modal-card">
       <div class="pkg-card-header">
@@ -450,6 +574,78 @@ function buildPackageCard(pkg) {
       </div>
       ${pillsHtml}
       ${descHtml ? `<div class="pkg-card-desc-wrap">${descHtml}</div>` : ''}
+      ${tiersHtml}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUILD TIERS HTML
+// Uses only DB columns: tier_name, tier_subtitle, tier_full_inclusions, sort_order
+// Splits tier_full_inclusions by newline or comma
+// Shows first 5 items, "View full inclusions" button if more than 5
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function parseTierInclusions(text) {
+  if (!text || !text.trim()) return [];
+
+  // Split by newlines first
+  let items = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
+
+  // If only one line, try splitting by commas
+  if (items.length === 1) {
+    const commaSplit = items[0].split(',').map(s => s.trim()).filter(s => s.length > 0);
+    if (commaSplit.length > 1) {
+      items = commaSplit;
+    }
+  }
+
+  return items;
+}
+
+function buildTiersHtml(tiers) {
+  if (!tiers || tiers.length === 0) return '';
+
+  const tierCards = tiers.map(tier => {
+    const allInclusions = parseTierInclusions(tier.tier_full_inclusions);
+    const hasMany = allInclusions.length > TIER_VISIBLE_COUNT;
+    const visibleItems = hasMany ? allInclusions.slice(0, TIER_VISIBLE_COUNT) : allInclusions;
+    const hiddenItems = hasMany ? allInclusions.slice(TIER_VISIBLE_COUNT) : [];
+
+    // Build visible inclusions list
+    const visibleListHtml = visibleItems.length > 0
+      ? `<ul class="tier-list">${visibleItems.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+      : '';
+
+    // Build toggle + hidden inclusions (only if > 5 items)
+    let toggleHtml = '';
+    if (hiddenItems.length > 0) {
+      toggleHtml = `
+        <button type="button" class="tier-toggle-btn" aria-expanded="false">View full inclusions</button>
+        <div class="tier-extra" hidden>
+          <ul class="tier-list">${hiddenItems.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="tier-card">
+        <div class="tier-card-head">
+          <h4>${escapeHtml(tier.tier_name)}</h4>
+          ${tier.tier_subtitle ? `<p>${escapeHtml(tier.tier_subtitle)}</p>` : ''}
+        </div>
+        <div class="tier-card-body">
+          ${visibleListHtml}
+          ${toggleHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="pkg-tiers-section">
+      <h4 class="pkg-tiers-title">Package Tiers:</h4>
+      <div class="tier-grid">${tierCards}</div>
     </div>
   `;
 }

@@ -217,6 +217,9 @@ body {
   font-size: 28px;
   font-weight: 700;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
   line-height: 1.2;
 }
 

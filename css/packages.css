@@ -54,6 +54,7 @@ body {
     font-size: 36px;
     color: #6B3A1F;
     padding: 20px 0;
+    font-family: 'Kumbh Sans', sans-serif;
 }
 .what-we-offer p {
     text-align: center;
@@ -63,6 +64,7 @@ body {
     margin: 0 auto;
     padding: 0 20px;
     line-height: 2;
+    font-family: 'Kumbh Sans', sans-serif;
 }
 
 /*packages section*/
@@ -78,11 +80,13 @@ body {
   color: #6B3A1F;
   font-size: 36px;
   margin-bottom: 10px;
+  font-family: 'Kumbh Sans', sans-serif;
 }
 .packages-section p {
   color: #241208;
   font-size: 16px;
   max-width: 900px;
+  font-family: 'Kumbh Sans', sans-serif;
   margin: 0 auto 30px auto;
 }
 .packages-container {
@@ -91,6 +95,7 @@ body {
   gap: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  font-family: 'Kumbh Sans', sans-serif;
 }
 .package-card {
   background-color: #fff;
@@ -149,6 +154,7 @@ body {
     display: flex;
     flex-direction: column;
     cursor: pointer;
+    font-family: 'Kumbh Sans', sans-serif;
 }
 .card-img {
     width: 100%;
@@ -293,7 +299,7 @@ body {
    ══════════════════════════════════════════════════════════════ */
 
 .package-category-modal-content {
-  max-width: 660px;
+  max-width: 850px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -358,7 +364,7 @@ body {
 .pkg-modal-section-title {
   font-size: 17px;
   font-weight: 700;
-  color: #4e3624;
+  color: #6B3A1F;
   margin-bottom: 18px;
   font-family: 'Kumbh Sans', sans-serif;
 }
@@ -502,7 +508,7 @@ body {
 .pkg-modal-inclusions .pkg-modal-section-title {
   font-size: 17px;
   font-weight: 700;
-  color: #4e3624;
+  color: #6B3A1F;
   margin-bottom: 14px;
 }
 
@@ -522,6 +528,203 @@ body {
   font-weight: 400;
   font-family: 'Kumbh Sans', sans-serif;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   TIER CARDS (inside package modal) — REVISED
+   ══════════════════════════════════════════════════════════════ */
+
+.pkg-tiers-section {
+  margin-top: 24px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.pkg-tiers-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #6B3A1F;
+  margin-bottom: 16px;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.tier-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #eadfd2;
+  background: #fffaf5;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.tier-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.tier-card-head {
+  background: #6B3A1F;
+  color: #fff;
+  padding: 18px 20px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tier-card-head h4 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  font-family: 'Kumbh Sans', sans-serif;
+  color: #ffffff;
+}
+
+.tier-card-head p {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+  line-height: 1.5;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+/* Remove tier image section to match reference */
+.tier-card-image {
+  display: none;
+}
+
+.tier-card-body {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tier-desc {
+  font-size: 13.5px;
+  color: #73685f;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+.tier-list {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tier-list li {
+  font-size: 14px;
+  color: #20150b;
+  line-height: 1.6;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+.tier-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  background: #6B3A1F;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-family: 'Kumbh Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.tier-toggle-btn:hover {
+  background: #6B3A1F;
+}
+
+.tier-extra {
+  padding-top: 12px;
+  border-top: 1px solid #f0ebe3;
+  margin-top: 12px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CATEGORY INCLUSIONS — Grouped Grid Layout
+   ══════════════════════════════════════════════════════════════ */
+
+/* Simple flat list (no sections) */
+.pkg-modal-inclusions-list {
+  list-style: disc;
+  padding-left: 22px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pkg-modal-inclusions-list li {
+  font-size: 14.5px;
+  color: #20150b;
+  line-height: 1.7;
+  font-weight: 400;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+/* Grouped sections grid */
+.inclusions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.inclusions-group {
+  border: 1px solid #eadfd2;
+  border-radius: 12px;
+  background: #fffaf5;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.inclusions-group-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #6B3A1F;
+  margin: 0 0 14px;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+.inclusions-group-list {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inclusions-group-list li {
+  font-size: 14px;
+  color: #20150b;
+  line-height: 1.6;
+  font-family: 'Kumbh Sans', sans-serif;
+}
+
+/* Responsive */
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -628,3 +831,38 @@ body {
     }
 }
 
+@media (max-width: 900px) {
+  .tier-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .inclusions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .tier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-card-head {
+    min-height: auto;
+    padding: 14px 16px;
+  }
+
+  .tier-card-head h4 {
+    font-size: 16px;
+  }
+
+  .tier-card-body {
+    padding: 16px;
+  }
+
+  .tier-card-image {
+    display: none;
+    height: 120px;
+  }
+  .inclusions-grid {
+    grid-template-columns: 1fr;
+  }
+}

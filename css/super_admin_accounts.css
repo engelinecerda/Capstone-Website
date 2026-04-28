@@ -163,11 +163,15 @@ body {
   gap: 16px;
   align-items: flex-start;
 }
-.page-title { 
-  font-size: 28px; 
-  font-weight: 700; 
-  color: var(--text); 
-  line-height: 1.2; 
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 1.2;
 }
 
 .admin-badge {

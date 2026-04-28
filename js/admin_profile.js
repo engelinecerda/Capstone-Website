@@ -8,6 +8,7 @@ import {
   populatePortalIdentity
 } from './admin_auth.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -131,8 +132,14 @@ async function handleProfileSubmit(event) {
       ...payload
     };
 
-    // Keep the cached profile in sync so other pages see the updated info
     localStorage.setItem('profile', JSON.stringify(state.profile));
+
+    await logAudit({
+      action:   'Updated Profile',
+      category: 'account',
+      details:  `Profile updated for ${payload.first_name} ${payload.last_name} (${payload.email})`,
+      entityId: payload.user_id
+    });
 
     renderProfileShell();
     setFormMessage(profileMessage, 'Profile updated successfully.', 'success');
@@ -175,6 +182,14 @@ async function handlePasswordSubmit(event) {
     if (updateError) throw updateError;
 
     passwordForm.reset();
+
+    await logAudit({
+      action:   'Changed Password',
+      category: 'account',
+      details:  `Password changed for ${state.session.user.email}`,
+      entityId: state.session.user.id
+    });
+
     setFormMessage(passwordMessage, 'Password updated successfully.', 'success');
   } catch (error) {
     setFormMessage(passwordMessage, `Failed to update password: ${error.message}`, 'error');

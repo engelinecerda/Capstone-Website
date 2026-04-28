@@ -2,7 +2,7 @@ import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
-
+import { logAudit } from './audit_logger.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let allAccounts = [];
@@ -293,10 +293,16 @@ async function handleCreateAccount() {
 
     if (profileErr) throw profileErr;
 
+    await logAudit({
+      action:   'Created Account',
+      category: 'system',
+      details:  `New ${role} account created for ${firstName} ${lastName} (${email})${staffRole ? ` · Staff role: ${staffRole}` : ''}`,
+      entityId: userId
+    });
+
     showMsg('Account created successfully!', 'success');
     await loadAccounts();
     setTimeout(closeAccountModal, 1400);
-
   } catch (err) {
     showMsg(err.message || 'Failed to create account.', 'error');
   } finally {
@@ -393,6 +399,13 @@ async function handleUpdateAccount(a) {
     }
     validatePasswordRequirements();
 
+    await logAudit({
+      action:   newPassword ? 'Updated Account & Password' : 'Updated Account',
+      category: 'system',
+      details:  `Account updated for ${firstName} ${lastName} (${a.email}) · Role: ${role}${staffRole ? ` · Staff role: ${staffRole}` : ''}${newPassword ? ' · Password was changed' : ''}`,
+      entityId: a.user_id
+    });
+
     const successMsg = newPassword
       ? 'Changes saved and password updated successfully.'
       : 'Changes saved successfully.';
@@ -400,7 +413,6 @@ async function handleUpdateAccount(a) {
     showMsg(successMsg, 'success');
     updateStats();
     applyFilters();
-
   } catch (err) {
     showMsg(err.message || 'Failed to save changes.', 'error');
   } finally {
@@ -432,6 +444,13 @@ function openLockConfirm(a) {
     statusMap[a.user_id] = newStatus ? 'locked' : 'active';
     const idx = allAccounts.findIndex(x => x.user_id === a.user_id);
     if (idx !== -1) allAccounts[idx]._status = statusMap[a.user_id];
+
+    await logAudit({
+      action:   isLocked ? 'Unlocked Account' : 'Locked Account',
+      category: 'system',
+      details:  `Account ${isLocked ? 'unlocked' : 'locked'} for ${displayName(a)} (${a.email})`,
+      entityId: a.user_id
+    });
 
     applyFilters();
     closeConfirmModal();
@@ -530,7 +549,15 @@ document.getElementById('sendPasswordResetBtn')?.addEventListener('click', async
   showSecurityMsg('Sending password reset email…', 'info');
   const { error } = await supabase.auth.resetPasswordForEmail(a.email);
   if (error) showSecurityMsg('Failed: ' + error.message, 'error');
-  else showSecurityMsg(`Password reset email sent to ${a.email}.`, 'success');
+  else {
+    await logAudit({
+      action:   'Sent Password Reset Email',
+      category: 'system',
+      details:  `Password reset email sent to ${a.email}`,
+      entityId: a.user_id || null
+    });
+    showSecurityMsg(`Password reset email sent to ${a.email}.`, 'success');
+  }
 });
 
 // ── SESSION ──────────────────────────────────────────────────────

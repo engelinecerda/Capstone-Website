@@ -231,6 +231,9 @@ body {
   font-size: 28px;
   font-weight: 700;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
   line-height: 1.2;
 }
 
@@ -1030,6 +1033,68 @@ body {
   font-size: 14px;
   color: var(--text);
   line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TIER MANAGEMENT
+   ══════════════════════════════════════════════════════════════ */
+
+/* Tiers action button in table */
+.action-btn.tiers {
+  color: #7c3aed;
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.action-btn.tiers:hover { background: #ede9fe; }
+
+/* Tier panel card */
+.tier-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tier-panel-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Tier table thumbnail */
+.tier-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tier-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tier-thumb svg { color: var(--muted); }
+
+.tier-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tier-name-text {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
 }
 
 /* ══════════════════════════════════════════════════════════════

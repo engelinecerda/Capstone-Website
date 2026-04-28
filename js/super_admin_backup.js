@@ -6,6 +6,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { logAudit } from './audit_logger.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID  = '840885111053-9o5sunpcth34kfv4c1fc74fp0h9nn2ub.apps.googleusercontent.com';
@@ -15,7 +16,9 @@ const DRIVE_SCOPE       = 'https://www.googleapis.com/auth/drive.file';
 // ─── All tables to back up (in dependency order for safe restore) ─────────────
 const BACKUP_TABLES = [
   'profiles',
+  'package_category',
   'package',
+  'package_tier',
   'contract_templates',
   'reservations',
   'reservation_contracts',
@@ -29,6 +32,7 @@ const BACKUP_TABLES = [
   'calendar_blackouts',
   'reservation_forecast',
   'reviews',
+  'audit_log',            
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -39,6 +43,7 @@ let pendingRestoreFile    = null;
 let pendingSettingsAction = null;
 let settings              = { retentionDays: 30 };
 let currentAdminId        = null;
+let pendingDeleteFile = null;
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const pageMessage           = document.getElementById('pageMessage');
@@ -54,6 +59,12 @@ const emptyHistory          = document.getElementById('emptyHistory');
 const configureRetentionBtn = document.getElementById('configureRetentionBtn');
 const googleAuthBtn         = document.getElementById('googleAuthBtn');
 const googleAuthStatus      = document.getElementById('googleAuthStatus');
+const deleteBackupModal   = document.getElementById('deleteBackupModal');
+const deleteBackupClose   = document.getElementById('deleteBackupClose');
+const deleteBackupCancel  = document.getElementById('deleteBackupCancel');
+const deleteBackupOk      = document.getElementById('deleteBackupOk');
+const deleteBackupCopy    = document.getElementById('deleteBackupCopy');
+const deleteBackupMessage = document.getElementById('deleteBackupMessage');
 
 // Confirm backup modal
 const confirmBackupModal   = document.getElementById('confirmBackupModal');
@@ -191,10 +202,16 @@ function initGoogleAuth() {
 
       driveAccessToken = response.access_token;
 
-      // ✅ Save token + expiry time
       const expiresAt = Date.now() + (response.expires_in ?? 3600) * 1000;
       localStorage.setItem('drive_token', driveAccessToken);
       localStorage.setItem('drive_token_expires_at', String(expiresAt));
+
+      await logAudit({
+        action:   'Connected Google Drive',
+        category: 'system',
+        details:  'Admin authenticated with Google Drive for backup access',
+        entityId: currentAdminId || null
+      });
 
       await onTokenReady();
     }
@@ -392,7 +409,7 @@ async function uploadToDrive(filename, jsonContent, description, onProgress) {
 // ─── Create backup ────────────────────────────────────────────────────────────
 createBackupBtn?.addEventListener('click', async () => {
   try {
-    await ensureValidToken(); // ✅ check before opening modal
+    await ensureValidToken(); // check before opening modal
   } catch (err) {
     setPageMessage(err.message, 'error');
     return;
@@ -412,7 +429,7 @@ confirmBackupOk?.addEventListener('click', async () => {
     setProgress(backupProgressBar, backupProgressLabel, backupProgressWrap, pct, text);
 
   try {
-    await ensureValidToken(); // ✅ re-check at point of use
+    await ensureValidToken(); // re-check at point of use
 
     const snapshot = await readAllTables(onProgress);
 
@@ -441,6 +458,12 @@ confirmBackupOk?.addEventListener('click', async () => {
     onProgress(100, 'Done!');
 
     await loadBackupHistory();
+    await logAudit({
+      action:   'Created Backup',
+      category: 'system',
+      details:  `Backup created and uploaded to Google Drive: ${uploaded.name} (${formatBytes(parseInt(uploaded.size || 0))})`,
+      entityId: uploaded.id || null
+    });
     closeModal(confirmBackupModal);
     setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}`, 'success');
 
@@ -453,10 +476,46 @@ confirmBackupOk?.addEventListener('click', async () => {
   }
 });
 
+// ─── Delete backup ───────────────────────────────────────────────────────────
+deleteBackupOk?.addEventListener('click', async () => {
+  if (!pendingDeleteFile) return;
+
+  deleteBackupOk.disabled    = true;
+  deleteBackupCancel.disabled = true;
+  setModalMsg(deleteBackupMessage, 'Deleting backup…', 'info');
+
+  try {
+    await ensureValidToken();
+
+    await fetch(`https://www.googleapis.com/drive/v3/files/${pendingDeleteFile.id}`, {
+      method:  'DELETE',
+      headers: { 'Authorization': `Bearer ${driveAccessToken}` }
+    });
+
+    await logAudit({
+      action:   'Deleted Backup',
+      category: 'system',
+      details:  `Backup file deleted from Google Drive: ${pendingDeleteFile.name}`,
+      entityId: pendingDeleteFile.id || null
+    });
+
+    closeModal(deleteBackupModal);
+    setPageMessage('Backup deleted.', 'success');
+    await loadBackupHistory();
+
+  } catch (err) {
+    setModalMsg(deleteBackupMessage, `Delete failed: ${err.message}`);
+  } finally {
+    deleteBackupOk.disabled    = false;
+    deleteBackupCancel.disabled = false;
+    pendingDeleteFile           = null;
+  }
+});
+
 // ─── Restore: open modal ──────────────────────────────────────────────────────
 restoreSystemBtn?.addEventListener('click', async () => {
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken(); // 
   } catch (err) {
     setPageMessage(err.message, 'error');
     return;
@@ -494,7 +553,7 @@ restoreOk?.addEventListener('click', async () => {
     setProgress(restoreProgressBar, restoreProgressLabel, restoreProgressWrap, pct, text);
 
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken(); // 
 
     onProgress(5, 'Downloading backup from Google Drive…');
     const res = await fetch(
@@ -534,6 +593,12 @@ restoreOk?.addEventListener('click', async () => {
     }
 
     onProgress(100, 'Restore complete!');
+    await logAudit({
+      action:   'Restored System Backup',
+      category: 'system',
+      details:  `System restored from backup file: ${pendingRestoreFile.name}`,
+      entityId: pendingRestoreFile.id || null
+    });
     setTimeout(() => {
       closeModal(restoreModal);
       setPageMessage('System restored successfully from the selected backup.', 'success');
@@ -553,7 +618,9 @@ restoreOk?.addEventListener('click', async () => {
 function getPrimaryKey(table) {
   const keys = {
     profiles:                      'user_id',
+    package_category:              'package_category_id',  
     package:                       'package_id',
+    package_tier:                  'tier_id',           
     contract_templates:            'template_id',
     reservations:                  'reservation_id',
     reservation_contracts:         'reservation_contract_id',
@@ -567,6 +634,7 @@ function getPrimaryKey(table) {
     calendar_blackouts:            'blackout_id',
     reservation_forecast:          'forecast_id',
     reviews:                       'review_id',
+    audit_log: 'audit_id',  
   };
   return keys[table] || 'id';
 }
@@ -591,6 +659,12 @@ async function handleDownload(fileId, filename) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    await logAudit({
+      action:   'Downloaded Backup',
+      category: 'system',
+      details:  `Backup file downloaded: ${filename}`,
+      entityId: fileId || null
+    });
     setPageMessage('Download started.', 'success');
 
   } catch (err) {
@@ -600,22 +674,18 @@ async function handleDownload(fileId, filename) {
 
 // ─── Delete backup from Drive ─────────────────────────────────────────────────
 async function handleDelete(fileId, filename) {
-  if (!confirm(`Delete "${filename}" from Google Drive? This cannot be undone.`)) return;
-
   try {
-    await ensureValidToken(); // ✅
-
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
-      method:  'DELETE',
-      headers: { 'Authorization': `Bearer ${driveAccessToken}` }
-    });
-
-    setPageMessage('Backup deleted.', 'success');
-    await loadBackupHistory();
-
+    await ensureValidToken();
   } catch (err) {
-    setPageMessage(`Delete failed: ${err.message}`, 'error');
+    setPageMessage(err.message, 'error');
+    return;
   }
+
+  pendingDeleteFile = { id: fileId, name: filename };
+  deleteBackupCopy.textContent = `Delete "${filename}" from Google Drive? This cannot be undone.`;
+  setModalMsg(deleteBackupMessage, '');
+  deleteBackupOk.disabled = false;
+  openModal(deleteBackupModal);
 }
 
 // ─── Enforce retention policy ─────────────────────────────────────────────────
@@ -636,7 +706,13 @@ async function enforceRetention() {
   }
 
   await loadBackupHistory();
-  setPageMessage(`Removed ${expired.length} expired backup(s) per retention policy.`, 'success');
+    await logAudit({
+      action:   'Enforced Retention Policy',
+      category: 'system',
+      details:  `Removed ${expired.length} expired backup(s) older than ${settings.retentionDays} days`,
+      entityId: null
+    });
+    setPageMessage(`Removed ${expired.length} expired backup(s) per retention policy.`, 'success');
 }
 
 // ─── Status card ──────────────────────────────────────────────────────────────
@@ -772,12 +848,21 @@ confirmBackupModal?.addEventListener('click', e => { if (e.target === confirmBac
 restoreModal?.addEventListener('click',       e => { if (e.target === restoreModal)       closeModal(restoreModal); });
 settingsModal?.addEventListener('click',      e => { if (e.target === settingsModal)      closeModal(settingsModal); });
 
+deleteBackupClose?.addEventListener('click',  () => closeModal(deleteBackupModal));
+deleteBackupCancel?.addEventListener('click', () => closeModal(deleteBackupModal));
+deleteBackupModal?.addEventListener('click', e => {
+  if (e.target === deleteBackupModal) closeModal(deleteBackupModal);
+});
+
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!confirmBackupModal?.classList.contains('hidden')) closeModal(confirmBackupModal);
   if (!restoreModal?.classList.contains('hidden'))       closeModal(restoreModal);
   if (!settingsModal?.classList.contains('hidden'))      closeModal(settingsModal);
+  if (!deleteBackupModal?.classList.contains('hidden'))  closeModal(deleteBackupModal);
 });
+
+
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 function init() {
@@ -803,12 +888,12 @@ function init() {
       const savedToken = localStorage.getItem('drive_token');
 
       if (savedToken && !isTokenExpired()) {
-        // ✅ Token exists and is still valid — use it directly
+        //  Token exists and is still valid — use it directly
         driveAccessToken = savedToken;
         await onTokenReady();
 
       } else if (savedToken && isTokenExpired()) {
-        // ✅ Token exists but expired — clear and prompt reconnect
+        //  Token exists but expired — clear and prompt reconnect
         clearSavedToken();
         googleAuthStatus.textContent = 'Session expired — please reconnect to Google Drive';
         googleAuthStatus.className   = 'auth-status error';
