@@ -40,7 +40,7 @@ const state = {
     },
     reservationId: new URLSearchParams(window.location.search).get('reservation_id') || '',
     activeTab: 'current',
-    selectedMethod: 'gcash_maya',
+    selectedMethod: 'gcash',
     selectedOptionKey: '',
     isSubmitting: false,
     flashMessage: '',
@@ -154,10 +154,10 @@ function getPaymentOptionKey(option) {
 
 function getVisibleOptions(reservation) {
     const options = getActivePaymentOptions(reservation);
-    if (state.selectedMethod !== 'cash') {
-        return options;
+    if (PAYMENT_METHODS[state.selectedMethod]?.type === 'onsite') {
+        return options.filter((option) => option.paymentType === 'full_payment');
     }
-    return options.filter((option) => option.paymentType === 'full_payment');
+    return options;
 }
 
 function getSelectedOption(reservation) {
@@ -169,8 +169,8 @@ function syncSelections(reservation) {
     const allOptions = getActivePaymentOptions(reservation);
     const cashAllowed = allOptions.some((option) => option.paymentType === 'full_payment');
 
-    if (state.selectedMethod === 'cash' && !cashAllowed) {
-        state.selectedMethod = 'gcash_maya';
+    if (PAYMENT_METHODS[state.selectedMethod]?.type === 'onsite' && !cashAllowed) {
+        state.selectedMethod = 'gcash';
     }
 
     const visibleOptions = getVisibleOptions(reservation);
@@ -257,26 +257,46 @@ function renderPaymentTypeButtons(reservation) {
     `).join('');
 }
 
+const COPY_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+const INFO_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
 function renderInstructionCard() {
     const methodMeta = PAYMENT_METHODS[state.selectedMethod];
-    const channel = methodMeta?.channel;
-    if (!channel) {
+
+    if (methodMeta?.type === 'online') {
         return `
             <div class="payment-instructions-card">
-                <div class="payment-step-copy">Pay in person at the cafe on your selected visit date. The admin will review and confirm it manually.</div>
+                <div class="payment-howto-online">
+                    <div class="payment-howto-qr-wrap">
+                        <img class="payment-howto-qr" src="${escapeHtml(methodMeta.qrImage)}" alt="${escapeHtml(methodMeta.label)} QR Code" loading="lazy">
+                        <p class="payment-howto-qr-label">Scan with ${escapeHtml(methodMeta.label)}</p>
+                    </div>
+                    <div class="payment-howto-or"><span>or</span></div>
+                    <div class="payment-howto-details">
+                        ${(methodMeta.details || []).map((detail) => `
+                            <div class="payment-howto-detail-row">
+                                <div class="payment-howto-detail-label">${escapeHtml(detail.label)}</div>
+                                <div class="payment-howto-detail-value">
+                                    <span>${escapeHtml(detail.value)}</span>
+                                    ${detail.copyable ? `<button type="button" class="payment-copy-btn" data-copy="${escapeHtml(detail.value)}" title="Copy ${escapeHtml(detail.label)}">${COPY_ICON} Copy</button>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="payment-howto-reminder">${INFO_ICON} ${escapeHtml(methodMeta.helper || '')}</div>
+                </div>
             </div>
         `;
     }
 
     return `
         <div class="payment-instructions-card">
-            <div class="payment-instructions-grid">
-                ${channel.rows.map((row) => `
-                    <div class="payment-instruction-row">
-                        <div class="payment-instruction-label">${escapeHtml(row.label)}</div>
-                        <div class="payment-instruction-value">${escapeHtml(row.value)}</div>
-                    </div>
-                `).join('')}
+            <div class="payment-howto-onsite">
+                <div class="payment-howto-visit-date">
+                    <label for="payment-visit-date">Date of cafe visit</label>
+                    <input id="payment-visit-date" type="date" data-field="cashPaymentDate" value="${escapeHtml(state.form.cashPaymentDate)}">
+                </div>
+                <div class="payment-howto-reminder">${INFO_ICON} ${escapeHtml(methodMeta?.helper || 'Pay in person at the cafe on your scheduled visit date. The admin will confirm your payment manually.')}</div>
             </div>
         </div>
     `;
@@ -286,7 +306,7 @@ function renderFormSection(reservation) {
     const selectedOption = getSelectedOption(reservation);
     if (!selectedOption) return '';
 
-    const isCash = state.selectedMethod === 'cash';
+    const isOnsite = PAYMENT_METHODS[state.selectedMethod]?.type === 'onsite';
     const proofName = state.form.proofFile?.name || 'PNG, JPG up to 10MB';
 
     return `
@@ -296,7 +316,7 @@ function renderFormSection(reservation) {
                 <h2 class="payment-step-heading">Payment details</h2>
             </div>
             <div class="payment-form-grid">
-                ${!isCash ? `
+                ${!isOnsite ? `
                     <div class="payment-form-row">
                         <div class="payment-field-group">
                             <label for="payment-reference-number">Reference number</label>
@@ -323,11 +343,7 @@ function renderFormSection(reservation) {
                 ` : `
                     <div class="payment-form-row">
                         <div class="payment-field-group">
-                            <label for="payment-cash-date">Date of cafe visit</label>
-                            <input id="payment-cash-date" type="date" data-field="cashPaymentDate" value="${escapeHtml(state.form.cashPaymentDate)}">
-                        </div>
-                        <div class="payment-field-group">
-                            <label for="payment-amount">Amount paid</label>
+                            <label for="payment-amount">Amount to pay</label>
                             <input id="payment-amount" type="text" readonly value="${escapeHtml(formatCurrency(selectedOption.amount))}">
                         </div>
                     </div>
@@ -762,9 +778,35 @@ async function handleSubmitPayment() {
 }
 
 paymentApp?.addEventListener('click', async (event) => {
+    const copyButton = event.target.closest('[data-copy]');
+    if (copyButton) {
+        const text = copyButton.dataset.copy || '';
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        const origInner = copyButton.innerHTML;
+        copyButton.classList.add('copied');
+        copyButton.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+        setTimeout(() => {
+            if (document.body.contains(copyButton)) {
+                copyButton.classList.remove('copied');
+                copyButton.innerHTML = origInner;
+            }
+        }, 2000);
+        return;
+    }
+
     const methodButton = event.target.closest('[data-payment-method]');
     if (methodButton) {
-        state.selectedMethod = methodButton.dataset.paymentMethod || 'gcash_maya';
+        state.selectedMethod = methodButton.dataset.paymentMethod || 'gcash';
         renderReservationPaymentPage();
         return;
     }

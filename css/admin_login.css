@@ -318,3 +318,219 @@ body {
         padding: 32px 24px;
     }
 }
+
+/* ========================
+   Forgot Password Modal
+======================== */
+.forgot {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.fp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(42, 20, 8, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.fp-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.fp-modal {
+    background: #fff;
+    border-radius: 16px;
+    padding: 36px 40px;
+    max-width: 480px;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(42, 20, 8, 0.18);
+    transform: translateY(8px);
+    transition: transform 0.2s ease;
+}
+
+.fp-overlay.open .fp-modal {
+    transform: translateY(0);
+}
+
+.fp-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #aaa;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.fp-close:hover {
+    color: #2A1408;
+    background: #f5efe7;
+}
+
+.fp-icon {
+    width: 52px;
+    height: 52px;
+    background: #f5efe7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: #6B3A1F;
+}
+
+.fp-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.fp-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #2A1408;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.fp-intro {
+    font-size: 0.875rem;
+    color: #666;
+    text-align: center;
+    line-height: 1.65;
+    margin-bottom: 24px;
+}
+
+.fp-section {
+    margin-bottom: 20px;
+}
+
+.fp-section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+
+.fp-contact-card {
+    background: #fdf7f2;
+    border: 1px solid #ead9c8;
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fp-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fp-contact-icon {
+    color: #6B3A1F;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.fp-contact-text {
+    font-size: 0.875rem;
+    color: #2A1408;
+}
+
+.fp-contact-link {
+    font-size: 0.875rem;
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.fp-contact-link:hover {
+    text-decoration: underline;
+}
+
+.fp-checklist {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fp-checklist li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.875rem;
+    color: #444;
+}
+
+.fp-checklist li svg {
+    color: #6B3A1F;
+    flex-shrink: 0;
+}
+
+.fp-response-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #888;
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 11px 14px;
+    margin-bottom: 24px;
+}
+
+.fp-response-note svg {
+    color: #6B3A1F;
+    flex-shrink: 0;
+}
+
+.fp-response-note strong {
+    color: #2A1408;
+}
+
+.fp-back-btn {
+    width: 100%;
+    padding: 13px;
+    background: #2A1408;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Kumbh Sans', sans-serif;
+    transition: background 0.2s ease;
+    letter-spacing: 0.2px;
+}
+
+.fp-back-btn:hover {
+    background: #6B3A1F;
+}
+
+@media (max-width: 520px) {
+    .fp-modal {
+        padding: 28px 22px;
+    }
+}

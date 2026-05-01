@@ -1,29 +1,27 @@
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
-import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
-import {
-    getEffectiveReservationStatus,
-    syncCompletedReservations
-} from './reservation_status.js';
+import { getEffectiveReservationStatus, syncCompletedReservations } from './reservation_status.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
-const sidebarAvatar = document.getElementById('sidebarAvatar');
+const badge = document.getElementById('adminBadge');
+const sidebarTitle = document.getElementById('sidebarTitle');
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
-const navReservationCount = document.getElementById('navReservationCount');
-const navContractCount = document.getElementById('navContractCount');
-const navPaymentCount = document.getElementById('navPaymentCount');
-const navReviewCount = document.getElementById('navReviewCount');
 const demandYearSelect = document.getElementById('demandYear');
-
-// ── Co-dev addition: API base URL and forecast data store ──────────────────────
 const API = "https://capstone-website-papg.onrender.com";
+
 let fullData = [];
+let barChart;
+let pieChart;
+let demandChart;
+let refreshSidebarBadges = () => {};
 
 const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
@@ -42,11 +40,6 @@ const chipTargets = {
     rescheduled: document.getElementById('chipRescheduled')
 };
 
-let barChart;
-let pieChart;
-let demandChart;
-
-// ── Co-dev addition: API fetch helpers ─────────────────────────────────────────
 async function loadForecast() {
     const res = await fetch(`${API}/forecast`);
     return res.ok ? res.json() : [];
@@ -62,10 +55,8 @@ async function loadPackages() {
     return res.ok ? res.json() : [];
 }
 
-// ── Removed: demandDataByYear hardcoded object (replaced by API data) ──────────
-
 function redirectToAdminLogin() {
-    window.location.replace('/admin/index.html');
+    window.location.replace('./admin_login.html');
 }
 
 function setDashboardMessage(message, isError = false) {
@@ -103,7 +94,6 @@ function formatStatus(status) {
         cancelled: 'Cancelled',
         rescheduled: 'Rescheduled'
     };
-
     return {
         key: normalized,
         label: labelMap[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1)
@@ -120,39 +110,28 @@ function getContractStatusMeta(contract) {
     if (!contract?.contract_url) {
         return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
     }
-
     const reviewStatus = String(contract.review_status || '').toLowerCase();
     if (reviewStatus === 'verified' || contract.verified_date) {
         return { key: 'approved', label: 'Verified', sublabel: 'Ready for approval' };
     }
-
     if (reviewStatus === 'resubmission_requested') {
         return { key: 'resubmission_requested', label: 'Fix Requested', sublabel: 'Waiting for customer' };
     }
-
     if (reviewStatus === 'pending_review' && contract.resubmitted_at) {
         return { key: 'resubmitted', label: 'Replacement Submitted', sublabel: 'Needs admin review' };
     }
-
     if (reviewStatus === 'pending_review' || contract.contract_url) {
         return { key: 'pending', label: 'Pending Review', sublabel: 'Initial contract uploaded' };
     }
-
     return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
 }
 
-// ── Co-dev change: renderBarChart now accepts API data array ───────────────────
-function renderBarChart(data) {
+async function renderBarChart(data) {
     const labels = data.map(d => d.month);
     const values = data.map(d => d.count);
-
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
-
-    if (barChart) {
-        barChart.destroy();
-    }
-
+    if (barChart) barChart.destroy();
     barChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -168,36 +147,21 @@ function renderBarChart(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
+            plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#9ca3af' }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f3f0eb', borderDash: [4, 4] },
-                    ticks: { precision: 0, color: '#9ca3af' }
-                }
+                x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#9ca3af' } }
             }
         }
     });
 }
 
-// ── Co-dev change: renderPieChart now accepts API data array ───────────────────
-function renderPieChart(data) {
+async function renderPieChart(data) {
     const labels = data.map(d => d.package);
     const values = data.map(d => d.count);
-
     const ctx = document.getElementById('pieChart');
     if (!ctx) return;
-
-    if (pieChart) {
-        pieChart.destroy();
-    }
-
+    if (pieChart) pieChart.destroy();
     pieChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -216,51 +180,26 @@ function renderPieChart(data) {
             plugins: {
                 legend: {
                     position: 'right',
-                    labels: {
-                        color: '#374151',
-                        padding: 14,
-                        usePointStyle: true,
-                        pointStyleWidth: 8
-                    }
+                    labels: { color: '#374151', padding: 14, usePointStyle: true }
                 }
             }
         }
     });
 }
 
-// ── Co-dev change: renderDemandChart now uses real fullData instead of hardcoded object ──
-function renderDemandChart(year) {
+async function renderDemandChart(year) {
     const filtered = fullData.filter(d => d.year === year);
-
-    const allMonths = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-
+    const allMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dataMap = {};
-    filtered.forEach(d => {
-        dataMap[d.month_name] = d;
-    });
-
-    const actual = allMonths.map(month => {
-        const d = dataMap[month];
-        return d ? d.y : 0;
-    });
-
+    filtered.forEach(d => { dataMap[d.month_name] = d; });
+    const actual = allMonths.map(month => { const d = dataMap[month]; return d ? d.y : 0; });
     const forecast = allMonths.map(month => {
         const d = dataMap[month];
-        return d && d.yhat !== null && d.yhat !== undefined
-            ? Math.round(d.yhat)
-            : null;
+        return d && d.yhat !== null && d.yhat !== undefined ? Math.round(d.yhat) : null;
     });
-
     const ctx = document.getElementById('demandChart');
     if (!ctx) return;
-
-    if (demandChart) {
-        demandChart.destroy();
-    }
-
+    if (demandChart) demandChart.destroy();
     demandChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -296,43 +235,20 @@ function renderDemandChart(year) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { color: '#374151' }
-                }
-            },
+            plugins: { legend: { position: 'top', labels: { color: '#374151' } } },
             scales: {
-                x: {
-                    grid: { color: '#f3f0eb' },
-                    ticks: { color: '#9ca3af' }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f3f0eb' },
-                    ticks: { color: '#9ca3af', precision: 0 }
-                }
+                x: { grid: { color: '#f3f0eb' }, ticks: { color: '#9ca3af' } },
+                y: { beginAtZero: true, grid: { color: '#f3f0eb' }, ticks: { color: '#9ca3af', precision: 0 } }
             }
         }
     });
 }
 
-// ── Kept from Doc 2: uses getEffectiveReservationStatus + setBadgeCount ────────
 function updateStats(reservations, contractsByReservationId = {}) {
-    const totals = {
-        pending: 0,
-        approved: 0,
-        declined: 0,
-        completed: 0,
-        cancelled: 0,
-        rescheduled: 0,
-        replacementContracts: 0
-    };
-
+    const totals = { pending: 0, approved: 0, declined: 0, completed: 0, cancelled: 0, rescheduled: 0, replacementContracts: 0 };
     const customerIds = new Set();
-
     reservations.forEach((reservation) => {
-        const status = getEffectiveReservationStatus(reservation);
+        const status = (reservation.status || 'pending').toLowerCase();
         if (status === 'pending') totals.pending += 1;
         if (status === 'confirmed' || status === 'approved') totals.approved += 1;
         if (status === 'declined') totals.declined += 1;
@@ -340,20 +256,16 @@ function updateStats(reservations, contractsByReservationId = {}) {
         if (status === 'cancelled') totals.cancelled += 1;
         if (status === 'rescheduled') totals.rescheduled += 1;
         if (reservation.user_id) customerIds.add(reservation.user_id);
-
         const contract = contractsByReservationId[reservation.reservation_id];
         if (String(contract?.review_status || '').toLowerCase() === 'pending_review' && contract?.resubmitted_at) {
             totals.replacementContracts += 1;
         }
     });
-
     if (statTargets.pending) statTargets.pending.textContent = String(totals.pending);
     if (statTargets.approved) statTargets.approved.textContent = String(totals.approved);
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
     if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
-    setBadgeCount(navReservationCount, totals.pending);
-
     if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
     if (chipTargets.approved) chipTargets.approved.textContent = String(totals.approved);
     if (chipTargets.declined) chipTargets.declined.textContent = String(totals.declined);
@@ -362,262 +274,147 @@ function updateStats(reservations, contractsByReservationId = {}) {
     if (chipTargets.rescheduled) chipTargets.rescheduled.textContent = String(totals.rescheduled);
 }
 
-// ── Kept from Doc 2: uses getEffectiveReservationStatus ───────────────────────
 function renderReservationsTable(reservations, contractsByReservationId = {}) {
     if (!recentReservationsBody) return;
-
     if (!reservations.length) {
-        recentReservationsBody.innerHTML = `
-            <tr>
-                <td colspan="7">No reservations found yet.</td>
-            </tr>
-        `;
+        recentReservationsBody.innerHTML = `<tr><td colspan="7">No reservations found yet.</td></tr>`;
         return;
     }
-
-    recentReservationsBody.innerHTML = reservations
-        .slice(0, 10)
-        .map((reservation) => {
-            const customerName = reservation.contact_name || 'Unknown customer';
-            const customerEmail = reservation.contact_email || 'No email';
-            const packageName = reservation.package?.package_name || 'No package selected';
-            const location = reservation.location_type === 'onsite'
-                ? 'Onsite - ELI Coffee'
-                : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
-            const status = formatStatus(getEffectiveReservationStatus(reservation));
-            const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
-
-            return `
-                <tr>
-                    <td>
-                        <span class="table-main">${escapeHtml(customerName)}</span>
-                        <span class="table-sub">${escapeHtml(customerEmail)}</span>
-                    </td>
-                    <td>
-                        <span class="table-main">${escapeHtml(reservation.event_type || 'Event')}</span>
-                        <span class="table-sub">Submitted ${escapeHtml(formatDate(reservation.created_at))}</span>
-                    </td>
-                    <td>
-                        <span class="table-main">${escapeHtml(formatDate(reservation.event_date))}</span>
-                        <span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span>
-                    </td>
-                    <td>
-                        <span class="table-main">${escapeHtml(packageName)}</span>
-                        <span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span>
-                    </td>
-                    <td>${escapeHtml(location)}</td>
-                    <td>
-                        <span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span>
-                        <span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span>
-                    </td>
-                    <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
-                </tr>
-            `;
-        })
-        .join('');
+    recentReservationsBody.innerHTML = reservations.slice(0, 10).map((reservation) => {
+        const customerName = reservation.contact_name || 'Unknown customer';
+        const customerEmail = reservation.contact_email || 'No email';
+        const packageName = reservation.package?.package_name || 'No package selected';
+        const location = reservation.location_type === 'onsite'
+            ? 'Onsite - ELI Coffee'
+            : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
+        const status = formatStatus(reservation.status);
+        const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
+        return `
+            <tr>
+                <td><span class="table-main">${escapeHtml(customerName)}</span><span class="table-sub">${escapeHtml(customerEmail)}</span></td>
+                <td><span class="table-main">${escapeHtml(reservation.event_type || 'Event')}</span><span class="table-sub">Submitted ${escapeHtml(formatDate(reservation.created_at))}</span></td>
+                <td><span class="table-main">${escapeHtml(formatDate(reservation.event_date))}</span><span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span></td>
+                <td><span class="table-main">${escapeHtml(packageName)}</span><span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span></td>
+                <td>${escapeHtml(location)}</td>
+                <td><span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span><span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span></td>
+                <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+            </tr>`;
+    }).join('');
 }
 
-// ── Kept from Doc 2: syncCompletedReservations preserved ──────────────────────
 async function fetchReservations() {
     const { data, error } = await supabase
         .from('reservations')
         .select(`
-            reservation_id,
-            user_id,
-            event_type,
-            event_date,
-            event_time,
-            guest_count,
-            location_type,
-            venue_location,
-            contact_name,
-            contact_email,
-            total_price,
-            status,
-            created_at,
-            package:package_id (
-                package_name,
-                package_type
-            )
+            reservation_id, user_id, event_type, event_date, event_time,
+            guest_count, location_type, venue_location, contact_name,
+            contact_email, total_price, status, created_at,
+            package:package_id (package_name, package_type)
         `)
         .order('created_at', { ascending: false });
-
-    if (error) {
-        throw error;
-    }
-
-    return syncCompletedReservations({
-        supabase,
-        reservations: data || []
-    });
+    if (error) throw error;
+    return syncCompletedReservations({ supabase, reservations: data || [] });
 }
 
 async function fetchContracts(reservationIds) {
     if (!reservationIds.length) return {};
-
     const { data, error } = await supabase
         .from('reservation_contracts')
         .select('reservation_id, contract_url, verified_date, review_status, resubmitted_at')
         .in('reservation_id', reservationIds);
-
     if (error) {
-        if (
-            isReservationContractsColumnMissing(error, 'review_status')
-            || isReservationContractsColumnMissing(error, 'resubmitted_at')
-        ) {
+        if (isReservationContractsColumnMissing(error, 'review_status') || isReservationContractsColumnMissing(error, 'resubmitted_at')) {
             const fallback = await supabase
                 .from('reservation_contracts')
                 .select('reservation_id, contract_url, verified_date')
                 .in('reservation_id', reservationIds);
-
             if (fallback.error) throw fallback.error;
-
-            return (fallback.data || []).reduce((map, contract) => {
-                map[contract.reservation_id] = contract;
-                return map;
-            }, {});
+            return (fallback.data || []).reduce((map, c) => { map[c.reservation_id] = c; return map; }, {});
         }
-
         throw error;
     }
-
-    return (data || []).reduce((map, contract) => {
-        map[contract.reservation_id] = contract;
-        return map;
-    }, {});
+    return (data || []).reduce((map, c) => { map[c.reservation_id] = c; return map; }, {});
 }
 
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
+    updateStats([], {});
+    renderReservationsTable([], {});
 
-    try {
-        // ── Co-dev addition: preload forecast data and populate year dropdown dynamically ──
-        fullData = await loadForecast();
+    let reservationsCount = 0;
+    let replacementContracts = 0;
+    let hasError = false;
 
-        if (demandYearSelect && fullData.length) {
-            const years = [...new Set(fullData.map(d => d.year))].sort();
-
-            demandYearSelect.innerHTML = '';
-
-            years.forEach(year => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                demandYearSelect.appendChild(option);
-            });
-
-            const currentYear = new Date().getFullYear().toString();
-            demandYearSelect.value = years.includes(currentYear)
-                ? currentYear
-                : years[years.length - 1];
+    const fastPath = (async () => {
+        try {
+            const reservations = await fetchReservations();
+            reservationsCount = reservations.length;
+            updateStats(reservations, {});
+            renderReservationsTable(reservations, {});
+            refreshSidebarBadges();
+            const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
+            const contractsByReservationId = await fetchContracts(reservationIds);
+            replacementContracts = Object.values(contractsByReservationId)
+                .filter((c) => String(c?.review_status || '').toLowerCase() === 'pending_review' && c?.resubmitted_at)
+                .length;
+            updateStats(reservations, contractsByReservationId);
+            renderReservationsTable(reservations, contractsByReservationId);
+        } catch (error) {
+            console.error('Failed to load reservations/contracts:', error);
+            hasError = true;
+            setDashboardMessage(`Failed to load reservations: ${error?.message || 'unknown error'}.`, true);
         }
+    })();
 
-        const reservations = await fetchReservations();
-        const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
-        const contractsByReservationId = await fetchContracts(reservationIds);
-        const replacementContracts = Object.values(contractsByReservationId)
-            .filter((contract) => String(contract?.review_status || '').toLowerCase() === 'pending_review' && contract?.resubmitted_at)
-            .length;
+    const monthlyPromise = loadMonthly()
+        .then((data) => renderBarChart(data))
+        .catch((error) => { console.error('Failed to load monthly chart:', error); return renderBarChart([]); });
 
-        updateStats(reservations, contractsByReservationId);
+    const packagePromise = loadPackages()
+        .then((data) => renderPieChart(data))
+        .catch((error) => { console.error('Failed to load package chart:', error); return renderPieChart([]); });
 
-        // ── Kept from Doc 2: sidebar counts refresh ────────────────────────────
-        await refreshAdminSidebarCounts({
-            supabase,
-            reservationBadgeEl: navReservationCount,
-            paymentBadgeEl: navPaymentCount,
-            contractBadgeEl: navContractCount,
-            reviewBadgeEl: navReviewCount
-        });
+    const forecastPromise = loadForecast()
+        .then(async (data) => {
+            fullData = Array.isArray(data) ? data : [];
+            if (demandYearSelect && fullData.length) {
+                const years = [...new Set(fullData.map((d) => d.year))].sort();
+                demandYearSelect.innerHTML = '';
+                years.forEach((year) => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    demandYearSelect.appendChild(option);
+                });
+                const currentYear = new Date().getFullYear().toString();
+                demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
+            }
+            const selectedYear = demandYearSelect?.value;
+            if (selectedYear) await renderDemandChart(selectedYear);
+        })
+        .catch((error) => { console.error('Failed to load forecast:', error); });
 
-        renderReservationsTable(reservations, contractsByReservationId);
+    await Promise.allSettled([fastPath, monthlyPromise, packagePromise, forecastPromise]);
 
-        // ── Co-dev change: charts now use API data ─────────────────────────────
-        renderBarChart(await loadMonthly());
-        renderPieChart(await loadPackages());
-
-        const selectedYear = demandYearSelect?.value;
-        if (selectedYear) {
-            renderDemandChart(selectedYear);
-        }
-
-        const summaryText = reservations.length
-            ? `Showing ${Math.min(reservations.length, 10)} of ${reservations.length} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
-            : 'No reservations available yet.';
-
-        setDashboardMessage(summaryText);
-    } catch (error) {
-        console.error('Failed to load admin dashboard:', error);
+    if (!hasError) {
         setDashboardMessage(
-            `Failed to load reservations: ${error?.message || 'unknown error'}. If this admin account should see all bookings, check RLS policies and the admin role.`,
-            true
+            reservationsCount
+                ? `Showing ${Math.min(reservationsCount, 10)} of ${reservationsCount} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
+                : 'No reservations available yet.'
         );
-        updateStats([], {});
-
-        // ── Kept from Doc 2: sidebar counts refresh on error ──────────────────
-        await refreshAdminSidebarCounts({
-            supabase,
-            reservationBadgeEl: navReservationCount,
-            paymentBadgeEl: navPaymentCount,
-            contractBadgeEl: navContractCount,
-            reviewBadgeEl: navReviewCount
-        }).catch(() => {});
-
-        renderReservationsTable([], {});
-        renderBarChart([]);
-        renderPieChart([]);
-
-        const fallbackYear = demandYearSelect?.value;
-        if (fallbackYear) {
-            renderDemandChart(fallbackYear);
-        }
     }
 }
 
-async function validateAdminSession() {
-    const { session, profile } = await verifyAdminSession(supabase);
+refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
+demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 
-    if (!session) {
-        await supabase.auth.signOut();
-        redirectToAdminLogin();
-        return null;
-    }
+wireLogoutButton();
+watchAuthState();
 
-    // ── Kept from Doc 2: avatarEl preserved ───────────────────────────────────
-    populatePortalIdentity({
-        profile,
-        session,
-        nameEl: sidebarName,
-        emailEl: sidebarEmail,
-        roleEl: sidebarRolePill,
-        avatarEl: sidebarAvatar,
-        fallbackLabel: 'Admin'
-    });
-
-    return session;
-}
-
-logoutBtn?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-});
-
-refreshDashboardBtn?.addEventListener('click', async () => {
-    await loadDashboard();
-});
-
-demandYearSelect?.addEventListener('change', () => {
-    const selectedYear = demandYearSelect.value;
-    renderDemandChart(selectedYear);
-});
-
-supabase.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT') {
-        redirectToAdminLogin();
+validateAdminSession({
+    onSuccess: ({ profile }) => {
+        setupInactivityLogout(profile.role);
+        refreshSidebarBadges = initAdminSidebarBadges(supabase);
+        loadDashboard();
     }
 });
-
-const session = await validateAdminSession();
-if (session) {
-    await loadDashboard();
-}

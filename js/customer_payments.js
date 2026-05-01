@@ -6,54 +6,54 @@ const CLOUDINARY_CONFIG = {
 };
 
 export const PAYMENT_METHODS = {
+    gcash: {
+        label: 'GCash',
+        shortLabel: 'GCash',
+        type: 'online',
+        qrImage: '/images/qr-gcash.png',
+        details: [
+            { label: 'Account Name', value: 'Engeline Cerda', copyable: true },
+            { label: 'GCash Number', value: '09983839455', copyable: true }
+        ],
+        helper: 'Scan the QR code or send to the GCash number above. Screenshot your payment confirmation and upload it as proof.'
+    },
+    maya: {
+        label: 'Maya',
+        shortLabel: 'Maya',
+        type: 'online',
+        qrImage: '/images/qr-maya.png',
+        details: [
+            { label: 'Account Name', value: 'Evangeline Cerda', copyable: true },
+            { label: 'Maya Number', value: '09696210379', copyable: true }
+        ],
+        helper: 'Scan the QR code or send to the Maya number above. Screenshot your payment confirmation and upload it as proof.'
+    },
+    bpi: {
+        label: 'BPI',
+        shortLabel: 'Bank (BPI)',
+        type: 'online',
+        qrImage: '/images/qr-bpi.png',
+        details: [
+            { label: 'Account Name', value: 'Engeline Cerda', copyable: true },
+            { label: 'Account Number', value: '4039941106', copyable: true }
+        ],
+        helper: 'Transfer to the BPI account above. Upload your transaction receipt or screenshot as proof.'
+    },
     card: {
         label: 'Card',
         shortLabel: 'Card',
-        helper: 'Use the owner-provided debit or credit card payment arrangement, then submit the payment reference and proof here for review.',
-        channel: {
-            title: 'Owner Card Arrangement',
-            rows: [
-                { label: 'Account name', value: 'ELI Coffee Events' },
-                { label: 'Channel', value: 'Card terminal or payment link' },
-                { label: 'Reference', value: 'Use the admin-provided reference number.' }
-            ]
-        }
-    },
-    bancnet: {
-        label: 'BancNet',
-        shortLabel: 'Bank transfer',
-        helper: 'Submit your transfer reference number and upload a clear screenshot or receipt.',
-        channel: {
-            title: 'Owner Bank Account',
-            rows: [
-                { label: 'Account name', value: 'ELI Coffee Events' },
-                { label: 'Bank', value: 'BDO Unibank' },
-                { label: 'Account no.', value: '1234 5678 9012' }
-            ]
-        }
-    },
-    gcash_maya: {
-        label: 'GCash/Maya',
-        shortLabel: 'GCash / Maya',
-        helper: 'Use your e-wallet reference number and upload your payment proof for admin review.',
-        channel: {
-            title: 'Owner E-Wallet Channel',
-            rows: [
-                { label: 'Account name', value: 'ELI Coffee Events' },
-                { label: 'Channel', value: 'GCash - 0917 123 4567' },
-                { label: 'Reference', value: 'Use the admin-provided reference number.' }
-            ]
-        }
+        type: 'onsite',
+        helper: 'Pay by card at the cafe on your visit date. The admin will confirm your payment manually.'
     },
     cash: {
         label: 'Cash',
         shortLabel: 'Cash',
-        helper: 'Schedule the date you will visit the cafe to pay in person. Admin will still confirm the payment manually.',
-        channel: null
+        type: 'onsite',
+        helper: 'Pay in cash at the cafe on your visit date. The admin will confirm your payment manually.'
     }
 };
 
-export const PAYMENT_METHOD_ORDER = ['gcash_maya', 'card', 'bancnet', 'cash'];
+export const PAYMENT_METHOD_ORDER = ['gcash', 'maya', 'bpi', 'card', 'cash'];
 
 export const PAYMENT_TYPE_META = {
     reservation_fee: { label: 'Reservation Fee', description: 'Fixed reservation fee' },
@@ -642,15 +642,16 @@ export async function submitCustomerPayment({
         throw new Error('This payment option is no longer available. Please refresh the page.');
     }
 
-    const activeMethod = String(paymentMethod || 'card');
+    const activeMethod = String(paymentMethod || 'gcash');
+    const isOnsite = PAYMENT_METHODS[activeMethod]?.type === 'onsite';
     const amount = Number(selectedOption.amount || 0);
     if (!amount || amount <= 0) {
         throw new Error('This payment option does not have a valid amount.');
     }
 
-    if (activeMethod === 'cash') {
+    if (isOnsite) {
         if (!cashPaymentDate) {
-            throw new Error('Please choose the date you will visit the cafe to pay in cash.');
+            throw new Error('Please choose the date you will visit the cafe to pay.');
         }
     } else {
         if (!referenceNumber) {
@@ -664,7 +665,7 @@ export async function submitCustomerPayment({
         }
     }
 
-    const proofUrl = activeMethod === 'cash' ? '' : await uploadPaymentProof(proofFile);
+    const proofUrl = isOnsite ? '' : await uploadPaymentProof(proofFile);
     const payload = {
         reservation_id: reservation.reservation_id,
         reschedule_request_id: selectedOption.rescheduleRequestId || null,
@@ -672,11 +673,11 @@ export async function submitCustomerPayment({
         payment_method: activeMethod,
         amount,
         payment_status: 'pending_review',
-        reference_number: activeMethod === 'cash' ? null : referenceNumber,
-        payment_date: activeMethod === 'cash' ? null : paymentDate,
+        reference_number: isOnsite ? null : referenceNumber,
+        payment_date: isOnsite ? null : paymentDate,
         notes: notes || null,
         proof_url: proofUrl || null,
-        cash_payment_date: activeMethod === 'cash' ? cashPaymentDate : null,
+        cash_payment_date: isOnsite ? cashPaymentDate : null,
         submitted_at: new Date().toISOString()
     };
 
@@ -689,7 +690,7 @@ export async function submitCustomerPayment({
     if (error) throw error;
 
     const newPaymentId = insertedRows?.[0]?.payment_id;
-    let successMessage = activeMethod === 'cash'
+    let successMessage = isOnsite
         ? 'Payment details submitted for admin review.'
         : 'Payment details submitted for admin review.';
 

@@ -1,6 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { applyRoleVisibility } from './session_validation.js';
 import {
     getEffectiveReservationStatus,
     syncCompletedReservations
@@ -309,7 +310,7 @@ async function fetchReservations() {
 }
 
 async function validateAdminSession() {
-    const { session, profile } = await verifyAdminSession(supabase);
+    const { session, profile } = await verifyMultiRoleSession(supabase, ['admin', 'super_admin']);
 
     if (!session) {
         await supabase.auth.signOut();
@@ -326,6 +327,8 @@ async function validateAdminSession() {
         avatarEl: sidebarAvatar,
         fallbackLabel: 'Admin'
     });
+
+    applyRoleVisibility(profile.role);
 
     return session;
 }

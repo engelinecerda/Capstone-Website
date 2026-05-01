@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ELI Coffee Events Management System</title>
-    <link rel="stylesheet" href="/css/admin_login.css">
+    <link rel="stylesheet" href="../css/admin_login.css">
     <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     
 </head>
@@ -81,7 +81,7 @@
 
                     <!-- Forgot Password -->
                     <div class="options options-forgot-only">
-                        <a href="/admin/forgot-password.html" class="forgot">Forgot password?</a>
+                        <button type="button" class="forgot" id="forgotPasswordBtn">Forgot password?</button>
                     </div>
 
                     <!-- Submit -->
@@ -102,7 +102,86 @@
         </div>
     </div>
 
+    <!-- Forgot Password Modal -->
+    <div class="fp-overlay" id="forgotPasswordOverlay" role="dialog" aria-modal="true" aria-labelledby="fpTitle">
+        <div class="fp-modal">
+            <button type="button" class="fp-close" id="fpCloseBtn" aria-label="Close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+
+            <div class="fp-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+
+            <h2 class="fp-title" id="fpTitle">Need to Reset Your Password?</h2>
+            <p class="fp-intro">For security, password resets for admin accounts are handled directly by the cafe owner — not through automated email. This keeps your account protected and ensures only authorized changes are made.</p>
+
+            <div class="fp-section">
+                <p class="fp-section-label">Contact the Cafe Owner</p>
+                <div class="fp-contact-card">
+                    <div class="fp-contact-row">
+                        <span class="fp-contact-icon">
+                            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                        </span>
+                        <span class="fp-contact-text"><strong>ELI Coffee Events</strong> &mdash; Cafe Owner</span>
+                    </div>
+                    <div class="fp-contact-row">
+                        <span class="fp-contact-icon">
+                            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        </span>
+                        <a href="mailto:elicoffeeevents@email.com" class="fp-contact-link">elicoffeeevents@email.com</a>
+                    </div>
+                    <div class="fp-contact-row">
+                        <span class="fp-contact-icon">
+                            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.37 2 2 0 0 1 3.54 1.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.82 6.82l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        </span>
+                        <a href="tel:+639XXXXXXXXX" class="fp-contact-link">+63 9XX XXX XXXX</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fp-section">
+                <p class="fp-section-label">When You Reach Out, Please Include</p>
+                <ul class="fp-checklist">
+                    <li>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        Your registered email address
+                    </li>
+                    <li>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        Your role (Admin or Staff)
+                    </li>
+                    <li>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        A brief reason for the reset request
+                    </li>
+                </ul>
+            </div>
+
+            <div class="fp-response-note">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                You'll typically receive a response within <strong>24 hours</strong> on business days.
+            </div>
+
+            <button type="button" class="fp-back-btn" id="fpBackBtn">Back to Login</button>
+        </div>
+    </div>
+
     <script>
+        const forgotPasswordOverlay = document.getElementById('forgotPasswordOverlay');
+        document.getElementById('forgotPasswordBtn').addEventListener('click', () => {
+            forgotPasswordOverlay.classList.add('open');
+        });
+        document.getElementById('fpCloseBtn').addEventListener('click', () => {
+            forgotPasswordOverlay.classList.remove('open');
+        });
+        document.getElementById('fpBackBtn').addEventListener('click', () => {
+            forgotPasswordOverlay.classList.remove('open');
+        });
+        forgotPasswordOverlay.addEventListener('click', (e) => {
+            if (e.target === forgotPasswordOverlay) forgotPasswordOverlay.classList.remove('open');
+        });
+
         function togglePassword() {
             const input = document.getElementById('password');
             const icon = document.getElementById('eyeIcon');
@@ -123,8 +202,7 @@
         }
 
     </script>
-    <script type="module" src="/js/admin_login.js"></script>
+    <script type="module" src="../js/admin_login.js"></script>
 
 </body>
 </html>
-

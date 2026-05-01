@@ -1,6 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
-import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -14,7 +15,6 @@ const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
 const navReviewCount = document.getElementById('navReviewCount');
-
 const statTotalCustomers = document.getElementById('statTotalCustomers');
 const statCustomersWithReservations = document.getElementById('statCustomersWithReservations');
 const statNewThisMonth = document.getElementById('statNewThisMonth');
@@ -303,13 +303,7 @@ async function loadCustomers() {
     allCustomers = mergeCustomersWithActivity(profiles, reservations);
 
     updateStats(allCustomers);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
+    initAdminSidebarBadges(supabase)
 
     applyFilters();
   } catch (error) {
@@ -317,13 +311,7 @@ async function loadCustomers() {
     allCustomers = [];
     updateStats([]);
     renderCustomers([]);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    initAdminSidebarBadges(supabase)
     setCustomersMessage(
       `Failed to load registered customers: ${error?.message || 'unknown error'}. If the admin account should see all profiles, check the RLS policies for the profiles table.`,
       true
@@ -331,47 +319,20 @@ async function loadCustomers() {
   }
 }
 
-async function validateAdminSession() {
-  const { session, profile } = await verifyAdminSession(supabase);
+wireLogoutButton();
+watchAuthState();
 
-  if (!session) {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-    return null;
-  }
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
 
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarName,
-    emailEl: sidebarEmail,
-    roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
-  });
+    // Setup inactivity
+    setupInactivityLogout(profile.role);
 
-  return session;
-}
+    // Attach UI listeners (IMPORTANT)
+    refreshCustomersBtn?.addEventListener('click', loadCustomers);
+    searchInput?.addEventListener('input', applyFilters);
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectToAdminLogin();
-});
-
-refreshCustomersBtn?.addEventListener('click', async () => {
-  await loadCustomers();
-});
-
-searchInput?.addEventListener('input', () => {
-  applyFilters();
-});
-
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') {
-    redirectToAdminLogin();
+    // Load data
+    await loadCustomers();
   }
 });
-
-const session = await validateAdminSession();
-if (session) {
-  await loadCustomers();
-}

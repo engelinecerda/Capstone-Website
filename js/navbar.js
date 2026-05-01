@@ -1,3 +1,4 @@
+// navbar.js
 import { customerSupabase as supabase } from './supabase.js';
 
 async function updateNavbar() {

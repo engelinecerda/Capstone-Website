@@ -589,6 +589,171 @@ body {
     font-size: 15px;
 }
 
+/* ========================
+   How to Pay — Online
+======================== */
+.payment-howto-online {
+    display: grid;
+    gap: 18px;
+}
+
+.payment-howto-qr-wrap {
+    text-align: center;
+}
+
+.payment-howto-qr {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    border-radius: 14px;
+    border: 1px solid var(--payment-border);
+    background: #fff;
+    display: block;
+    margin: 0 auto 8px;
+}
+
+.payment-howto-qr-label {
+    margin: 0;
+    color: var(--payment-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.payment-howto-or {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--payment-muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.payment-howto-or::before,
+.payment-howto-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--payment-border);
+}
+
+.payment-howto-details {
+    display: grid;
+    gap: 8px;
+}
+
+.payment-howto-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid var(--payment-border);
+}
+
+.payment-howto-detail-label {
+    color: var(--payment-muted);
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.payment-howto-detail-value {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--payment-text);
+}
+
+.payment-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--payment-border-strong);
+    background: var(--payment-surface-soft);
+    color: var(--payment-accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.payment-copy-btn:hover {
+    background: var(--payment-accent-soft);
+    border-color: var(--payment-accent);
+}
+
+.payment-copy-btn.copied {
+    background: #e4f3e8;
+    color: #266744;
+    border-color: #b5dfc0;
+}
+
+.payment-howto-reminder {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #faf6ef;
+    border: 1px solid #ede0cc;
+    color: var(--payment-muted);
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+.payment-howto-reminder svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--payment-accent);
+}
+
+/* ========================
+   How to Pay — Onsite
+======================== */
+.payment-howto-onsite {
+    display: grid;
+    gap: 16px;
+}
+
+.payment-howto-visit-date {
+    display: grid;
+    gap: 8px;
+}
+
+.payment-howto-visit-date label {
+    color: var(--payment-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.payment-howto-visit-date input[type="date"] {
+    width: 100%;
+    min-height: 54px;
+    border: 1px solid #dfd3c7;
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: #fff;
+    color: var(--payment-text);
+    font: inherit;
+    font-size: 15px;
+}
+
+.payment-howto-visit-date input[type="date"]:focus {
+    outline: none;
+    border-color: var(--payment-accent);
+}
+
 @media (max-width: 960px) {
     .payment-hero-card {
         grid-template-columns: 1fr;

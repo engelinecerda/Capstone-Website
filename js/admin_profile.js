@@ -1,12 +1,13 @@
 import { portalSupabase as supabase } from './supabase.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 import {
   formatPortalRoleLabel,
   getPortalDisplayName,
   getPortalInitials,
-  populatePortalIdentity,
-  verifyAdminSession
+  populatePortalIdentity
 } from './admin_auth.js';
-import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -23,11 +24,6 @@ const profileForm = document.getElementById('profileForm');
 const profileMessage = document.getElementById('profileMessage');
 const passwordForm = document.getElementById('passwordForm');
 const passwordMessage = document.getElementById('passwordMessage');
-const logoutBtn = document.getElementById('logoutBtn');
-const navReservationCount = document.getElementById('navReservationCount');
-const navContractCount = document.getElementById('navContractCount');
-const navPaymentCount = document.getElementById('navPaymentCount');
-const navReviewCount = document.getElementById('navReviewCount');
 
 const profileFirstName = document.getElementById('profileFirstName');
 const profileMiddleName = document.getElementById('profileMiddleName');
@@ -40,10 +36,6 @@ const state = {
   session: null,
   profile: null
 };
-
-function redirectLogin() {
-  window.location.replace('/admin/index.html');
-}
 
 function setPageMessage(message, isError = false) {
   if (!pageMessage) return;
@@ -70,20 +62,6 @@ function formatDate(value) {
   });
 }
 
-function getFallbackProfile(session) {
-  const user = session?.user;
-  return {
-    user_id: user?.id || '',
-    first_name: user?.user_metadata?.first_name || '',
-    middle_name: user?.user_metadata?.middle_name || '',
-    last_name: user?.user_metadata?.last_name || '',
-    email: user?.email || '',
-    phone_number: user?.user_metadata?.phone_number || '',
-    role: 'admin',
-    date_registered: user?.created_at || ''
-  };
-}
-
 function populateProfileForm() {
   const profile = state.profile;
   if (!profile) return;
@@ -106,7 +84,7 @@ function renderProfileShell() {
     nameEl: sidebarName,
     emailEl: sidebarEmail,
     roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
+    fallbackLabel: profile.role === 'super_admin' ? 'Super Admin' : 'Admin'
   });
 
   if (heroAvatar) heroAvatar.textContent = getPortalInitials(profile, 'A');
@@ -117,40 +95,6 @@ function renderProfileShell() {
   if (detailDisplayName) detailDisplayName.textContent = getPortalDisplayName(profile, 'Admin');
   if (detailEmail) detailEmail.textContent = identity.email;
   populateProfileForm();
-}
-
-async function loadAdminProfile() {
-  setPageMessage('Loading your profile...');
-
-  try {
-    const { session, profile } = await verifyAdminSession(supabase);
-    if (!session) {
-      await supabase.auth.signOut();
-      redirectLogin();
-      return;
-    }
-
-    state.session = session;
-    state.profile = profile || getFallbackProfile(session);
-    renderProfileShell();
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
-    setPageMessage('Your admin profile is ready.');
-  } catch (error) {
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
-    setPageMessage(error?.message || 'Unable to load your admin profile right now.', true);
-  }
 }
 
 async function handleProfileSubmit(event) {
@@ -186,6 +130,10 @@ async function handleProfileSubmit(event) {
       ...state.profile,
       ...payload
     };
+
+    // Keep the cached profile in sync so other pages see the updated info
+    localStorage.setItem('profile', JSON.stringify(state.profile));
+
     renderProfileShell();
     setFormMessage(profileMessage, 'Profile updated successfully.', 'success');
   } catch (error) {
@@ -236,18 +184,20 @@ async function handlePasswordSubmit(event) {
 function bindEvents() {
   profileForm?.addEventListener('submit', handleProfileSubmit);
   passwordForm?.addEventListener('submit', handlePasswordSubmit);
-
-  logoutBtn?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    redirectLogin();
-  });
-
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT') {
-      redirectLogin();
-    }
-  });
 }
 
+// ── BOOT ─────────────────────────────────────────────────────────
 bindEvents();
-await loadAdminProfile();
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: ({ session, profile }) => {
+    state.session = session;
+    state.profile = profile;
+    setupInactivityLogout(profile.role);
+    initAdminSidebarBadges(supabase);
+    renderProfileShell();
+    setPageMessage('Your profile is ready.');
+  }
+});
