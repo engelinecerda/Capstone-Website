@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Reviews — ELI Coffee Events Cafe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/reviews.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar__container">
+            <a href="/index.html">
+                <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+            </a>
+
+            <div class="navbar__toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+
+            <ul class="navbar__menu">
+                <li class="navbar__item">
+                    <a href="/index.html" class="navbar__links">Home</a>
+                </li>
+                <li class="navbar__item">
+                    <a href="/packages.html" class="navbar__links">Packages</a>
+                </li>
+                <li class="navbar__item">
+                    <a href="/reservations.html" class="navbar__links">Reservations</a>
+                </li>
+                <li class="navbar__item">
+                    <a href="/reviews.html" class="navbar__links">Reviews</a>
+                </li>
+                <li class="navbar__item">
+                    <a href="/faqs.html" class="navbar__links">FAQs</a>
+                </li>
+                <li class="navbar__item">
+                    <a href="/about.html" class="navbar__links">About</a>
+                </li>
+                <li class="navbar__btn">
+                    <a href="/login.html" class="button">Login / Sign Up</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- REVIEWS HEADER -->
+    <header class="reviews-header">
+        <h1>Customer Reviews</h1>
+        <p>See what our guests have to say about their experience at ELI Coffee Events Cafe.</p>
+    </header>
+
+    <!-- SUMMARY / STATS BAR -->
+    <section class="reviews-summary">
+        <div class="reviews-summary__card">
+            <div class="reviews-summary__rating">
+                <span id="averageRating">0.0</span>
+                <div class="reviews-summary__stars" id="averageStars" aria-label="Average rating stars">
+                    ☆☆☆☆☆
+                </div>
+                <p>Based on <span id="totalReviews">0</span> verified reviews</p>
+            </div>
+
+            <div class="reviews-summary__breakdown" id="ratingBreakdown">
+                <!-- Rating bars (5★ → 1★) populated by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- FILTER BAR -->
+    <section class="reviews-controls">
+        <div class="reviews-controls__inner">
+            <div class="reviews-filter-group">
+                <button class="reviews-filter is-active" data-filter="all">All</button>
+                <button class="reviews-filter" data-filter="5">5 ★</button>
+                <button class="reviews-filter" data-filter="4">4 ★</button>
+                <button class="reviews-filter" data-filter="3">3 ★</button>
+                <button class="reviews-filter" data-filter="2">2 ★</button>
+                <button class="reviews-filter" data-filter="1">1 ★</button>
+            </div>
+
+            <label class="reviews-toggle">
+                <input type="checkbox" id="toggleRatingOnly">
+                <span class="reviews-toggle__slider"></span>
+                <span class="reviews-toggle__label">Include rating-only reviews</span>
+            </label>
+
+            <div class="reviews-sort-group">
+                <label for="sortReviews">Sort by:</label>
+                <select id="sortReviews">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="highest">Highest rating</option>
+                    <option value="lowest">Lowest rating</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- REVIEWS LIST -->
+    <main class="reviews-main">
+        <div class="reviews-list" id="reviewsList">
+            <!-- Reviews injected here by JS -->
+            <div class="reviews-loading" id="reviewsLoading">
+                <i class="fa-solid fa-mug-hot"></i>
+                <p>Loading reviews...</p>
+            </div>
+        </div>
+
+        <div class="reviews-empty" id="reviewsEmpty" hidden>
+            <i class="fa-regular fa-comment-dots"></i>
+            <h3>No reviews yet</h3>
+            <p>Be the first to share your experience after your reservation!</p>
+        </div>
+
+         <div class="reviews-load-more-wrapper" id="loadMoreWrapper" hidden>
+            <p class="reviews-count-text" id="reviewsCountText"></p>
+            <button class="reviews-load-more-btn" id="loadMoreBtn">
+                Load More Reviews
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+        </div>  
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="footer-top">
+            <div class="footer-brand">
+                <img src="/images/eli coffee binangonan logo.png" alt="ELI Coffee Logo" class="footer-logo">
+                <p>Your go-to events cafe in Binangonan, Rizal.</p>
+            </div>
+            <div class="footer-contact">
+                <h3>Contact Us</h3>
+                <p><i class="fa-solid fa-phone"></i> 0917 562 0306 | 0917 562 0308</p>
+                <p><i class="fa-solid fa-at"></i> elicoffeetea@gmail.com</p>
+            </div>
+            <div class="footer-social">
+                <h3>Follow Us</h3>
+                <p>
+                    <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-brands fa-square-facebook"></i> Facebook: @elicoffeeph
+                    </a>
+                </p>
+                <p>
+                    <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-brands fa-instagram"></i> Instagram: @elicoffeeph
+                    </a>
+                </p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2023 ELI Coffee Events Cafe. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+    <script type="module" src="/js/navbar.js"></script>
+    <script type="module" src="/js/reviews.js"></script>
+</body>
+</html>

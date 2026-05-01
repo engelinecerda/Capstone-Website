@@ -42,7 +42,8 @@
 ======================== */
 .venue-wrapper {
     width: 100%;
-    margin-top: 30px;
+    margin-top: 14px;  /* space between cards and input */
+    margin-bottom: 0;
 }
 
 /* ========================
@@ -197,11 +198,21 @@
             margin-top: 24px;
             padding-top: 22px;
             border-top: 1px solid #f0e5db;
+            display: block;
+            
         }
+        .location-options + .venue-wrapper {
+    margin-top: 14px;
+    width: 100%;
+    display: block;
+    clear: both;
+}
+
         .smart-step-section:first-of-type {
             margin-top: 0;
             padding-top: 0;
             border-top: none;
+            
         }
         .smart-step-heading {
             margin-bottom: 16px;
@@ -462,7 +473,7 @@
         }
 
         /* Location Cards */
-        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 0; }
         .location-card {
             border: 1px solid #ddd;
             border-radius: 12px;
@@ -475,6 +486,8 @@
             justify-content: center;
             align-items: center;
             transition: all 0.2s;
+             box-sizing: border-box;  
+    height: auto; 
         }
         .loc-icon {
             width: 48px;
