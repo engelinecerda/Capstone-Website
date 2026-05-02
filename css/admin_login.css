@@ -320,6 +320,51 @@ body {
 }
 
 /* ========================
+   MFA Card
+======================== */
+.mfa-icon {
+    width: 52px;
+    height: 52px;
+    background: #f5efe7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 18px;
+    color: #6B3A1F;
+}
+
+.mfa-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.mfa-code-input {
+    font-size: 24px !important;
+    letter-spacing: 0.25em;
+    text-align: center;
+    font-weight: 700;
+}
+
+.mfa-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6B3A1F;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Kumbh Sans', sans-serif;
+    padding: 0;
+}
+
+.mfa-back-link:hover {
+    text-decoration: underline;
+}
+
+/* ========================
    Forgot Password Modal
 ======================== */
 .forgot {

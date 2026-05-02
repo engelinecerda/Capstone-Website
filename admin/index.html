@@ -28,7 +28,7 @@
             </div>
 
             <!-- Login Card -->
-            <div class="admin-card">
+            <div class="admin-card" id="loginCard">
                 <h2>Portal Login</h2>
                 <p class="subtitle">Enter your credentials to access the correct portal workspace</p>
 
@@ -98,6 +98,43 @@
                     </svg>
                     Secured connection &mdash; authorized personnel only
                 </div>
+            </div>
+
+            <!-- MFA Verification Card -->
+            <div class="admin-card" id="mfaCard" style="display:none">
+                <div class="mfa-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                </div>
+                <h2>Two-Factor Authentication</h2>
+                <p class="subtitle">Open your authenticator app and enter the 6-digit code to continue.</p>
+
+                <form id="mfaForm">
+                    <div class="form-group">
+                        <label for="mfaCode">Authentication code</label>
+                        <input
+                            type="text"
+                            id="mfaCode"
+                            name="mfaCode"
+                            class="mfa-code-input"
+                            placeholder="000000"
+                            maxlength="6"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            required
+                        />
+                    </div>
+                    <button type="submit" class="login-btn" id="mfaSubmitBtn">Verify &amp; Continue</button>
+                    <div class="form-msg" id="mfaMsg"></div>
+                </form>
+
+                <hr class="divider">
+
+                <button type="button" class="mfa-back-link" id="mfaBackBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    Back to login
+                </button>
             </div>
         </div>
     </div>

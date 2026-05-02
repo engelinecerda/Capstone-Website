@@ -266,10 +266,51 @@
             </div>
           </form>
         </section>
+
+        <!-- Two-Factor Authentication -->
+        <section class="profile-panel profile-panel-mfa">
+          <div class="panel-head">
+            <div class="panel-title-wrap">
+              <span class="panel-icon-badge" aria-hidden="true">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
+              <div>
+                <h2 class="section-title">Two-Factor Authentication</h2>
+                <p class="section-copy">Protect your account with a TOTP authenticator app (Google Authenticator, Authy, etc.).</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-form">
+            <div class="mfa-status-row" id="mfaStatusRow" style="display:none">
+              <span class="mfa-status-chip" id="mfaStatusChip"></span>
+              <div class="form-actions" id="mfaActionArea"></div>
+            </div>
+
+            <div class="mfa-enroll-panel" id="mfaEnrollPanel" style="display:none">
+              <p class="mfa-enroll-instruction">Scan the QR code with your authenticator app, then enter the 6-digit code below to activate 2FA on your account.</p>
+              <div class="mfa-qr-wrap" id="mfaQrWrap"></div>
+              <div class="form-row">
+                <label class="field">
+                  <span class="field-label">Verification Code</span>
+                  <input type="text" id="mfaEnrollCode" class="field-input mfa-enroll-code-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                </label>
+              </div>
+              <p class="form-message" id="mfaEnrollMessage"></p>
+              <div class="form-actions mfa-enroll-actions">
+                <button type="button" class="primary-btn" id="mfaVerifyBtn">Verify &amp; Activate</button>
+                <button type="button" class="secondary-btn" id="mfaCancelEnrollBtn">Cancel</button>
+              </div>
+            </div>
+
+            <p class="form-message" id="mfaMessage"></p>
+          </div>
+        </section>
       </section>
     </section>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="../js/admin_profile.js"></script>
 </body>
 </html>

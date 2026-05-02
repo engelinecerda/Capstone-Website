@@ -273,6 +273,112 @@
   align-items: start;
 }
 
+.profile-panel-mfa {
+  margin-top: 18px;
+}
+
+.mfa-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f8f3ed;
+  border: 1px solid #efe4d8;
+}
+
+.mfa-status-chip {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+.mfa-chip-on {
+  background: #e0f2e9;
+  color: #1d6a40;
+  border: 1px solid #b2dfc5;
+}
+
+.mfa-chip-off {
+  background: #f1ebe3;
+  color: #7a5c42;
+  border: 1px solid #dfd0c0;
+}
+
+.mfa-status-row .form-actions {
+  justify-content: flex-end;
+}
+
+.mfa-remove-btn {
+  color: #b42318;
+  border-color: #f3c5c2;
+}
+
+.mfa-enroll-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.mfa-enroll-instruction {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.mfa-qr-wrap {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.mfa-qr-wrap canvas,
+.mfa-qr-wrap img {
+  display: block;
+  border-radius: 12px;
+  border: 1px solid #efe4d8;
+  background: #fff;
+  padding: 8px;
+}
+
+.mfa-manual-secret {
+  margin-top: 12px;
+}
+
+.mfa-manual-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.mfa-secret-code {
+  display: block;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  background: #f1ebe3;
+  border: 1px solid #efe4d8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  word-break: break-all;
+  color: var(--text);
+  user-select: all;
+}
+
+.mfa-enroll-code-input {
+  font-size: 22px !important;
+  letter-spacing: 0.3em;
+  text-align: center;
+  font-weight: 700;
+  max-width: 220px;
+}
+
+.mfa-enroll-actions {
+  gap: 10px;
+}
+
 @media (max-width: 1120px) {
   .profile-layout {
     grid-template-columns: 1fr;
