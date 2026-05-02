@@ -272,6 +272,29 @@
     letter-spacing: 0.5px;
 }
 
+/* Package tag */
+.review-card__package {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    align-self: flex-start;
+    background: #fff3e8;
+    color: #7a4826;
+    border: 1px solid #e8d0ba;
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.review-card__package i {
+    font-size: 11px;
+    color: #9a5a30;
+    flex-shrink: 0;
+}
+
+
 /* Loading & Empty states */
 .reviews-loading,
 .reviews-empty {
