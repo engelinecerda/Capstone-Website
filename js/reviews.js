@@ -1,5 +1,3 @@
-reviews.js
-
 // /js/reviews.js
 import { customerSupabase as supabase } from './supabase.js';
 import { shouldHideReview } from './reviews_filter.js';

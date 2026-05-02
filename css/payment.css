@@ -594,7 +594,15 @@ body {
 ======================== */
 .payment-howto-online {
     display: grid;
-    gap: 18px;
+    grid-template-columns: auto 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.payment-howto-qr-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .payment-howto-qr-wrap {
@@ -602,14 +610,14 @@ body {
 }
 
 .payment-howto-qr {
-    width: 160px;
-    height: 160px;
+    width: 220px;
+    height: 220px;
     object-fit: contain;
-    border-radius: 14px;
+    border-radius: 16px;
     border: 1px solid var(--payment-border);
     background: #fff;
     display: block;
-    margin: 0 auto 8px;
+    margin: 0 auto 10px;
 }
 
 .payment-howto-qr-label {
@@ -619,23 +627,18 @@ body {
     font-weight: 600;
 }
 
-.payment-howto-or {
-    display: flex;
-    align-items: center;
+.payment-howto-info-col {
+    display: grid;
     gap: 12px;
-    color: var(--payment-muted);
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
 }
 
-.payment-howto-or::before,
-.payment-howto-or::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--payment-border);
+.payment-howto-info-heading {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--payment-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
 .payment-howto-details {
@@ -766,6 +769,15 @@ body {
     .payment-form-row,
     .payment-readonly-grid {
         grid-template-columns: 1fr;
+    }
+
+    .payment-howto-online {
+        grid-template-columns: 1fr;
+    }
+
+    .payment-howto-qr {
+        width: 200px;
+        height: 200px;
     }
 }
 

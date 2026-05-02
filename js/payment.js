@@ -267,23 +267,27 @@ function renderInstructionCard() {
         return `
             <div class="payment-instructions-card">
                 <div class="payment-howto-online">
-                    <div class="payment-howto-qr-wrap">
-                        <img class="payment-howto-qr" src="${escapeHtml(methodMeta.qrImage)}" alt="${escapeHtml(methodMeta.label)} QR Code" loading="lazy">
-                        <p class="payment-howto-qr-label">Scan with ${escapeHtml(methodMeta.label)}</p>
+                    <div class="payment-howto-qr-col">
+                        <div class="payment-howto-qr-wrap">
+                            <img class="payment-howto-qr" src="${escapeHtml(methodMeta.qrImage)}" alt="${escapeHtml(methodMeta.label)} QR Code" loading="lazy">
+                            <p class="payment-howto-qr-label">Scan with ${escapeHtml(methodMeta.label)}</p>
+                        </div>
                     </div>
-                    <div class="payment-howto-or"><span>or</span></div>
-                    <div class="payment-howto-details">
-                        ${(methodMeta.details || []).map((detail) => `
-                            <div class="payment-howto-detail-row">
-                                <div class="payment-howto-detail-label">${escapeHtml(detail.label)}</div>
-                                <div class="payment-howto-detail-value">
-                                    <span>${escapeHtml(detail.value)}</span>
-                                    ${detail.copyable ? `<button type="button" class="payment-copy-btn" data-copy="${escapeHtml(detail.value)}" title="Copy ${escapeHtml(detail.label)}">${COPY_ICON} Copy</button>` : ''}
+                    <div class="payment-howto-info-col">
+                        <p class="payment-howto-info-heading">Or send manually to:</p>
+                        <div class="payment-howto-details">
+                            ${(methodMeta.details || []).map((detail) => `
+                                <div class="payment-howto-detail-row">
+                                    <div class="payment-howto-detail-label">${escapeHtml(detail.label)}</div>
+                                    <div class="payment-howto-detail-value">
+                                        <span>${escapeHtml(detail.value)}</span>
+                                        ${detail.copyable ? `<button type="button" class="payment-copy-btn" data-copy="${escapeHtml(detail.value)}" title="Copy ${escapeHtml(detail.label)}">${COPY_ICON} Copy</button>` : ''}
+                                    </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `).join('')}
+                        </div>
+                        <div class="payment-howto-reminder">${INFO_ICON} ${escapeHtml(methodMeta.helper || '')}</div>
                     </div>
-                    <div class="payment-howto-reminder">${INFO_ICON} ${escapeHtml(methodMeta.helper || '')}</div>
                 </div>
             </div>
         `;
