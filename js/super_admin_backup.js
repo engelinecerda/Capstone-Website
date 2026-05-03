@@ -42,9 +42,12 @@ let driveFolderId         = null;
 let backupHistory         = [];
 let pendingRestoreFile    = null;
 let pendingSettingsAction = null;
-let settings              = { retentionDays: 30 };
+let settings              = { retentionDays: 90};
 let currentAdminId        = null;
 let pendingDeleteFile = null;
+let historyCurrentPage  = 1;
+const HISTORY_PAGE_SIZE = 10;
+
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const pageMessage           = document.getElementById('pageMessage');
@@ -186,7 +189,7 @@ async function onTokenReady() {
   createBackupBtn.disabled     = false;
   restoreSystemBtn.disabled    = false;
 
-  await resolveDriveFolder();
+  await resolveDriveFolder(currentAdminId);
   await loadBackupHistory();
 }
 
@@ -296,44 +299,145 @@ async function driveRequest(path, options = {}) {
   return res.json();
 }
 
-async function resolveDriveFolder() {
+async function resolveDriveFolder(userId) {
+  // Scope cache key to the current user to avoid cross-account contamination
+  const cacheKey = `drive_folder_id_${userId}`;
+  const savedFolderId = localStorage.getItem(cacheKey);
+
+  // 1. Validate cached folder — and confirm it actually has backups
+  if (savedFolderId) {
+    try {
+      const existing = await driveRequest(
+        `files/${savedFolderId}?fields=id,name,trashed`
+      );
+
+      if (existing?.id && !existing.trashed) {
+        // Verify this folder has at least one backup before trusting cache
+        const check = await driveRequest(
+          `files?q='${existing.id}' in parents and mimeType='application/json' and trashed=false` +
+          `&fields=files(id)&pageSize=1`
+        );
+
+        if (check.files?.length) {
+          driveFolderId = existing.id;
+          return;
+        }
+        // Cached folder is empty — don't trust it, fall through to search
+      }
+      localStorage.removeItem(cacheKey);
+    } catch {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  // 2. Find ALL matching folders
   const search = await driveRequest(
-    `files?q=name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`
+    `files?q=name='${DRIVE_FOLDER_NAME}'` +
+    ` and mimeType='application/vnd.google-apps.folder'` +
+    ` and trashed=false` +
+    `&fields=files(id,name,createdTime)` +
+    `&orderBy=createdTime asc`
   );
 
-  if (search.files?.length) {
-    driveFolderId = search.files[0].id;
+  const candidates = search.files || [];
+
+  if (candidates.length > 0) {
+    // 3. For each candidate, count its backup files
+    const counts = await Promise.all(
+      candidates.map(async (folder) => {
+        try {
+          const res = await driveRequest(
+            `files?q='${folder.id}' in parents and mimeType='application/json' and trashed=false` +
+            `&fields=files(id)&pageSize=1000`
+          );
+          return { folder, count: res.files?.length || 0 };
+        } catch {
+          return { folder, count: 0 };
+        }
+      })
+    );
+
+    // 4. Pick the folder with the most backups; tiebreak by oldest
+    counts.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return new Date(a.folder.createdTime) - new Date(b.folder.createdTime);
+    });
+
+    const winner = counts[0].folder;
+    driveFolderId = winner.id;
+    localStorage.setItem(cacheKey, driveFolderId);
+
+    // Warn the user about duplicates
+    if (candidates.length > 1) {
+      console.warn(
+        `Found ${candidates.length} folders named "${DRIVE_FOLDER_NAME}". ` +
+        `Using the one with ${counts[0].count} backups (created ${winner.createdTime}). ` +
+        `Consider consolidating duplicate folders.`
+      );
+    }
+
     return;
   }
 
+  // 5. Create only if nothing exists at all
   const created = await driveRequest('files', {
     method: 'POST',
     body: JSON.stringify({
-      name:     DRIVE_FOLDER_NAME,
+      name: DRIVE_FOLDER_NAME,
       mimeType: 'application/vnd.google-apps.folder'
     })
   });
 
+  if (!created?.id) throw new Error('Failed to create Drive folder');
+
   driveFolderId = created.id;
+  localStorage.setItem(cacheKey, driveFolderId);
 }
 
 // ─── Load backup history from Drive ──────────────────────────────────────────
+let loadHistoryRequestId = 0;
+
 async function loadBackupHistory() {
   if (!driveAccessToken || !driveFolderId) return;
+
+  // Race condition guard: only the latest call updates state
+  const requestId = ++loadHistoryRequestId;
 
   setPageMessage('Loading backup history…');
 
   try {
-    const res = await driveRequest(
-      `files?q='${driveFolderId}' in parents and mimeType='application/json' and trashed=false` +
-      `&fields=files(id,name,size,createdTime,description)&orderBy=createdTime desc`
-    );
+    const allFiles = [];
+    let pageToken = null;
 
-    backupHistory = res.files || [];
+    // Paginate to get all backups, not just the first 100
+    do {
+      const query =
+        `files?q='${driveFolderId}' in parents` +
+        ` and mimeType='application/json'` +
+        ` and trashed=false` +
+        `&fields=nextPageToken,files(id,name,size,createdTime,modifiedTime,description)` +
+        `&orderBy=createdTime desc` +
+        `&pageSize=100` +
+        (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+
+      const res = await driveRequest(query);
+
+      // Abort if a newer call has superseded this one
+      if (requestId !== loadHistoryRequestId) return;
+
+      if (res.files?.length) allFiles.push(...res.files);
+      pageToken = res.nextPageToken || null;
+    } while (pageToken);
+
+    backupHistory = allFiles;
+    historyCurrentPage = 1;
     renderHistory();
     updateStatusCard();
     setPageMessage('');
   } catch (err) {
+    // Only show error if this is still the most recent call
+    if (requestId !== loadHistoryRequestId) return;
+
     setPageMessage(`Failed to load backup history: ${err.message}`, 'error');
     renderHistory();
   }
@@ -745,7 +849,17 @@ function renderHistory() {
 
   emptyHistory.classList.add('hidden');
 
-  historyList.innerHTML = backupHistory.map(b => `
+  const totalPages = Math.ceil(backupHistory.length / HISTORY_PAGE_SIZE);
+
+  // Clamp current page in case backups got deleted
+  if (historyCurrentPage > totalPages) historyCurrentPage = totalPages;
+  if (historyCurrentPage < 1) historyCurrentPage = 1;
+
+  const start = (historyCurrentPage - 1) * HISTORY_PAGE_SIZE;
+  const end   = start + HISTORY_PAGE_SIZE;
+  const pageItems = backupHistory.slice(start, end);
+
+  const rowsHtml = pageItems.map(b => `
     <div class="history-row">
       <div class="history-left">
         <div class="history-icon">
@@ -799,6 +913,29 @@ function renderHistory() {
       </div>
     </div>
   `).join('');
+
+  // Only show pagination if we have more than one page
+  const paginationHtml = totalPages > 1 ? `
+    <div class="history-pagination">
+      <button class="pagination-btn" data-action="prev-page" ${historyCurrentPage === 1 ? 'disabled' : ''}>
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Previous
+      </button>
+      <span class="pagination-info">
+        Page ${historyCurrentPage} of ${totalPages} · Showing ${start + 1}–${Math.min(end, backupHistory.length)} of ${backupHistory.length}
+      </span>
+      <button class="pagination-btn" data-action="next-page" ${historyCurrentPage === totalPages ? 'disabled' : ''}>
+        Next
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+    </div>
+  ` : '';
+
+  historyList.innerHTML = rowsHtml + paginationHtml;
 }
 
 // ─── History click delegation ─────────────────────────────────────────────────
@@ -810,6 +947,16 @@ historyList?.addEventListener('click', e => {
   if (action === 'download') handleDownload(id, name);
   if (action === 'restore')  openRestoreModal(id, name, date);
   if (action === 'delete')   handleDelete(id, name);
+
+  if (action === 'prev-page') {
+    historyCurrentPage = Math.max(1, historyCurrentPage - 1);
+    renderHistory();
+  }
+  if (action === 'next-page') {
+    const totalPages = Math.ceil(backupHistory.length / HISTORY_PAGE_SIZE);
+    historyCurrentPage = Math.min(totalPages, historyCurrentPage + 1);
+    renderHistory();
+  }
 });
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
