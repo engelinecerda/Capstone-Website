@@ -55,6 +55,57 @@ export const PAYMENT_METHODS = {
 
 export const PAYMENT_METHOD_ORDER = ['gcash', 'maya', 'bpi', 'card', 'cash'];
 
+// Maps the DB's mode_of_payment value to the internal key used in PAYMENT_METHODS
+const DB_MODE_TO_KEY = { 'GCash': 'gcash', 'Maya': 'maya', 'BPI': 'bpi' };
+
+const DB_DETAIL_LABEL = {
+    gcash: 'GCash Number',
+    maya:  'Maya Number',
+    bpi:   'Account Number',
+};
+
+/**
+ * Fetches the latest payment method entries from the `payment_method` table
+ * and patches PAYMENT_METHODS in-place so every reference sees live DB data.
+ * Falls back silently to the hardcoded defaults if the fetch fails.
+ */
+export async function loadDynamicPaymentMethods(supabase) {
+    try {
+        const { data, error } = await supabase
+            .from('payment_method')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (!data || !data.length) return;
+
+        // Use only the most recent row per mode (data is newest-first)
+        const seen = new Set();
+        for (const row of data) {
+            const key = DB_MODE_TO_KEY[row.mode_of_payment];
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+
+            const accountName   = row.account_name               || '';
+            const accountNumber = row['phone/account_number']     || '';
+            const qrImage       = row.qr_image                    || PAYMENT_METHODS[key].qrImage;
+
+            PAYMENT_METHODS[key] = {
+                ...PAYMENT_METHODS[key],
+                qrImage,
+                details: [
+                    { label: 'Account Name',       value: accountName,   copyable: true },
+                    { label: DB_DETAIL_LABEL[key], value: accountNumber, copyable: true },
+                ],
+            };
+        }
+
+        console.log('[Payments] Payment methods loaded from DB.');
+    } catch (err) {
+        console.warn('[Payments] Could not load payment methods from DB, using defaults:', err?.message || err);
+    }
+}
+
 export const PAYMENT_TYPE_META = {
     reservation_fee: { label: 'Reservation Fee', description: 'Fixed reservation fee' },
     down_payment: { label: 'Down Payment', description: '50% of your total amount' },

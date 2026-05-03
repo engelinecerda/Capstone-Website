@@ -15,12 +15,14 @@ import {
     isCompletedPaymentOverview,
     isPendingPaymentOverview,
     loadCustomerPaymentBundle,
+    loadDynamicPaymentMethods,
     submitCustomerPayment
 } from './customer_payments.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
     window.location.href = '/login.html';
+    throw new Error('Not authenticated');
 }
 
 const user = session.user;
@@ -716,6 +718,7 @@ function closeReceiptModal() {
 
 async function loadPaymentPage() {
     try {
+        await loadDynamicPaymentMethods(supabase);
         state.bundle = await loadCustomerPaymentBundle(supabase, user.id);
         renderReservationPaymentPage();
     } catch (error) {

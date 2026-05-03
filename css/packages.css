@@ -90,14 +90,18 @@ body {
   margin: 0 auto 30px auto;
 }
 .packages-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
   max-width: 1200px;
   margin: 0 auto;
   font-family: 'Kumbh Sans', sans-serif;
 }
+
 .package-card {
+  flex: 0 1 280px;
+  min-width: 250px;
   background-color: #fff;
   border-radius: 12px;
   padding: 20px;

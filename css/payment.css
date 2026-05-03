@@ -610,8 +610,8 @@ body {
 }
 
 .payment-howto-qr {
-    width: 220px;
-    height: 220px;
+    width: 320px;
+    height: 320px;
     object-fit: contain;
     border-radius: 16px;
     border: 1px solid var(--payment-border);
