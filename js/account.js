@@ -582,13 +582,14 @@ function getReservationReviewState(reservation) {
         isCompleted,
         dismissedAt,
         isDismissed: Boolean(dismissedAt) && !review,
-        canReview: isCompleted && !review && !dismissedAt
+        canReview: isCompleted && !review,
+        canAutoPrompt: isCompleted && !review && !dismissedAt
     };
 }
 
 function getReviewPromptCandidate() {
     return state.reservations
-        .filter((reservation) => getReservationReviewState(reservation).canReview)
+        .filter((reservation) => getReservationReviewState(reservation).canAutoPrompt)
         .sort((left, right) => {
             const leftTime = getReservationEventDateTime(left)?.getTime() || new Date(left?.created_at || 0).getTime() || 0;
             const rightTime = getReservationEventDateTime(right)?.getTime() || new Date(right?.created_at || 0).getTime() || 0;
@@ -1760,6 +1761,7 @@ function buildReservationCard(reservation, view) {
     const canManagePayments = paymentModuleEnabled && view === 'active';
     const compactPaymentLabel = getCompactPaymentSummaryLabel(paymentSummary);
     const compactContractLabel = getCompactContractLabel(contractMeta);
+    const reviewState = view === 'past' ? getReservationReviewState(reservation) : null;
 
     return `
         <article class="reservation-summary-card${view === 'past' ? ' past' : ''}">
@@ -1820,6 +1822,8 @@ function buildReservationCard(reservation, view) {
                 <div class="reservation-summary-actions">
                     <button type="button" class="res-secondary-btn open-reservation-details-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">View Details</button>
                     ${canManagePayments ? `<button type="button" class="res-primary-btn open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">${escapeHtml(paymentActionLabel)}</button>` : ''}
+                    ${reviewState?.review ? `<span class="reservation-reviewed-badge">&#10003; Reviewed</span>` : ''}
+                    ${reviewState?.canReview ? `<button type="button" class="res-secondary-btn open-review-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Leave a Review</button>` : ''}
                 </div>
             </div>
         </article>
@@ -1883,10 +1887,13 @@ function buildReservationReviewSection(reservation) {
                 <div class="reservation-details-section-head">
                     <div>
                         <h3>Your Review</h3>
-                        <p>This reservation is complete. You chose not to leave a review for it.</p>
+                        <p>This reservation is complete. You can still leave a review whenever you are ready.</p>
                     </div>
                 </div>
-                <div class="reservation-inline-note">Review skipped${dismissedAt ? ` on ${escapeHtml(formatDateTime(dismissedAt))}` : ''}.</div>
+                <div class="reservation-inline-note">You skipped the review prompt${dismissedAt ? ` on ${escapeHtml(formatDateTime(dismissedAt))}` : ''}. You can still share your feedback below.</div>
+                <div class="reservation-details-actions">
+                    <button type="button" class="res-secondary-btn open-review-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Leave a Review</button>
+                </div>
             </section>
         `;
     }

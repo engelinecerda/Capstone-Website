@@ -2409,6 +2409,21 @@ body{
     gap: 10px;
 }
 
+.reservation-reviewed-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: #d9f3df;
+    color: #166534;
+    border: 1px solid #8fd2a3;
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .reservation-empty-state {
     margin: 0;
     border: 1px dashed #eadbcf;
