@@ -13,11 +13,9 @@ import {
     fetchBlackoutDates,
     fetchCalendarAvailability,
     fetchDateAvailability,
-    getAvailabilitySummaryMessage,
     getBookingScope as getSharedBookingScope,
     getCalendarRange,
     getScopeLabel,
-    isScopeOccupied
 } from './reservation_availability.js';
 
 const CLOUDINARY_CONFIG = {
@@ -114,6 +112,12 @@ const rescheduleCalendarGrid = document.getElementById('reschedule-calendar-grid
 const rescheduleTimeGrid = document.getElementById('reschedule-time-grid');
 const reschedulePrevMonth = document.getElementById('reschedule-prev-month');
 const rescheduleNextMonth = document.getElementById('reschedule-next-month');
+const cancelReservationBackdrop = document.getElementById('cancel-reservation-backdrop');
+const cancelModalClose = document.getElementById('cancel-modal-close');
+const cancelModalDismiss = document.getElementById('cancel-modal-dismiss');
+const cancelModalConfirm = document.getElementById('cancel-modal-confirm');
+const cancelModalMessage = document.getElementById('cancel-modal-message');
+const cancelFeeAmount = document.getElementById('cancel-fee-amount');
 const reviewPromptBackdrop = document.getElementById('review-prompt-backdrop');
 const reviewPromptClose = document.getElementById('review-prompt-close');
 const reviewPromptDismiss = document.getElementById('review-prompt-dismiss');
@@ -155,6 +159,9 @@ const state = {
         closedDates: new Set(),
         blackoutDateColumn: null,
         blackoutReasonColumn: null
+    },
+    cancelModal: {
+        reservationId: null
     }
 };
 
@@ -370,7 +377,8 @@ function getReservationStatusMeta(status) {
         declined: 'Declined',
         completed: 'Completed',
         rescheduled: 'Rescheduled',
-        resubmission_requested: 'Resubmission Requested'
+        resubmission_requested: 'Resubmission Requested',
+        cancellation_requested: 'Cancellation Requested'
     };
 
     return {
@@ -1109,6 +1117,20 @@ function canRescheduleReservation(reservation) {
         .find((request) => ['pending', 'approved_pending_payment'].includes(String(request.status || '').toLowerCase()));
 
     return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !latestOpenRequest;
+}
+
+function getCancellationFee(reservation) {
+    return String(reservation?.location_type || '').toLowerCase() === 'offsite' ? 2000 : 500;
+}
+
+function canCancelReservation(reservation) {
+    const status = String(reservation?.status || '').toLowerCase();
+    if (!['approved', 'confirmed', 'rescheduled'].includes(status)) return false;
+    const hasPendingFee = getReservationPayments(reservation.reservation_id).some((p) =>
+        p.payment_type === 'cancellation_fee' &&
+        ['pending_review', 'approved'].includes(String(p.payment_status || '').toLowerCase())
+    );
+    return !hasPendingFee;
 }
 
 function renderPaymentComposer(reservation) {
@@ -2086,6 +2108,7 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
     const contractMeta = getReservationContractMeta(reservation.reservation_id);
     const addOnName = getReservationAddOnName(reservation);
     const canReschedule = canRescheduleReservation(reservation);
+    const canCancel = canCancelReservation(reservation);
     const latestRescheduleRequest = getReservationRescheduleRequests(reservation.reservation_id)[0] || null;
 
     reservationDetailsView.innerHTML = `
@@ -2276,9 +2299,10 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                         <strong class="reservation-detail-value">${escapeHtml(latestRescheduleRequest ? `${formatDate(latestRescheduleRequest.requested_date)} at ${latestRescheduleRequest.requested_time || 'No time selected'}` : 'No changes requested')}</strong>
                     </div>
                 </div>
-                ${canReschedule ? `
+                ${(canReschedule || canCancel) ? `
                     <div class="reservation-details-actions">
-                        <button type="button" class="res-secondary-btn open-reschedule-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Request Reschedule</button>
+                        ${canReschedule ? `<button type="button" class="res-secondary-btn open-reschedule-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Request Reschedule</button>` : ''}
+                        ${canCancel ? `<button type="button" class="res-danger-btn open-cancel-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Cancel Reservation</button>` : ''}
                     </div>
                 ` : ''}
             </section>
@@ -3153,7 +3177,7 @@ function renderRescheduleCalendar() {
             isFullyBooked: false
         };
         const reservationScope = getBookingScope(reservation);
-        const isBooked = reservationScope ? isScopeOccupied(dateAvailability.occupiedScopes, reservationScope) : false;
+        const isBooked = dateAvailability.isFullyBooked;
         const isCurrent = currentReservationDate === dateKey;
         const isAvailable = !isPastOrToday && !isClosed && !isBooked && !isCurrent;
         const isSelected = state.rescheduleModal.selectedDate === dateKey;
@@ -3168,7 +3192,7 @@ function renderRescheduleCalendar() {
             label = 'Closed';
         } else if (isBooked) {
             classNames.push('booked');
-            label = getAvailabilitySummaryMessage(dateAvailability.occupiedScopes, reservationScope);
+            label = 'This date is fully booked.';
         } else {
             classNames.push('disabled');
             label = isCurrent ? 'Current booking date' : 'Unavailable';
@@ -3204,6 +3228,71 @@ function closeRescheduleModal() {
     rescheduleModalBackdrop?.setAttribute('aria-hidden', 'true');
     rescheduleModalSubmit?.removeAttribute('disabled');
     setRescheduleModalMessage('');
+}
+
+function setCancelModalMessage(message, isError = false) {
+    if (!cancelModalMessage) return;
+    cancelModalMessage.textContent = message || '';
+    cancelModalMessage.className = 'account-modal-message' + (isError ? ' error' : '');
+}
+
+function closeCancelModal() {
+    state.cancelModal.reservationId = null;
+    cancelReservationBackdrop?.classList.add('hidden');
+    cancelReservationBackdrop?.setAttribute('aria-hidden', 'true');
+    if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
+    setCancelModalMessage('');
+}
+
+function openCancelModal(reservationId) {
+    const reservation = state.reservations.find((r) => String(r.reservation_id) === String(reservationId));
+    if (!reservation) return;
+
+    state.cancelModal.reservationId = reservationId;
+    const fee = getCancellationFee(reservation);
+    if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    setCancelModalMessage('');
+    cancelReservationBackdrop?.classList.remove('hidden');
+    cancelReservationBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+async function submitCancellationRequest() {
+    const reservationId = state.cancelModal.reservationId;
+    const reservation = state.reservations.find((r) => String(r.reservation_id) === String(reservationId));
+    if (!reservation) return;
+
+    if (cancelModalConfirm) cancelModalConfirm.setAttribute('disabled', 'true');
+    setCancelModalMessage('Processing your cancellation request...');
+
+    try {
+        const fee = getCancellationFee(reservation);
+
+        const { error: statusError } = await supabase
+            .from('reservations')
+            .update({ status: 'cancellation_requested' })
+            .eq('reservation_id', reservationId);
+
+        if (statusError) throw statusError;
+
+        const { error: paymentError } = await supabase
+            .from('payment')
+            .insert({
+                reservation_id: reservationId,
+                payment_type: 'cancellation_fee',
+                amount: fee,
+                payment_status: 'pending_review',
+                submitted_at: new Date().toISOString()
+            });
+
+        if (paymentError) throw paymentError;
+
+        closeCancelModal();
+        await loadReservations();
+        window.location.href = buildCustomerPaymentUrl(reservationId);
+    } catch (error) {
+        if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
+        setCancelModalMessage(`Failed to submit cancellation: ${error.message}`, true);
+    }
 }
 
 async function openRescheduleModal(reservationId) {
@@ -3251,7 +3340,7 @@ async function submitRescheduleRequest() {
         if (latestAvailability?.scopeTaken) {
             state.rescheduleModal.selectedTime = '';
             renderRescheduleTimes();
-            throw new Error(getAvailabilitySummaryMessage(latestAvailability.occupiedScopes, getBookingScope(reservation)));
+            throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
         }
 
         const payload = {
@@ -3523,6 +3612,12 @@ function wireReservationActions() {
             return;
         }
 
+        const cancelBtn = event.target.closest('.open-cancel-btn');
+        if (cancelBtn) {
+            openCancelModal(cancelBtn.dataset.reservationId);
+            return;
+        }
+
         const reviewBtn = event.target.closest('.open-review-btn');
         if (reviewBtn) {
             openReviewPromptModal(reviewBtn.dataset.reservationId);
@@ -3560,6 +3655,13 @@ function wireReservationDetailsModal() {
         if (rescheduleBtn) {
             closeReservationDetailsModal();
             await openRescheduleModal(rescheduleBtn.dataset.reservationId);
+            return;
+        }
+
+        const cancelBtn = event.target.closest('.open-cancel-btn');
+        if (cancelBtn) {
+            closeReservationDetailsModal();
+            openCancelModal(cancelBtn.dataset.reservationId);
             return;
         }
 
@@ -3702,7 +3804,7 @@ function wireRescheduleModal() {
         renderRescheduleTimes();
         setRescheduleModalMessage(
             availability?.scopeTaken
-                ? getAvailabilitySummaryMessage(availability.occupiedScopes, getBookingScope(reservation))
+                ? 'This date is fully booked.'
                 : `Selected ${formatDate(state.rescheduleModal.selectedDate)} for your ${getScopeLabel(getBookingScope(reservation))} booking slot.`
         );
     });
@@ -3713,6 +3815,15 @@ function wireRescheduleModal() {
         if (timeButton.hasAttribute('disabled')) return;
         state.rescheduleModal.selectedTime = timeButton.dataset.time || '';
         renderRescheduleTimes();
+    });
+}
+
+function wireCancelModal() {
+    cancelModalClose?.addEventListener('click', closeCancelModal);
+    cancelModalDismiss?.addEventListener('click', closeCancelModal);
+    cancelModalConfirm?.addEventListener('click', submitCancellationRequest);
+    cancelReservationBackdrop?.addEventListener('click', (event) => {
+        if (event.target === cancelReservationBackdrop) closeCancelModal();
     });
 }
 
@@ -4139,6 +4250,7 @@ wireReservationDetailsModal();
 wirePaymentActions();
 wireReceiptModal();
 wireRescheduleModal();
+wireCancelModal();
 wireReviewPromptModal();
 wireSubmissionFeedbackModal();
 wireProfileForm();

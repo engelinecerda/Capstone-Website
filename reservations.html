@@ -54,7 +54,9 @@
 
                 <div class="smart-step-section">
                     <div class="input-row">
-                        <input class="res-input" type="text"   id="event-type"  placeholder="Event Type (e.g. Birthday, Wedding) *">
+                        <select class="res-input" id="event-type">
+                            <option value="">Event Type *</option>
+                        </select>
                         <input class="res-input" type="number" id="guest-count" placeholder="Number of Guests *" min="1">
                     </div>
                 </div>
@@ -301,12 +303,9 @@
         fetchBlackoutDates,
         fetchCalendarAvailability,
         fetchDateAvailability,
-        getAvailabilitySummaryMessage,
         getBookingScope as getSharedBookingScope,
         getCalendarRange,
         getScopeLabel,
-        isDateFullyBooked as isFullyBookedFromScopes,
-        isScopeOccupied
     } from '/js/reservation_availability.js';
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -815,7 +814,7 @@
         if (S.eventDate && (!selectedScope || isDateUnavailableForScope(S.eventDate, selectedScope))) {
             const dateAvailability = getDateAvailability(S.eventDate);
             const conflictMessage = selectedScope
-                ? `${getAvailabilitySummaryMessage(dateAvailability.occupiedScopes, selectedScope)} Choose another available date to see time slots.`
+                ? 'This date is fully booked. Choose another available date to see time slots.'
                 : getScopeSelectionPrompt();
             syncSelectedDate('');
             S.time = '';
@@ -852,15 +851,13 @@
     }
 
     function isDateFullyBooked(dateKey) {
-        return isFullyBookedFromScopes(getDateAvailability(dateKey).occupiedScopes);
+        return getDateAvailability(dateKey).isFullyBooked;
     }
 
     function isDateUnavailableForScope(dateKey, scope) {
         if (!dateKey) return false;
         if (availabilityState.closedDates.has(dateKey)) return true;
-        const availability = getDateAvailability(dateKey);
-        if (!scope) return availability.isFullyBooked || isDateFullyBooked(dateKey);
-        return isScopeOccupied(availability.occupiedScopes, scope);
+        return getDateAvailability(dateKey).isFullyBooked;
     }
 
     async function resolveAvailabilityBlackoutColumn() {
@@ -962,14 +959,10 @@
                 dayBtn.title = getScopeSelectionPrompt();
             } else if (isBooked) {
                 dayBtn.classList.add('booked');
-                dayBtn.title = selectedScope
-                    ? getAvailabilitySummaryMessage(dayAvailability.occupiedScopes, selectedScope)
-                    : 'This date is fully booked.';
+                dayBtn.title = 'This date is fully booked.';
                 dayBtn.setAttribute('aria-disabled', 'true');
                 dayBtn.addEventListener('click', () => {
-                    const reason = selectedScope
-                        ? getAvailabilitySummaryMessage(dayAvailability.occupiedScopes, selectedScope)
-                        : 'This date is fully booked.';
+                    const reason = 'This date is fully booked.';
                     syncSelectedDate('');
                     S.time = '';
                     availabilityState.selectedDateAvailability = null;
@@ -1071,7 +1064,7 @@
             availabilityState.selectedDateAvailability = availability;
 
             if (availability.scopeTaken) {
-                setAvailabilityMessage(getAvailabilitySummaryMessage(availability.occupiedScopes, selectedScope), true);
+                setAvailabilityMessage('This date is fully booked.', true);
             } else {
                 setAvailabilityMessage(`Selected ${formatDisplayDate(S.eventDate)}.`, false);
             }
@@ -1117,6 +1110,34 @@
         };
     }
 
+    // ── Load event types from Supabase ──
+    async function loadEventTypes() {
+        const sel = document.getElementById('event-type');
+        const { data, error } = await supabase
+            .from('event_types')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) { console.error('event_types fetch error:', error); return; }
+        if (!data || data.length === 0) { console.warn('event_types: no rows returned', data); return; }
+
+        console.log('event_types rows:', data);
+
+        data.forEach(et => {
+            // skip archived — works whether column is status:'Active' or is_active:true
+            if (et.status && et.status !== 'Active') return;
+            if (et.is_active === false) return;
+
+            const label = et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1];
+            if (!label) return;
+
+            const opt = document.createElement('option');
+            opt.value = label;
+            opt.textContent = label;
+            sel.appendChild(opt);
+        });
+    }
+
     // ── Load packages from Supabase ──
     async function loadPackages() {
         const { data: pkgs, error } = await supabase
@@ -1132,6 +1153,9 @@
         OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
 
         pkgs.forEach(p => {
+            const desc = (p.description || '').trim();
+            if (p.price === 0 && (desc === '' || desc === '.')) return;
+
             const base   = {
                 id: p.package_id,
                 label: p.package_name,
@@ -1684,10 +1708,10 @@
             if (timeStatusNote) {
                 timeStatusNote.textContent = 'Choose your location and package first so the correct booking slot can be checked.';
             }
-        } else if (selectedAvailability.scopeTaken || isScopeOccupied(selectedAvailability.occupiedScopes, selectedScope)) {
+        } else if (selectedAvailability.scopeTaken) {
             S.time = '';
             if (timeStatusNote) {
-                timeStatusNote.textContent = getAvailabilitySummaryMessage(selectedAvailability.occupiedScopes, selectedScope);
+                timeStatusNote.textContent = 'This date is fully booked.';
             }
         } else if (timeStatusNote) {
             timeStatusNote.textContent = blockedTimes.size
@@ -1921,7 +1945,7 @@
             if (getSelectedBookingScope() && latestAvailability.scopeTaken) {
                 availabilityState.selectedDateAvailability = latestAvailability;
                 buildTimeGrid();
-                throw new Error(getAvailabilitySummaryMessage(latestAvailability.occupiedScopes, getSelectedBookingScope()));
+                throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
             }
 
             const { data: { session } } = await supabase.auth.getSession();
@@ -2135,6 +2159,7 @@
     // Load packages from DB first, then start the form
     syncSelectedDate('');
     await prefillReservationContactDetails();
+    await loadEventTypes();
     await loadPackages();
     await loadAvailabilityCalendar();
     showStep(1);
