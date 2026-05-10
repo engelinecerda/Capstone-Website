@@ -86,6 +86,9 @@ const PAYMENT_TYPE_LABELS = {
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
+const prevPageBtn    = document.getElementById('prevPageBtn');
+const nextPageBtn    = document.getElementById('nextPageBtn');
+const paginationInfo = document.getElementById('paginationInfo');
 
 let reservationsCache = [];
 let blackouts = new Set();
@@ -108,6 +111,9 @@ let assignmentSearchTerm = '';
 let activeDetailsReservationId = null;
 let reservationDetailsFlash = null;
 let showPendingRescheduleOnly = false;
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let totalReservationCount = 0;
 
 function setMessage(el, msg, isError = false) {
   if (!el) return;
@@ -1271,25 +1277,45 @@ function filterAndRender() {
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
   const status = dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
-  if (!getPendingRescheduleRequestCount(reservationsCache)) {
-    showPendingRescheduleOnly = false;
-  }
+
   const filtered = sortReservationsForView(
-    reservationsCache.filter(r => matchesStatus(r, status) && matchesSearch(r, term) && (!showPendingRescheduleOnly || hasPendingRescheduleRequest(r))),
+    reservationsCache.filter(r =>
+      matchesStatus(r, status) &&
+      matchesSearch(r, term) &&
+      (!showPendingRescheduleOnly || hasPendingRescheduleRequest(r))
+    ),
     status
   );
+
+  totalReservationCount = filtered.length;
+
+  const totalPages = Math.max(1, Math.ceil(totalReservationCount / PAGE_SIZE));
+
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+  }
+
+  const from = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filtered.slice(from, from + PAGE_SIZE);
+
   renderStats(reservationsCache);
-  renderTable(filtered);
-  setMessage(tableMessage, filtered.length ? '' : getEmptyFilterMessage(status), false);
+  renderTable(paginated);
+  updatePagination();
+
+  setMessage(
+    tableMessage,
+    paginated.length ? '' : getEmptyFilterMessage(status),
+    false
+  );
 }
 
 function wireFilters() {
-  searchInput?.addEventListener('input', filterAndRender);
-  statusDropdown?.addEventListener('change', () => {
-    showPendingRescheduleOnly = false;
-    chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    filterAndRender();
-  });
+  searchInput?.addEventListener('input', () => {
+  currentPage = 1;
+  filterAndRender();
+  updatePagination();
+});
+
   chipsRow?.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
@@ -1297,16 +1323,46 @@ function wireFilters() {
     chipsRow.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     statusDropdown.value = 'all';
+    currentPage = 1;
     filterAndRender();
-  });
+    updatePagination();
+    });
+
   rescheduleAlertAction?.addEventListener('click', () => {
     showPendingRescheduleOnly = true;
     statusDropdown.value = 'all';
     chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     chipsRow?.querySelector('[data-status="all"]')?.classList.add('active');
+    currentPage = 1;
+  filterAndRender();
+  updatePagination();
+  });
+
+  statusDropdown?.addEventListener('change', () => {
+    showPendingRescheduleOnly = false;
+    chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    currentPage = 1;
     filterAndRender();
+    updatePagination();
   });
 }
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+// ─── Pagination ───────────────────────────────────────────────────────────────
+function updatePagination() {
+  const totalPages = Math.max(1, Math.ceil(totalReservationCount / PAGE_SIZE));
+  if (paginationInfo) paginationInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  if (prevPageBtn)    prevPageBtn.disabled = currentPage <= 1;
+  if (nextPageBtn)    nextPageBtn.disabled = currentPage >= totalPages;
+}
+
+prevPageBtn?.addEventListener('click', () => {
+  if (currentPage > 1) { currentPage--; filterAndRender(); updatePagination(); }
+});
+nextPageBtn?.addEventListener('click', () => {
+  const totalPages = Math.ceil(totalReservationCount / PAGE_SIZE);
+  if (currentPage < totalPages) { currentPage++; filterAndRender(); updatePagination(); }
+});
 
 async function fetchReservations() {
   const { data: reservations, error } = await supabase
@@ -1333,7 +1389,6 @@ async function fetchReservations() {
 
   const list = reservations || [];
   const reservationIds = list.map((reservation) => reservation.reservation_id).filter(Boolean);
-
   if (!reservationIds.length) return list;
 
   const [
@@ -2297,7 +2352,11 @@ async function loadData() {
       reviewBadgeEl: navReviewCount
     });
     renderStats(reservationsCache);
-    filterAndRender();
+
+currentPage = 1;
+  filterAndRender();
+  updatePagination();
+    
     await loadCalendar();
     if (activeDetailsReservationId) {
       if (getReservationById(activeDetailsReservationId)) {

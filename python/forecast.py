@@ -9,7 +9,7 @@ SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 1. Fetch reservation data (ACTUAL)
-response = supabase.table("reservations").select("event_date").eq("status", "completed").execute()  # WILL BE CHANGED TO COMPLETED
+response = supabase.table("reservations").select("event_date").eq("status", "completed").execute()  
 data = response.data
 
 df = pd.DataFrame(data)

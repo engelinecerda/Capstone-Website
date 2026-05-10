@@ -772,8 +772,8 @@ async function performContractAction(action, button) {
   const reservationId = button.dataset.reservationId;
   const reservation = getReservationById(reservationId);
   const previousStatus = reservation?.status || null;
-  const customerName = reservation?.contact_name || 'Unknown';          // ★ ADD THIS
-  const packageName = reservation?.package?.package_name || 'Unknown';  // ★ ADD THIS
+  const customerName = reservation?.contact_name || 'Unknown';         
+  const packageName = reservation?.package?.package_name || 'Unknown';  
 
   if (action === 'verify-contract') {
     await markReservationContractVerified(reservationId);
