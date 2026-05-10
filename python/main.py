@@ -55,7 +55,7 @@ async def get_forecast():
         )
 
     def fetch_actuals():
-        return supabase.table("reservations").select("event_date").execute()
+        return supabase.table("reservations").select("event_date").eq("status", "completed").execute()  
 
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor() as pool:
