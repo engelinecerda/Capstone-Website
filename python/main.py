@@ -111,7 +111,7 @@ async def get_forecast():
 def monthly_reservations():
     res = supabase.table("reservations") \
         .select("event_date") \
-        .in_("status", ["approved", "confirmed"]) \
+        .in_("status", ["approved", "confirmed", "completed"]) \
         .execute()
 
     df = pd.DataFrame(res.data)
