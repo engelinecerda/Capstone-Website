@@ -185,8 +185,13 @@
 
     <section class="charts-row">
       <div class="card chart-card">
-        <h2 class="card-title">Monthly Reservations</h2>
-        <p class="card-sub">Reservation submissions over the last 6 months</p>
+        <div class="demand-head">
+          <div>
+            <h2 class="card-title">Monthly Reservations</h2>
+            <p class="card-sub">Approved reservations by month for the selected year</p>
+          </div>
+          <select id="monthlyYear" class="demand-select"></select>
+        </div>
         <div class="chart-wrap">
           <canvas id="barChart"></canvas>
         </div>

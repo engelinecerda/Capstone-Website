@@ -12,7 +12,7 @@ export function setupInactivityLogout(role) {
         timeout = setTimeout(async () => {
             alert("Logged out due to inactivity.");
             await supabase.auth.signOut();
-            window.location.href = "./admin_login.html";
+            window.location.href = "/admin/index.html";
         }, INACTIVITY_LIMIT);
     }
 

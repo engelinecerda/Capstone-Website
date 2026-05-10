@@ -41,28 +41,36 @@ def start_scheduler():
 # FORECAST
 # =========================
 @app.get("/forecast")
-def get_forecast():
+async def get_forecast():
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
 
-    # 🔹 Forecast data
-    forecast_res = (
-        supabase.table("reservation_forecast")
-        .select("forecast_data")
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
+    def fetch_forecast():
+        return (
+            supabase.table("reservation_forecast")
+            .select("forecast_data")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    def fetch_actuals():
+        return supabase.table("reservations").select("event_date").execute()
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as pool:
+        forecast_res, res = await asyncio.gather(
+            loop.run_in_executor(pool, fetch_forecast),
+            loop.run_in_executor(pool, fetch_actuals)
+        )
 
     if not forecast_res.data:
         return []
 
     forecast_data = forecast_res.data[0]["forecast_data"]
-
     forecast_map = {
         f["ds"][:7]: f["yhat"] for f in forecast_data
     }
-
-    # Actual data
-    res = supabase.table("reservations").select("event_date").execute()
 
     actual_map = {}
     years = set()
@@ -97,12 +105,14 @@ def get_forecast():
     return result
 
 # =========================
-# MONTHLY RESERVATIONS (LAST 6 MONTHS)
+# MONTHLY RESERVATIONS
 # =========================
 @app.get("/analytics/monthly-reservations")
 def monthly_reservations():
-
-    res = supabase.table("reservations").select("event_date").execute()
+    res = supabase.table("reservations") \
+        .select("event_date") \
+        .in_("status", ["approved", "confirmed"]) \
+        .execute()
 
     df = pd.DataFrame(res.data)
 
@@ -110,24 +120,18 @@ def monthly_reservations():
         return []
 
     df['event_date'] = pd.to_datetime(df['event_date'])
-
-    today = datetime.today()
-    six_months_ago = today - pd.DateOffset(months=5)
-
-    df = df[df['event_date'] >= six_months_ago]
-
+    df['year'] = df['event_date'].dt.year.astype(str)
     df['month_num'] = df['event_date'].dt.month
     df['month'] = df['event_date'].dt.strftime('%b')
 
     grouped = (
-        df.groupby(['month_num','month'])
+        df.groupby(['year', 'month_num', 'month'])
         .size()
         .reset_index(name='count')
-        .sort_values('month_num')
+        .sort_values(['year', 'month_num'])
     )
 
-    return grouped[['month','count']].to_dict(orient='records')
-
+    return grouped[['year', 'month_num', 'month', 'count']].to_dict(orient='records')
 # =========================
 # PACKAGE DISTRIBUTION
 # =========================
@@ -135,7 +139,7 @@ def monthly_reservations():
 def package_distribution():
 
     res = supabase.table("reservations") \
-        .select("package!reservations_package_id_fkey(package_type)") \
+        .select("package!reservations_package_id_fkey(package_name)") \
         .execute()
 
     counts = {}
@@ -143,8 +147,8 @@ def package_distribution():
     for r in res.data:
         pkg = r.get("package")
 
-        if pkg and pkg.get("package_type"):
-            name = pkg["package_type"]
+        if pkg and pkg.get("package_name"):
+            name = pkg["package_name"]
         else:
             name = "Unknown"
 

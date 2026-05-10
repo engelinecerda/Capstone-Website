@@ -21,6 +21,7 @@ let fullData = [];
 let barChart;
 let pieChart;
 let demandChart;
+let fullMonthlyData = [];
 let refreshSidebarBadges = () => {};
 
 const statTargets = {
@@ -126,9 +127,16 @@ function getContractStatusMeta(contract) {
     return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
 }
 
-async function renderBarChart(data) {
-    const labels = data.map(d => d.month);
-    const values = data.map(d => d.count);
+// NEW
+async function renderBarChart(year) {
+    const allMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dataMap = {};
+    fullMonthlyData
+        .filter(d => d.year === year)
+        .forEach(d => { dataMap[d.month] = d.count; });
+    const labels = allMonths;
+    const values = allMonths.map(m => dataMap[m] ?? 0);
+
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
     if (barChart) barChart.destroy();
@@ -137,7 +145,7 @@ async function renderBarChart(data) {
         data: {
             labels,
             datasets: [{
-                label: 'Reservations',
+                label: 'Approved Reservations',
                 data: values,
                 backgroundColor: '#6b3a2a',
                 borderRadius: 6,
@@ -155,7 +163,6 @@ async function renderBarChart(data) {
         }
     });
 }
-
 async function renderPieChart(data) {
     const labels = data.map(d => d.package);
     const values = data.map(d => d.count);
@@ -336,6 +343,8 @@ async function fetchContracts(reservationIds) {
     return (data || []).reduce((map, c) => { map[c.reservation_id] = c; return map; }, {});
 }
 
+fetch(`${API}/forecast`).catch(() => {});
+
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
     updateStats([], {});
@@ -366,10 +375,27 @@ async function loadDashboard() {
         }
     })();
 
-    const monthlyPromise = loadMonthly()
-        .then((data) => renderBarChart(data))
-        .catch((error) => { console.error('Failed to load monthly chart:', error); return renderBarChart([]); });
+    const monthlyYearSelect = document.getElementById('monthlyYear');
 
+    const monthlyPromise = loadMonthly()
+        .then((data) => {
+            fullMonthlyData = Array.isArray(data) ? data : [];
+            if (monthlyYearSelect && fullMonthlyData.length) {
+                const years = [...new Set(fullMonthlyData.map(d => d.year))].sort();
+                monthlyYearSelect.innerHTML = '';
+                years.forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    monthlyYearSelect.appendChild(option);
+                });
+                const currentYear = new Date().getFullYear().toString();
+                monthlyYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
+            }
+            const selectedYear = monthlyYearSelect?.value;
+            if (selectedYear) return renderBarChart(selectedYear);
+        })
+    .catch((error) => { console.error('Failed to load monthly chart:', error); });
     const packagePromise = loadPackages()
         .then((data) => renderPieChart(data))
         .catch((error) => { console.error('Failed to load package chart:', error); return renderPieChart([]); });
@@ -405,11 +431,18 @@ async function loadDashboard() {
     }
 }
 
+// EVENT LISTENERS
 refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
+document.getElementById('monthlyYear')?.addEventListener('change', (e) => { renderBarChart(e.target.value); });
 
 wireLogoutButton();
 watchAuthState();
+
+
+fetch(`${API}/analytics/monthly-reservations`).catch(() => {});
+fetch(`${API}/analytics/package-distribution`).catch(() => {});
+fetch(`${API}/forecast`).catch(() => {});
 
 validateAdminSession({
     onSuccess: ({ profile }) => {

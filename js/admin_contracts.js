@@ -1,5 +1,6 @@
 // admin/contracts.js
 import { portalSupabase as supabase } from './supabase.js';
+import { logAudit } from './audit_logger.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
@@ -771,15 +772,34 @@ async function performContractAction(action, button) {
   const reservationId = button.dataset.reservationId;
   const reservation = getReservationById(reservationId);
   const previousStatus = reservation?.status || null;
+  const customerName = reservation?.contact_name || 'Unknown';          // ★ ADD THIS
+  const packageName = reservation?.package?.package_name || 'Unknown';  // ★ ADD THIS
 
   if (action === 'verify-contract') {
     await markReservationContractVerified(reservationId);
+
+     await logAudit({
+      action:   'Verified Contract',
+      category: 'contract',
+      details:  `Contract verified for ${customerName} - ${packageName}`,
+      entityId: reservationId
+    });
+
     return { message: 'Contract approved. You can now approve the reservation.' };
   }
 
   if (action === 'request-contract-resubmission') {
     const noteInput = contractActionsSection?.querySelector(`[data-contract-review-note="${reservationId}"]`);
+    const noteText = noteInput?.value || ''; 
     await requestReservationContractResubmission(reservationId, noteInput?.value || '');
+
+    await logAudit({
+      action:   'Requested Contract Resubmission',
+      category: 'contract',
+      details:  `Resubmission requested for ${customerName} - ${packageName}. Note: ${noteText.trim() || 'No note'}`,
+      entityId: reservationId
+    });
+
     return { message: 'Customer has been asked to re-upload the signed contract.' };
   }
 
@@ -790,11 +810,27 @@ async function performContractAction(action, button) {
     }
 
     await updateReservationStatus(reservationId, 'approved', previousStatus);
+
+    await logAudit({
+      action:   'Approved Reservation',
+      category: 'reservation',
+      details:  `Reservation approved for ${customerName} - ${packageName} (was: ${previousStatus || 'unknown'})`,
+      entityId: reservationId
+    });
+
     return { message: 'Reservation approved.' };
   }
 
   if (action === 'decline-reservation') {
     await updateReservationStatus(reservationId, 'declined', previousStatus);
+
+    await logAudit({
+      action:   'Declined Reservation',
+      category: 'reservation',
+      details:  `Reservation declined for ${customerName} - ${packageName} (was: ${previousStatus || 'unknown'})`,
+      entityId: reservationId
+    });
+
     return { message: 'Reservation declined.' };
   }
 

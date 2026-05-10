@@ -342,6 +342,14 @@ async function exportAuditPdf() {
         });
 
     doc.save(`audit-trail-${filenameDate}.pdf`);
+
+    await logAudit({
+      action: 'Exported Audit Logs to PDF',
+      category: 'system',
+      details: 'Audit logs exported to PDF',
+      entityId: null
+    });
+
     setMessage(`Exported ${logs.length} audit log(s) to PDF.`, 'success');
   } catch (err) {
     setMessage(`PDF export failed: ${err.message}`, 'error');

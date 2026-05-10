@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -909,8 +910,25 @@ function wireModals() {
     (async () => {
       try {
         setPaymentReviewMessage('Updating payment status...');
-        if (action === 'approve-payment') await handlePaymentReview(paymentId, 'approved');
-        if (action === 'reject-payment') await handlePaymentReview(paymentId, 'rejected');
+        if (action === 'approve-payment') {
+          await handlePaymentReview(paymentId, 'approved');
+          await logAudit({
+            action: 'Approved Payment',
+            category: 'payment',
+            details: `${paymentTypeLabel} of ${amountLabel} approved for ${customerName} - ${packageName}`,
+            entityId: payment?.reservation_id
+          });
+        }
+        if (action === 'reject-payment') {
+          await handlePaymentReview(paymentId, 'rejected');
+          await logAudit({
+            action: 'Rejected Payment',
+            category: 'payment',
+            details: `${paymentTypeLabel} of ${amountLabel} rejected for ${customerName} - ${packageName}`,
+            entityId: payment?.reservation_id
+          });
+        }
+
         paymentReviewFlash = { message: 'Payment updated.', isError: false };
         await loadData();
         setMessage(tableMessage, 'Payment updated.');

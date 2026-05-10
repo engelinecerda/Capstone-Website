@@ -54,7 +54,8 @@
 
                 <div class="smart-step-section">
                     <div class="input-row">
-                        <input class="res-input" type="text"   id="event-type"  placeholder="Event Type (e.g. Birthday, Wedding) *">
+                        <select class="res-input" id="event-type"><option value="">Event Type *</option></select>
+                        <input class="res-input hidden" type="text" id="event-type-other" placeholder="Please specify your event type *" maxlength="100">
                         <input class="res-input" type="number" id="guest-count" placeholder="Number of Guests *" min="1">
                     </div>
                 </div>
@@ -90,8 +91,12 @@
                     </div>
 
                     <div id="onsite-section" class="hidden">
-                        <div class="section-label">Mini Gathering Packages</div>
                         <div class="cards-grid" id="mini-grid"></div>
+                        <div id="tier-section" class="hidden">
+                            <div class="section-label" style="margin-top:20px;">Package Tiers</div>
+                            <p class="smart-step-heading" style="font-size:13px;color:#7b6a5d;margin-bottom:12px;">Select a tier to see what's included. Your chosen tier will be noted in your reservation.</p>
+                            <div class="cards-grid" id="tier-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"></div>
+                        </div>
                         <div id="snack-addon" class="addon-banner hidden">
                             <div class="section-label">&#127850; Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
                             <div class="cards-grid" id="snack-grid"></div>
@@ -315,7 +320,7 @@
     const S = {
         eventType: '', guestCount: '', eventDate: '',
         locationType: '', venueLocation: '',
-        miniPackage: null, snackAddon: null,
+        miniPackage: null, selectedTier: null, snackAddon: null,
         offsiteCategory: '', offsitePackage: null,
         cateringCart: [],
         name: '', phone: '', email: '', requests: '',
@@ -535,16 +540,12 @@
   
     };
 
-    // These are populated from the Supabase `package` table
-    let MINI        = [];
-    let SNACK       = [];
-    let OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+    let MINI         = [];   
+    let MINI_CATS    = [];  
+    let SNACK        = [];   
+    let OFFSITE_CATS = [];   
+    let OFFSITE_PKGS = {};   
 
-    const OFFSITE_CATS = [
-        { label:'Eli Coffee Bar',   val:'coffee',   icon:'&#9749;',   desc:'Professional coffee bar service for your event' },
-        { label:'Snack Bar Corner', val:'snack',    icon:'&#127850;', desc:'Mobile snack bar with chocolate fountain' },
-        { label:'Catering',         val:'catering', icon:'&#127869;&#65039;', desc:'Full catering service with buffet setup, styled tables &amp; more' }
-    ];
     function pad(value) {
         return String(value).padStart(2, '0');
     }
@@ -718,19 +719,20 @@
         if (!S.locationType) {
             return 'Choose your location type and package first to unlock dates for your booking.';
         }
-
-        if (S.locationType === 'onsite' && !S.miniPackage) {
-            return 'Choose an onsite package first to unlock VIP or Main Hall dates.';
+        if (S.locationType === 'onsite') {
+            if (!S.miniPackage) return 'Choose an onsite package first to unlock dates.';
+            const tierSection = document.getElementById('tier-section');
+            if (tierSection && !tierSection.classList.contains('hidden') && !S.selectedTier) {
+                return 'Select a package tier to unlock dates.';
+            }
         }
-
-        if (S.locationType === 'offsite' && !S.offsiteCategory) {
-            return 'Choose your offsite service first to unlock dates.';
+        if (S.locationType === 'offsite') {
+            if (!S.offsiteCategory) return 'Choose your offsite service first to unlock dates.';
+            const activeCat = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
+            if (!activeCat?.isCatering && !S.offsitePackage) {
+                return 'Choose an offsite package first to unlock dates.';
+            }
         }
-
-        if (S.locationType === 'offsite' && S.offsiteCategory !== 'catering' && !S.offsitePackage) {
-            return 'Choose an offsite package first to unlock dates.';
-        }
-
         return 'Choose an available date for your booking.';
     }
 
@@ -831,12 +833,32 @@
 
     function getSelectedBookingScope() {
         if (!S.locationType) return null;
+
         if (S.locationType === 'offsite') {
             if (!S.offsiteCategory) return null;
-            if (S.offsiteCategory !== 'catering' && !S.offsitePackage) return null;
+            const activeCat = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
+            if (!activeCat) return null;
+            if (activeCat.isCatering) return 'offsite';
+            if (!S.offsitePackage) return null;
             return 'offsite';
         }
-        return getSharedBookingScope(S.locationType, S.miniPackage?.label || '');
+
+        if (S.locationType === 'onsite') {
+            if (!S.miniPackage) return null;
+            const tierSection = document.getElementById('tier-section');
+            if (tierSection && !tierSection.classList.contains('hidden') && !S.selectedTier) return null;
+
+            const scopeFromLabel = getSharedBookingScope(S.locationType, S.miniPackage?.label || '');
+            if (scopeFromLabel) return scopeFromLabel;
+
+            const parentCat = MINI_CATS.find(cat => cat.packages.some(p => p.id === S.miniPackage.id));
+            const catName = (parentCat?.label || '').toLowerCase();
+            if (catName.includes('main hall')) return 'onsite_main_hall';
+            if (catName.includes('vip'))       return 'onsite_vip';
+            return 'onsite_vip';
+        }
+
+        return null;
     }
 
     function getSelectedDurationHours() {
@@ -844,7 +866,7 @@
             return Number(S.miniPackage?.durationHours || 0) || null;
         }
 
-        if (S.offsiteCategory === 'catering') {
+        if (OFFSITE_CATS.find(c => c.val === S.offsiteCategory)?.isCatering) {
             return Number(OFFSITE_PKGS.catering?.[0]?.durationHours || 0) || 4;
         }
 
@@ -1118,49 +1140,187 @@
     }
 
     // ── Load packages from Supabase ──
+    const CATEGORY_ICON_MAP = {
+    'coffee': 'fa-mug-hot',
+    'snack':  'fa-cookie-bite',
+    'catering': 'fa-utensils',
+    'food tray': 'fa-bowl-rice',
+    'mini': 'fa-store',
+    'vip': 'fa-star',
+    'main hall': 'fa-building'
+};
+
+function getCategoryIcon(name = '') {
+    const lower = name.toLowerCase();
+    for (const [key, icon] of Object.entries(CATEGORY_ICON_MAP)) {
+        if (lower.includes(key)) return icon;
+    }
+    return 'fa-briefcase';
+}
+
+function isCateringCategory(name = '') {
+    return name.toLowerCase().includes('catering');
+}
+
     async function loadPackages() {
-        const { data: pkgs, error } = await supabase
-            .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type, duration_hours')
+        const { data: categories, error } = await supabase
+            .from('package_category')
+            .select(`
+                package_category_id,
+                category_name,
+                description,
+                is_active,
+                packages:package!package_package_category_id_fkey (
+                package_id,
+                package_name,
+                description,
+                package_type,
+                price,
+                guest_capacity,
+                duration_hours,
+                location_type,
+                is_active
+            )
+            `)
             .eq('is_active', true)
-            .order('price', { ascending: true });
+            .eq('packages.is_active', true);
 
-        if (error || !pkgs) { console.error('Failed to load packages:', error); return; }
+        if (error || !categories) {
+            console.error('Failed to load package categories:', error);
+            return;
+        }
 
-        MINI  = [];
-        SNACK = [];
-        OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+        // Reset
+        MINI      = [];
+        MINI_CATS = [];
+        SNACK     = [];
+        OFFSITE_CATS = [];
+        OFFSITE_PKGS = {};
 
-        pkgs.forEach(p => {
-            const base   = {
-                id: p.package_id,
-                label: p.package_name,
-                price: p.price,
-                desc: p.description || '',
-                contract: getContractFileForPackage(p),
-                durationHours: Number(p.duration_hours || 0) || null
-            };
-            const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
+        categories.forEach(cat => {
+            const activePkgs = (cat.packages || []).filter(p => p.is_active);
+            if (!activePkgs.length) return;
 
-            if (p.location_type === 'onsite') {
-                if (isAddon) {
-                    SNACK.push(base);
-                } else {
-                    // main onsite package
-                    MINI.push({
-                        ...base,
-                        ...parseMiniPackageDetails(p)
+            const isAddOn = p => p.package_type === 'add on' || p.package_type === 'add_on';
+
+            // Packages that appear onsite (location_type = 'onsite' or 'both')
+            const onsitePkgs  = activePkgs.filter(p =>
+                p.location_type === 'onsite' || p.location_type === 'both'
+            );
+
+            // Packages that appear offsite (location_type = 'offsite' or 'both')
+            // add-ons are excluded from offsite entirely
+            const offsitePkgs = activePkgs.filter(p =>
+                (p.location_type === 'offsite' || p.location_type === 'both') && !isAddOn(p)
+            );
+
+            // ── ONSITE ──
+            if (onsitePkgs.length) {
+                const addOns   = onsitePkgs.filter(p =>  isAddOn(p));
+                const mainPkgs = onsitePkgs.filter(p => !isAddOn(p));
+
+                // Onsite add-ons → SNACK (shown after a main package is selected)
+                addOns.forEach(p => {
+                    SNACK.push({
+                        id: p.package_id,
+                        label: p.package_name,
+                        price: p.price,
+                        desc: p.description || '',
+                        contract: getContractFileForPackage(p),
+                        durationHours: Number(p.duration_hours || 0) || null
+                    });
+                });
+
+                // Main onsite packages → MINI_CATS grouped by category
+                if (mainPkgs.length) {
+                    const catEntry = {
+                        id: cat.package_category_id,
+                        label: cat.category_name,
+                        packages: mainPkgs.map(p => ({
+                            id: p.package_id,
+                            label: p.package_name,
+                            price: p.price,
+                            desc: p.description || '',
+                            contract: getContractFileForPackage(p),
+                            durationHours: Number(p.duration_hours || 0) || null,
+                            ...parseMiniPackageDetails(p)
+                        }))
+                    };
+                    MINI_CATS.push(catEntry);
+                    MINI.push(...catEntry.packages);
+                }
+            }
+
+            // ── OFFSITE ──
+            if (offsitePkgs.length) {
+                const catId      = cat.package_category_id;
+                const catName    = cat.category_name;
+                const isCaltering = isCateringCategory(catName);
+
+                // Only add category once (a 'both' category could have been added already
+                // if it also had onsite packages — check by id)
+                if (!OFFSITE_CATS.find(c => c.id === catId)) {
+                    OFFSITE_CATS.push({
+                        id:         catId,
+                        label:      catName,
+                        val:        catId,
+                        icon:       getCategoryIcon(catName),
+                        desc:       cat.description || '',
+                        isCatering: isCaltering
                     });
                 }
-            } else if (p.location_type === 'offsite') {
-                // Infer offsite category from package name since package_type is only 'main'/'add on'
-                const name = p.package_name.toLowerCase();
-                if (name.includes('coffee'))   OFFSITE_PKGS.coffee.push(base);
-                else if (name.includes('snack') || name.includes('biscuit')) OFFSITE_PKGS.snack.push(base);
-                else if (name.includes('catering')) OFFSITE_PKGS.catering.push(base);
-                else OFFSITE_PKGS.catering.push(base); // fallback
+
+                OFFSITE_PKGS[catId] = offsitePkgs.map(p => ({
+                    id: p.package_id,
+                    label: p.package_name,
+                    price: p.price,
+                    desc: p.description || '',
+                    contract: getContractFileForPackage(p),
+                    durationHours: Number(p.duration_hours || 0) || null
+                }));
             }
         });
+    }
+
+    async function loadEventTypes() {
+        const select = document.getElementById('event-type');
+        if (!select) return;
+
+        const { data, error } = await supabase
+            .from('event_types')
+            .select('id, name')
+            .eq('status', 'Active')
+            .order('name', { ascending: true });
+
+        if (error || !data) {
+            console.error('Failed to load event types:', error);
+            return;
+        }
+
+        data.forEach(et => {
+            const option = document.createElement('option');
+            option.value = et.name;
+            option.textContent = et.name;
+            select.appendChild(option);
+        });
+
+        select.addEventListener('change', () => {
+            const otherInput = document.getElementById('event-type-other');
+            if (!otherInput) return;
+            if (select.value === '__other__') {
+                otherInput.classList.remove('hidden');
+                otherInput.focus();
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.value = '';
+            }
+        });
+
+        // Always append Other at the end
+        const otherOption = document.createElement('option');
+        otherOption.value = '__other__';
+        otherOption.textContent = 'Other';
+        select.appendChild(otherOption);
     }
 
     const DISHES = [
@@ -1272,7 +1432,7 @@
             };
         }
 
-        if (S.offsiteCategory === 'catering') {
+        if (OFFSITE_CATS.find(c => c.val === S.offsiteCategory)?.isCatering) {
             const cateringPkg = OFFSITE_PKGS.catering[0];
             return {
                 title: 'Catering Package Contract',
@@ -1333,7 +1493,7 @@
         if (S.locationType === 'onsite') {
             onEl.classList.remove('hidden');
             offEl.classList.add('hidden');
-            descEl.textContent = 'Select a VIP or Main Hall package to unlock dates for that booking slot.';
+            descEl.textContent = 'Select an onsite package to unlock dates for that booking slot.';
             buildMiniGrid();
         } else {
             onEl.classList.add('hidden');
@@ -1347,22 +1507,53 @@
         const g = document.getElementById('mini-grid');
         g.innerHTML = '';
         document.getElementById('snack-addon').classList.toggle('hidden', !S.miniPackage);
-        MINI.forEach(p => {
-            const c = card(
-                '<h4>' + p.label + '</h4>' +
-                '<div class="pkg-price">&#8369;' + p.price.toLocaleString() + '</div>' +
-                '<p class="pkg-desc">' + p.pax + ' &bull; ' + p.hours + '<br>' + p.credit + '</p>',
-                S.miniPackage && S.miniPackage.label === p.label
-            );
-            c.onclick = async () => {
-                S.miniPackage = p;
-                S.time = '';
-                activate(g, c);
-                document.getElementById('snack-addon').classList.remove('hidden');
-                buildSnackGrid();
-                await refreshAvailabilityForSelectedScope();
-            };
-            g.appendChild(c);
+
+        MINI_CATS.forEach(cat => {
+            // Category section label
+            const label = document.createElement('div');
+            label.className = 'section-label';
+            label.style.cssText = 'grid-column: 1 / -1; margin-top: 16px; margin-bottom: 4px;';
+            label.textContent = cat.label.toUpperCase();
+            g.appendChild(label);
+
+            cat.packages.forEach(p => {
+                const paxLine  = p.pax   ? p.pax   : (p.guest_capacity ? 'Up to ' + p.guest_capacity + ' pax' : '');
+                const hourLine = p.hours ? p.hours  : '';
+                const creditLine = p.credit || '';
+                const detailParts = [paxLine, hourLine].filter(Boolean).join(' &bull; ');
+
+                const c = card(
+                    '<h4>' + p.label + '</h4>' +
+                    '<div class="pkg-price">&#8369;' + Number(p.price || 0).toLocaleString() + '</div>' +
+                    '<p class="pkg-desc">' + detailParts + (creditLine ? '<br>' + creditLine : '') + '</p>',
+                    S.miniPackage && S.miniPackage.id === p.id
+                );
+                c.onclick = async () => {
+                    S.miniPackage  = p;
+                    S.selectedTier = null;
+                    S.snackAddon   = null;
+                    S.time         = '';
+                    g.querySelectorAll('.pkg-card').forEach(x => x.classList.remove('active'));
+                    c.classList.add('active');
+
+                    // Hide snack add-on until tier is selected (or no tiers exist)
+                    document.getElementById('snack-addon').classList.add('hidden');
+
+                    // Load tiers — snack add-on shown inside loadTiersForPackage if tiers exist,
+                    // or shown immediately if no tiers
+                    await loadTiersForPackage(p.id);
+
+                    const tierSection = document.getElementById('tier-section');
+                    if (tierSection.classList.contains('hidden')) {
+                        // No tiers — show snack add-on directly
+                        document.getElementById('snack-addon').classList.remove('hidden');
+                        buildSnackGrid();
+                    }
+
+                    await refreshAvailabilityForSelectedScope();
+                };
+                g.appendChild(c);
+            });
         });
     }
 
@@ -1387,20 +1578,16 @@
     function buildOffsiteCats() {
         const g = document.getElementById('offsite-cat-grid');
         g.innerHTML = '';
-        const serviceIcons = {
-            coffee: 'fa-mug-hot',
-            snack: 'fa-cookie-bite',
-            catering: 'fa-utensils'
-        };
-        OFFSITE_CATS.forEach(p => {
+
+        OFFSITE_CATS.forEach(cat => {
             const c = card(
-                '<div class="service-card-icon" aria-hidden="true"><i class="fa-solid ' + (serviceIcons[p.val] || 'fa-briefcase') + '"></i></div>' +
-                '<h4>' + p.label + '</h4><p class="pkg-desc">' + p.desc + '</p>',
-                S.offsiteCategory === p.val
+                '<div class="service-card-icon" aria-hidden="true"><i class="fa-solid ' + cat.icon + '"></i></div>' +
+                '<h4>' + cat.label + '</h4><p class="pkg-desc">' + cat.desc + '</p>',
+                S.offsiteCategory === cat.val
             );
             c.classList.add('service-card');
             c.onclick = async () => {
-                S.offsiteCategory = p.val;
+                S.offsiteCategory = cat.val;
                 S.offsitePackage  = null;
                 S.cateringCart    = [];
                 S.time            = '';
@@ -1409,29 +1596,33 @@
                 const subEl      = document.getElementById('offsite-sub');
                 const cateringEl = document.getElementById('catering-section');
 
-                if (p.val === 'catering') {
+                if (cat.isCatering) {
                     subEl.classList.add('hidden');
                     cateringEl.classList.remove('hidden');
                     buildCateringDishBuilder();
                 } else {
                     cateringEl.classList.add('hidden');
                     subEl.classList.remove('hidden');
-                    document.getElementById('offsite-sub-label').textContent = 'Choose a ' + p.label + ' Package';
-                    buildOffsiteSub(p.val);
+                    document.getElementById('offsite-sub-label').textContent = 'Choose a ' + cat.label + ' Package';
+                    buildOffsiteSub(cat.val);
                 }
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
 
-        if (S.offsiteCategory === 'catering') {
-            document.getElementById('offsite-sub').classList.add('hidden');
-            document.getElementById('catering-section').classList.remove('hidden');
-            buildCateringDishBuilder();
-        } else if (S.offsiteCategory && S.offsiteCategory !== 'catering') {
-            document.getElementById('catering-section').classList.add('hidden');
-            document.getElementById('offsite-sub').classList.remove('hidden');
-            buildOffsiteSub(S.offsiteCategory);
+        // Re-render sub-section if a category is already selected
+        if (S.offsiteCategory) {
+            const activeCat = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
+            if (activeCat?.isCatering) {
+                document.getElementById('offsite-sub').classList.add('hidden');
+                document.getElementById('catering-section').classList.remove('hidden');
+                buildCateringDishBuilder();
+            } else if (activeCat) {
+                document.getElementById('catering-section').classList.add('hidden');
+                document.getElementById('offsite-sub').classList.remove('hidden');
+                buildOffsiteSub(S.offsiteCategory);
+            }
         }
     }
 
@@ -1498,6 +1689,75 @@
             }
         });
     }
+
+    async function loadTiersForPackage(packageId) {
+    const tierSection = document.getElementById('tier-section');
+    const tierGrid    = document.getElementById('tier-grid');
+    if (!tierSection || !tierGrid) return;
+
+    // Reset
+    tierSection.classList.add('hidden');
+    tierGrid.innerHTML = '';
+    S.selectedTier = null;
+
+    if (!packageId) return;
+
+    const { data: tiers, error } = await supabase
+        .from('package_tier')
+        .select('tier_id, tier_name, tier_subtitle, tier_full_inclusions, sort_order')
+        .eq('package_id', packageId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+
+    if (error || !tiers || !tiers.length) return;
+
+    tierSection.classList.remove('hidden');
+
+    tiers.forEach(tier => {
+        // Parse inclusions — stored as newline or comma separated text
+        const inclusionLines = (tier.tier_full_inclusions || '')
+            .split('\n')
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        const inclusionHtml = inclusionLines.length
+            ? '<ul class="tier-inclusions">' +
+            inclusionLines.map(i => '<li>' + (i || '') + '</li>').join('') +
+            '</ul>'
+            : '';
+
+        const subtitleHtml = tier.tier_subtitle
+            ? '<p class="pkg-desc" style="margin-bottom:8px;">' + (tier.tier_subtitle || '') + '</p>'
+            : '';
+
+        const dividerHtml = subtitleHtml && inclusionHtml ? '<hr class="tier-divider">' : '';
+
+        const c = card(
+            '<h4>' + (tier.tier_name || '') + '</h4>' +
+            subtitleHtml +
+            dividerHtml +
+            inclusionHtml,
+            false
+        );
+        c.style.cssText = 'align-items:flex-start; height:auto;';
+
+        c.onclick = () => {
+            S.selectedTier = {
+                id:       tier.tier_id,
+                name:     tier.tier_name,
+                subtitle: tier.tier_subtitle || ''
+            };
+            tierGrid.querySelectorAll('.pkg-card').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            // Show snack add-on after tier is picked
+            document.getElementById('snack-addon').classList.remove('hidden');
+            buildSnackGrid();
+        };
+
+        tierGrid.appendChild(c);
+    });
+}
 
     function buildCateringDishBuilder() {
         const builder = document.getElementById('catering-tray-builder');
@@ -1729,12 +1989,15 @@
                 total += S.miniPackage.price;
                 pkgRows += sr('Package', S.miniPackage.label + ' &mdash; &#8369;' + S.miniPackage.price.toLocaleString());
                 pkgRows += sr('Inclusions', S.miniPackage.pax + ' &bull; ' + S.miniPackage.hours + ' &bull; ' + S.miniPackage.credit);
+                if (S.selectedTier) {
+                    pkgRows += sr('Tier', S.selectedTier.name + (S.selectedTier.subtitle ? ' &mdash; ' + S.selectedTier.subtitle : ''));
+                }
             }
             if (S.snackAddon) {
                 total += S.snackAddon.price;
                 pkgRows += sr('Snack Bar Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
             }
-        } else if (S.offsiteCategory === 'catering') {
+        } else if (OFFSITE_CATS.find(c => c.val === S.offsiteCategory)?.isCatering) {
             pkgRows += sr('Service', '&#127869;&#65039; Catering');
             pkgRows += sr('Inclusions', 'Buffet setup, utensils, waiters, styled tables, backdrop, centerpiece, 3-4 hrs');
             pkgRows += sr('Special Offer', 'FREE Overflowing Coffee & 1 Appetizer/Dessert');
@@ -1787,21 +2050,34 @@
         const id = sid(n);
 
         if (id === 'rs1') {
-            const et = document.getElementById('event-type').value.trim();
-            const gc = document.getElementById('guest-count').value.trim();
+            const etSelect  = document.getElementById('event-type').value.trim();
+            const etOther   = document.getElementById('event-type-other').value.trim();
+            const et        = etSelect === '__other__' ? etOther : etSelect;
+            const gc        = document.getElementById('guest-count').value.trim();
             const venueValue = document.getElementById('venue-location').value.trim();
-            const ed = document.getElementById('event-date').value;
-            if (!et || !gc) { alert('Please fill in your event type and guest count first.'); return false; }
+            const ed        = document.getElementById('event-date').value;
+
+            if (!etSelect) { alert('Please select an event type.'); return false; }
+            if (etSelect === '__other__' && !etOther) { alert('Please specify your event type.'); return false; }
+            if (!gc) { alert('Please enter the number of guests.'); return false; }
             if (!S.locationType) { alert('Please choose whether your reservation is onsite or offsite.'); return false; }
+
             if (S.locationType === 'offsite' && !venueValue) {
                 alert('Please enter your venue location for the offsite booking.');
                 return false;
             }
+
             if (S.locationType === 'onsite') {
                 if (!S.miniPackage) { alert('Please select an onsite package before choosing a date.'); return false; }
+                const tierSection = document.getElementById('tier-section');
+                if (tierSection && !tierSection.classList.contains('hidden') && !S.selectedTier) {
+                    alert('Please select a package tier before continuing.');
+                    return false;
+                }
             } else {
                 if (!S.offsiteCategory) { alert('Please select an offsite service first.'); return false; }
-                if (S.offsiteCategory === 'catering') {
+                const activeCat = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
+                if (activeCat?.isCatering) {
                     if (!isCateringSelectionValid()) {
                         alert('Please select at least 1 main dish, 1 pasta, and 1 dessert for your catering package.');
                         return false;
@@ -1820,9 +2096,9 @@
             }
             if (!S.time) { alert('Please select a time slot.'); return false; }
 
-            S.eventType = et;
-            S.guestCount = gc;
-            S.eventDate = ed;
+            S.eventType     = et;
+            S.guestCount    = gc;
+            S.eventDate     = ed;
             S.venueLocation = S.locationType === 'offsite' ? venueValue : '';
         }
 
@@ -1956,9 +2232,9 @@
                 addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
                 totalPrice = (S.miniPackage ? S.miniPackage.price : 0)
                            + (S.snackAddon  ? S.snackAddon.price  : 0);
-            } else if (S.offsiteCategory === 'catering') {
+            } else if (OFFSITE_CATS.find(c => c.val === S.offsiteCategory)?.isCatering) {
                 // Catering package row in the package table
-                const cateringPkg = OFFSITE_PKGS.catering[0];
+                 const cateringPkg = (OFFSITE_PKGS[S.offsiteCategory] || [])[0];
                 packageId  = cateringPkg ? cateringPkg.id : null;
                 totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
             } else {
@@ -1983,6 +2259,7 @@
                     contact_email:    S.email,
                     contact_phone:    S.phone,
                     special_requests: S.requests || null,
+                    tier_id: S.selectedTier?.id || null,
                     status:           'pending'
                 })
                 .select('reservation_id')
@@ -2135,7 +2412,7 @@
     // Load packages from DB first, then start the form
     syncSelectedDate('');
     await prefillReservationContactDetails();
-    await loadPackages();
+    await Promise.all([loadPackages(), loadEventTypes()]);
     await loadAvailabilityCalendar();
     showStep(1);
     </script>
