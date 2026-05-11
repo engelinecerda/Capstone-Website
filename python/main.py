@@ -138,19 +138,26 @@ def monthly_reservations():
 @app.get("/analytics/package-distribution")
 def package_distribution():
 
-    res = supabase.table("reservations") \
-        .select("package!reservations_package_id_fkey(package_name)") \
+    res = (
+        supabase.table("reservations")
+        .select("""
+            reservation_id,
+            package:package_id (
+                package_category:package_category_id (
+                    category_name
+                )
+            )
+        """)
         .execute()
+    )
 
     counts = {}
 
     for r in res.data:
-        pkg = r.get("package")
+        pkg = r.get("package") or {}
+        category = pkg.get("package_category") or {}
 
-        if pkg and pkg.get("package_name"):
-            name = pkg["package_name"]
-        else:
-            name = "Unknown"
+        name = category.get("category_name", "Unknown")
 
         counts[name] = counts.get(name, 0) + 1
 
