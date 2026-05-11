@@ -11,6 +11,9 @@ const refreshCustomersBtn = document.getElementById('refreshCustomersBtn');
 const searchInput = document.getElementById('searchInput');
 const customersMessage = document.getElementById('customersMessage');
 const customersBody = document.getElementById('customersBody');
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const paginationInfo = document.getElementById('paginationInfo');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
@@ -21,6 +24,9 @@ const statNewThisMonth = document.getElementById('statNewThisMonth');
 const statCustomersWithPhone = document.getElementById('statCustomersWithPhone');
 
 let allCustomers = [];
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let totalCustomerCount = 0;
 
 function redirectToAdminLogin() {
   window.location.replace('/admin/index.html');
@@ -184,6 +190,22 @@ function updateStats(customers) {
   if (statCustomersWithPhone) statCustomersWithPhone.textContent = String(customersWithPhone);
 }
 
+function updatePagination() {
+  const totalPages = Math.max(1, Math.ceil(totalCustomerCount / PAGE_SIZE));
+
+  if (paginationInfo) {
+    paginationInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  }
+
+  if (prevPageBtn) {
+    prevPageBtn.disabled = currentPage <= 1;
+  }
+
+  if (nextPageBtn) {
+    nextPageBtn.disabled = currentPage >= totalPages;
+  }
+}
+
 function applyFilters() {
   const query = (searchInput?.value || '').trim().toLowerCase();
   const filteredCustomers = !query
@@ -200,10 +222,21 @@ function applyFilters() {
       return haystacks.some((value) => value.includes(query));
     });
 
-  renderCustomers(filteredCustomers);
+  totalCustomerCount = filteredCustomers.length;
+  const totalPages = Math.max(1, Math.ceil(totalCustomerCount / PAGE_SIZE));
+
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+  }
+
+  const from = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filteredCustomers.slice(from, from + PAGE_SIZE);
+
+  renderCustomers(paginated);
+  updatePagination();
 
   const summaryText = filteredCustomers.length
-    ? `Showing ${filteredCustomers.length} of ${allCustomers.length} registered customer(s).`
+    ? `Showing ${paginated.length} of ${filteredCustomers.length} registered customer(s).`
     : `No registered customers matched "${query}".`;
 
   setCustomersMessage(summaryText);
@@ -305,6 +338,7 @@ async function loadCustomers() {
     updateStats(allCustomers);
     initAdminSidebarBadges(supabase)
 
+    currentPage = 1;
     applyFilters();
   } catch (error) {
     console.error('Failed to load customers:', error);
@@ -330,7 +364,27 @@ validateAdminSession({
 
     // Attach UI listeners (IMPORTANT)
     refreshCustomersBtn?.addEventListener('click', loadCustomers);
-    searchInput?.addEventListener('input', applyFilters);
+    searchInput?.addEventListener('input', () => {
+      currentPage = 1;
+      applyFilters();
+    });
+
+    // Pagination listeners
+    prevPageBtn?.addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage -= 1;
+        applyFilters();
+      }
+    });
+
+    nextPageBtn?.addEventListener('click', () => {
+      const totalPages = Math.max(1, Math.ceil(totalCustomerCount / PAGE_SIZE));
+
+      if (currentPage < totalPages) {
+        currentPage += 1;
+        applyFilters();
+      }
+    });
 
     // Load data
     await loadCustomers();

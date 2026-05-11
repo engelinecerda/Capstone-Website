@@ -6,6 +6,7 @@ import {
     getEffectiveReservationStatus,
     syncCompletedReservations
 } from './reservation_status.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -20,13 +21,19 @@ const reportSearch = document.getElementById('reportSearch');
 const reportsMessage = document.getElementById('reportsMessage');
 const reportsSummary = document.getElementById('reportsSummary');
 const reportsTableBody = document.getElementById('reportsTableBody');
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const paginationInfo = document.getElementById('paginationInfo');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
 const navReviewCount = document.getElementById('navReviewCount');
 
 const state = {
-    reservations: []
+    reservations: [],
+    currentPage: 1,
+    PAGE_SIZE: 10,
+    totalReservationCount: 0
 };
 
 function redirectToAdminLogin() {
@@ -86,6 +93,22 @@ function getCustomerEmail(reservation) {
 
 function getPackageName(reservation) {
     return reservation?.package?.package_name || reservation?.package_id || 'No package';
+}
+
+function updatePagination() {
+    const totalPages = Math.max(1, Math.ceil(state.totalReservationCount / state.PAGE_SIZE));
+
+    if (paginationInfo) {
+        paginationInfo.textContent = `Page ${state.currentPage} of ${totalPages}`;
+    }
+
+    if (prevPageBtn) {
+        prevPageBtn.disabled = state.currentPage <= 1;
+    }
+
+    if (nextPageBtn) {
+        nextPageBtn.disabled = state.currentPage >= totalPages;
+    }
 }
 
 function getFilteredReservations() {
@@ -199,12 +222,28 @@ function renderTable(reservations) {
 
 function renderReports() {
     const filteredReservations = getFilteredReservations();
+    
+    // Update pagination state
+    state.totalReservationCount = filteredReservations.length;
+    const totalPages = Math.max(1, Math.ceil(state.totalReservationCount / state.PAGE_SIZE));
+    
+    if (state.currentPage > totalPages) {
+        state.currentPage = totalPages;
+    }
+
+    // Get paginated slice
+    const from = (state.currentPage - 1) * state.PAGE_SIZE;
+    const paginated = filteredReservations.slice(from, from + state.PAGE_SIZE);
+
+    // Render with all filtered data for summary
     renderSummary(filteredReservations);
-    renderTable(filteredReservations);
-    setReportsMessage(`${filteredReservations.length} reservation(s) currently included in this report.`);
+    renderTable(paginated);
+    updatePagination();
+
+    setReportsMessage(`${paginated.length} of ${filteredReservations.length} reservation(s) currently displayed on this page.`);
 }
 
-function exportReportsPdf() {
+async function exportReportsPdf() {
     const filteredReservations = getFilteredReservations();
     if (!filteredReservations.length) {
         setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
@@ -273,6 +312,18 @@ function exportReportsPdf() {
     });
 
     doc.save(`reservation-report-${filenameDate}.pdf`);
+
+    try {
+        await logAudit({
+            action: 'Exported Reports to PDF',
+            category: 'system',
+            details: `Exported ${filteredReservations.length} reservation(s) to PDF`,
+            entityId: null
+        });
+    } catch (error) {
+        console.warn('Failed to log audit for PDF export:', error);
+    }
+
     setReportsMessage(`Exported ${filteredReservations.length} reservation(s) to PDF.`);
 }
 
@@ -338,6 +389,7 @@ async function loadReports() {
 
     try {
         state.reservations = await fetchReservations();
+        state.currentPage = 1;
         renderReports();
         await refreshAdminSidebarCounts({
             supabase,
@@ -367,9 +419,36 @@ logoutBtn?.addEventListener('click', async () => {
 
 refreshReportsBtn?.addEventListener('click', loadReports);
 exportPdfBtn?.addEventListener('click', exportReportsPdf);
-reportDateFrom?.addEventListener('input', renderReports);
-reportDateTo?.addEventListener('input', renderReports);
-reportSearch?.addEventListener('input', renderReports);
+reportDateFrom?.addEventListener('input', () => {
+    state.currentPage = 1;
+    renderReports();
+});
+reportDateTo?.addEventListener('input', () => {
+    state.currentPage = 1;
+    renderReports();
+});
+reportSearch?.addEventListener('input', () => {
+    state.currentPage = 1;
+    renderReports();
+});
+
+// Pagination listeners
+prevPageBtn?.addEventListener('click', () => {
+    if (state.currentPage > 1) {
+        state.currentPage -= 1;
+        renderReports();
+    }
+});
+
+nextPageBtn?.addEventListener('click', () => {
+    const filteredReservations = getFilteredReservations();
+    const totalPages = Math.max(1, Math.ceil(filteredReservations.length / state.PAGE_SIZE));
+
+    if (state.currentPage < totalPages) {
+        state.currentPage += 1;
+        renderReports();
+    }
+});
 
 supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {

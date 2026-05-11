@@ -60,15 +60,16 @@ const totalSizeEl           = document.getElementById('totalSize');
 const storageLocationEl     = document.getElementById('storageLocation');
 const historyList           = document.getElementById('historyList');
 const emptyHistory          = document.getElementById('emptyHistory');
+const retentionText         = document.getElementById('retentionText');
 const configureRetentionBtn = document.getElementById('configureRetentionBtn');
 const googleAuthBtn         = document.getElementById('googleAuthBtn');
 const googleAuthStatus      = document.getElementById('googleAuthStatus');
-const deleteBackupModal   = document.getElementById('deleteBackupModal');
-const deleteBackupClose   = document.getElementById('deleteBackupClose');
-const deleteBackupCancel  = document.getElementById('deleteBackupCancel');
-const deleteBackupOk      = document.getElementById('deleteBackupOk');
-const deleteBackupCopy    = document.getElementById('deleteBackupCopy');
-const deleteBackupMessage = document.getElementById('deleteBackupMessage');
+const deleteBackupModal     = document.getElementById('deleteBackupModal');
+const deleteBackupClose     = document.getElementById('deleteBackupClose');
+const deleteBackupCancel    = document.getElementById('deleteBackupCancel');
+const deleteBackupOk        = document.getElementById('deleteBackupOk');
+const deleteBackupCopy      = document.getElementById('deleteBackupCopy');
+const deleteBackupMessage   = document.getElementById('deleteBackupMessage');
 
 // Confirm backup modal
 const confirmBackupModal   = document.getElementById('confirmBackupModal');
@@ -534,7 +535,7 @@ confirmBackupOk?.addEventListener('click', async () => {
     setProgress(backupProgressBar, backupProgressLabel, backupProgressWrap, pct, text);
 
   try {
-    await ensureValidToken(); // re-check at point of use
+    await ensureValidToken(); 
 
     const snapshot = await readAllTables(onProgress);
 
@@ -747,7 +748,7 @@ function getPrimaryKey(table) {
 // ─── Download backup file ─────────────────────────────────────────────────────
 async function handleDownload(fileId, filename) {
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken(); 
     setPageMessage('Preparing download…');
 
     const res = await fetch(
@@ -959,6 +960,14 @@ historyList?.addEventListener('click', e => {
   }
 });
 
+// ─── Retention policy ─────────────────────────────────────────────────────
+function updateRetentionUI() {
+  if (retentionText) {
+    retentionText.textContent =
+      `Keep backups for ${settings.retentionDays} days`;
+  }
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 configureRetentionBtn?.addEventListener('click', () => {
   pendingSettingsAction        = 'retention';
@@ -978,8 +987,15 @@ settingsSave?.addEventListener('click', async () => {
     const val = parseInt(document.getElementById('retentionInput')?.value, 10);
     if (!val || val < 1) { setPageMessage('Enter a valid number of days.', 'error'); return; }
     settings.retentionDays = val;
-    document.querySelector('.settings-row .settings-row-sub').textContent = `Keep backups for ${val} days`;
+    retentionText.textContent = `Keep backups for ${val} days`;
+     await logAudit({
+        action: 'Updated Backup Retention Policy',
+        category: 'system',
+        details: `Backup retention period updated to ${val} day${val !== 1 ? 's' : ''}`,
+        entityId: currentAdminId || null
+      });
     setPageMessage('Retention period updated.', 'success');
+    updateRetentionUI();
   }
   closeModal(settingsModal);
 });
@@ -1016,6 +1032,7 @@ document.addEventListener('keydown', e => {
 function init() {
   wireLogoutButton('logoutBtn');
   watchAuthState();
+  updateRetentionUI();
 
   validateAdminSession({
     onSuccess: async ({ session, profile }) => {
@@ -1054,7 +1071,6 @@ function init() {
       }
     }
   });
-
   updateStatusCard();
   renderHistory();
 }

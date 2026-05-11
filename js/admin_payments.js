@@ -14,6 +14,13 @@ const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
 
+const prevPageBtn     = document.getElementById('prevPageBtn');
+const nextPageBtn     = document.getElementById('nextPageBtn');
+const paginationInfo  = document.getElementById('paginationInfo');
+const pmPrevPageBtn   = document.getElementById('pmPrevPageBtn');
+const pmNextPageBtn   = document.getElementById('pmNextPageBtn');
+const pmPaginationInfo = document.getElementById('pmPaginationInfo');
+
 const paymentDetailsModal = document.getElementById('paymentDetailsModal');
 const paymentDetailsClose = document.getElementById('paymentDetailsClose');
 const paymentDetailsDismiss = document.getElementById('paymentDetailsDismiss');
@@ -62,6 +69,14 @@ let paymentProofZoomPercent = 100;
 const PAYMENT_PROOF_MIN_ZOOM = 50;
 const PAYMENT_PROOF_MAX_ZOOM = 300;
 const PAYMENT_PROOF_ZOOM_STEP = 25;
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let totalPaymentCount = 0;
+
+let pmCurrentPage = 1;
+const PM_PAGE_SIZE = 10;
+let totalPmCount = 0;
+let pmCache = []; 
 
 function setMessage(el, msg, isError = false) {
   if (!el) return;
@@ -412,8 +427,18 @@ function filterAndRender() {
     && matchesStatus(payment, status)
     && matchesSearch(payment, term)
   ));
+
+  totalPaymentCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalPaymentCount / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const from = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filtered.slice(from, from + PAGE_SIZE);
+
   renderStats(paymentsCache);
-  renderTable(filtered);
+  renderTable(paginated);
+  updatePaymentPagination();
+
   if (!filtered.length) {
     setMessage(tableMessage, 'No payment submissions match the current filter.');
   } else if (reservationFilterParam) {
@@ -813,6 +838,36 @@ function openReceiptModalForPayment(paymentId) {
   receiptModal?.setAttribute('aria-hidden', 'false');
 }
 
+function updatePaymentPagination() {
+  const totalPages = Math.max(1, Math.ceil(totalPaymentCount / PAGE_SIZE));
+  if (paginationInfo)  paginationInfo.textContent  = `Page ${currentPage} of ${totalPages}`;
+  if (prevPageBtn)     prevPageBtn.disabled  = currentPage <= 1;
+  if (nextPageBtn)     nextPageBtn.disabled  = currentPage >= totalPages;
+}
+
+function updatePmPagination() {
+  const totalPages = Math.max(1, Math.ceil(totalPmCount / PM_PAGE_SIZE));
+  if (pmPaginationInfo) pmPaginationInfo.textContent = `Page ${pmCurrentPage} of ${totalPages}`;
+  if (pmPrevPageBtn)    pmPrevPageBtn.disabled = pmCurrentPage <= 1;
+  if (pmNextPageBtn)    pmNextPageBtn.disabled = pmCurrentPage >= totalPages;
+}
+
+prevPageBtn?.addEventListener('click', () => {
+  if (currentPage > 1) { currentPage--; filterAndRender(); }
+});
+nextPageBtn?.addEventListener('click', () => {
+  const totalPages = Math.ceil(totalPaymentCount / PAGE_SIZE);
+  if (currentPage < totalPages) { currentPage++; filterAndRender(); }
+});
+
+pmPrevPageBtn?.addEventListener('click', () => {
+  if (pmCurrentPage > 1) { pmCurrentPage--; filterAndRenderPm(); }
+});
+pmNextPageBtn?.addEventListener('click', () => {
+  const totalPages = Math.ceil(totalPmCount / PM_PAGE_SIZE);
+  if (pmCurrentPage < totalPages) { pmCurrentPage++; filterAndRenderPm(); }
+});
+
 async function loadData() {
   setMessage(tableMessage, 'Loading payment submissions...');
   try {
@@ -845,8 +900,8 @@ async function loadData() {
 }
 
 function wireFilters() {
-  searchInput?.addEventListener('input', filterAndRender);
-  statusDropdown?.addEventListener('change', filterAndRender);
+  searchInput?.addEventListener('input', () => { currentPage = 1; filterAndRender(); });
+  statusDropdown?.addEventListener('change', () => { currentPage = 1; filterAndRender(); });
 }
 
 function wireTableActions() {

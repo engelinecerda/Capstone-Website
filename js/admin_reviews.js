@@ -11,6 +11,9 @@ const refreshReviewsBtn = document.getElementById('refreshReviewsBtn');
 const searchInput = document.getElementById('searchInput');
 const reviewsMessage = document.getElementById('reviewsMessage');
 const reviewsBody = document.getElementById('reviewsBody');
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const paginationInfo = document.getElementById('paginationInfo');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
@@ -22,6 +25,9 @@ const statFiveStarReviews = document.getElementById('statFiveStarReviews');
 const statCommentedReviews = document.getElementById('statCommentedReviews');
 
 let allReviews = [];
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let totalReviewCount = 0;
 let adminSession = null;
 
 function redirectToAdminLogin() {
@@ -173,6 +179,22 @@ function updateStats(reviews) {
   if (statCommentedReviews) statCommentedReviews.textContent = String(commentedReviews);
 }
 
+function updatePagination() {
+  const totalPages = Math.max(1, Math.ceil(totalReviewCount / PAGE_SIZE));
+
+  if (paginationInfo) {
+    paginationInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  }
+
+  if (prevPageBtn) {
+    prevPageBtn.disabled = currentPage <= 1;
+  }
+
+  if (nextPageBtn) {
+    nextPageBtn.disabled = currentPage >= totalPages;
+  }
+}
+
 function applyFilters() {
   const query = (searchInput?.value || '').trim().toLowerCase();
   const filteredReviews = !query
@@ -195,10 +217,21 @@ function applyFilters() {
       return haystacks.some((value) => value.includes(query));
     });
 
-  renderReviews(filteredReviews);
+  totalReviewCount = filteredReviews.length;
+  const totalPages = Math.max(1, Math.ceil(totalReviewCount / PAGE_SIZE));
+
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+  }
+
+  const from = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filteredReviews.slice(from, from + PAGE_SIZE);
+
+  renderReviews(paginated);
+  updatePagination();
 
   const summaryText = filteredReviews.length
-    ? `Showing ${filteredReviews.length} of ${allReviews.length} submitted review(s).`
+    ? `Showing ${paginated.length} of ${filteredReviews.length} submitted review(s).`
     : `No submitted reviews matched "${query}".`;
 
   setReviewsMessage(summaryText);
@@ -318,6 +351,7 @@ async function loadReviews() {
       reviewBadgeEl: navReviewCount
     });
 
+    currentPage = 1;
     applyFilters();
   } catch (error) {
     console.error('Failed to load reviews:', error);
@@ -351,8 +385,29 @@ validateAdminSession({
     setupInactivityLogout(profile.role);
 
     // Wire UI
-    searchInput?.addEventListener('input', applyFilters);
+    searchInput?.addEventListener('input', () => {
+      currentPage = 1;
+      applyFilters();
+    });
+
     refreshReviewsBtn?.addEventListener('click', loadReviews);
+
+    // Pagination listeners
+    prevPageBtn?.addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage -= 1;
+        applyFilters();
+      }
+    });
+
+    nextPageBtn?.addEventListener('click', () => {
+      const totalPages = Math.max(1, Math.ceil(totalReviewCount / PAGE_SIZE));
+
+      if (currentPage < totalPages) {
+        currentPage += 1;
+        applyFilters();
+      }
+    });
 
     // Load data
     await loadReviews();

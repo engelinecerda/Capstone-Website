@@ -157,30 +157,43 @@
         </button>
       </section>
 
-      <section class="card table-card">
-        <div class="table-head">
-          <div>
-            <h2 class="card-title">Registered Customers</h2>
-            <p class="card-sub">Customer accounts only. Admin profiles are excluded.</p>
-          </div>
-        </div>
+            <section class="card table-card">
+              <div class="table-head">
+                <div>
+                  <h2 class="card-title">Registered Customers</h2>
+                  <p class="card-sub">Customer accounts only. Admin profiles are excluded.</p>
+                </div>
+              </div>
 
-        <p class="table-message" id="customersMessage">Loading customers...</p>
+              <p class="table-message" id="customersMessage">Loading customers...</p>
 
-        <div class="table-wrap">
-          <table class="customers-table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Contact</th>
-                <th>Registered</th>
-                <th>Reservation Activity</th>
-              </tr>
-            </thead>
-            <tbody id="customersBody"></tbody>
-          </table>
-        </div>
-      </section>
+              <div class="table-wrap">
+                <table class="customers-table">
+                  <thead>
+                    <tr>
+                      <th>Customer</th>
+                      <th>Contact</th>
+                      <th>Registered</th>
+                      <th>Reservation Activity</th>
+                    </tr>
+                  </thead>
+                  <tbody id="customersBody"></tbody>
+                </table>
+                <div class="table-pagination">
+                  <button type="button" id="prevPageBtn" class="pagination-btn">
+                    ‹ Previous
+                  </button>
+
+                  <span id="paginationInfo" class="pagination-info">
+                    Page 1 of 1
+                  </span>
+
+                  <button type="button" id="nextPageBtn" class="pagination-btn">
+                    Next ›
+                  </button>
+                </div>
+              </div>
+            </section>
 
     </section>
   </main>
