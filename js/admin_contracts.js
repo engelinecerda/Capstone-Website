@@ -15,7 +15,9 @@ const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const contractsBody = document.getElementById('contractsBody');
 const chipsRow = document.getElementById('chipsRow');
-
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const paginationInfo = document.getElementById('paginationInfo');
 
 const statPendingContracts = document.getElementById('statPendingContracts');
 const statReplacementContracts = document.getElementById('statReplacementContracts');
@@ -33,6 +35,11 @@ const contractReviewSection = document.getElementById('contractReviewSection');
 const contractActionsSection = document.getElementById('contractActionsSection');
 const contractDetailsMessage = document.getElementById('contractDetailsMessage');
 
+
+
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let totalContractCount = 0;
 let contractsCache = [];
 let allReservationsCount = 0;
 let activeContractReservationId = null;
@@ -454,14 +461,27 @@ function syncActiveChip() {
 function filterAndRender() {
   const term = String(searchInput?.value || '').trim().toLowerCase();
   const status = statusDropdown?.value || 'all';
+
   const filtered = contractsCache.filter((reservation) => (
     matchesSearch(reservation, term)
     && matchesStatus(reservation, status)
   ));
 
+  totalContractCount = filtered.length;
+
+  const totalPages = Math.max(1, Math.ceil(totalContractCount / PAGE_SIZE));
+
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+  }
+
+  const from = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filtered.slice(from, from + PAGE_SIZE);
+
   syncActiveChip();
   renderStats(contractsCache);
-  renderTable(filtered);
+  renderTable(paginated);
+  updatePagination();
 
   if (!contractsCache.length) {
     setMessage(tableMessage, 'No submitted contracts are available yet.');
@@ -470,7 +490,7 @@ function filterAndRender() {
   } else {
     setMessage(
       tableMessage,
-      `Showing ${filtered.length} of ${contractsCache.length} submitted contract(s).`
+      `Showing ${paginated.length} of ${filtered.length} submitted contract(s).`
     );
   }
 }
@@ -848,7 +868,7 @@ async function loadData() {
     contractsCache = reservations
       .filter((reservation) => getContractReviewMeta(reservation).hasFile)
       .sort((left, right) => new Date(getContractActivityDate(right)) - new Date(getContractActivityDate(left)));
-
+    currentPage = 1;
     filterAndRender();
 
     if (activeContractReservationId) {
@@ -866,14 +886,38 @@ async function loadData() {
   }
 }
 
+function updatePagination() {
+  const totalPages = Math.max(1, Math.ceil(totalContractCount / PAGE_SIZE));
+
+  if (paginationInfo) {
+    paginationInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  }
+
+  if (prevPageBtn) {
+    prevPageBtn.disabled = currentPage <= 1;
+  }
+
+  if (nextPageBtn) {
+    nextPageBtn.disabled = currentPage >= totalPages;
+  }
+}
+
 function wireFilters() {
-  searchInput?.addEventListener('input', filterAndRender);
-  statusDropdown?.addEventListener('change', filterAndRender);
+  searchInput?.addEventListener('input', () => {
+  currentPage = 1;
+  filterAndRender();
+});
+
+statusDropdown?.addEventListener('change', () => {
+  currentPage = 1;
+  filterAndRender();
+});
   chipsRow?.addEventListener('click', (event) => {
     const button = event.target.closest('.chip');
     if (!button) return;
     statusDropdown.value = button.dataset.status || 'all';
-    filterAndRender();
+    currentPage = 1;
+  filterAndRender();
   });
 }
 
@@ -923,7 +967,24 @@ function wireModals() {
   });
 }
 
+// LISTENERS
 refreshBtn?.addEventListener('click', loadData);
+
+prevPageBtn?.addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    filterAndRender();
+  }
+});
+
+nextPageBtn?.addEventListener('click', () => {
+  const totalPages = Math.max(1, Math.ceil(totalContractCount / PAGE_SIZE));
+
+  if (currentPage < totalPages) {
+    currentPage += 1;
+    filterAndRender();
+  }
+});
 
 
 wireLogoutButton();
