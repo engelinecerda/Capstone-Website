@@ -28,16 +28,20 @@ app.add_middleware(
 def run_forecast():
     subprocess.run(["python", "python/forecast.py"])
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(run_forecast, "interval", hours=24)
+scheduler = BackgroundScheduler(timezone="Asia/Manila")
+
+scheduler.add_job(
+    run_forecast,
+    "cron",
+    hour=0,
+    minute=0,
+    id="daily_forecast"
+)
 
 @app.on_event("startup")
 def start_scheduler():
     if not scheduler.running:
         scheduler.start()
-
-    # Run forecast in background (non-blocking)
-    threading.Thread(target=run_forecast).start()
 
 # =========================
 # FORECAST (scheduled)
