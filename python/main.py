@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from supabase import create_client
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
+from fastapi import HTTPException
+from pydantic import BaseModel
 import pandas as pd
 import subprocess
 import threading
@@ -38,7 +40,7 @@ def start_scheduler():
     threading.Thread(target=run_forecast).start()
 
 # =========================
-# FORECAST
+# FORECAST (scheduled)
 # =========================
 @app.get("/forecast")
 async def get_forecast():
@@ -103,6 +105,33 @@ async def get_forecast():
             })
 
     return result
+
+# =========================
+# FORECAST (manual trigger)
+# =========================
+class GenerateForecastRequest(BaseModel):
+    user_id: str | None = None
+
+@app.post("/forecast/generate")
+async def generate_forecast(body: GenerateForecastRequest):
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    def run():
+        args = ["python", "python/forecast.py"]
+        if body.user_id:
+            args.append(body.user_id)
+        result = subprocess.run(args, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr)
+
+    loop = asyncio.get_event_loop()
+    try:
+        with ThreadPoolExecutor() as pool:
+            await loop.run_in_executor(pool, run)
+        return {"success": True, "message": "Forecast generated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =========================
 # MONTHLY RESERVATIONS

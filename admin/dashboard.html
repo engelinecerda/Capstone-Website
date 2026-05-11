@@ -211,7 +211,10 @@
           <h2 class="card-title">Demand Forecasting</h2>
           <p class="card-sub">Demo forecast preview with sample data</p>
         </div>
-        <select id="demandYear" class="demand-select"></select>
+        <div class="forecast-actions">
+          <button id="generateForecastBtn">Update Forecast</button>
+          <select id="demandYear" class="demand-select"></select>
+        </div>
       </div>
       <div class="chart-wrap">
         <canvas id="demandChart"></canvas>

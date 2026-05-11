@@ -2,6 +2,7 @@ from supabase import create_client
 import pandas as pd
 from prophet import Prophet
 import json
+import sys
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
 SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM"
@@ -55,8 +56,12 @@ output = forecast_data.to_dict(orient='records')
 #    print("Old forecast(s) deleted.")
 #else:
 #    print("No existing forecast found. Proceeding to store.")
+
+generated_by = sys.argv[1] if len(sys.argv) > 1 else None
+
 supabase.table("reservation_forecast").insert({
-    "forecast_data": output
+    "forecast_data": output,
+    "generated_by": generated_by   # None if run by scheduler
 }).execute()
 
 print("Forecast updated!") # CHECKING PURPOSES

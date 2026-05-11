@@ -137,7 +137,7 @@ async function renderBarChart(year) {
     const labels = allMonths;
     const values = allMonths.map(m => dataMap[m] ?? 0);
 
-    const ctx = document.getElementById('barChart');
+    const ctx = document.getElementById('barChart').getContext('2d');
     if (!ctx) return;
     if (barChart) barChart.destroy();
     barChart = new Chart(ctx, {
@@ -166,7 +166,7 @@ async function renderBarChart(year) {
 async function renderPieChart(data) {
     const labels = data.map(d => d.package);
     const values = data.map(d => d.count);
-    const ctx = document.getElementById('pieChart');
+    const ctx = document.getElementById('pieChart').getContext('2d');
     if (!ctx) return;
     if (pieChart) pieChart.destroy();
     pieChart = new Chart(ctx, {
@@ -204,7 +204,7 @@ async function renderDemandChart(year) {
         const d = dataMap[month];
         return d && d.yhat !== null && d.yhat !== undefined ? Math.round(d.yhat) : null;
     });
-    const ctx = document.getElementById('demandChart');
+    const ctx = document.getElementById('demandChart').getContext('2d');
     if (!ctx) return;
     if (demandChart) demandChart.destroy();
     demandChart = new Chart(ctx, {
@@ -431,10 +431,62 @@ async function loadDashboard() {
     }
 }
 
+// MANUAL FORECAST GENERATION
+document.getElementById('generateForecastBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('generateForecastBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+
+    try {
+        // Get current user ID from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id ?? null;
+
+        const res = await fetch(`${API}/forecast/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || 'Unknown error');
+
+        // Reload the demand chart with fresh data
+        const fresh = await loadForecast();
+        fullData = Array.isArray(fresh) ? fresh : [];
+        const selectedYear = demandYearSelect?.value;
+        if (selectedYear) await renderDemandChart(selectedYear);
+
+        setDashboardMessage('Forecast regenerated successfully.');
+    } catch (err) {
+        setDashboardMessage(`Forecast generation failed: ${err.message}`, true);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Forecast';
+    }
+});
+
 // EVENT LISTENERS
 refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 document.getElementById('monthlyYear')?.addEventListener('change', (e) => { renderBarChart(e.target.value); });
+
+window.addEventListener('resize', () => {
+    if (barChart) {
+        barChart.resize();
+        barChart.update('none');
+    }
+
+    if (pieChart) {
+        pieChart.resize();
+        pieChart.update('none');
+    }
+
+    if (demandChart) {
+        demandChart.resize();
+        demandChart.update('none');
+    }
+});
 
 wireLogoutButton();
 watchAuthState();

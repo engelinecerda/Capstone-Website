@@ -28,36 +28,40 @@ let state = {
 // Package Data
 // ========================
 const miniPackages = [
-    { label: "VIP Lite", price: 2999, pax: "15–18 pax", hours: "2 hours", credit: "₱2,000 food credit" },
-    { label: "VIP Plus", price: 3999, pax: "15–18 pax", hours: "3 hours", credit: "₱2,499 food credit" },
-    { label: "VIP Max", price: 4999, pax: "15–18 pax", hours: "4 hours", credit: "₱3,000 food credit" },
-    { label: "Main Hall Basic", price: 9999, pax: "Up to 25 pax", hours: "2 hours", credit: "₱8,000 food credit" },
-    { label: "Main Hall Plus", price: 11999, pax: "Up to 25 pax", hours: "3 hours", credit: "₱9,000 food credit" }
+    { label: "VIP Lite", price: 2999, pax: "15–18 pax", hours: "2 hours", credit: "₱2,000 food credit", contract: '../files/contracts/contract-vip-lounge.pdf' },
+    { label: "VIP Plus", price: 3999, pax: "15–18 pax", hours: "3 hours", credit: "₱2,499 food credit", contract: '../files/contracts/contract-vip-lounge.pdf' },
+    { label: "VIP Max", price: 4999, pax: "15–18 pax", hours: "4 hours", credit: "₱3,000 food credit", contract: '../files/contracts/contract-vip-lounge.pdf' },
+    { label: "Main Hall Basic", price: 9999, pax: "Up to 25 pax", hours: "2 hours", credit: "₱8,000 food credit", contract: '../files/contracts/contract-main-hall.pdf' },
+    { label: "Main Hall Plus", price: 11999, pax: "Up to 25 pax", hours: "3 hours", credit: "₱9,000 food credit", contract: '../files/contracts/contract-main-hall.pdf' }
 ];
 
 const snackPackages = [
-    { label: "Biscuits & Candies", price: 3500, desc: "Chocolate fountain, biscuits, candies, marshmallow, brownies, 20 donuts" },
-    { label: "Biscuits, Candies & Fruits", price: 4000, desc: "Chocolate fountain, biscuits, candies, marshmallow, 4 seasonal fruits" },
-    { label: "Biscuits, Chips & Drinks", price: 5000, desc: "Chocolate fountain, biscuits, chips, cupcakes, marshmallow, 2 drinks" }
+    { label: "Biscuits & Candies", price: 3500, desc: "Chocolate fountain, biscuits, candies, marshmallow, brownies, 20 donuts", contract: '../files/contracts/contract-snack-bar.pdf' },
+    { label: "Biscuits, Candies & Fruits", price: 4000, desc: "Chocolate fountain, biscuits, candies, marshmallow, 4 seasonal fruits", contract: '../files/contracts/contract-snack-bar.pdf' },
+    { label: "Biscuits, Chips & Drinks", price: 5000, desc: "Chocolate fountain, biscuits, chips, cupcakes, marshmallow, 2 drinks", contract: '../files/contracts/contract-snack-bar.pdf' }
 ];
 
 const offsiteCategories = [
-    { label: "Eli Coffee Bar", value: "coffee", icon: "☕", desc: "Professional coffee bar service for your event" },
-    { label: "Snack Bar Corner", value: "snack", icon: "🍪", desc: "Mobile snack bar with chocolate fountain" },
-    { label: "Catering", value: "catering", icon: "🍽️", desc: "Fully customizable catering for any event" },
-    { label: "Food Tray", value: "foodtray", icon: "🍱", desc: "Ready to serve meal trays for any gathering" }
+    { label: "Eli Coffee Bar", value: "coffee", icon: "☕", desc: "Professional coffee bar service for your event", contract: '../files/contracts/contract-coffee-bar.pdf' },
+    { label: "Snack Bar Corner", value: "snack", icon: "🍪", desc: "Mobile snack bar with chocolate fountain", contract: '../files/contracts/contract-snack-bar.pdf' },
+    { label: "Catering", value: "catering", icon: "🍽️", desc: "Fully customizable catering for any event", contract: '../files/contracts/contract-catering.pdf' },
+    { label: "Food Tray", value: "foodtray", icon: "🍱", desc: "Ready to serve meal trays for any gathering", contract: '../files/contracts/contract-food-tray.pdf' }
 ];
 
 const offsiteSubPackages = {
     coffee: [
-        { label: "30 pax", price: 3990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving" },
-        { label: "50 pax", price: 5990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving" },
-        { label: "100 pax", price: 10990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving" },
-        { label: "150 pax", price: 14990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving" }
+        { label: "30 pax", price: 3990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving", contract: '../files/contracts/contract-coffee-bar.pdf' },
+        { label: "50 pax", price: 5990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving", contract: '../files/contracts/contract-coffee-bar.pdf' },
+        { label: "100 pax", price: 10990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving", contract: '../files/contracts/contract-coffee-bar.pdf' },
+        { label: "150 pax", price: 14990, desc: "2–3 baristas • 3 hours service • 1:1 coffee serving", contract: '../files/contracts/contract-coffee-bar.pdf' }
     ],
-    snack: snackPackages,
+    snack: [
+        { label: "Biscuits & Candies", price: 3500, desc: "Chocolate fountain, biscuits, candies, marshmallow, brownies, 20 donuts", contract: '../files/contracts/contract-snack-bar.pdf' },
+        { label: "Biscuits, Candies & Fruits", price: 4000, desc: "Chocolate fountain, biscuits, candies, marshmallow, 4 seasonal fruits", contract: '../files/contracts/contract-snack-bar.pdf' },
+        { label: "Biscuits, Chips & Drinks", price: 5000, desc: "Chocolate fountain, biscuits, chips, cupcakes, marshmallow, 2 drinks", contract: '../files/contracts/contract-snack-bar.pdf' }
+    ],
     catering: [
-        { label: "Custom Catering Package", price: 0, desc: "Buffet setup, table & chair setup, uniformed waiters • Price varies by guest count" }
+        { label: "Custom Catering Package", price: 0, desc: "Buffet setup, table & chair setup, uniformed waiters • Price varies by guest count", contract: '../files/contracts/contract-catering.pdf' }
     ]
 };
 
@@ -140,14 +144,29 @@ function populateStep(stepId) {
     if (stepId === 'step4') populateStep4();
     if (stepId === 'step6') populateTimeSlots();
     if (stepId === 'step7') populateSummary();
-    if (id === 'rs8') buildContractStep();
+    if (stepId === 'step8') buildContractStep();
 }
 
 function buildContractStep() {
     const url = getContractUrl();
-    const btn = document.querySelector('.dl-btn');
+    const btn = document.getElementById('contract-download-btn');
+    
+    console.log('=== Contract Debug ===');
+    console.log('locationType:', state.locationType);
+    console.log('offsiteCategory:', state.offsiteCategory);
+    console.log('offsitePackage:', state.offsitePackage);
+    console.log('Contract URL:', url);
+    console.log('Button:', btn);
+    
     if (btn && url) {
         btn.href = url;
+        btn.download = url.split('/').pop();
+        btn.removeAttribute('aria-disabled');
+    } else {
+        if (btn) {
+            btn.setAttribute('aria-disabled', 'true');
+            btn.href = '#';
+        }
     }
 }
 
@@ -243,6 +262,18 @@ function buildOffsiteCategories() {
                 show(subSection);
                 document.getElementById('offsite-sub-label').innerText = `Choose a ${cat.label} Package`;
                 buildOffsiteSubPackages(cat.value);
+                
+                // AUTO-SELECT if only one option (like catering)
+                const packages = offsiteSubPackages[cat.value] || [];
+                if (packages.length === 1) {
+                    state.offsitePackage = packages[0];
+                    // ALSO mark it as selected in the UI
+                    const subContainer = document.getElementById('offsite-sub-options');
+                    const cards = subContainer.querySelectorAll('.package-card');
+                    if (cards.length > 0) {
+                        selectCard(subContainer, cards[0]);
+                    }
+                }
             }
         });
         container.appendChild(card);
@@ -632,35 +663,17 @@ function hide(el) { if (el) el.classList.add('hidden'); }
 showStep(currentStep);
 
 
-const MINI = [
-    { label: 'VIP Lite', price: 2999, pax: '15–18 pax', hours: '2 hours', credit: '₱2,000 food credit', contract: '../files/contracts/contract-vip-lounge.pdf' },
-    { label: 'VIP Plus', price: 3999, pax: '15–18 pax', hours: '3 hours', credit: '₱2,499 food credit', contract: '../files/contracts/contract-vip-lounge.pdf' },
-    { label: 'VIP Max', price: 4999, pax: '15–18 pax', hours: '4 hours', credit: '₱3,000 food credit', contract: '../files/contracts/contract-vip-lounge.pdf' },
-    { label: 'Main Hall Basic', price: 9999, pax: 'Up to 25 pax', hours: '2 hours', credit: '₱8,000 food credit', contract: '../files/contracts/contract-main-hall.pdf' },
-    { label: 'Main Hall Plus', price: 11999, pax: 'Up to 25 pax', hours: '3 hours', credit: '₱9,000 food credit', contract: '../files/contracts/contract-main-hall.pdf' }
-];
 
-const OFFSITE_PKGS = {
-    coffee: [
-        { label: '30 pax', price: 3990, desc: '...', contract: '../files/contracts/contract-coffee-bar.pdf' },
-        { label: '50 pax', price: 5990, desc: '...', contract: '../files/contracts/contract-coffee-bar.pdf' },
-        { label: '100 pax', price: 10990, desc: '...', contract: '../files/contracts/contract-coffee-bar.pdf' },
-        { label: '150 pax', price: 14990, desc: '...', contract: '../files/contracts/contract-coffee-bar.pdf' },
-        { label: 'Food Tray', val: 'foodtray', icon: '🍱', desc: '...', contract: '../files/contracts/contract-food-tray.pdf' }
-    ],
-    snack: [{ label: '...', price: 3500, desc: '...', contract: '../files/contracts/contract-snack-bar.pdf' }],
-    catering: [{ label: '...', price: 0, desc: '...', contract: '../files/contracts/contract-catering.pdf' }]
-};
 
 
 function getContractUrl() {
-    if (S.locationType === 'onsite') {
-        return S.miniPackage?.contract || '';
+    if (state.locationType === 'onsite') {
+        return state.miniPackage?.contract || '';
     } else {
-        if (S.offsiteCategory === 'foodtray') {
-            const cat = OFFSITE_CATS.find(c => c.val === 'foodtray');
+        if (state.offsiteCategory === 'foodtray') {
+            const cat = offsiteCategories.find(c => c.value === 'foodtray');
             return cat?.contract || '';
         }
-        return S.offsitePackage?.contract || '';
+        return state.offsitePackage?.contract || '';
     }
 }
