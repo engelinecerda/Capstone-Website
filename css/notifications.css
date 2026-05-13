@@ -1,0 +1,209 @@
+/* ── Notification Bell & Panel ─────────────────────────────────────────────── */
+
+/* Bell button */
+.notif-bell-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  transition: background 0.15s;
+  line-height: 0;
+}
+
+.notif-bell-btn:hover { background: rgba(0, 0, 0, 0.07); }
+
+/* Unread count badge on bell */
+.notif-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  background: #e53935;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* ── Customer navbar wrapper ─────────────────────────────────────────────────  */
+.notif-navbar-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.notif-navbar-wrapper .notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+}
+
+/* ── Shared panel styles ─────────────────────────────────────────────────────  */
+.notif-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.13);
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.notif-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.notif-panel-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #111;
+}
+
+.notif-mark-all-btn {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #7c5c3a;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+
+.notif-mark-all-btn:hover { text-decoration: underline; }
+
+/* Notification list scroll area */
+.notif-list {
+  max-height: 320px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notif-list::-webkit-scrollbar { width: 4px; }
+.notif-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+
+/* Individual notification item */
+.notif-item {
+  display: grid;
+  grid-template-columns: 1fr 8px;
+  column-gap: 6px;
+  row-gap: 2px;
+  padding: 11px 14px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background 0.12s;
+  list-style: none;
+}
+
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: #faf9f7; }
+.notif-item.unread { background: #fdf7f0; }
+.notif-item.unread:hover { background: #faefe0; }
+
+.notif-item-title {
+  grid-column: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.notif-unread-dot {
+  grid-column: 2;
+  width: 7px;
+  height: 7px;
+  background: #e53935;
+  border-radius: 50%;
+  align-self: center;
+  margin-top: 2px;
+}
+
+.notif-item-body {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.notif-item-time {
+  grid-column: 1 / -1;
+  font-size: 10.5px;
+  color: #9ca3af;
+  margin-top: 1px;
+}
+
+/* Empty state */
+.notif-empty {
+  padding: 36px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12.5px;
+}
+
+.notif-empty-icon {
+  font-size: 26px;
+  display: block;
+  margin-bottom: 8px;
+  opacity: 0.55;
+}
+
+/* ── Admin sidebar bell ───────────────────────────────────────────────────────  */
+.sidebar-header { position: relative; }
+
+.notif-sidebar-btn-wrap {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+
+/* Admin inline panel — sits inside the sidebar nav flow */
+.notif-sidebar-panel {
+  margin: 0 8px 8px;
+  background: #fdf9f5;
+  border: 1px solid #ecddd2;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.notif-sidebar-panel .notif-panel-header {
+  padding: 9px 12px;
+}
+
+.notif-sidebar-panel .notif-list {
+  max-height: 260px;
+}
+
+.notif-sidebar-panel .notif-item {
+  padding: 9px 12px;
+}
+
+/* Nav-item used as the bell toggle in sidebar */
+.notif-nav-item {
+  cursor: pointer;
+  user-select: none;
+}
+
+.notif-nav-item:focus-visible {
+  outline: 2px solid #6b3c11;
+  outline-offset: -2px;
+  border-radius: 6px;
+}

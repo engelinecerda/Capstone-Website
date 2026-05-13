@@ -1,0 +1,797 @@
+================================================================================
+  ELI COFFEE EVENTS CAFE — SUPER ADMIN SYSTEM ARCHITECTURE
+  Complete Technical Reference
+================================================================================
+
+
+--------------------------------------------------------------------------------
+1. TECHNOLOGY STACK
+--------------------------------------------------------------------------------
+
+  Technology         Role
+  ─────────────────────────────────────────────────────────────────────────────
+  Supabase           PostgreSQL database, authentication (Auth), Row Level
+                     Security (RLS), Edge Functions, RPC (remote procedure
+                     calls via security-definer SQL functions)
+
+  Vanilla JS         All frontend logic — no framework, no bundler. Files use
+  (ES Modules)       native browser ES module imports/exports.
+
+  HTML5 / CSS3       Markup and styling. No preprocessor (plain CSS).
+
+  Cloudinary         Cloud image hosting. Package images are uploaded directly
+                     from the browser via unsigned upload presets.
+
+  Google Drive API   Backup and restore of database tables. Uses the Google
+                     Identity Services (GIS) token client and the Drive REST
+                     API v3 (drive.file scope).
+
+  jsPDF +            In-browser PDF generation for audit log exports. No
+  jsPDF-AutoTable    server required — PDF is built in memory and downloaded.
+
+  Google Fonts       Typography: Kumbh Sans, loaded from fonts.googleapis.com.
+
+
+--------------------------------------------------------------------------------
+2. HIGH-LEVEL ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  Browser (Super Admin)
+  ┌───────────────────────────────────────────────────────────────────────────┐
+  │                                                                           │
+  │  admin_settings.html   admin_accounts.html   admin_audit.html            │
+  │  admin_backup.html     admin_packages.html                                │
+  │         │                    │                   │                        │
+  │         └────────────────────┴───────────────────┘                       │
+  │                              │                                            │
+  │                   js/portal_supabase_client.js                            │
+  │                   (portalSupabase client instance)                        │
+  │                              │                                            │
+  │              ┌───────────────┴───────────────┐                           │
+  │              │                               │                           │
+  │    Supabase Auth (JWT)            Supabase Database (RLS)                │
+  │    Session: eli-portal-auth       Tables: profiles, reservations,        │
+  │                                   packages, categories, reviews,         │
+  │                                   payments, event_types, audit_log       │
+  └───────────────────────────────────────────────────────────────────────────┘
+              │                               │
+              ▼                               ▼
+       Google Drive API              Cloudinary Upload API
+       (backup/restore)              (package images)
+
+
+--------------------------------------------------------------------------------
+3. DUAL SUPABASE CLIENT PATTERN
+--------------------------------------------------------------------------------
+
+  The website runs two separate Supabase client instances on the same domain,
+  each with its own isolated session storage key. This prevents the admin
+  session and the customer session from overwriting each other in localStorage.
+
+  Client              File                        Storage Key
+  ─────────────────────────────────────────────────────────────────────────────
+  portalSupabase      js/portal_supabase_client.js    'eli-portal-auth'
+  customerSupabase    js/supabase_client.js            'eli-customer-auth'
+
+  Code example (portal_supabase_client.js):
+
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    export const portalSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey: 'eli-portal-auth',
+        persistSession: true,
+        autoRefreshToken: true,
+      }
+    });
+
+  Why this matters:
+  - An admin logging out on the portal does not log out a customer tab.
+  - A customer logging in does not corrupt the admin JWT.
+  - Supabase RLS policies check the JWT from whichever client initiated the
+    request, so both clients can coexist safely.
+
+
+--------------------------------------------------------------------------------
+4. AUTHENTICATION ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  4.1 validateAdminSession()
+  ──────────────────────────
+  Every super admin page calls validateAdminSession() on load. This function:
+
+    1. Calls portalSupabase.auth.getSession() to retrieve the current JWT.
+    2. If no session exists, redirects to /admin_login.html.
+    3. Queries the profiles table: SELECT role FROM profiles WHERE id = user.id
+    4. If role is not 'admin' or 'super_admin', redirects to /admin_login.html.
+    5. Calls applyRoleVisibility(role) to show/hide super_admin-only UI.
+    6. Returns { session, role } to the calling page.
+
+  Code pattern:
+
+    const { session, role } = await validateAdminSession();
+    // page init continues here, guaranteed admin
+
+  4.2 applyRoleVisibility(role)
+  ─────────────────────────────
+  Walks the DOM for elements marked data-role="super_admin" and hides them
+  when the logged-in role is 'admin'. This lets one HTML file serve both
+  roles with different visible controls.
+
+  4.3 setupInactivityLogout(timeoutMs)
+  ─────────────────────────────────────
+  Only called for super_admin role. Listens for mousemove, keydown, click,
+  scroll. Resets a setTimeout on each event. If the timeout fires (default:
+  2 hours) it calls portalSupabase.auth.signOut() and redirects to login.
+
+  Code pattern:
+
+    function setupInactivityLogout(timeoutMs = 2 * 60 * 60 * 1000) {
+      let timer;
+      const reset = () => {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+          await portalSupabase.auth.signOut();
+          location.href = '/admin_login.html';
+        }, timeoutMs);
+      };
+      ['mousemove','keydown','click','scroll'].forEach(e =>
+        document.addEventListener(e, reset, { passive: true })
+      );
+      reset();
+    }
+
+
+--------------------------------------------------------------------------------
+5. SIDEBAR BADGE ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  The admin sidebar displays live counts (e.g., pending reservations, pending
+  payments) as numeric badges on navigation links. These are loaded once on
+  page load using initAdminSidebarBadges().
+
+  The function fires four Supabase queries in parallel using Promise.all():
+
+    async function initAdminSidebarBadges() {
+      const [
+        { count: pendingRes },
+        { count: pendingPay },
+        { count: pendingReviews },
+        { count: pendingContracts },
+      ] = await Promise.all([
+        portalSupabase
+          .from('reservations')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+        portalSupabase
+          .from('payments')
+          .select('*', { count: 'exact', head: true })
+          .eq('payment_status', 'pending_review'),
+        portalSupabase
+          .from('reviews')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+        portalSupabase
+          .from('reservations')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'for_contract_signing'),
+      ]);
+      // update badge DOM elements
+    }
+
+  Using Promise.all() means all four queries run simultaneously, and the
+  function waits for all four to complete before updating the UI.
+
+
+--------------------------------------------------------------------------------
+6. AUDIT LOG ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  6.1 logAudit(action, targetType, targetId, details)
+  ─────────────────────────────────────────────────────
+  Every sensitive action (account creation, status change, deletion, backup)
+  writes a record to the audit_log table:
+
+    async function logAudit(action, targetType, targetId, details = {}) {
+      const { data: { user } } = await portalSupabase.auth.getUser();
+      await portalSupabase.from('audit_log').insert({
+        performed_by: user.id,
+        action,          // e.g. 'UPDATE_RESERVATION_STATUS'
+        target_type,     // e.g. 'reservation'
+        target_id,       // e.g. reservation UUID
+        details,         // JSON object with before/after values
+        created_at: new Date().toISOString(),
+      });
+    }
+
+  audit_log table columns:
+    id            uuid, primary key
+    performed_by  uuid, FK → auth.users
+    action        text  (e.g. 'CREATE_ACCOUNT', 'ARCHIVE_PACKAGE')
+    target_type   text  (e.g. 'account', 'package', 'reservation')
+    target_id     text  (UUID or slug of the affected record)
+    details       jsonb (arbitrary before/after context)
+    created_at    timestamptz
+
+  6.2 buildAuditQuery(filters)
+  ─────────────────────────────
+  The audit page builds a dynamic Supabase query from the active filter state:
+
+    function buildAuditQuery(filters) {
+      let q = portalSupabase
+        .from('audit_log')
+        .select('*, profiles(first_name, last_name)', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      if (filters.action)     q = q.eq('action', filters.action);
+      if (filters.targetType) q = q.eq('target_type', filters.targetType);
+      if (filters.adminId)    q = q.eq('performed_by', filters.adminId);
+      if (filters.dateFrom)   q = q.gte('created_at', filters.dateFrom);
+      if (filters.dateTo)     q = q.lte('created_at', filters.dateTo);
+      if (filters.search)     q = q.ilike('details::text', `%${filters.search}%`);
+
+      return q.range(filters.offset, filters.offset + filters.limit - 1);
+    }
+
+  The query joins the profiles table to get the admin's name alongside each
+  audit entry. { count: 'exact' } returns the total matching rows for
+  pagination without a second query.
+
+  6.3 PDF Export (jsPDF + autoTable)
+  ────────────────────────────────────
+  The export function:
+    1. Fetches ALL audit records matching the current filters (no pagination).
+    2. Instantiates new jsPDF().
+    3. Calls doc.autoTable({ head, body, styles }) with the audit data.
+    4. Calls doc.save('audit_log.pdf') to trigger a browser download.
+
+  This is entirely client-side — no server or endpoint is involved.
+
+
+--------------------------------------------------------------------------------
+7. SETTINGS PAGE ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  7.1 Tab Switching
+  ─────────────────
+  The settings page has multiple tabs (General, Payment Methods, Event Types,
+  etc.). Tab switching is handled by a single delegated event listener:
+
+    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.settings-tab-btn').forEach(b =>
+          b.classList.remove('active')
+        );
+        document.querySelectorAll('.settings-tab-panel').forEach(p =>
+          p.classList.remove('active')
+        );
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+  7.2 Dirty State Tracking
+  ─────────────────────────
+  The settings page tracks unsaved changes and shows an amber "unsaved changes"
+  banner. Each input stores its original value in a data-original attribute:
+
+    inputs.forEach(input => {
+      input.dataset.original = input.value;
+      input.addEventListener('input', checkDirty);
+    });
+
+    function checkDirty() {
+      const isDirty = [...inputs].some(i => i.value !== i.dataset.original);
+      banner.classList.toggle('visible', isDirty);
+    }
+
+  When the form is saved, data-original is updated to the new saved value.
+
+  7.3 Event Types Table
+  ──────────────────────
+  Event types (e.g., "Birthday", "Wedding") are stored in an event_types table.
+  The settings page loads them, renders an editable table, and allows inline
+  add/edit/delete with immediate Supabase upsert/delete calls.
+
+  The event_types table:
+    id          uuid, primary key
+    name        text
+    description text
+    is_active   boolean
+
+
+--------------------------------------------------------------------------------
+8. ACCOUNTS PAGE ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  8.1 Data Model
+  ───────────────
+  Admin accounts exist in two places:
+    - auth.users (Supabase Auth) — stores email, password hash, UUID
+    - profiles (public schema) — stores first_name, last_name, role, is_locked
+
+  The profiles row is created automatically by a Supabase trigger on
+  auth.users INSERT (after_auth_user_created trigger).
+
+  Roles:
+    'admin'       — standard admin, access to reservations/packages/reviews
+    'super_admin' — full access including settings, accounts, audit, backup
+
+  8.2 Account Creation
+  ─────────────────────
+  Super admins create new accounts using the Supabase Admin API (service role),
+  which bypasses email confirmation:
+
+    const { data, error } = await portalSupabase.auth.admin.createUser({
+      email: formData.email,
+      password: formData.password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+      }
+    });
+
+  After creation, the profiles row is updated with the role:
+
+    await portalSupabase.from('profiles')
+      .update({ role: formData.role })
+      .eq('id', data.user.id);
+
+  Note: auth.admin.createUser() requires the SERVICE_ROLE key, not the anon
+  key. This call must only be made from a trusted context (admin portal with
+  validated session, not the public customer site).
+
+  8.3 Account Locking
+  ────────────────────
+  Locking an account sets is_locked = true in profiles. The validateAdminSession
+  function checks this flag and redirects locked admins to the login page.
+
+  8.4 Pagination
+  ───────────────
+  The accounts list uses Supabase range() with count: 'exact':
+
+    const { data, count } = await portalSupabase
+      .from('profiles')
+      .select('*', { count: 'exact' })
+      .in('role', ['admin', 'super_admin'])
+      .order('created_at', { ascending: false })
+      .range(pageOffset, pageOffset + PAGE_SIZE - 1);
+
+  range(from, to) maps to a PostgreSQL LIMIT/OFFSET query. count: 'exact'
+  returns the total matching rows via the Content-Range header so the frontend
+  can render page controls without a second query.
+
+
+--------------------------------------------------------------------------------
+9. BACKUP PAGE ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  9.1 Google Drive OAuth Flow
+  ────────────────────────────
+  The backup page uses Google Identity Services (GIS) for OAuth, requesting
+  the drive.file scope (access only to files created by this app):
+
+    Step 1 — Initialize the GIS token client:
+
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: handleTokenResponse,
+      });
+
+    Step 2 — Request a token on button click:
+
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+
+    Step 3 — handleTokenResponse stores the token + expiry in localStorage:
+
+      function handleTokenResponse(resp) {
+        const expiresAt = Date.now() + (resp.expires_in - 120) * 1000;
+        // 120-second safety buffer so token never expires mid-backup
+        localStorage.setItem('gdrive_token', resp.access_token);
+        localStorage.setItem('gdrive_token_expires', expiresAt);
+      }
+
+    Step 4 — Before any Drive API call, check if token is still valid:
+
+      function getStoredToken() {
+        const token = localStorage.getItem('gdrive_token');
+        const expiry = parseInt(localStorage.getItem('gdrive_token_expires'), 10);
+        if (!token || Date.now() >= expiry) return null;
+        return token;
+      }
+
+  9.2 Backup Process
+  ───────────────────
+  The backup function reads all rows from each table sequentially (not in
+  parallel, to avoid rate limits) and writes them to Google Drive as JSON files:
+
+    const TABLES_TO_BACKUP = [
+      'profiles', 'reservations', 'payments', 'packages',
+      'categories', 'reviews', 'event_types', 'audit_log'
+    ];
+
+    for (const table of TABLES_TO_BACKUP) {
+      const { data } = await portalSupabase.from(table).select('*');
+      const json = JSON.stringify(data, null, 2);
+      await uploadToDrive(table + '_backup.json', json, token);
+    }
+
+  uploadToDrive() makes two Google Drive REST API calls:
+    1. POST https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart
+       to create or replace the file
+    2. Uses multipart/form-data with the file metadata and JSON content
+
+  9.3 Restore Process
+  ────────────────────
+  The restore function downloads backup files from Drive, parses the JSON, and
+  upserts rows back into Supabase:
+
+    const fileContent = await downloadFromDrive(fileId, token);
+    const rows = JSON.parse(fileContent);
+
+    await portalSupabase.from(table).upsert(rows, {
+      onConflict: 'id',
+      ignoreDuplicates: false,
+    });
+
+  upsert with onConflict: 'id' inserts new rows and updates existing ones if
+  the primary key matches. This is safe to run repeatedly.
+
+
+--------------------------------------------------------------------------------
+10. PACKAGES PAGE ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  10.1 Two-Level Hierarchy
+  ─────────────────────────
+  Packages belong to categories. The data model:
+
+    categories
+      id          uuid
+      name        text
+      description text
+      is_active   boolean
+
+    packages
+      id            uuid
+      category_id   uuid, FK → categories
+      name          text
+      description   text
+      price         numeric
+      image_url     text
+      is_active     boolean
+
+  is_active is used for soft-delete. Records are never hard-deleted because
+  reservations have foreign keys to packages — deleting a package would break
+  historical reservation records.
+
+  10.2 Client-Side View Routing
+  ──────────────────────────────
+  The packages page renders three views without any page navigation:
+    - Category list view (default)
+    - Package list view (after selecting a category)
+    - Package detail/edit view (after selecting a package)
+
+  Routing is managed entirely in JavaScript:
+
+    function showView(viewName, context = {}) {
+      document.querySelectorAll('.packages-view').forEach(v =>
+        v.classList.remove('active')
+      );
+      document.getElementById(`view-${viewName}`).classList.add('active');
+      currentView = viewName;
+      currentContext = context;
+      renderView(viewName, context);
+    }
+
+  Breadcrumb navigation (Categories > Category Name > Package Name) is rendered
+  dynamically based on currentView and currentContext.
+
+  10.3 Cloudinary Image Upload
+  ─────────────────────────────
+  Package images are uploaded directly from the browser to Cloudinary using an
+  unsigned upload preset. No server proxy is needed:
+
+    async function uploadImageToCloudinary(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'eli_coffee_packages');
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      const result = await response.json();
+      return result.secure_url;
+    }
+
+  The returned secure_url (HTTPS CDN URL) is stored in packages.image_url.
+
+  10.4 Soft-Delete Pattern
+  ─────────────────────────
+  Archiving a package sets is_active = false:
+
+    await portalSupabase
+      .from('packages')
+      .update({ is_active: false })
+      .eq('id', packageId);
+
+  The customer-facing packages page filters with .eq('is_active', true).
+  The admin packages page shows all packages with an "Archived" badge on
+  inactive ones and an option to restore them.
+
+  Categories follow the same pattern. Archiving a category does not
+  automatically archive its packages — this is handled explicitly.
+
+
+--------------------------------------------------------------------------------
+11. RESERVATIONS PAGE ARCHITECTURE (ADMIN SIDE)
+--------------------------------------------------------------------------------
+
+  11.1 Reservation Status Flow
+  ─────────────────────────────
+  A reservation moves through the following statuses:
+
+    pending
+      ↓ admin reviews and approves
+    approved
+      ↓ customer signs contract
+    for_contract_signing → pending_review (contract uploaded by customer)
+      ↓ admin verifies contract
+    for_finalization
+      ↓ payments made, admin confirms
+    confirmed → partially_paid → fully_paid
+      ↓
+    completed
+
+  Special statuses:
+    cancellation_requested  — customer has requested cancellation, fee pending
+    cancelled               — admin confirmed cancellation after fee payment
+    rescheduled             — customer submitted reschedule, awaiting approval
+
+  11.2 Booking Capacity System
+  ─────────────────────────────
+  The system enforces a maximum of 2 reservations per calendar day.
+  This is enforced at three layers:
+
+    Layer 1 — Database trigger (enforce_reservation_capacity):
+      A BEFORE INSERT OR UPDATE trigger on the reservations table counts
+      active reservations on the target date. If count >= 2, raises an
+      exception and blocks the insert.
+
+    Layer 2 — RPC function (get_booking_availability):
+      Called by the frontend to check date availability before rendering
+      the booking calendar. Returns is_fully_booked = (count >= 2).
+
+    Layer 3 — Frontend calendar rendering:
+      Dates where availability.isFullyBooked = true are rendered as
+      unselectable in the calendar. Time slots are all disabled when the
+      date is fully booked.
+
+  Relevant Supabase function (simplified):
+
+    CREATE OR REPLACE FUNCTION get_booking_availability(p_date date)
+    RETURNS TABLE (is_fully_booked boolean, ...) AS $$
+    DECLARE
+      v_count int;
+    BEGIN
+      SELECT COUNT(*) INTO v_count
+      FROM reservations
+      WHERE event_date = p_date
+        AND is_capacity_blocking_reservation_status(status);
+
+      RETURN QUERY SELECT
+        (v_count >= 2) AS is_fully_booked,
+        ...;
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  is_capacity_blocking_reservation_status() returns true for statuses:
+    pending, pending_review, for_finalization, for_contract_signing,
+    approved, confirmed, partially_paid, fully_paid, rescheduled
+
+  11.3 Cancellation Flow
+  ───────────────────────
+  Customer initiates cancellation:
+    1. Customer clicks "Cancel Reservation" in their My Reservations page.
+    2. Modal shows non-refundable policy and the cancellation fee:
+         Offsite packages: ₱2,000
+         Onsite packages:  ₱500
+    3. Customer confirms → reservation status set to 'cancellation_requested'
+       and a payment record is inserted with type 'cancellation_fee'
+       and status 'pending_review'.
+    4. Customer is redirected to the payment portal to submit the fee.
+
+  Admin processes cancellation:
+    5. Admin sees reservation in 'cancellation_requested' status.
+    6. Admin verifies the cancellation fee payment.
+    7. Admin clicks "Process Cancellation" → status set to 'cancelled'.
+
+  11.4 updateReservationStatus()
+  ────────────────────────────────
+  The admin's central function for all status transitions:
+
+    async function updateReservationStatus(reservationId, newStatus, fromStatus) {
+      const { error } = await portalSupabase
+        .from('reservations')
+        .update({ status: newStatus })
+        .eq('reservation_id', reservationId)
+        .eq('status', fromStatus); // optimistic lock: only update if status matches
+
+      if (error) throw error;
+
+      await logAudit('UPDATE_RESERVATION_STATUS', 'reservation', reservationId, {
+        from: fromStatus,
+        to: newStatus,
+      });
+
+      await logReservationStatusChange(reservationId, fromStatus, newStatus);
+    }
+
+  The .eq('status', fromStatus) check prevents race conditions where two admins
+  might try to update the same reservation simultaneously.
+
+
+--------------------------------------------------------------------------------
+12. SECURITY ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  12.1 Row Level Security (RLS)
+  ──────────────────────────────
+  All Supabase tables have RLS enabled. Policies control which rows each
+  authenticated user can read, insert, update, or delete.
+
+  Example — reservations table policies:
+
+    -- Customers can only see their own reservations
+    CREATE POLICY "customer_select_own"
+    ON reservations FOR SELECT
+    USING (
+      auth.uid() = customer_id
+      AND EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role = 'customer'
+      )
+    );
+
+    -- Admins can see all reservations
+    CREATE POLICY "admin_select_all"
+    ON reservations FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+      )
+    );
+
+  12.2 Security-Definer Functions
+  ─────────────────────────────────
+  RPC functions used for capacity checks and availability lookups are defined
+  with SECURITY DEFINER. This means they run with the privileges of the
+  function owner (postgres), not the calling user. This allows the function
+  to read reservation data without the caller needing direct table access.
+
+    CREATE FUNCTION get_booking_availability(...)
+    RETURNS ... AS $$
+    ...
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  12.3 Defense-in-Depth Summary
+  ──────────────────────────────
+
+    Layer              Mechanism
+    ─────────────────────────────────────────────────────────────────────────
+    Network            HTTPS only (Supabase hosted, Cloudinary CDN)
+    Authentication     JWT verified on every Supabase request
+    Authorization      RLS policies on every table
+    Session isolation  Two Supabase clients, separate localStorage keys
+    Role enforcement   validateAdminSession() on every admin page load
+    Inactivity         Auto-logout after 2 hours idle (super_admin only)
+    Audit trail        logAudit() on every sensitive action
+    Capacity           DB trigger blocks over-bookings even if frontend is
+                       bypassed or manipulated
+
+
+--------------------------------------------------------------------------------
+13. MODULE DEPENDENCY MAP
+--------------------------------------------------------------------------------
+
+  admin_settings.html
+    └── js/admin_settings.js
+          └── js/portal_supabase_client.js
+
+  admin_accounts.html
+    └── js/admin_accounts.js
+          └── js/portal_supabase_client.js
+
+  admin_audit.html
+    └── js/admin_audit.js
+          ├── js/portal_supabase_client.js
+          └── jsPDF (CDN)
+
+  admin_backup.html
+    └── js/admin_backup.js
+          ├── js/portal_supabase_client.js
+          └── Google Identity Services (CDN)
+
+  admin_packages.html
+    └── js/admin_packages.js
+          ├── js/portal_supabase_client.js
+          └── Cloudinary Upload API (fetch)
+
+  admin_reservations.html
+    └── js/admin_reservations.js
+          ├── js/portal_supabase_client.js
+          └── js/reservation_availability.js
+
+  account.html (customer)
+    └── js/account.js
+          ├── js/supabase_client.js
+          └── js/reservation_availability.js
+
+  reservations.html (customer booking)
+    └── (inline script)
+          ├── js/supabase_client.js
+          └── js/reservation_availability.js
+
+  All admin pages also load:
+    └── js/navbar.js (portal navbar, logout button)
+
+
+--------------------------------------------------------------------------------
+14. KEY DATA FLOW SUMMARIES
+--------------------------------------------------------------------------------
+
+  14.1 Admin Creates a New Admin Account
+  ────────────────────────────────────────
+    1. Super admin fills form on admin_accounts.html
+    2. validateAdminSession() confirms caller is super_admin
+    3. portalSupabase.auth.admin.createUser() creates auth.users row
+    4. Supabase trigger creates profiles row with default role
+    5. JS updates profiles.role to chosen role
+    6. logAudit('CREATE_ACCOUNT', ...) writes to audit_log
+    7. Account appears in the accounts list
+
+  14.2 Admin Archives a Package
+  ───────────────────────────────
+    1. Admin navigates to package detail view
+    2. Clicks "Archive" button
+    3. Confirmation dialog shown (no hard-delete warning)
+    4. portalSupabase.from('packages').update({ is_active: false })
+    5. logAudit('ARCHIVE_PACKAGE', ...)
+    6. Package view re-renders with "Archived" badge
+
+  14.3 Admin Runs a Backup
+  ─────────────────────────
+    1. Admin clicks "Authenticate with Google"
+    2. GIS token client requests drive.file access
+    3. Token stored in localStorage with expiry
+    4. Admin clicks "Run Backup"
+    5. For each table: SELECT * → JSON → POST to Google Drive
+    6. Progress shown per table
+    7. logAudit('RUN_BACKUP', ...) written after all tables complete
+
+  14.4 Customer Cancels a Reservation
+  ─────────────────────────────────────
+    1. Customer clicks "Cancel Reservation" in My Reservations
+    2. account.js calls canCancelReservation() — checks status is
+       approved/confirmed/rescheduled and no cancellation_fee payment pending
+    3. getCancellationFee() returns ₱2000 (offsite) or ₱500 (onsite)
+    4. Cancel modal shown with policy text and fee amount
+    5. Customer clicks "Confirm Cancellation"
+    6. submitCancellationRequest():
+         a. Updates reservation.status to 'cancellation_requested'
+         b. Inserts payment row: type=cancellation_fee, status=pending_review
+    7. Customer redirected to /customer_payments.html
+    8. customer_payments.js shows cancellation fee as payable option
+    9. Customer submits fee proof
+    10. Admin verifies payment, clicks "Process Cancellation"
+    11. updateReservationStatus() sets status to 'cancelled'
+    12. logAudit('UPDATE_RESERVATION_STATUS', ...) written
+
+
+================================================================================
+  END OF DOCUMENT
+================================================================================

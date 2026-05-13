@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="/css/reservations.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <title>ELI Coffee Reservations</title>
     
     <style>
@@ -80,7 +81,17 @@
                         </div>
                     </div>
                     <div id="venue-wrapper" class="venue-wrapper hidden">
-                        <input class="res-input" type="text" id="venue-location" placeholder="Enter complete venue address (e.g., 0221 National Road, Calumpang, Binangonan, Rizal) *">
+                        <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically.</p>
+                        <div class="venue-search-row">
+                            <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)">
+                            <button type="button" id="venue-search-btn" class="venue-search-btn">Search</button>
+                        </div>
+                        <div id="venue-map" class="venue-map-container"></div>
+                        <div class="venue-pinned-row">
+                            <span class="venue-pin-icon">&#128205;</span>
+                            <span id="venue-pinned-label">Click the map or search an address to pin your venue.</span>
+                        </div>
+                        <input type="hidden" id="venue-location" value="">
                     </div>
                 </div>
 
@@ -1907,6 +1918,11 @@
             S.cateringCart    = [];
             S.time            = '';
             document.getElementById('venue-wrapper').classList.toggle('hidden', S.locationType !== 'offsite');
+            if (S.locationType === 'offsite') {
+                setTimeout(function () {
+                    if (window.venueMap) { window.venueMap.invalidateSize(); }
+                }, 150);
+            }
             buildStep3();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2156,6 +2172,16 @@
         el.classList.add('active');
     }
 
+    // Load map scope config from system_settings, expose for non-module Leaflet script
+    try {
+        const { data: mapSetting } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'venue_map_scope')
+            .maybeSingle();
+        if (mapSetting?.value) window.venueMapConfig = mapSetting.value;
+    } catch { /* non-critical — Leaflet IIFE falls back to hardcoded Rizal defaults */ }
+
     // Load packages from DB first, then start the form
     syncSelectedDate('');
     await prefillReservationContactDetails();
@@ -2163,6 +2189,149 @@
     await loadPackages();
     await loadAvailabilityCalendar();
     showStep(1);
+    </script>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        // Geographic bounds — loaded from system_settings, falling back to Rizal province defaults
+        var cfg          = window.venueMapConfig || {};
+        var RIZAL_CENTER = [cfg.center_lat || 14.5794, cfg.center_lng || 121.1878];
+        var RIZAL_BOUNDS = [
+            [cfg.sw_lat || 14.26, cfg.sw_lng || 120.95],
+            [cfg.ne_lat || 14.82, cfg.ne_lng || 121.62]
+        ];
+
+        var map            = null;
+        var marker         = null;
+        var mapInitialized = false;
+
+        function initVenueMap() {
+            if (mapInitialized) return;
+            mapInitialized = true;
+
+            window.venueMap = map = L.map('venue-map', {
+                center:             RIZAL_CENTER,
+                zoom:               11,
+                maxBounds:          RIZAL_BOUNDS,
+                maxBoundsViscosity: 1.0,
+                minZoom:            10,
+                maxZoom:            18
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            map.on('click', function (e) {
+                placeMarker(e.latlng.lat, e.latlng.lng, true);
+            });
+        }
+
+        function placeMarker(lat, lng, doReverseGeocode) {
+            if (!map) return;
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            } else {
+                marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+                marker.on('dragend', function () {
+                    var pos = marker.getLatLng();
+                    reverseGeocode(pos.lat, pos.lng);
+                });
+            }
+            map.panTo([lat, lng]);
+            if (doReverseGeocode) reverseGeocode(lat, lng);
+        }
+
+        function setVenueAddress(address) {
+            var label  = document.getElementById('venue-pinned-label');
+            var hidden = document.getElementById('venue-location');
+            if (label)  label.textContent = address;
+            if (hidden) hidden.value       = address;
+        }
+
+        function reverseGeocode(lat, lng) {
+            setVenueAddress('Looking up address…');
+            fetch(
+                'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json',
+                { headers: { 'Accept-Language': 'en' } }
+            )
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                setVenueAddress(d.display_name || (lat.toFixed(5) + ', ' + lng.toFixed(5)));
+            })
+            .catch(function () {
+                setVenueAddress(lat.toFixed(5) + ', ' + lng.toFixed(5));
+            });
+        }
+
+        function searchAddress(query) {
+            if (!query.trim()) return;
+            setVenueAddress('Searching…');
+
+            var viewbox = (cfg.sw_lng||120.95)+','+(cfg.sw_lat||14.26)+','+(cfg.ne_lng||121.62)+','+(cfg.ne_lat||14.82);
+            var url = 'https://nominatim.openstreetmap.org/search'
+                + '?q='        + encodeURIComponent(query + ', Rizal, Philippines')
+                + '&format=json&limit=1'
+                + '&viewbox='  + viewbox
+                + '&bounded=1&countrycodes=ph';
+
+            fetch(url, { headers: { 'Accept-Language': 'en' } })
+            .then(function (r) { return r.json(); })
+            .then(function (results) {
+                if (!results.length) {
+                    setVenueAddress('No results found in Rizal. Try a more specific address.');
+                    return;
+                }
+                var r = results[0];
+                placeMarker(parseFloat(r.lat), parseFloat(r.lon), false);
+                setVenueAddress(r.display_name);
+            })
+            .catch(function () {
+                setVenueAddress('Search failed. Please try again.');
+            });
+        }
+
+        // Show map when venue-wrapper becomes visible (offsite selected)
+        // Uses MutationObserver on the hidden class toggle.
+        var observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                if (m.attributeName === 'class') {
+                    var wrapper = document.getElementById('venue-wrapper');
+                    if (wrapper && !wrapper.classList.contains('hidden')) {
+                        setTimeout(function () {
+                            initVenueMap();
+                            if (map) map.invalidateSize();
+                        }, 120);
+                    }
+                }
+            });
+        });
+
+        // Script is at bottom of <body> — DOM is already ready, run immediately.
+        var wrapper     = document.getElementById('venue-wrapper');
+        var searchBtn   = document.getElementById('venue-search-btn');
+        var searchInput = document.getElementById('venue-search-input');
+
+        if (wrapper) observer.observe(wrapper, { attributes: true });
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', function () {
+                if (searchInput) searchAddress(searchInput.value);
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAddress(searchInput.value);
+                }
+            });
+        }
+    })();
     </script>
 
 </body>

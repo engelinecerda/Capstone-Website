@@ -109,6 +109,7 @@ export async function loadDynamicPaymentMethods(supabase) {
 export const PAYMENT_TYPE_META = {
     reservation_fee: { label: 'Reservation Fee', description: 'Fixed reservation fee' },
     down_payment: { label: 'Down Payment', description: '50% of your total amount' },
+    partial_payment: { label: 'Custom Amount', description: 'Customer-specified partial payment' },
     full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
     reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' },
     cancellation_fee: { label: 'Cancellation Fee', description: 'Required fee to process the reservation cancellation' }

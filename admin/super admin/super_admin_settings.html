@@ -118,6 +118,7 @@
         <button type="button" class="settings-tab-btn" data-tab="rescheduling" role="tab">Rescheduling Rules</button>
         <button type="button" class="settings-tab-btn active" data-tab="reservation-rules" role="tab">Reservation Rules</button>
         <button type="button" class="settings-tab-btn" data-tab="event-types" role="tab">Event Types</button>
+        <button type="button" class="settings-tab-btn" data-tab="venue-map" role="tab">Venue Map</button>
       </div>
 
       <!-- ══ TAB: CANCELLATION FEE ══ -->
@@ -435,6 +436,58 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ══ TAB: VENUE MAP ══ -->
+      <div class="settings-panel" id="panel-venue-map" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Venue Map Scope</p>
+          <p class="settings-card-sub">Configure the geographic area shown on the booking map when customers select an offsite package. The map will be restricted to these bounds.</p>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Map Center — Latitude</label>
+              <input type="number" class="form-input" id="map-center-lat" step="0.0001" placeholder="e.g. 14.5794">
+              <span class="form-hint">Vertical center point of the map when it first opens.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Map Center — Longitude</label>
+              <input type="number" class="form-input" id="map-center-lng" step="0.0001" placeholder="e.g. 121.1878">
+              <span class="form-hint">Horizontal center point of the map when it first opens.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">South-West Bound — Latitude</label>
+              <input type="number" class="form-input" id="map-sw-lat" step="0.0001" placeholder="e.g. 14.26">
+              <span class="form-hint">Southern edge of the allowed map area.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">South-West Bound — Longitude</label>
+              <input type="number" class="form-input" id="map-sw-lng" step="0.0001" placeholder="e.g. 120.95">
+              <span class="form-hint">Western edge of the allowed map area.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">North-East Bound — Latitude</label>
+              <input type="number" class="form-input" id="map-ne-lat" step="0.0001" placeholder="e.g. 14.82">
+              <span class="form-hint">Northern edge of the allowed map area.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">North-East Bound — Longitude</label>
+              <input type="number" class="form-input" id="map-ne-lng" step="0.0001" placeholder="e.g. 121.62">
+              <span class="form-hint">Eastern edge of the allowed map area.</span>
+            </div>
+          </div>
+
+          <p class="form-hint" style="margin-top:4px;">
+            <strong>Rizal province defaults:</strong> Center 14.5794, 121.1878 &nbsp;|&nbsp; SW 14.26, 120.95 &nbsp;|&nbsp; NE 14.82, 121.62
+          </p>
+
+          <p class="map-settings-msg" id="map-settings-msg"></p>
+
+          <div class="action-bar">
+            <button type="button" class="btn-secondary" id="resetMapScopeBtn">Reset to Rizal Defaults</button>
+            <button type="button" class="btn-primary" id="saveMapScopeBtn">Save Map Scope</button>
+          </div>
         </div>
       </div>
 

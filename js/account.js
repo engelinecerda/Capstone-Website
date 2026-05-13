@@ -60,6 +60,7 @@ const PAYMENT_METHODS = {
 const PAYMENT_TYPE_META = {
     reservation_fee: { label: 'Reservation Fee', description: 'Fixed reservation fee' },
     down_payment: { label: 'Down Payment', description: '50% of your total amount' },
+    partial_payment: { label: 'Custom Amount', description: 'Enter any amount you want to pay' },
     full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
     reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' }
 };
@@ -836,6 +837,11 @@ function getAvailablePaymentOptions(reservation) {
                 }));
             }
 
+            options.push(buildPaymentOption(reservation, 'partial_payment', 0, {
+                displayLabel: 'Custom Amount',
+                displayDescription: 'Enter any amount you want to pay toward this reservation.'
+            }));
+
             if (!hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
                 options.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, {
                     displayDescription: 'Settle the reservation in one payment.'
@@ -1166,13 +1172,16 @@ function renderPaymentComposer(reservation) {
         </button>
     `).join('');
 
-    const optionChips = options.map((option, index) => `
+    const optionChips = options.map((option, index) => {
+        const isCustom = option.paymentType === 'partial_payment';
+        return `
         <button
             type="button"
             class="res-choice-chip payment-choice-card payment-type-card res-payment-type ${index === 0 ? 'active' : ''}"
             data-payment-option="${index}"
             data-payment-type="${escapeHtml(option.paymentType)}"
             data-amount="${escapeHtml(option.amount)}"
+            data-custom-amount="${isCustom ? 'true' : 'false'}"
             data-reschedule-request-id="${escapeHtml(option.rescheduleRequestId || '')}"
             data-display-label="${escapeHtml(option.displayLabel || option.label)}"
             data-display-description="${escapeHtml(option.displayDescription || option.description)}"
@@ -1180,10 +1189,10 @@ function renderPaymentComposer(reservation) {
             <div class="payment-type-head">
                 <strong>${escapeHtml(option.displayLabel || option.label)}</strong>
             </div>
-            <span class="payment-choice-amount">${escapeHtml(formatCurrency(option.amount))}</span>
+            <span class="payment-choice-amount">${isCustom ? 'You decide' : escapeHtml(formatCurrency(option.amount))}</span>
             <span class="payment-choice-copy">${escapeHtml(option.displayDescription || option.description)}</span>
-        </button>
-    `).join('');
+        </button>`;
+    }).join('');
 
     return `
         <div class="payment-composer" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-cash-enabled="${canUseCash ? 'true' : 'false'}">
@@ -2401,12 +2410,38 @@ function syncPaymentComposerState(section) {
         }
     }
 
+    const isCustomAmount = activeTypeChip?.dataset.customAmount === 'true';
+
     if (selectionSummaryEl && activeTypeChip) {
-        selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} / ${activeDisplayLabel} / ${formatCurrency(amount)}`;
+        const amountLabel = isCustomAmount
+            ? (Number(amountInput?.value?.replace(/[^0-9.]/g, '') || 0) > 0 ? formatCurrency(Number(amountInput.value.replace(/[^0-9.]/g, ''))) : 'enter amount')
+            : formatCurrency(amount);
+        selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} / ${activeDisplayLabel} / ${amountLabel}`;
     }
 
     if (amountInput) {
-        amountInput.value = formatCurrency(amount);
+        if (isCustomAmount) {
+            amountInput.removeAttribute('readonly');
+            amountInput.placeholder = 'e.g. 1500';
+            amountInput.value = '';
+            amountInput.type = 'number';
+            amountInput.min = '1';
+            // Update summary live as customer types
+            amountInput.oninput = () => {
+                if (selectionSummaryEl && activeTypeChip) {
+                    const entered = Number(amountInput.value || 0);
+                    const amountLabel = entered > 0 ? formatCurrency(entered) : 'enter amount';
+                    selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} / ${activeDisplayLabel} / ${amountLabel}`;
+                }
+            };
+        } else {
+            amountInput.setAttribute('readonly', 'true');
+            amountInput.placeholder = '';
+            amountInput.type = 'text';
+            amountInput.removeAttribute('min');
+            amountInput.oninput = null;
+            amountInput.value = formatCurrency(amount);
+        }
     }
 
     const isCash = activeMethod === 'cash';
@@ -3380,8 +3415,8 @@ async function submitPayment(section, reservationId) {
         return;
     }
 
-    const amount = Number(activeOption.dataset.amount || 0);
     const paymentType = activeOption.dataset.paymentType || '';
+    const isCustomAmount = activeOption.dataset.customAmount === 'true';
     const rescheduleRequestId = activeOption.dataset.rescheduleRequestId || null;
     const referenceNumber = section.querySelector('[data-field="reference_number"]')?.value.trim() || '';
     const paymentDate = section.querySelector('[data-field="payment_date"]')?.value || null;
@@ -3389,9 +3424,24 @@ async function submitPayment(section, reservationId) {
     const notes = section.querySelector('[data-field="notes"]')?.value.trim() || '';
     const proofFile = section.querySelector('[data-field="proof_file"]')?.files?.[0] || null;
 
+    // For custom amount, read from the editable input; otherwise use the chip's preset amount
+    const amountRaw = isCustomAmount
+        ? Number(section.querySelector('[data-field="amount"]')?.value || 0)
+        : Number(activeOption.dataset.amount || 0);
+    const amount = Math.round(amountRaw * 100) / 100;
+
     if (!amount || amount <= 0) {
-        setInlineMessage(messageEl, 'This payment option does not have a valid amount.', 'error');
+        setInlineMessage(messageEl, isCustomAmount ? 'Please enter the amount you want to pay.' : 'This payment option does not have a valid amount.', 'error');
         return;
+    }
+
+    // Prevent custom amount from exceeding the remaining balance
+    if (isCustomAmount) {
+        const balance = getReservationBalanceDetails(reservation);
+        if (amount > balance.remainingBalance) {
+            setInlineMessage(messageEl, `Amount cannot exceed the remaining balance of ${formatCurrency(balance.remainingBalance)}.`, 'error');
+            return;
+        }
     }
 
     if (activeMethod === 'cash') {
@@ -3489,8 +3539,9 @@ async function submitReplacementContract(reservationId) {
         return;
     }
 
-    if (contractMeta.statusKey !== 'resubmission_requested') {
-        setReservationDetailsMessage('Contract replacement is only available after admin requests a resubmission.', true);
+    const allowedForUpload = ['resubmission_requested', 'missing'];
+    if (!allowedForUpload.includes(contractMeta.statusKey)) {
+        setReservationDetailsMessage('Contract upload is not available for this reservation right now.', true);
         return;
     }
 
@@ -3545,9 +3596,37 @@ async function submitReplacementContract(reservationId) {
             throw new Error('Your reservation contract could not be updated.');
         }
 
-        setReservationDetailsMessage('Replacement contract submitted for admin review.');
+        // ── Auto-verify: ask the edge function to detect the signature ─────────
+        setReservationDetailsMessage('Verifying contract signature...');
+        let autoVerified = false;
+        try {
+            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-contract', {
+                body: { reservation_id: reservationId, contract_url: contractUrl }
+            });
+
+            if (!verifyError && verifyData?.verified === true) {
+                autoVerified = true;
+            }
+        } catch (verifyErr) {
+            console.warn('[verify-contract] invocation failed:', verifyErr?.message || verifyErr);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         await loadReservations();
-        openSubmissionFeedbackModal();
+
+        if (autoVerified) {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Contract Verified',
+                title: 'Signature Detected — Contract Approved',
+                copy: 'Your signed contract was automatically verified. Your reservation has been advanced to the finalization stage.'
+            });
+        } else {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Contract Resubmitted',
+                title: 'Replacement Contract Submitted',
+                copy: 'Your corrected signed contract was sent to the admin for review.'
+            });
+        }
     } catch (error) {
         submitBtn?.removeAttribute('disabled');
         setReservationDetailsMessage(`Failed to submit replacement contract: ${error.message}`, true);
