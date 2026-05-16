@@ -3600,15 +3600,21 @@ async function submitReplacementContract(reservationId) {
         setReservationDetailsMessage('Verifying contract signature...');
         let autoVerified = false;
         try {
+            console.log('[verify-contract] invoking →', { reservation_id: reservationId, contract_url: contractUrl });
             const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-contract', {
                 body: { reservation_id: reservationId, contract_url: contractUrl }
             });
+            console.log('[verify-contract] response →', JSON.stringify({ verifyData, verifyError: verifyError?.message ?? null }));
 
-            if (!verifyError && verifyData?.verified === true) {
+            if (verifyError) {
+                console.warn('[verify-contract] function returned an error:', verifyError.message);
+            } else if (verifyData?.verified === true) {
                 autoVerified = true;
+            } else {
+                console.log('[verify-contract] not auto-verified:', verifyData?.reason ?? verifyData?.error ?? 'unknown reason');
             }
         } catch (verifyErr) {
-            console.warn('[verify-contract] invocation failed:', verifyErr?.message || verifyErr);
+            console.warn('[verify-contract] invocation threw:', verifyErr?.message || verifyErr);
         }
         // ─────────────────────────────────────────────────────────────────────
 

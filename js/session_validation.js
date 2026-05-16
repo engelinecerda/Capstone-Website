@@ -21,13 +21,17 @@ export function applyRoleVisibility(role) {
     el.style.display = isSuperAdmin ? 'flex' : 'none';
   });
 
+  document.querySelectorAll('.manager-only').forEach(el => {
+    el.style.display = isSuperAdmin ? 'none' : 'flex';
+  });
+
   const pill = document.getElementById('sidebarRolePill');
   const badge = document.getElementById('adminBadge');
   const title = document.getElementById('sidebarTitle');
 
-  if (pill) pill.textContent = isSuperAdmin ? 'Super Admin' : 'Admin';
-  if (badge) badge.textContent = isSuperAdmin ? 'Super Admin' : 'Admin';
-  if (title) title.textContent = isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel';
+  if (pill) pill.textContent = isSuperAdmin ? 'Admin' : 'Manager';
+  if (badge) badge.textContent = isSuperAdmin ? 'Admin' : 'Manager';
+  if (title) title.textContent = isSuperAdmin ? 'Admin Panel' : 'Manager Panel';
 
   // Set data-role for CSS targeting
   if (pill) pill.dataset.role = role;

@@ -62,15 +62,15 @@ function validateMapConfig(config) {
 async function loadMapScope() {
   const { data, error } = await supabase
     .from('system_settings')
-    .select('value')
-    .eq('key', 'venue_map_scope')
+    .select('setting_value')
+    .eq('setting_key', 'venue_map_scope')
     .maybeSingle();
 
   if (error || !data) {
     populateMapFields(RIZAL_DEFAULTS);
     return;
   }
-  populateMapFields({ ...RIZAL_DEFAULTS, ...data.value });
+  populateMapFields({ ...RIZAL_DEFAULTS, ...JSON.parse(data.setting_value) });
 }
 
 async function saveMapScope() {
@@ -82,8 +82,8 @@ async function saveMapScope() {
   const { error } = await supabase
     .from('system_settings')
     .upsert(
-      { key: 'venue_map_scope', value: config, updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-      { onConflict: 'key' }
+      { setting_key: 'venue_map_scope', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
     );
 
   if (error) { setMapMsg('Failed to save: ' + error.message, true); return; }

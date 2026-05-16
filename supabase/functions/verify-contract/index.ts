@@ -24,10 +24,29 @@ const SIGNATURE_LABELS = new Set([
   'manuscript',
   'hand writing',
   'calligraphy',
+  'ballpoint pen',
+  'pencil',
+  'marker pen',
+  'felt pen',
+  'sketch',
+  'doodle',
+  'notation',
+  'cursive',
+  'letter',
+  'note',
 ]);
 
 type VisionBlock = {
   blockType?: string;
+  confidence?: number;
+  paragraphs?: VisionParagraph[];
+};
+
+type VisionParagraph = {
+  words?: VisionWord[];
+};
+
+type VisionWord = {
   confidence?: number;
 };
 
@@ -65,16 +84,16 @@ function toImageUrl(contractUrl: string): string {
  * Calls GCP Vision with LABEL_DETECTION and DOCUMENT_TEXT_DETECTION.
  *
  * Signed contracts are detected by:
- *   1. Label check  — GCP Vision returns "Handwriting" / "Writing" labels when
- *      ink marks from a pen are present in the image.
- *   2. Block check  — DOCUMENT_TEXT_DETECTION parses every text block; a block
- *      with confidence < 0.70 is characteristic of handwritten content since
- *      the OCR engine is less certain about cursive or informal letterforms.
+ *   1. Label check      — GCP Vision returns handwriting-related labels.
+ *   2. Block check      — A text block confidence < 0.80 suggests handwriting.
+ *   3. Word check       — Any individual word with confidence < 0.60 strongly
+ *                         suggests a cursive or handwritten word (e.g. a signature).
  */
 async function detectSignature(imageUrl: string): Promise<{
   signed: boolean;
   confidence: 'high' | 'medium' | 'none';
   detectedLabels: string[];
+  debugInfo: Record<string, unknown>;
 }> {
   const res = await fetch(VISION_API_URL, {
     method: 'POST',
@@ -84,7 +103,7 @@ async function detectSignature(imageUrl: string): Promise<{
         {
           image: { source: { imageUri: imageUrl } },
           features: [
-            { type: 'LABEL_DETECTION', maxResults: 30 },
+            { type: 'LABEL_DETECTION', maxResults: 50 },
             { type: 'DOCUMENT_TEXT_DETECTION' },
           ],
         },
@@ -105,25 +124,44 @@ async function detectSignature(imageUrl: string): Promise<{
   );
   const hasSignatureLabel = detectedLabels.some((l) => SIGNATURE_LABELS.has(l));
 
-  // --- Block-level confidence check ---
+  // --- Block and word confidence checks ---
   const pages: VisionPage[] = result.fullTextAnnotation?.pages ?? [];
   const blocks = pages.flatMap((p) => p.blocks ?? []);
-  // A text block with confidence < 0.70 strongly suggests handwritten content
+
+  // Block with confidence < 0.80 suggests handwritten content
   const hasLowConfidenceBlock = blocks.some(
     (b) =>
       b.blockType === 'TEXT' &&
       typeof b.confidence === 'number' &&
-      b.confidence < 0.70,
+      b.confidence < 0.80,
   );
 
-  const signed = hasSignatureLabel || hasLowConfidenceBlock;
+  // Individual word with confidence < 0.60 strongly suggests a handwritten word/signature
+  const allWords = blocks.flatMap((b) =>
+    (b.paragraphs ?? []).flatMap((p) => p.words ?? [])
+  );
+  const lowConfidenceWords = allWords.filter(
+    (w) => typeof w.confidence === 'number' && w.confidence < 0.60
+  );
+  const hasLowConfidenceWord = lowConfidenceWords.length > 0;
+
+  const signed = hasSignatureLabel || hasLowConfidenceBlock || hasLowConfidenceWord;
   const confidence: 'high' | 'medium' | 'none' = hasSignatureLabel
     ? 'high'
-    : hasLowConfidenceBlock
+    : (hasLowConfidenceBlock || hasLowConfidenceWord)
     ? 'medium'
     : 'none';
 
-  return { signed, confidence, detectedLabels: detectedLabels.slice(0, 15) };
+  const debugInfo = {
+    totalBlocks: blocks.length,
+    totalWords: allWords.length,
+    lowConfidenceWordCount: lowConfidenceWords.length,
+    hasLowConfidenceBlock,
+    hasLowConfidenceWord,
+    hasSignatureLabel,
+  };
+
+  return { signed, confidence, detectedLabels: detectedLabels.slice(0, 15), debugInfo };
 }
 
 Deno.serve(async (req: Request) => {

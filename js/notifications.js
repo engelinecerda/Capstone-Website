@@ -188,79 +188,49 @@ export async function initCustomerNotificationBell(supabase, userId) {
 
 // ── Admin sidebar bell ────────────────────────────────────────────────────────
 export async function initAdminNotificationBell(supabase, userId) {
-  // Inject bell button into sidebar-header
   const sidebarHeader = document.querySelector('.sidebar-header');
   if (!sidebarHeader) return;
 
-  // Bell button positioned absolute inside sidebar-header (CSS handles placement)
   const btnWrap = document.createElement('span');
   btnWrap.className = 'notif-sidebar-btn-wrap';
   btnWrap.innerHTML = `
     <button class="notif-bell-btn" id="notifBellBtnAdmin"
-            aria-label="Notifications" aria-expanded="false">
+            aria-label="Go to notifications">
       ${BELL_SVG(15)}
       <span class="notif-badge" id="notifBadgeAdmin" hidden>0</span>
     </button>`;
   sidebarHeader.appendChild(btnWrap);
 
-  // Inline panel injected as a nav item in sidebar-nav, after the Customers link
-  const sidebarNav = document.querySelector('.sidebar-nav');
-  if (sidebarNav) {
-    const panel = document.createElement('div');
-    panel.className = 'notif-sidebar-panel';
-    panel.id = 'notifSidebarPanel';
-    panel.hidden = true;
-    panel.innerHTML = `
-      <div class="notif-panel-header">
-        <span class="notif-panel-title">Notifications</span>
-        <button class="notif-mark-all-btn" id="notifMarkAllAdmin">Mark all read</button>
-      </div>
-      <ul class="notif-list" id="notifListAdmin"></ul>`;
+  const bellBtn = document.getElementById('notifBellBtnAdmin');
+  const badgeEl = document.getElementById('notifBadgeAdmin');
 
-    // Insert after the Customers nav item if present, otherwise append
-    const customersLink = sidebarNav.querySelector('a[href*="customers.html"]');
-    if (customersLink?.nextSibling) {
-      sidebarNav.insertBefore(panel, customersLink.nextSibling);
-    } else {
-      sidebarNav.appendChild(panel);
-    }
+  // Fetch unread count for badge only — no inline panel
+  async function refreshBadge() {
+    try {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+      syncBadge(badgeEl, count ?? 0);
+    } catch { /* ignore */ }
   }
 
-  const bellBtn    = document.getElementById('notifBellBtnAdmin');
-  const panel      = document.getElementById('notifSidebarPanel');
-  const listEl     = document.getElementById('notifListAdmin');
-  const badgeEl    = document.getElementById('notifBadgeAdmin');
-  const markAllBtn = document.getElementById('notifMarkAllAdmin');
+  await refreshBadge();
 
-  if (!panel || !listEl) return;
-
-  await fetchAndRender(supabase, userId, listEl, badgeEl);
-
-  // Bell button toggles inline panel (no outside-click close for sidebar)
-  bellBtn?.addEventListener('click', e => {
-    e.stopPropagation();
-    const opening = panel.hidden;
-    panel.hidden = !opening;
-    bellBtn.setAttribute('aria-expanded', String(opening));
+  // Navigate to dedicated notifications page on click
+  bellBtn?.addEventListener('click', () => {
+    window.location.href = '/admin/notifications.html';
   });
 
-  markAllBtn?.addEventListener('click', async e => {
-    e.stopPropagation();
-    await markAll(supabase, userId, listEl, badgeEl);
-  });
-
-  listEl.addEventListener('click', async e => {
-    const item = e.target.closest('.notif-item');
-    if (!item) return;
-    const { id, link } = item.dataset;
-    if (id && item.classList.contains('unread')) {
-      await markOne(supabase, id, listEl, badgeEl);
-    }
-    if (link) {
-      panel.hidden = true;
-      window.location.href = link;
-    }
-  });
-
-  subscribeRealtime(supabase, userId, listEl, badgeEl);
+  // Keep badge live via realtime
+  supabase
+    .channel(`notif_bell_admin_${userId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${userId}`,
+    }, () => refreshBadge())
+    .subscribe();
 }

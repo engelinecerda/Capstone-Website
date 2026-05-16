@@ -332,6 +332,58 @@
         time: ''
     };
 
+    const DRAFT_KEY = 'eli_reservation_draft';
+
+    function saveDraft() {
+        try {
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ state: S, step: cur }));
+        } catch { /* sessionStorage unavailable */ }
+    }
+
+    function clearDraft() {
+        try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+
+    function restoreDraft() {
+        try {
+            const raw = sessionStorage.getItem(DRAFT_KEY);
+            if (!raw) return false;
+            const { state: saved, step: savedStep } = JSON.parse(raw);
+            if (!saved || typeof savedStep !== 'number') return false;
+
+            Object.assign(S, saved);
+            cur = Math.min(Math.max(savedStep, 1), total());
+
+            const etEl = document.getElementById('event-type');
+            if (etEl && S.eventType) etEl.value = S.eventType;
+
+            const gcEl = document.getElementById('guest-count');
+            if (gcEl && S.guestCount) gcEl.value = S.guestCount;
+
+            const nameEl = document.getElementById('name');
+            if (nameEl && S.name) nameEl.value = S.name;
+
+            const phoneEl = document.getElementById('phone');
+            if (phoneEl && S.phone) phoneEl.value = S.phone;
+
+            const emailEl = document.getElementById('email');
+            if (emailEl && S.email) emailEl.value = S.email;
+
+            const reqEl = document.getElementById('requests');
+            if (reqEl && S.requests) reqEl.value = S.requests;
+
+            if (S.locationType) {
+                document.querySelectorAll('.location-card').forEach(c => {
+                    c.classList.toggle('active', c.dataset.val === S.locationType);
+                });
+            }
+
+            if (S.eventDate) syncSelectedDate(S.eventDate);
+
+            return true;
+        } catch { return false; }
+    }
+
     const eventDateInput = document.getElementById('event-date');
     const eventDateDisplayInput = document.getElementById('event-date-display');
     const nameInput = document.getElementById('name');
@@ -1264,6 +1316,7 @@
         document.getElementById('nextBtn').textContent = n === total() ? 'Submit' : 'Next \u2192';
 
         populate(sid(n));
+        saveDraft();
     }
 
     function populate(id) {
@@ -2094,6 +2147,28 @@
                 throw new Error('Contract save failed: ' + contractInsertError.message);
             }
 
+            // ── Auto-verify contract signature via Edge Function ──────────────
+            let autoVerified = false;
+            try {
+                console.log('[verify-contract] invoking →', { reservation_id: reservation.reservation_id, contract_url: contractUrl });
+                const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-contract', {
+                    body: { reservation_id: reservation.reservation_id, contract_url: contractUrl }
+                });
+                console.log('[verify-contract] response →', JSON.stringify({ verifyData, verifyError: verifyError?.message ?? null }));
+                if (verifyError) {
+                    console.warn('[verify-contract] function error:', verifyError.message);
+                } else if (verifyData?.verified === true) {
+                    autoVerified = true;
+                } else {
+                    console.log('[verify-contract] not auto-verified:', verifyData?.reason ?? verifyData?.error ?? 'unknown reason');
+                }
+            } catch (verifyErr) {
+                console.warn('[verify-contract] invocation threw:', verifyErr?.message || verifyErr);
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            clearDraft();
+
             document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
             document.querySelector('.reservation-buttons').style.display = 'none';
             document.querySelector('.progress-container').style.display  = 'none';
@@ -2101,14 +2176,26 @@
             const msg = document.createElement('div');
             msg.className = 'summary-box';
             msg.style.cssText = 'text-align:center;padding:48px 20px;';
-            msg.innerHTML =
-                '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
-                '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
-                '<p style="color:#777;line-height:1.8;font-size:15px;">' +
-                'Thank you, <strong>' + S.name + '</strong>!<br>' +
-                'Your reservation is <strong style="color:#6B3A1F;">under verification</strong>.<br>' +
-                'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
-                '</p>';
+            if (autoVerified) {
+                msg.innerHTML =
+                    '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
+                    '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
+                    '<p style="color:#777;line-height:1.8;font-size:15px;">' +
+                    'Thank you, <strong>' + S.name + '</strong>!<br>' +
+                    'Your signed contract was <strong style="color:#6B3A1F;">automatically verified</strong>.<br>' +
+                    'Your reservation has been advanced to the finalization stage.<br>' +
+                    'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
+                    '</p>';
+            } else {
+                msg.innerHTML =
+                    '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
+                    '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
+                    '<p style="color:#777;line-height:1.8;font-size:15px;">' +
+                    'Thank you, <strong>' + S.name + '</strong>!<br>' +
+                    'Your reservation is <strong style="color:#6B3A1F;">under verification</strong>.<br>' +
+                    'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
+                    '</p>';
+            }
             document.querySelector('.reservation-container').appendChild(msg);
 
         } catch (err) {
@@ -2176,10 +2263,10 @@
     try {
         const { data: mapSetting } = await supabase
             .from('system_settings')
-            .select('value')
-            .eq('key', 'venue_map_scope')
+            .select('setting_value')
+            .eq('setting_key', 'venue_map_scope')
             .maybeSingle();
-        if (mapSetting?.value) window.venueMapConfig = mapSetting.value;
+        if (mapSetting?.setting_value) window.venueMapConfig = JSON.parse(mapSetting.setting_value);
     } catch { /* non-critical — Leaflet IIFE falls back to hardcoded Rizal defaults */ }
 
     // Load packages from DB first, then start the form
@@ -2188,7 +2275,8 @@
     await loadEventTypes();
     await loadPackages();
     await loadAvailabilityCalendar();
-    showStep(1);
+    const _draftRestored = restoreDraft();
+    showStep(_draftRestored ? cur : 1);
     </script>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
