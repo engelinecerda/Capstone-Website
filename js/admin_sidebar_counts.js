@@ -210,5 +210,46 @@ export function initAdminSidebarBadges(supabase) {
     }
   });
 
+  injectSidebarHamburger();
+
   return refresh;
+}
+
+function injectSidebarHamburger() {
+  if (document.getElementById('sidebarHamburger')) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'sidebarHamburger';
+  btn.className = 'sidebar-hamburger';
+  btn.setAttribute('aria-label', 'Open menu');
+  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/>
+    <line x1="3" y1="12" x2="21" y2="12"/>
+    <line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'sidebarOverlay';
+  overlay.className = 'sidebar-overlay';
+
+  document.body.prepend(overlay);
+  document.body.prepend(btn);
+
+  btn.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-open');
+  });
+
+  overlay.addEventListener('click', () => {
+    document.body.classList.remove('sidebar-open');
+  });
+
+  // Close sidebar when a nav link is tapped on mobile
+  document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        document.body.classList.remove('sidebar-open');
+      }
+    });
+  });
 }

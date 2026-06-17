@@ -502,3 +502,10 @@ body {
   transition: color 0.15s, border-color 0.15s;
 }
 .add-row-btn:hover { color: var(--primary); border-color: var(--primary); }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-group.span-2 { grid-column: span 1; }
+  .settings-card { padding: 20px 16px; }
+}

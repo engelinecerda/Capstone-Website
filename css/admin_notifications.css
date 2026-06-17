@@ -453,3 +453,9 @@ body {
   line-height: 1;
   pointer-events: none;
 }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .notif-page-item { padding: 14px 16px; gap: 10px; }
+  .notif-page-item-title { font-size: 13.5px; }
+}

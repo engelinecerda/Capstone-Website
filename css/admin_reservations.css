@@ -2007,3 +2007,25 @@ body {
     width: 100%;
   }
 }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .toolbar-grid { grid-template-columns: 1fr; }
+  .filters-bar { flex-wrap: wrap; gap: 8px; }
+  .filter-select-wrap { border-left: none; padding-left: 0; flex-wrap: wrap; }
+  .filters-bar select { min-width: 0; width: 100%; }
+  .table-card { overflow-x: auto; }
+  .reschedule-alert { flex-direction: column; gap: 12px; }
+  .reschedule-alert-actions { width: 100%; }
+  .chips-row { gap: 6px; }
+  .chip { padding: 7px 10px; font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  .stat-row { grid-template-columns: 1fr 1fr; }
+}

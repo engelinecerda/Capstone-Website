@@ -555,3 +555,14 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .stat-grid    { grid-template-columns: repeat(2, 1fr); }
+  .toolbar-grid { grid-template-columns: 1fr; }
+  .table-head   { flex-direction: column; gap: 8px; align-items: flex-start; }
+}

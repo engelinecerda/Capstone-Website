@@ -331,3 +331,11 @@ body {
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-right { flex-direction: column; align-items: stretch; }
 }
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}

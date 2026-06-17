@@ -884,9 +884,7 @@ body {
 }
 
 @media (max-width: 720px) {
-  :root      { --sidebar-w: 0px; }
-  .sidebar   { display: none; }
-  .main      { margin-left: 0; width: 100%; padding: 20px 16px; }
+  .main          { margin-left: 0; width: 100%; padding: 64px 16px 40px; }
   .page-header   { flex-direction: column; }
   .history-row   { flex-direction: column; align-items: flex-start; }
   .history-right { width: 100%; flex-wrap: wrap; }
