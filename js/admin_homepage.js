@@ -456,7 +456,7 @@ document.getElementById('generateForecastBtn')?.addEventListener('click', async 
         fullData = Array.isArray(fresh) ? fresh : [];
         const selectedYear = demandYearSelect?.value;
         if (selectedYear) await renderDemandChart(selectedYear);
-
+        
         setDashboardMessage('Forecast regenerated successfully.');
     } catch (err) {
         setDashboardMessage(`Forecast generation failed: ${err.message}`, true);
