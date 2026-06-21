@@ -343,10 +343,13 @@ async function fetchContracts(reservationIds) {
     return (data || []).reduce((map, c) => { map[c.reservation_id] = c; return map; }, {});
 }
 
-fetch(`${API}/forecast`).catch(() => {});
+// Warm the backend as early as possible (page parse time) so cold starts on
+// Render's free tier overlap with auth/session checks instead of stacking on
+// top of them. Hits the lightweight /health endpoint — no DB/pandas work.
+fetch(`${API}/health`).catch(() => {});
 
 async function loadDashboard() {
-    setDashboardMessage('Loading reservations...');
+    setDashboardMessage('Waking up the server and loading reservations… this can take up to 30s on first load.');
     updateStats([], {});
     renderReservationsTable([], {});
 
@@ -490,11 +493,6 @@ window.addEventListener('resize', () => {
 
 wireLogoutButton();
 watchAuthState();
-
-
-fetch(`${API}/analytics/monthly-reservations`).catch(() => {});
-fetch(`${API}/analytics/package-distribution`).catch(() => {});
-fetch(`${API}/forecast`).catch(() => {});
 
 validateAdminSession({
     onSuccess: ({ profile }) => {

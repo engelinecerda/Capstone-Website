@@ -1,13 +1,11 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from supabase import create_client
-from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from fastapi import HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import subprocess
-import threading
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
 SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM" 
@@ -24,27 +22,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Run Prophet
-def run_forecast():
-    subprocess.run(["python", "python/forecast.py"])
-
-scheduler = BackgroundScheduler(timezone="Asia/Manila")
-
-scheduler.add_job(
-    run_forecast,
-    "cron",
-    hour=0,
-    minute=0,
-    id="daily_forecast"
-)
-
-@app.on_event("startup")
-def start_scheduler():
-    if not scheduler.running:
-        scheduler.start()
+# =========================
+# HEALTH / KEEP-ALIVE
+# =========================
+# Lightweight endpoint with zero heavy imports (no pandas/Prophet work),
+# so external uptime pingers can hit this to prevent Render free-tier
+# cold starts without triggering any real work.
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # =========================
-# FORECAST (scheduled)
+# FORECAST (read-only; generation now runs as a separate Render Cron Job)
 # =========================
 @app.get("/forecast")
 async def get_forecast():
@@ -111,7 +100,7 @@ async def get_forecast():
     return result
 
 # =========================
-# FORECAST (manual trigger)
+# FORECAST (manual trigger — kept for the "Update Forecast" button in the dashboard)
 # =========================
 class GenerateForecastRequest(BaseModel):
     user_id: str | None = None
