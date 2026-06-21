@@ -1,8 +1,4 @@
-export const BOOKING_LIMITS = {
-    onsite_vip: 1,
-    onsite_main_hall: 1,
-    offsite: 1
-};
+export const DAILY_BOOKING_LIMIT = 2;
 
 export const BLOCKING_RESERVATION_STATUSES = new Set(['pending', 'approved', 'confirmed', 'rescheduled']);
 
@@ -71,7 +67,7 @@ export function getOccupiedScopesFromReservations(reservations, dateKey, exclude
 
 export function isDateFullyBooked(occupiedScopes) {
     const scopeSet = new Set(occupiedScopes || []);
-    return Object.keys(BOOKING_LIMITS).every((scope) => scopeSet.has(scope));
+    return ['onsite_vip', 'onsite_main_hall', 'offsite'].every((scope) => scopeSet.has(scope));
 }
 
 export function isScopeOccupied(occupiedScopes, scope) {
@@ -80,19 +76,9 @@ export function isScopeOccupied(occupiedScopes, scope) {
 }
 
 export function getAvailabilitySummaryMessage(occupiedScopes, scope = '') {
-    if (isScopeOccupied(occupiedScopes, scope)) {
-        return `${getScopeLabel(scope)} already booked on this date.`;
-    }
-
-    if (isDateFullyBooked(occupiedScopes)) {
+    if ((occupiedScopes || []).length) {
         return 'This date is fully booked.';
     }
-
-    if ((occupiedScopes || []).length) {
-        const labels = (occupiedScopes || []).map((entry) => getScopeLabel(entry));
-        return `${labels.join(', ')} already booked on this date.`;
-    }
-
     return 'This date is available.';
 }
 

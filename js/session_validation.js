@@ -1,5 +1,22 @@
 
 //session_validation.js
+//
+// ─── ROLE NAMING NOTE ───────────────────────────────────────────────────────
+// The DB column `profiles.role` and all code in this codebase still use the
+// ORIGINAL role values 'admin' and 'super_admin'. Only the UI-facing LABELS
+// were renamed. The mapping is:
+//
+//   DB / code value      UI label shown to user
+//   ──────────────────   ───────────────────────
+//   role = 'admin'        →  "Manager"   (operational staff: reservations, reviews, customers)
+//   role = 'super_admin'  →  "Admin"     (non-operational: accounts, settings, backup, audit, etc.)
+//
+// This mismatch is intentional — renaming the DB/code values would require
+// touching every RLS policy, SQL trigger, edge function, and JS role check
+// across the project. Do NOT assume `role === 'super_admin'` means "super
+// admin" in the UI — it means the "Admin" role. Same for `role === 'admin'`
+// meaning "Manager" in the UI, not "Admin".
+// ──────────────────────────────────────────────────────────────────────────
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 
@@ -8,8 +25,10 @@ const ALLOWED_ROLES = ['admin', 'super_admin'];
 // ─── Role visibility ──────────────────────────────────────────────────────────
 // Reads .super-admin-only elements and shows/hides them based on role.
 // Also updates any sidebar title, badge, and role pill if present.
+// NOTE: role === 'super_admin' here means the "Admin" role in the UI — see
+// the naming note at the top of this file.
 export function applyRoleVisibility(role) {
-  const isSuperAdmin = role === 'super_admin';
+  const isSuperAdmin = role === 'super_admin'; // true → UI label "Admin"
 
    document.body.classList.remove('is-super-admin');
   if (isSuperAdmin) {
@@ -21,13 +40,17 @@ export function applyRoleVisibility(role) {
     el.style.display = isSuperAdmin ? 'flex' : 'none';
   });
 
+  document.querySelectorAll('.manager-only').forEach(el => {
+    el.style.display = isSuperAdmin ? 'none' : 'flex';
+  });
+
   const pill = document.getElementById('sidebarRolePill');
   const badge = document.getElementById('adminBadge');
   const title = document.getElementById('sidebarTitle');
 
-  if (pill) pill.textContent = isSuperAdmin ? 'Super Admin' : 'Admin';
-  if (badge) badge.textContent = isSuperAdmin ? 'Super Admin' : 'Admin';
-  if (title) title.textContent = isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel';
+  if (pill) pill.textContent = isSuperAdmin ? 'Admin' : 'Manager';
+  if (badge) badge.textContent = isSuperAdmin ? 'Admin' : 'Manager';
+  if (title) title.textContent = isSuperAdmin ? 'Admin Panel' : 'Manager Panel';
 
   // Set data-role for CSS targeting
   if (pill) pill.dataset.role = role;

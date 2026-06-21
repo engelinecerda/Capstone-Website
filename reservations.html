@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="/css/reservations.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <title>ELI Coffee Reservations</title>
     
     <style>
@@ -79,7 +80,17 @@
                         </div>
                     </div>
                     <div id="venue-wrapper" class="venue-wrapper hidden">
-                        <input class="res-input" type="text" id="venue-location" placeholder="Enter complete venue address (e.g., 0221 National Road, Calumpang, Binangonan, Rizal) *">
+                        <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically.</p>
+                        <div class="venue-search-row">
+                            <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)">
+                            <button type="button" id="venue-search-btn" class="venue-search-btn">Search</button>
+                        </div>
+                        <div id="venue-map" class="venue-map-container"></div>
+                        <div class="venue-pinned-row">
+                            <span class="venue-pin-icon">&#128205;</span>
+                            <span id="venue-pinned-label">Click the map or search an address to pin your venue.</span>
+                        </div>
+                        <input type="hidden" id="venue-location" value="">
                     </div>
                 </div>
 
@@ -306,12 +317,9 @@
         fetchBlackoutDates,
         fetchCalendarAvailability,
         fetchDateAvailability,
-        getAvailabilitySummaryMessage,
         getBookingScope as getSharedBookingScope,
         getCalendarRange,
         getScopeLabel,
-        isDateFullyBooked as isFullyBookedFromScopes,
-        isScopeOccupied
     } from '/js/reservation_availability.js';
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -326,6 +334,58 @@
         name: '', phone: '', email: '', requests: '',
         time: ''
     };
+
+    const DRAFT_KEY = 'eli_reservation_draft';
+
+    function saveDraft() {
+        try {
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ state: S, step: cur }));
+        } catch { /* sessionStorage unavailable */ }
+    }
+
+    function clearDraft() {
+        try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+
+    function restoreDraft() {
+        try {
+            const raw = sessionStorage.getItem(DRAFT_KEY);
+            if (!raw) return false;
+            const { state: saved, step: savedStep } = JSON.parse(raw);
+            if (!saved || typeof savedStep !== 'number') return false;
+
+            Object.assign(S, saved);
+            cur = Math.min(Math.max(savedStep, 1), total());
+
+            const etEl = document.getElementById('event-type');
+            if (etEl && S.eventType) etEl.value = S.eventType;
+
+            const gcEl = document.getElementById('guest-count');
+            if (gcEl && S.guestCount) gcEl.value = S.guestCount;
+
+            const nameEl = document.getElementById('name');
+            if (nameEl && S.name) nameEl.value = S.name;
+
+            const phoneEl = document.getElementById('phone');
+            if (phoneEl && S.phone) phoneEl.value = S.phone;
+
+            const emailEl = document.getElementById('email');
+            if (emailEl && S.email) emailEl.value = S.email;
+
+            const reqEl = document.getElementById('requests');
+            if (reqEl && S.requests) reqEl.value = S.requests;
+
+            if (S.locationType) {
+                document.querySelectorAll('.location-card').forEach(c => {
+                    c.classList.toggle('active', c.dataset.val === S.locationType);
+                });
+            }
+
+            if (S.eventDate) syncSelectedDate(S.eventDate);
+
+            return true;
+        } catch { return false; }
+    }
 
     const eventDateInput = document.getElementById('event-date');
     const eventDateDisplayInput = document.getElementById('event-date-display');
@@ -817,7 +877,7 @@
         if (S.eventDate && (!selectedScope || isDateUnavailableForScope(S.eventDate, selectedScope))) {
             const dateAvailability = getDateAvailability(S.eventDate);
             const conflictMessage = selectedScope
-                ? `${getAvailabilitySummaryMessage(dateAvailability.occupiedScopes, selectedScope)} Choose another available date to see time slots.`
+                ? 'This date is fully booked. Choose another available date to see time slots.'
                 : getScopeSelectionPrompt();
             syncSelectedDate('');
             S.time = '';
@@ -874,15 +934,13 @@
     }
 
     function isDateFullyBooked(dateKey) {
-        return isFullyBookedFromScopes(getDateAvailability(dateKey).occupiedScopes);
+        return getDateAvailability(dateKey).isFullyBooked;
     }
 
     function isDateUnavailableForScope(dateKey, scope) {
         if (!dateKey) return false;
         if (availabilityState.closedDates.has(dateKey)) return true;
-        const availability = getDateAvailability(dateKey);
-        if (!scope) return availability.isFullyBooked || isDateFullyBooked(dateKey);
-        return isScopeOccupied(availability.occupiedScopes, scope);
+        return getDateAvailability(dateKey).isFullyBooked;
     }
 
     async function resolveAvailabilityBlackoutColumn() {
@@ -984,14 +1042,10 @@
                 dayBtn.title = getScopeSelectionPrompt();
             } else if (isBooked) {
                 dayBtn.classList.add('booked');
-                dayBtn.title = selectedScope
-                    ? getAvailabilitySummaryMessage(dayAvailability.occupiedScopes, selectedScope)
-                    : 'This date is fully booked.';
+                dayBtn.title = 'This date is fully booked.';
                 dayBtn.setAttribute('aria-disabled', 'true');
                 dayBtn.addEventListener('click', () => {
-                    const reason = selectedScope
-                        ? getAvailabilitySummaryMessage(dayAvailability.occupiedScopes, selectedScope)
-                        : 'This date is fully booked.';
+                    const reason = 'This date is fully booked.';
                     syncSelectedDate('');
                     S.time = '';
                     availabilityState.selectedDateAvailability = null;
@@ -1093,7 +1147,7 @@
             availabilityState.selectedDateAvailability = availability;
 
             if (availability.scopeTaken) {
-                setAvailabilityMessage(getAvailabilitySummaryMessage(availability.occupiedScopes, selectedScope), true);
+                setAvailabilityMessage('This date is fully booked.', true);
             } else {
                 setAvailabilityMessage(`Selected ${formatDisplayDate(S.eventDate)}.`, false);
             }
@@ -1137,6 +1191,34 @@
             hours: fallback.hours || '',
             credit: fallback.credit || ''
         };
+    }
+
+    // ── Load event types from Supabase ──
+    async function loadEventTypes() {
+        const sel = document.getElementById('event-type');
+        const { data, error } = await supabase
+            .from('event_types')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) { console.error('event_types fetch error:', error); return; }
+        if (!data || data.length === 0) { console.warn('event_types: no rows returned', data); return; }
+
+        console.log('event_types rows:', data);
+
+        data.forEach(et => {
+            // skip archived — works whether column is status:'Active' or is_active:true
+            if (et.status && et.status !== 'Active') return;
+            if (et.is_active === false) return;
+
+            const label = et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1];
+            if (!label) return;
+
+            const opt = document.createElement('option');
+            opt.value = label;
+            opt.textContent = label;
+            sel.appendChild(opt);
+        });
     }
 
     // ── Load packages from Supabase ──
@@ -1389,6 +1471,7 @@ function isCateringCategory(name = '') {
         document.getElementById('nextBtn').textContent = n === total() ? 'Submit' : 'Next \u2192';
 
         populate(sid(n));
+        saveDraft();
     }
 
     function populate(id) {
@@ -1944,10 +2027,10 @@ function isCateringCategory(name = '') {
             if (timeStatusNote) {
                 timeStatusNote.textContent = 'Choose your location and package first so the correct booking slot can be checked.';
             }
-        } else if (selectedAvailability.scopeTaken || isScopeOccupied(selectedAvailability.occupiedScopes, selectedScope)) {
+        } else if (selectedAvailability.scopeTaken) {
             S.time = '';
             if (timeStatusNote) {
-                timeStatusNote.textContent = getAvailabilitySummaryMessage(selectedAvailability.occupiedScopes, selectedScope);
+                timeStatusNote.textContent = 'This date is fully booked.';
             }
         } else if (timeStatusNote) {
             timeStatusNote.textContent = blockedTimes.size
@@ -2159,6 +2242,11 @@ function isCateringCategory(name = '') {
             S.cateringCart    = [];
             S.time            = '';
             document.getElementById('venue-wrapper').classList.toggle('hidden', S.locationType !== 'offsite');
+            if (S.locationType === 'offsite') {
+                setTimeout(function () {
+                    if (window.venueMap) { window.venueMap.invalidateSize(); }
+                }, 150);
+            }
             buildStep3();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2197,7 +2285,7 @@ function isCateringCategory(name = '') {
             if (getSelectedBookingScope() && latestAvailability.scopeTaken) {
                 availabilityState.selectedDateAvailability = latestAvailability;
                 buildTimeGrid();
-                throw new Error(getAvailabilitySummaryMessage(latestAvailability.occupiedScopes, getSelectedBookingScope()));
+                throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
             }
 
             const { data: { session } } = await supabase.auth.getSession();
@@ -2331,6 +2419,28 @@ function isCateringCategory(name = '') {
                 throw new Error('Contract save failed: ' + contractInsertError.message);
             }
 
+            // ── Auto-verify contract signature via Edge Function ──────────────
+            let autoVerified = false;
+            try {
+                console.log('[verify-contract] invoking →', { reservation_id: reservation.reservation_id, contract_url: contractUrl });
+                const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-contract', {
+                    body: { reservation_id: reservation.reservation_id, contract_url: contractUrl }
+                });
+                console.log('[verify-contract] response →', JSON.stringify({ verifyData, verifyError: verifyError?.message ?? null }));
+                if (verifyError) {
+                    console.warn('[verify-contract] function error:', verifyError.message);
+                } else if (verifyData?.verified === true) {
+                    autoVerified = true;
+                } else {
+                    console.log('[verify-contract] not auto-verified:', verifyData?.reason ?? verifyData?.error ?? 'unknown reason');
+                }
+            } catch (verifyErr) {
+                console.warn('[verify-contract] invocation threw:', verifyErr?.message || verifyErr);
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            clearDraft();
+
             document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
             document.querySelector('.reservation-buttons').style.display = 'none';
             document.querySelector('.progress-container').style.display  = 'none';
@@ -2338,14 +2448,26 @@ function isCateringCategory(name = '') {
             const msg = document.createElement('div');
             msg.className = 'summary-box';
             msg.style.cssText = 'text-align:center;padding:48px 20px;';
-            msg.innerHTML =
-                '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
-                '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
-                '<p style="color:#777;line-height:1.8;font-size:15px;">' +
-                'Thank you, <strong>' + S.name + '</strong>!<br>' +
-                'Your reservation is <strong style="color:#6B3A1F;">under verification</strong>.<br>' +
-                'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
-                '</p>';
+            if (autoVerified) {
+                msg.innerHTML =
+                    '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
+                    '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
+                    '<p style="color:#777;line-height:1.8;font-size:15px;">' +
+                    'Thank you, <strong>' + S.name + '</strong>!<br>' +
+                    'Your signed contract was <strong style="color:#6B3A1F;">automatically verified</strong>.<br>' +
+                    'Your reservation has been advanced to the finalization stage.<br>' +
+                    'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
+                    '</p>';
+            } else {
+                msg.innerHTML =
+                    '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
+                    '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
+                    '<p style="color:#777;line-height:1.8;font-size:15px;">' +
+                    'Thank you, <strong>' + S.name + '</strong>!<br>' +
+                    'Your reservation is <strong style="color:#6B3A1F;">under verification</strong>.<br>' +
+                    'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
+                    '</p>';
+            }
             document.querySelector('.reservation-container').appendChild(msg);
 
         } catch (err) {
@@ -2409,12 +2531,166 @@ function isCateringCategory(name = '') {
         el.classList.add('active');
     }
 
+    // Load map scope config from system_settings, expose for non-module Leaflet script
+    try {
+        const { data: mapSetting } = await supabase
+            .from('system_settings')
+            .select('setting_value')
+            .eq('setting_key', 'venue_map_scope')
+            .maybeSingle();
+        if (mapSetting?.setting_value) window.venueMapConfig = JSON.parse(mapSetting.setting_value);
+    } catch { /* non-critical — Leaflet IIFE falls back to hardcoded Rizal defaults */ }
+
     // Load packages from DB first, then start the form
     syncSelectedDate('');
     await prefillReservationContactDetails();
     await Promise.all([loadPackages(), loadEventTypes()]);
     await loadAvailabilityCalendar();
-    showStep(1);
+    const _draftRestored = restoreDraft();
+    showStep(_draftRestored ? cur : 1);
+    </script>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        // Geographic bounds — loaded from system_settings, falling back to Rizal province defaults
+        var cfg          = window.venueMapConfig || {};
+        var RIZAL_CENTER = [cfg.center_lat || 14.5794, cfg.center_lng || 121.1878];
+        var RIZAL_BOUNDS = [
+            [cfg.sw_lat || 14.26, cfg.sw_lng || 120.95],
+            [cfg.ne_lat || 14.82, cfg.ne_lng || 121.62]
+        ];
+
+        var map            = null;
+        var marker         = null;
+        var mapInitialized = false;
+
+        function initVenueMap() {
+            if (mapInitialized) return;
+            mapInitialized = true;
+
+            window.venueMap = map = L.map('venue-map', {
+                center:             RIZAL_CENTER,
+                zoom:               11,
+                maxBounds:          RIZAL_BOUNDS,
+                maxBoundsViscosity: 1.0,
+                minZoom:            10,
+                maxZoom:            18
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            map.on('click', function (e) {
+                placeMarker(e.latlng.lat, e.latlng.lng, true);
+            });
+        }
+
+        function placeMarker(lat, lng, doReverseGeocode) {
+            if (!map) return;
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            } else {
+                marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+                marker.on('dragend', function () {
+                    var pos = marker.getLatLng();
+                    reverseGeocode(pos.lat, pos.lng);
+                });
+            }
+            map.panTo([lat, lng]);
+            if (doReverseGeocode) reverseGeocode(lat, lng);
+        }
+
+        function setVenueAddress(address) {
+            var label  = document.getElementById('venue-pinned-label');
+            var hidden = document.getElementById('venue-location');
+            if (label)  label.textContent = address;
+            if (hidden) hidden.value       = address;
+        }
+
+        function reverseGeocode(lat, lng) {
+            setVenueAddress('Looking up address…');
+            fetch(
+                'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json',
+                { headers: { 'Accept-Language': 'en' } }
+            )
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                setVenueAddress(d.display_name || (lat.toFixed(5) + ', ' + lng.toFixed(5)));
+            })
+            .catch(function () {
+                setVenueAddress(lat.toFixed(5) + ', ' + lng.toFixed(5));
+            });
+        }
+
+        function searchAddress(query) {
+            if (!query.trim()) return;
+            setVenueAddress('Searching…');
+
+            var viewbox = (cfg.sw_lng||120.95)+','+(cfg.sw_lat||14.26)+','+(cfg.ne_lng||121.62)+','+(cfg.ne_lat||14.82);
+            var url = 'https://nominatim.openstreetmap.org/search'
+                + '?q='        + encodeURIComponent(query + ', Rizal, Philippines')
+                + '&format=json&limit=1'
+                + '&viewbox='  + viewbox
+                + '&bounded=1&countrycodes=ph';
+
+            fetch(url, { headers: { 'Accept-Language': 'en' } })
+            .then(function (r) { return r.json(); })
+            .then(function (results) {
+                if (!results.length) {
+                    setVenueAddress('No results found in Rizal. Try a more specific address.');
+                    return;
+                }
+                var r = results[0];
+                placeMarker(parseFloat(r.lat), parseFloat(r.lon), false);
+                setVenueAddress(r.display_name);
+            })
+            .catch(function () {
+                setVenueAddress('Search failed. Please try again.');
+            });
+        }
+
+        // Show map when venue-wrapper becomes visible (offsite selected)
+        // Uses MutationObserver on the hidden class toggle.
+        var observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                if (m.attributeName === 'class') {
+                    var wrapper = document.getElementById('venue-wrapper');
+                    if (wrapper && !wrapper.classList.contains('hidden')) {
+                        setTimeout(function () {
+                            initVenueMap();
+                            if (map) map.invalidateSize();
+                        }, 120);
+                    }
+                }
+            });
+        });
+
+        // Script is at bottom of <body> — DOM is already ready, run immediately.
+        var wrapper     = document.getElementById('venue-wrapper');
+        var searchBtn   = document.getElementById('venue-search-btn');
+        var searchInput = document.getElementById('venue-search-input');
+
+        if (wrapper) observer.observe(wrapper, { attributes: true });
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', function () {
+                if (searchInput) searchAddress(searchInput.value);
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAddress(searchInput.value);
+                }
+            });
+        }
+    })();
     </script>
 
 </body>

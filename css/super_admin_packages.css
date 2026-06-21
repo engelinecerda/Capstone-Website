@@ -1106,9 +1106,7 @@ body {
 }
 
 @media (max-width: 720px) {
-  :root { --sidebar-w: 0px; }
-  .sidebar { display: none; }
-  .main { margin-left: 0; width: 100%; padding: 20px 16px; }
+  .main { margin-left: 0; width: 100%; padding: 64px 16px 40px; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .modal-row { grid-template-columns: 1fr; }
   .modal-row-three { grid-template-columns: 1fr; }

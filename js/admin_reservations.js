@@ -5,11 +5,9 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 import {
   fetchDateAvailability,
-  getAvailabilitySummaryMessage,
   getBookingScope as getSharedBookingScope,
   getOccupiedScopesFromReservations,
   getScopeLabel as getSharedScopeLabel,
-  isDateFullyBooked as isFullyBookedFromScopes
 } from './reservation_availability.js';
 
 const tableMessage = document.getElementById('tableMessage');
@@ -82,7 +80,8 @@ const PAYMENT_TYPE_LABELS = {
   reservation_fee: 'Reservation Fee',
   down_payment: 'Down Payment',
   full_payment: 'Full Payment',
-  reschedule_fee: 'Reschedule Fee'
+  reschedule_fee: 'Reschedule Fee',
+  cancellation_fee: 'Cancellation Fee'
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
@@ -600,22 +599,25 @@ function getScopeLabel(scope) {
 }
 
 function getApprovalLimitMessage(reservation) {
-  const scope = getBookingScope(reservation);
-  if (!scope) return '';
-
   const dateKey = String(reservation.event_date || '').split('T')[0];
   if (!dateKey) return 'Cannot approve this reservation because it has no event date.';
 
-  const occupiedScopes = getOccupiedScopesFromReservations(reservationsCache, dateKey, reservation.reservation_id);
-  if (!occupiedScopes.includes(scope)) return '';
+  const BLOCKING = new Set([
+    'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
+    'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
+  ]);
+  const count = (reservationsCache || []).filter((r) =>
+    String(r.event_date || '').split('T')[0] === dateKey &&
+    String(r.reservation_id) !== String(reservation.reservation_id) &&
+    BLOCKING.has(String(r.status || '').toLowerCase())
+  ).length;
+
+  if (count < 2) return '';
 
   const formattedDate = new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-PH', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+    year: 'numeric', month: 'long', day: 'numeric'
   });
-
-  return `Cannot approve this reservation. ${getAvailabilitySummaryMessage(occupiedScopes, scope).replace('on this date.', `on ${formattedDate}.`)}`;
+  return `Cannot approve this reservation. ${formattedDate} is already fully booked (maximum 2 reservations per day).`;
 }
 
 function getReservationDurationHours(reservation) {
@@ -1226,6 +1228,13 @@ function renderReservationDetailsModal() {
         <button class="action-btn decline" data-action="decline" data-id="${reservation.reservation_id}" data-reservation-id="${reservation.reservation_id}">Decline</button>
       </div>
       ${!approvalState.canApprove ? `<div class="details-empty-inline">${escapeHtml(approvalState.reason)}</div>` : ''}
+    ` : reservationStatus.key === 'cancellation_requested' ? `
+      <div class="details-empty-inline">Customer has requested to cancel this reservation. Verify the cancellation fee payment first, then process the cancellation below.</div>
+      <div class="details-action-row">
+        <button class="action-btn approve" data-action="confirm-cancellation" data-reservation-id="${reservation.reservation_id}">
+          Process Cancellation
+        </button>
+      </div>
     ` : '<div class="details-empty-inline">No reservation status action is needed right now.</div>';
 
     const rescheduleMarkup = activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'pending' ? `
@@ -1710,7 +1719,7 @@ async function handlePaymentReview(reservationId, paymentId, nextStatus) {
     });
 
     if (availability.scopeTaken) {
-      throw new Error(getAvailabilitySummaryMessage(availability.occupiedScopes, getBookingScope(reservation)));
+      throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
     }
   }
 
@@ -1787,7 +1796,7 @@ async function handleRescheduleReview(requestId, nextStatus) {
     });
 
     if (availability.scopeTaken) {
-      throw new Error(getAvailabilitySummaryMessage(availability.occupiedScopes, getBookingScope(reservation)));
+      throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
     }
   }
 
@@ -2051,6 +2060,11 @@ async function performReservationAction(action, button) {
     return { shouldReload: true, message: 'Customer has been asked to re-upload the signed contract.' };
   }
 
+  if (action === 'confirm-cancellation') {
+    await updateReservationStatus(reservationId, 'cancelled', 'cancellation_requested');
+    return { shouldReload: true, message: 'Reservation has been cancelled.' };
+  }
+
   if (action === 'approve-reschedule') {
     await handleRescheduleReview(button.dataset.requestId, 'approved_pending_payment');
     await logAudit({
@@ -2194,10 +2208,17 @@ function renderCalendar(bookedDates = []) {
     const isToday = iso === todayIso;
     const cell = document.createElement('div');
     cell.className = 'calendar-cell';
-    const occupiedScopes = getOccupiedScopesFromReservations(reservationsCache, iso);
     const booked = bookedSet.has(iso);
     const closed = closedSet.has(iso);
     const formattedDate = formatBlackoutDate(iso);
+    const BLOCKING_STATUSES = new Set([
+      'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
+      'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
+    ]);
+    const dayCount = (reservationsCache || []).filter((r) =>
+      String(r.event_date || '').split('T')[0] === iso &&
+      BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
+    ).length;
     let statusKey = 'open';
     let statusLabel = 'Open';
     let titleText = `${formattedDate} is open. Click to close this date.`;
@@ -2217,9 +2238,9 @@ function renderCalendar(bookedDates = []) {
       cell.classList.add('booked');
       statusKey = 'booked';
       statusLabel = 'Booked';
-      titleText = isFullyBookedFromScopes(occupiedScopes)
-        ? `${formattedDate} is fully booked.`
-        : `${formattedDate} has active bookings. ${getAvailabilitySummaryMessage(occupiedScopes)}`;
+      titleText = dayCount >= 2
+        ? `${formattedDate} is fully booked (${dayCount}/2 reservations).`
+        : `${formattedDate} has ${dayCount} active reservation${dayCount !== 1 ? 's' : ''}.`;
     } else {
       cell.classList.add('available');
     }

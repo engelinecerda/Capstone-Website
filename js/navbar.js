@@ -1,5 +1,6 @@
 // navbar.js
 import { customerSupabase as supabase } from './supabase.js';
+import { initCustomerNotificationBell } from './notifications.js';
 
 async function updateNavbar() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -16,9 +17,13 @@ async function updateNavbar() {
 
         const displayName = profile ? profile.first_name : 'Account';
 
+        // #notifBellMount is the injection point for the notification bell
         navBtn.innerHTML = `
+            <span id="notifBellMount"></span>
             <a href="/account.html" class="button">${displayName}</a>
         `;
+
+        initCustomerNotificationBell(supabase, session.user.id);
 
     } else {
         navBtn.innerHTML = `

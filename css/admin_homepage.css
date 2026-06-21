@@ -631,3 +631,21 @@ body {
   .status-chips { grid-template-columns: repeat(2, 1fr); }
   .section-head { flex-direction: column; }
 }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .status-chips { grid-template-columns: repeat(3, 1fr); }
+  .charts-row   { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .stat-grid    { grid-template-columns: repeat(2, 1fr); }
+  .status-chips { grid-template-columns: repeat(2, 1fr); }
+  .charts-row   { grid-template-columns: 1fr; }
+  .demand-head  { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+@media (max-width: 480px) {
+  .stat-grid    { grid-template-columns: 1fr 1fr; }
+  .stat-value   { font-size: 28px; }
+}

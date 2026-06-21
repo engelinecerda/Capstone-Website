@@ -109,8 +109,10 @@ export async function loadDynamicPaymentMethods(supabase) {
 export const PAYMENT_TYPE_META = {
     reservation_fee: { label: 'Reservation Fee', description: 'Fixed reservation fee' },
     down_payment: { label: 'Down Payment', description: '50% of your total amount' },
+    partial_payment: { label: 'Custom Amount', description: 'Customer-specified partial payment' },
     full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
-    reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' }
+    reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' },
+    cancellation_fee: { label: 'Cancellation Fee', description: 'Required fee to process the reservation cancellation' }
 };
 
 export const PAYMENT_STATUS_META = {
@@ -288,7 +290,7 @@ export function getPaymentActionLabel(paymentType, reservation, amount, reschedu
 }
 
 export function isReservationPaymentEnabled(reservation) {
-    return ['approved', 'confirmed', 'rescheduled', 'completed'].includes(String(reservation?.status || '').toLowerCase());
+    return ['approved', 'confirmed', 'rescheduled', 'completed', 'cancellation_requested'].includes(String(reservation?.status || '').toLowerCase());
 }
 
 function buildPaymentOption(reservation, paymentType, amount, paymentsByReservationId, options = {}) {
@@ -400,6 +402,20 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
                 }));
             }
         });
+
+    if (String(reservation?.status || '').toLowerCase() === 'cancellation_requested') {
+        const hasPendingCancellationFee = getReservationPayments(paymentsByReservationId, reservationId).some((p) =>
+            p.payment_type === 'cancellation_fee' &&
+            ['pending_review', 'approved'].includes(String(p.payment_status || '').toLowerCase())
+        );
+        if (!hasPendingCancellationFee) {
+            const cancellationFeeAmount = String(reservation.location_type || '').toLowerCase() === 'offsite' ? 2000 : 500;
+            optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', cancellationFeeAmount, paymentsByReservationId, {
+                ...options,
+                displayDescription: 'Required fee to process the cancellation of your reservation.'
+            }));
+        }
+    }
 
     return optionsList.filter((option) => option.amount > 0);
 }
