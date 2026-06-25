@@ -2,7 +2,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 
 export function setupInactivityLogout(role) {
-    if (role !== "super_admin") return;
+    if (role !== "admin") return;
 
     let timeout;
     const INACTIVITY_LIMIT = 2 * 60 * 60 * 1000; // 2 hours

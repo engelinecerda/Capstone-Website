@@ -180,6 +180,12 @@ body {
     letter-spacing: 0.08em;
 }
 
+/* Hide browser-native password reveal button (Edge, IE, Chrome) */
+.password-wrapper input[type="password"]::-ms-reveal,
+.password-wrapper input[type="password"]::-ms-clear {
+    display: none;
+}
+
 .password-wrapper input::placeholder {
     font-size: 16px;
     letter-spacing: 0.08em;

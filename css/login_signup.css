@@ -267,6 +267,31 @@ body {
     color: #c0392b;
 }
 
+.admin-link {
+    text-align: center;
+    margin-top: 18px;
+    font-size: 0.875rem;
+    color: #6b7280;
+    line-height: 1.6;
+}
+
+.admin-link a {
+    color: #3D1A07;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1.5px;
+    transition: color 0.15s;
+}
+
+.admin-link a:visited {
+    color: #3D1A07;
+}
+
+.admin-link a:hover {
+    color: #1a0903;
+}
+
 /* ========================
    Responsive
 ======================== */

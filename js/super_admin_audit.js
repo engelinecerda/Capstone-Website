@@ -361,7 +361,7 @@ function init() {
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
       const adminBadge = document.getElementById('adminBadge');
-      if (adminBadge) adminBadge.textContent = profile.role === 'super_admin' ? 'Super Admin' : 'Admin';
+      if (adminBadge) adminBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
       loadStats();
       loadAuditLogs();
     }

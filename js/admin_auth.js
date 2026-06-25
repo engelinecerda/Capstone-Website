@@ -92,11 +92,11 @@ export async function verifyPortalSession(supabase, options = {}) {
 }
 
 export async function verifyAdminSession(supabase, options = {}) {
-  return verifyPortalSession(supabase, { ...options, requiredRole: 'admin' });
+  return verifyPortalSession(supabase, { ...options, requiredRole: 'manager' });
 }
 
 export async function verifySuperAdminSession(supabase, options = {}) {
-  return verifyPortalSession(supabase, { ...options, requiredRole: 'super_admin' });
+  return verifyPortalSession(supabase, { ...options, requiredRole: 'admin' });
 }
 
 // ADDED: accepts an array of allowed roles instead of one exact role

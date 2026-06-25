@@ -26,10 +26,10 @@ export async function logAudit({ action, category, details, entityId }) {
 
         userName = fullName || user.email;
 
-        if (effectiveRole === 'super_admin') {
-            userRole = 'Super Admin';
-        } else if (effectiveRole === 'admin') {
+        if (effectiveRole === 'admin') {
             userRole = 'Admin';
+        } else if (effectiveRole === 'manager') {
+            userRole = 'Manager';
         } else if (effectiveRole === 'staff') {
             userRole = 'Staff';
         }

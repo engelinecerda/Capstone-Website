@@ -948,7 +948,7 @@ validateAdminSession({
     setupInactivityLogout(profile.role);
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
     
-    if (profile.role === 'super_admin') {
+    if (profile.role === 'admin') {
       document.body.classList.add('is-super-admin');
     } else {
       document.body.classList.remove('is-super-admin');

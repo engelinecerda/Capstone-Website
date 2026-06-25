@@ -36,6 +36,41 @@ const BELL_SVG = (size = 17) =>
     <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
   </svg>`;
 
+// ── Notification type icon avatars ────────────────────────────────────────────
+function notifTypeIcon(type) {
+  const icons = {
+    reservation: {
+      bg: '#eff6ff', color: '#2563eb',
+      svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    },
+    contract: {
+      bg: '#f5f3ff', color: '#7c3aed',
+      svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+    },
+    payment: {
+      bg: '#ecfdf5', color: '#059669',
+      svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`,
+    },
+    review: {
+      bg: '#fffbeb', color: '#d97706',
+      svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`,
+    },
+    account: {
+      bg: '#f0f9ff', color: '#0284c7',
+      svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>`,
+    },
+    system: {
+      bg: '#f9fafb', color: '#6b7280',
+      svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    },
+  };
+  const cfg = icons[(type || '').toLowerCase()] || {
+    bg: '#fdf6ee', color: '#7c5c3a',
+    svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  };
+  return `<span class="notif-type-icon" style="background:${cfg.bg};color:${cfg.color}">${cfg.svg}</span>`;
+}
+
 // ── Shared notification logic ──────────────────────────────────────────────────
 function renderList(listEl, notifications) {
   if (!notifications.length) {
@@ -47,11 +82,18 @@ function renderList(listEl, notifications) {
     return;
   }
   listEl.innerHTML = notifications.map(n => `
-    <li class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${escHtml(n.id)}" data-link="${escHtml(n.link || '')}">
-      <span class="notif-item-title">${escHtml(n.title)}</span>
-      ${n.is_read ? '<span></span>' : '<span class="notif-unread-dot"></span>'}
-      <span class="notif-item-body">${escHtml(n.body)}</span>
-      <span class="notif-item-time">${relativeTime(n.created_at)}</span>
+    <li class="notif-item ${n.is_read ? '' : 'unread'}"
+        data-id="${escHtml(n.id)}"
+        data-link="${escHtml(n.link || '')}">
+      ${notifTypeIcon(n.type)}
+      <span class="notif-item-content">
+        <span class="notif-item-header">
+          <span class="notif-item-title">${escHtml(n.title)}</span>
+          <span class="notif-item-time">${relativeTime(n.created_at)}</span>
+        </span>
+        <span class="notif-item-body">${escHtml(n.body)}</span>
+      </span>
+      ${n.is_read ? '' : '<span class="notif-unread-dot"></span>'}
     </li>`).join('');
 }
 
@@ -65,6 +107,17 @@ function syncBadge(badgeEl, count) {
   }
 }
 
+function syncUnreadPill(count) {
+  const el = document.getElementById('notifUnreadCountCustomer');
+  if (!el) return;
+  if (count > 0) {
+    el.textContent = `${count} unread`;
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
 async function fetchAndRender(supabase, userId, listEl, badgeEl) {
   try {
     const { data } = await supabase
@@ -75,7 +128,9 @@ async function fetchAndRender(supabase, userId, listEl, badgeEl) {
       .limit(20);
     const notifs = data || [];
     renderList(listEl, notifs);
-    syncBadge(badgeEl, notifs.filter(n => !n.is_read).length);
+    const unread = notifs.filter(n => !n.is_read).length;
+    syncBadge(badgeEl, unread);
+    syncUnreadPill(unread);
   } catch { /* silently ignore fetch failures */ }
 }
 
@@ -99,7 +154,9 @@ async function markOne(supabase, id, listEl, badgeEl) {
       const dot = item.querySelector('.notif-unread-dot');
       if (dot) dot.replaceWith(document.createElement('span'));
     }
-    syncBadge(badgeEl, listEl.querySelectorAll('.notif-item.unread').length);
+    const unread = listEl.querySelectorAll('.notif-item.unread').length;
+    syncBadge(badgeEl, unread);
+    syncUnreadPill(unread);
   } catch { /* ignore */ }
 }
 
@@ -169,7 +226,10 @@ export async function initCustomerNotificationBell(supabase, userId) {
       </button>
       <div class="notif-panel" id="notifPanelCustomer" hidden>
         <div class="notif-panel-header">
-          <span class="notif-panel-title">Notifications</span>
+          <span class="notif-panel-header-left">
+            <span class="notif-panel-title">Notifications</span>
+            <span class="notif-panel-unread-count" id="notifUnreadCountCustomer" hidden></span>
+          </span>
           <button class="notif-mark-all-btn" id="notifMarkAllCustomer">Mark all read</button>
         </div>
         <ul class="notif-list" id="notifListCustomer"></ul>

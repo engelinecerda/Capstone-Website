@@ -125,7 +125,7 @@ function getBlackoutSchemaHint(error) {
     return "calendar_blackouts expects the blackout date in `closed_date`, not `date`. The page will now auto-detect that column, so reload and try again.";
   }
   if (message.includes('row-level security policy')) {
-    return "Your session is logged in, but the `calendar_blackouts` RLS policy is still denying inserts. If `profiles` now uses `user_id`, recreate the blackout policy so it checks `p.user_id = auth.uid()` and confirm your profile row has `role = 'admin'`.";
+    return "Your session is logged in, but the `calendar_blackouts` RLS policy is still denying inserts. If `profiles` now uses `user_id`, recreate the blackout policy so it checks `p.user_id = auth.uid()` and confirm your profile row has `role = 'manager'`.";
   }
   if (
     message.includes("Could not find the 'note' column of 'calendar_blackouts' in the schema cache")

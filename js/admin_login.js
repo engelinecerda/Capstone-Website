@@ -22,7 +22,7 @@ const mfaState = {
 };
 
 const PORTAL_ROUTES = {
-    super_admin: '/admin/dashboard.html',
+    manager: '/admin/dashboard.html',
     admin: '/admin/dashboard.html',
     staff: '/admin/staff/index.html'
 };
@@ -98,7 +98,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
     const targetRoute = getPortalRoute(selectedRole);
 
     if (!targetRoute) {
-        setMessage('This portal currently supports Super Admin, Admin, and Staff roles only.', 'error');
+        setMessage('This portal currently supports Manager, Admin, and Staff roles only.', 'error');
         roleSelect?.focus();
         return;
     }
@@ -132,13 +132,13 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         .eq('user_id', data.user.id)
         .maybeSingle();
 
-    if (lockError || !profileCheck) {
+    if (lockError) {
+        // is_locked column may not exist yet — role check below is the security gate
+    } else if (!profileCheck) {
         await supabase.auth.signOut();
-        setMessage('Unable to verify account status.', 'error');
+        setMessage('No account profile found. Contact the administrator to set up your account.', 'error');
         return;
-    }
-
-    if (profileCheck.is_locked === true) {
+    } else if (profileCheck.is_locked === true) {
         await supabase.auth.signOut();
         setMessage('Your account has been locked by the administrator.', 'error');
         return;

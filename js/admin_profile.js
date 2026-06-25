@@ -96,7 +96,7 @@ function renderProfileShell() {
     nameEl: sidebarName,
     emailEl: sidebarEmail,
     roleEl: sidebarRolePill,
-    fallbackLabel: profile.role === 'super_admin' ? 'Super Admin' : 'Admin'
+    fallbackLabel: profile.role === 'admin' ? 'Admin' : 'Manager'
   });
 
   if (heroAvatar) heroAvatar.textContent = getPortalInitials(profile, 'A');
@@ -120,7 +120,7 @@ async function handleProfileSubmit(event) {
     last_name: profileLastName.value.trim(),
     email: state.session.user.email || '',
     phone_number: profilePhone.value.trim() || null,
-    role: state.profile?.role || 'admin',
+    role: state.profile?.role || 'manager',
     date_registered: state.profile?.date_registered || state.session.user.created_at || new Date().toISOString()
   };
 

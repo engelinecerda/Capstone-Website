@@ -21,7 +21,7 @@
         .from('profiles')
         .select('*')
         //.select('user_id, first_name, middle_name, last_name, email, phone_number, role, staff_role, date_registered, is_locked')
-        .in('role', ['admin', 'staff'])
+        .in('role', ['manager', 'staff'])
         .order('date_registered', { ascending: false });
 
       if (error) {
@@ -45,10 +45,10 @@
       const total  = allAccounts.length;
 
       //const activeAccounts = allAccounts.filter(a => a._status === 'active');
-      const admins = allAccounts.filter(a => a.role === 'admin').length;
+      const admins = allAccounts.filter(a => a.role === 'manager').length;
       const staff  = allAccounts.filter(a => a.role === 'staff').length;
       document.getElementById('statTotal').textContent    = total;
-      document.getElementById('statTotalSub').textContent = `${admins} admin${admins !== 1 ? 's' : ''}, ${staff} staff`;
+      document.getElementById('statTotalSub').textContent = `${admins} manager${admins !== 1 ? 's' : ''}, ${staff} staff`;
       document.getElementById('statAdmins').textContent   = admins;
       document.getElementById('statStaff').textContent    = staff;
     }
@@ -97,9 +97,9 @@
         </div></td></tr>`;
       } else {
         tbody.innerHTML = page.map(a => {
-          const avClass    = a.role === 'admin' ? 'avatar-admin' : 'avatar-staff';
-          const roleBadge  = a.role === 'admin' ? 'badge-admin'  : 'badge-staff';
-          const roleLabel  = a.role === 'admin' ? 'Admin'        : 'Staff';
+          const avClass    = a.role === 'manager' ? 'avatar-admin' : 'avatar-staff';
+          const roleBadge  = a.role === 'manager' ? 'badge-admin'  : 'badge-staff';
+          const roleLabel  = a.role === 'manager' ? 'Manager'      : 'Staff';
           const stBadge    = { active:'badge-active', inactive:'badge-inactive', locked:'badge-locked' }[a._status] || 'badge-inactive';
           const stLabel    = a._status.charAt(0).toUpperCase() + a._status.slice(1);
           const lockTitle  = a._status === 'locked' ? 'Unlock Account' : 'Lock Account';
@@ -185,7 +185,7 @@
       ['tab-access','tab-activity'].forEach(id => document.getElementById(id).classList.remove('active'));
 
       clearFields(['fieldFirstName','fieldMiddleName','fieldLastName','fieldPhone','fieldEmail','fieldPassword','fieldPasswordConfirm','addFieldStaffRole']);
-      document.getElementById('addFieldRole').value   = 'admin';
+      document.getElementById('addFieldRole').value   = 'manager';
       document.getElementById('fieldEmail').readOnly  = false;
       document.getElementById('fieldEmailHint').style.display = 'none';
       hideMsg();
@@ -214,13 +214,13 @@
       document.getElementById('fieldEmail').readOnly   = true;
       document.getElementById('fieldEmailHint').style.display = 'block';
 
-      document.getElementById('fieldRole').value      = a.role || 'admin';
+      document.getElementById('fieldRole').value      = a.role || 'manager';
       document.getElementById('fieldStaffRole').value = a.staff_role || '';
       document.getElementById('fieldStatus').value    = a._status || 'active';
 
       document.getElementById('viewDateRegistered').textContent = fmtDate(a.date_registered);
       document.getElementById('viewLastSignIn').textContent     = a.last_sign_in_at ? fmtDate(a.last_sign_in_at) : '—';
-      document.getElementById('viewRole').textContent           = a.role === 'admin' ? 'Admin' : 'Staff';
+      document.getElementById('viewRole').textContent           = a.role === 'manager' ? 'Manager' : 'Staff';
       document.getElementById('viewStaffRole').textContent      = a.staff_role || '—';
 
       hideMsg();

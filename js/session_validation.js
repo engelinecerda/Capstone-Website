@@ -1,34 +1,22 @@
 
 //session_validation.js
 //
-// ─── ROLE NAMING NOTE ───────────────────────────────────────────────────────
-// The DB column `profiles.role` and all code in this codebase still use the
-// ORIGINAL role values 'admin' and 'super_admin'. Only the UI-facing LABELS
-// were renamed. The mapping is:
-//
+// ─── ROLE VALUES ─────────────────────────────────────────────────────────────
 //   DB / code value      UI label shown to user
 //   ──────────────────   ───────────────────────
-//   role = 'admin'        →  "Manager"   (operational staff: reservations, reviews, customers)
-//   role = 'super_admin'  →  "Admin"     (non-operational: accounts, settings, backup, audit, etc.)
-//
-// This mismatch is intentional — renaming the DB/code values would require
-// touching every RLS policy, SQL trigger, edge function, and JS role check
-// across the project. Do NOT assume `role === 'super_admin'` means "super
-// admin" in the UI — it means the "Admin" role. Same for `role === 'admin'`
-// meaning "Manager" in the UI, not "Admin".
+//   role = 'manager'  →  "Manager"  (operational: reservations, reviews, customers)
+//   role = 'admin'    →  "Admin"    (system: accounts, settings, backup, audit)
 // ──────────────────────────────────────────────────────────────────────────
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 
-const ALLOWED_ROLES = ['admin', 'super_admin'];
+const ALLOWED_ROLES = ['manager', 'admin'];
 
 // ─── Role visibility ──────────────────────────────────────────────────────────
 // Reads .super-admin-only elements and shows/hides them based on role.
 // Also updates any sidebar title, badge, and role pill if present.
-// NOTE: role === 'super_admin' here means the "Admin" role in the UI — see
-// the naming note at the top of this file.
 export function applyRoleVisibility(role) {
-  const isSuperAdmin = role === 'super_admin'; // true → UI label "Admin"
+  const isSuperAdmin = role === 'admin'; // true → Admin role
 
    document.body.classList.remove('is-super-admin');
   if (isSuperAdmin) {
@@ -57,7 +45,7 @@ export function applyRoleVisibility(role) {
 }
 
 // ─── Session validation ───────────────────────────────────────────────────────
-// Call this at the top of every admin/super_admin page.
+// Call this at the top of every manager/admin page.
 // Returns { session, profile } on success, null on failure (and redirects).
 export async function validateAdminSession({
   redirectTo = '/admin/index.html',

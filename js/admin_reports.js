@@ -310,7 +310,7 @@ async function fetchReservations() {
 }
 
 async function validateAdminSession() {
-    const { session, profile } = await verifyMultiRoleSession(supabase, ['admin', 'super_admin']);
+    const { session, profile } = await verifyMultiRoleSession(supabase, ['manager', 'admin']);
 
     if (!session) {
         await supabase.auth.signOut();

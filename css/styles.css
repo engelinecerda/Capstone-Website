@@ -38,13 +38,44 @@ html {
 
 
 .logo {
-    height: auto;   
-    width: 300px;   
+    width: 240px;
+    height: auto;
     margin-right: 20px;
     margin-left: 20px;
     cursor: pointer;
-    padding-top: 10px;
-} 
+    display: block;
+}
+
+/* Topbar right slot — hidden on desktop by default, shown on desktop when JS moves it */
+.navbar__topbar-right {
+    display: none;
+}
+
+/* Desktop: show bell next to the account button */
+@media screen and (min-width: 961px) {
+    .navbar__topbar-right {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        color: #6B3A1F;
+        margin-left: 4px;
+    }
+}
+
+/* Greeting in mobile drawer — hidden on desktop */
+.navbar__greeting {
+    display: none;
+}
+
+
+/* Constrain the logo anchor so it never overflows the navbar height */
+.navbar__container > a:first-child {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    flex-shrink: 0;
+    overflow: hidden;
+}
 .navbar{
     background: #fff;
     height: 70px;
@@ -127,28 +158,56 @@ html {
 }
 
 @media screen and (max-width: 960px) {
-    .navbar__container{
+    .navbar {
+        height: 64px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    }
+    .navbar__container {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        height: 88px;
+        height: 64px;
+        position: relative;
         z-index: 1;
         width: 100%;
         max-width: 1300px;
         margin: 0 auto;
         padding: 0 20px;
     }
-    .logo {
-        width: 150px;
+    /* Logo pinned to center of topbar */
+    .navbar__container > a:first-child {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
         height: auto;
+        overflow: visible;
     }
+    .logo {
+        content: url('/images/ELI COFFEE LOGO ONLY.png');
+        height: 42px;
+        width: auto;
+        margin: 0;
+    }
+    /* Hamburger on left */
     .navbar__toggle {
         display: flex;
+        order: 1;
+        z-index: 2;
     }
-    .navbar__menu{
+    /* Bell slot on right */
+    .navbar__topbar-right {
+        display: flex;
+        order: 3;
+        align-items: center;
+        min-width: 44px;
+        justify-content: flex-end;
+        color: #6B3A1F;
+        z-index: 2;
+    }
+    .navbar__menu {
         display: grid;
         grid-template-columns: auto;
-        margin: 0px;
+        margin: 0;
         width: 100%;
         position: absolute;
         top: -1000px;
@@ -157,35 +216,129 @@ html {
         height: auto;
         z-index: -1;
     }
-    .navbar__menu.active{
-        background: #fff;
+    .navbar__menu.active {
+        background: #f5f0eb;
+        position: fixed;
+        top: 64px;
         left: 0;
+        right: 0;
+        bottom: 0;
         opacity: 1;
-        transition: all 0.5s ease;
-        z-index: 1;
-        top: 60px;
+        transition: opacity 0.25s ease;
+        z-index: 9999;
         overflow-y: auto;
-        max-height: 80vh;
         scrollbar-width: none;
+        padding-top: 8px;
     }
-    .navbar__item{
-        height: 60px;
+    /* Greeting at top of drawer */
+    .navbar__menu.active .navbar__greeting {
+        display: block;
+        padding: 20px 32px 16px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #2A1408;
+        list-style: none;
+        height: auto;
     }
-    .navbar__links{
-        color: #6B3A1F;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    .navbar__greeting-link {
+        color: #2A1408;
         text-decoration: none;
-        padding: 0 1rem;
-        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
-    .navbar__btn{
+    .navbar__greeting-link:hover {
+        color: #6B3A1F;
+    }
+    .navbar__greeting-account-hint {
+        font-size: 12px;
+        font-weight: 500;
+        color: #9e7151;
+        letter-spacing: 0.02em;
+    }
+    .navbar__item {
+        height: auto;
+        min-height: 56px;
+        border-bottom: none;
+        background: #fff;
+        border-radius: 14px;
+        margin: 0 16px 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+        overflow: hidden;
+    }
+    .navbar__links {
+        color: #2A1408;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        padding: 0 20px;
+        min-height: 56px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        gap: 0;
+    }
+    /* Icon on the left of each nav item */
+    .navbar__links::before {
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 15px;
+        color: #6B3A1F;
+        width: 22px;
+        margin-right: 14px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+    .navbar__links[href="/index.html"]::before      { content: "\f015"; }
+    .navbar__links[href="/packages.html"]::before   { content: "\f06b"; }
+    .navbar__links[href="/reservations.html"]::before { content: "\f073"; }
+    .navbar__links[href="/reviews.html"]::before    { content: "\f005"; }
+    .navbar__links[href="/faqs.html"]::before       { content: "\f059"; }
+    .navbar__links[href="/about.html"]::before      { content: "\f05a"; }
+    /* Chevron pushed to the right */
+    .navbar__links::after {
+        content: '›';
+        font-size: 20px;
+        color: #c4a48a;
+        margin-left: auto;
+        padding-left: 8px;
+    }
+    .navbar__links:hover {
+        background: #fdf6ef;
+    }
+    /* Hide name button in drawer when logged in — greeting handles account access */
+    .user-logged-in .navbar__btn { display: none; }
+
+    /* CTA button pinned at bottom of drawer */
+    .navbar__btn {
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 0 1rem;
+        padding: 20px 24px;
         width: 100%;
+        height: auto;
+        min-height: 76px;
+        border-top: 1px solid #e0d4c8;
+        background: #f5f0eb;
+        margin-top: auto;
+    }
+    .navbar__btn .button {
+        width: 100%;
+        text-align: center;
+        padding: 14px 20px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 10px;
+        max-width: 320px;
+    }
+    /* Bell in topbar */
+    .navbar__topbar-right .notif-bell-btn {
+        color: #6B3A1F;
+        padding: 8px;
+        width: 40px;
+        height: 40px;
+    }
+    .navbar__topbar-right .notif-bell-btn:hover {
+        background: #f0e8e0;
     }
 }
 
@@ -511,8 +664,8 @@ html {
     color: #f5d9c8;
 }
 
-p a,
-p a:visited {
+.footer p a,
+.footer p a:visited {
   color: #f5d9c8;
   text-decoration: none;
 }
