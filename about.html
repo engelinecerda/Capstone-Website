@@ -1,328 +1,216 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="/css/styles.css">
-
-    <link rel="stylesheet" href="/css/about.css">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-    <title>ELI Coffee Events Cafe</title>
-
+    <title>About Us — ELI Coffee Events Cafe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/about.css" />
+    <link rel="stylesheet" href="/css/home.css" />
+    <style>.hidden { display: none !important; }</style>
 </head>
-
 <body>
 
     <nav class="navbar">
-
         <div class="navbar__container">
-
-            <a href="/index.html">
-
+            <a href="/index.html" id="navbar__logo">
                 <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
-
             </a>
-
-
-
             <div class="navbar__toggle" id="mobile-menu">
-
                 <span class="bar"></span>
-
                 <span class="bar"></span>
-
                 <span class="bar"></span>
-
             </div>
             <div class="navbar__topbar-right" id="navTopbarRight"></div>
-
-
-
-
-
-        <ul class="navbar__menu">
-
-            <li class="navbar__item">
-
-                <a href="/index.html" class="navbar__links">
-
-                    Home
-
-                </a>
-
-            </li>
-
-            <li class="navbar__item">
-
-                <a href="/packages.html" class="navbar__links">
-
-                    Packages
-
-                </a>
-
-            </li>
-
-            <li class="navbar__item">
-
-                <a href="/reservations.html" class="navbar__links">
-
-                    Reservations
-
-                </a>
-
-            </li>
-                <li class="navbar__item">
-    
-                    <a href="/reviews.html" class="navbar__links">
-    
-                        Reviews
-    
-                    </a>
-
-            <li class="navbar__item">
-
-                <a href="/faqs.html" class="navbar__links">
-
-                    FAQs
-
-                </a>
-
-            </li>
-
-            <li class="navbar__item">
-
-                <a href="/about.html" class="navbar__links">
-
-                    About
-
-                </a>
-
-            </li>
-
-          
-
-            <li class="navbar__btn"></li>
-
-            </li>
-
-        </ul>
-
+            <ul class="navbar__menu">
+                <li class="navbar__item"><a href="/index.html"        class="navbar__links">Home</a></li>
+                <li class="navbar__item"><a href="/packages.html"     class="navbar__links">Packages</a></li>
+                <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+                <li class="navbar__item"><a href="/reviews.html"      class="navbar__links">Reviews</a></li>
+                <li class="navbar__item"><a href="/faqs.html"         class="navbar__links">FAQs</a></li>
+                <li class="navbar__item"><a href="/about.html"        class="navbar__links">About</a></li>
+                <li class="navbar__btn"></li>
+            </ul>
         </div>
-
     </nav>
 
-    <div class="about">
-
-    <img src="/images/about-background-img.jpg" alt="About ELI Coffee Events Cafe">
-
-
-
-    </div>
-
-
-
-    <div class="about-title">
-
-        <h1>About ELI Coffee Events Cafe</h1>
-
-        <p>
-
-            At ELI Coffee Events Café, we believe that coffee tastes best when shared with community, creativity, and celebration. More than just a café, we are a welcoming space in Binangonan where people gather not only for great brews and homemade treats, but also for meaningful experiences.
-
-        </p>
-
-        <br>
-
-        <p>
-
-            Founded with passion by Glorie Gotis, ELI Coffee has grown into a hub for events, performances, and gatherings. Whether it’s an intimate open mic night, a cozy book club, or a full-scale celebration, our café transforms into the perfect venue to bring people together.
-
-        </p>
-
-    </div>
-
-
-
-    <section class="values">
-
-    <h2>What We Stand For</h2>
-
-    <div class="values-grid">
-
-      <div class="value-card">
-
-        <div class="icon">
-
-            <i class="fa-solid fa-mug-hot"></i>
-
+    <!-- PAGE HERO -->
+    <section class="page-hero">
+        <img class="page-hero-img" src="/images/about-background-img.jpg" alt="ELI Coffee Events Cafe" />
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-body">
+            <p class="hero-eyebrow">ELI Coffee Events Cafe</p>
+            <h1 class="page-hero-title">Our <em>Story</em></h1>
+            <p class="page-hero-sub">Founded with passion. Built for community.</p>
         </div>
+    </section>
 
-        <h3>Quality Coffee</h3>
-
-        <p>We source and brew only the finest coffee beans to ensure every cup is exceptional.</p>
-
-      </div>
-
-      <div class="value-card">
-
-        <div class="icon">
-
-            <i class="fa-solid fa-heart"></i>
-
+    <!-- ABOUT STORY -->
+    <section class="about-story">
+        <div class="about-story-inner">
+            <div class="about-story-image">
+                <img src="/images/eli coffee binangonan.jpg" alt="ELI Coffee Events Cafe interior" />
+            </div>
+            <div class="about-story-text">
+                <p class="eyebrow">Who We Are</p>
+                <h2 class="h2">More than just <em>a café</em></h2>
+                <p class="about-story-para">At ELI Coffee Events Café, we believe that coffee tastes best when shared with community, creativity, and celebration. More than just a café, we are a welcoming space in Binangonan where people gather not only for great brews and homemade treats, but also for meaningful experiences.</p>
+                <p class="about-story-para">Founded with passion by Glorie Gotis, ELI Coffee has grown into a hub for events, performances, and gatherings. Whether it's an intimate open mic night, a cozy book club, or a full-scale celebration, our café transforms into the perfect venue to bring people together.</p>
+                <div class="about-founder">
+                    <div class="about-founder-avatar">
+                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                        <p class="about-founder-name">Glorie Gotis</p>
+                        <p class="about-founder-title">Founder, ELI Coffee Events Cafe</p>
+                    </div>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <h3>Memorable Moments</h3>
+    <!-- VALUES -->
+    <section class="about-values">
+        <div class="about-values-inner">
+            <div class="about-values-head">
+                <p class="eyebrow">Our Values</p>
+                <h2 class="h2">What We <em>Stand For</em></h2>
+                <p class="about-values-desc">Every cup we brew and every event we host is guided by these core principles.</p>
+            </div>
+            <div class="values-grid">
 
-        <p>We're passionate about creating beautiful memories for you and your guests.</p>
+                <div class="value-card">
+                    <div class="value-card-icon">
+                        <i class="fa-solid fa-mug-hot" aria-hidden="true"></i>
+                    </div>
+                    <h3>Quality Coffee</h3>
+                    <p>We source and brew only the finest coffee beans to ensure every cup is exceptional.</p>
+                </div>
 
-      </div>
+                <div class="value-card">
+                    <div class="value-card-icon">
+                        <i class="fa-solid fa-heart" aria-hidden="true"></i>
+                    </div>
+                    <h3>Memorable Moments</h3>
+                    <p>We're passionate about creating beautiful memories for you and your guests.</p>
+                </div>
 
-      <div class="value-card">
+                <div class="value-card">
+                    <div class="value-card-icon">
+                        <i class="fa-solid fa-handshake-angle" aria-hidden="true"></i>
+                    </div>
+                    <h3>Professional Service</h3>
+                    <p>Our experienced team delivers top-tier service for every event, big or small.</p>
+                </div>
 
-        <div class="icon">
+                <div class="value-card">
+                    <div class="value-card-icon">
+                        <i class="fa-solid fa-users" aria-hidden="true"></i>
+                    </div>
+                    <h3>Community Focus</h3>
+                    <p>We're proud to serve the Binangonan community and surrounding areas.</p>
+                </div>
 
-            <i class="fa-solid fa-handshake-angle"></i>
-
+            </div>
         </div>
+    </section>
 
-        <h3>Professional Service</h3>
-
-        <p>Our experienced team delivers top-tier service for every event, big or small.</p>
-
-      </div>
-
-      <div class="value-card">
-
-        <div class="icon">
-
-            <i class="fa-solid fa-users"></i>
-
-        </div>
-
-        <h3>Community Focus</h3>
-
-        <p>We're proud to serve the Binangonan community and surrounding areas.</p>
-
-      </div>
-
-    </div>
-
-  </section>
-
-
-
-<div class="mission-section">
-
-    <h1>Our Mission</h1>
-
-    <p>To create a welcoming space where people can come together to enjoy great coffee, connect with others, and celebrate life's moments.</p>
-
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<footer class="footer">
-
-    <div class="footer-top">
-
-        <div class="footer-brand">
-
-            <img src="/images/eli coffee binangonan logo.png" alt="ELI Coffee Logo" class="footer-logo">
-
-            <p>Your go-to events cafe in Binangonan, Rizal.</p>
-
-        </div>
-
-
-
-        <div class="footer-contact">
-
-            <h3>Contact Us</h3>
-
-            <p> 
-
-                <i class="fa-solid fa-phone"></i>
-
-                0917 562 0306 | 0917 562 0308
-
+    <!-- MISSION -->
+    <section class="about-mission">
+        <div class="about-mission-inner">
+            <div class="about-mission-mark">
+                <i class="fa-solid fa-quote-left" aria-hidden="true"></i>
+            </div>
+            <p class="eyebrow about-mission-eyebrow">Our Purpose</p>
+            <h2 class="about-mission-title">Our <em>Mission</em></h2>
+            <p class="about-mission-body">To create a welcoming space where people can come together to enjoy great coffee, connect with others, and celebrate life's moments — one cup, one gathering, one memory at a time.</p>
+            <div class="about-mission-divider"></div>
+            <p class="about-mission-locations">
+                <span><i class="ti ti-map-pin"></i> Binangonan, Rizal</span>
+                <span><i class="ti ti-map-pin"></i> Antipolo City</span>
             </p>
+        </div>
+    </section>
 
-            <p>
+    <!-- CTA STRIP -->
+    <section class="about-cta-strip">
+        <p class="eyebrow about-cta-eyebrow">Ready to celebrate?</p>
+        <h2 class="about-cta-title">Plan your next <em>event with us</em></h2>
+        <p class="about-cta-desc">Browse our event packages or secure your date — we'd love to host your next gathering.</p>
+        <div class="about-cta-actions">
+            <a href="/reservations.html" class="btn-primary">Make a Reservation</a>
+            <a href="/packages.html" class="btn-ghost">View Packages</a>
+        </div>
+    </section>
 
-                <i class="fa-solid fa-at"></i>
+    <!-- FOOTER -->
+    <footer class="footer-new">
+        <div class="footer-new-grid">
 
-                elicoffeetea@gmail.com
+            <div>
+                <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
+                <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
+                <div class="footer-new-social">
+                    <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                        <i class="ti ti-brand-facebook"></i>
+                    </a>
+                    <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                        <i class="ti ti-brand-instagram"></i>
+                    </a>
+                </div>
+            </div>
 
-            </p>
+            <div>
+                <p class="footer-new-heading">Explore</p>
+                <ul class="footer-new-links">
+                    <li><a href="/index.html">Home</a></li>
+                    <li><a href="/packages.html">Packages</a></li>
+                    <li><a href="/reservations.html">Reservations</a></li>
+                    <li><a href="/reviews.html">Reviews</a></li>
+                    <li><a href="/faqs.html">FAQs</a></li>
+                    <li><a href="/about.html">About</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <p class="footer-new-heading">Services</p>
+                <ul class="footer-new-links">
+                    <li><a href="/packages.html">Cafe &amp; Lounge</a></li>
+                    <li><a href="/packages.html">Private Events</a></li>
+                    <li><a href="/packages.html">Catering</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <p class="footer-new-heading">Contact</p>
+                <div class="footer-new-contact-row">
+                    <i class="ti ti-phone"></i>
+                    <span>0917 562 0306 | 0917 562 0308</span>
+                </div>
+                <div class="footer-new-contact-row">
+                    <i class="ti ti-mail"></i>
+                    <span>elicoffeetea@gmail.com</span>
+                </div>
+                <div class="footer-new-contact-row">
+                    <i class="ti ti-map-pin"></i>
+                    <span>Binangonan, Rizal &amp; Antipolo City</span>
+                </div>
+            </div>
 
         </div>
-
-
-
-        <div class="footer-social">
-
-            <h3>Follow Us</h3>
-
-            <p>
-
-                <i class="fa-brands fa-square-facebook"></i>
-
-                Facebook: @elicoffeeph
-
-            </p>
-
-            <p>
-
-                <i class="fa-brands fa-instagram"></i>
-
-                 Instagram: @elicoffeeph</p>
-
+        <div class="footer-new-bottom">
+            <span>© 2026 ELI Coffee Events Cafe. All rights reserved.</span>
+            <span>Designed with care for every cup.</span>
         </div>
+    </footer>
 
-    </div>
-
-
-
-    <div class="footer-bottom">
-
-        <p>&copy; 2024 ELI Coffee Events Cafe. All rights reserved.</p>
-
-    </div>
-
-</footer>
-
-
-
-<script type="module" src="/js/navbar.js"></script>
-
-
-
-
+    <script src="/js/app.js"></script>
+    <script type="module" src="/js/navbar.js"></script>
 
 </body>
-
 </html>
-
-
-

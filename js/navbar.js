@@ -46,7 +46,7 @@ async function updateNavbar() {
         initCustomerNotificationBell(supabase, session.user.id);
 
     } else {
-        navBtn.innerHTML = `<a href="/login.html" class="button">Login / Sign Up</a>`;
+        navBtn.innerHTML = `<a href="/login.html" class="button">Login</a>`;
     }
 }
 
