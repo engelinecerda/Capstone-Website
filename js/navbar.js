@@ -21,14 +21,23 @@ async function updateNavbar() {
 
         // Mobile drawer: inject greeting linking to account page
         if (navMenu) {
+            const initial = displayName.charAt(0).toUpperCase();
             const greeting = document.createElement('li');
             greeting.className = 'navbar__greeting';
             greeting.innerHTML = `
                 <a href="/account.html" class="navbar__greeting-link">
-                    <span>Hi, ${displayName}!</span>
-                    <span class="navbar__greeting-account-hint">My Account ›</span>
+                    <div class="navbar__greeting-avatar">${initial}</div>
+                    <div class="navbar__greeting-text">
+                        <span class="navbar__greeting-name">Hi, ${displayName}!</span>
+                        <span class="navbar__greeting-account-hint">My Account ›</span>
+                    </div>
                 </a>`;
-            navMenu.insertBefore(greeting, navMenu.firstChild);
+            const drawerHeader = navMenu.querySelector('.nav-drawer-header');
+            if (drawerHeader) {
+                drawerHeader.insertAdjacentElement('afterend', greeting);
+            } else {
+                navMenu.insertBefore(greeting, navMenu.firstChild);
+            }
         }
 
         navBtn.innerHTML = `<a href="/account.html" class="button">${displayName}</a>`;

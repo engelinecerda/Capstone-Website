@@ -214,7 +214,8 @@ listEl.addEventListener('click', async e => {
 supabase
   .channel(`notif_page_${userId}`)
   .on('postgres_changes', {
-    event: 'INSERT', schema: 'public', table: 'notifications',
+    event: '*',   // INSERT + UPDATE + DELETE — catches mark-read from any tab/page
+    schema: 'public', table: 'notifications',
     filter: `user_id=eq.${userId}`,
   }, () => loadNotifs())
   .subscribe();

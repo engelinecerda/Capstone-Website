@@ -3046,7 +3046,7 @@ function openReceiptModal(paymentId, reservationId) {
                 <div class="receipt-grid">
                     <div class="receipt-field">
                         <span class="receipt-label">Customer</span>
-                        <span class="receipt-value">${escapeHtml(document.getElementById('sidebar-name')?.textContent || 'Customer')}</span>
+                        <span class="receipt-value">${escapeHtml(state.profile ? getReservationName(state.profile) : 'Customer')}</span>
                     </div>
                     <div class="receipt-field">
                         <span class="receipt-label">Event</span>
@@ -3643,8 +3643,14 @@ function activateAccountSection(sectionKey) {
     const normalizedSection = ['profile', 'reservations'].includes(String(sectionKey || '').toLowerCase())
         ? String(sectionKey).toLowerCase()
         : 'profile';
-    const navButtons = document.querySelectorAll('.account-nav-item[data-section]');
+    const navButtons = document.querySelectorAll('.account-tab[data-section]');
     const sections = document.querySelectorAll('.account-section');
+
+    // Sync hero breadcrumb with active tab
+    const breadcrumbCurrent = document.getElementById('hero-breadcrumb-current');
+    if (breadcrumbCurrent) {
+        breadcrumbCurrent.textContent = normalizedSection === 'reservations' ? 'Reservations' : 'Profile Overview';
+    }
 
     navButtons.forEach((navButton) => {
         navButton.classList.toggle('active', navButton.dataset.section === normalizedSection);
@@ -4094,8 +4100,6 @@ function getEmailChangeErrorMessage(error) {
 
 async function loadProfile() {
     const profileMessage = document.getElementById('profile-msg');
-    const sidebarName = document.getElementById('sidebar-name');
-    const sidebarEmail = document.getElementById('sidebar-email');
     const firstNameInput = document.getElementById('profile-first-name');
     const middleNameInput = document.getElementById('profile-middle-name');
     const lastNameInput = document.getElementById('profile-last-name');
@@ -4111,14 +4115,42 @@ async function loadProfile() {
         const displayName = getReservationName(state.profile);
         const confirmedEmail = getConfirmedProfileEmail(state.profile);
 
-        if (sidebarName) sidebarName.textContent = displayName;
-        if (sidebarEmail) sidebarEmail.textContent = confirmedEmail;
+        // ── Hero band identity ────────────────────────────────────────────
+        const heroAvatar = document.getElementById('hero-avatar');
+        const heroGreeting = document.getElementById('hero-greeting');
+        const heroRole = document.getElementById('hero-role');
+
+        if (heroAvatar) {
+            const fn = state.profile.first_name || '';
+            const ln = state.profile.last_name || '';
+            heroAvatar.textContent = ((fn[0] || '') + (ln[0] || '')).toUpperCase() || '?';
+        }
+        if (heroGreeting) {
+            const hour = new Date().getHours();
+            const tod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+            heroGreeting.textContent = `Good ${tod}, ${state.profile.first_name || 'there'}`;
+        }
+        if (heroRole) {
+            const r = state.profile.role || 'customer';
+            heroRole.textContent = r.charAt(0).toUpperCase() + r.slice(1);
+        }
+
+        // ── Read-only display fields ──────────────────────────────────────
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+        set('display-first-name', state.profile.first_name);
+        set('display-middle-name', state.profile.middle_name);
+        set('display-last-name', state.profile.last_name);
+        set('display-email', confirmedEmail);
+        set('display-phone', state.profile.phone_number);
+        set('display-date', formatDate(state.profile.date_registered));
+
+        // ── Edit form fields ──────────────────────────────────────────────
         if (firstNameInput) firstNameInput.value = state.profile.first_name || '';
         if (middleNameInput) middleNameInput.value = state.profile.middle_name || '';
         if (lastNameInput) lastNameInput.value = state.profile.last_name || '';
         if (emailInput) emailInput.value = confirmedEmail;
         if (phoneInput) phoneInput.value = state.profile.phone_number || '';
-        if (dateInput) dateInput.value = formatDate(state.profile.date_registered);
+        if (dateInput) dateInput.textContent = formatDate(state.profile.date_registered);
         renderPendingEmailNotice(state.profile);
     } catch (error) {
         console.error('Failed to load profile:', error);
@@ -4127,7 +4159,7 @@ async function loadProfile() {
 }
 
 function wireAccountNavigation() {
-    const navButtons = document.querySelectorAll('.account-nav-item[data-section]');
+    const navButtons = document.querySelectorAll('.account-tab[data-section]');
 
     navButtons.forEach((button) => {
         button.addEventListener('click', () => {
@@ -4145,6 +4177,7 @@ function wireProfileForm() {
     profileForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
 
+        const saveBtn = document.getElementById('save-profile-btn');
         const confirmedEmail = getConfirmedProfileEmail(state.profile);
         const requestedEmail = normalizeEmail(document.getElementById('profile-email')?.value || '');
         const currentPendingEmail = getPendingProfileEmail(state.profile);
@@ -4170,6 +4203,7 @@ function wireProfileForm() {
         }
 
         setFormMessage(profileMessage, 'Saving profile...');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
         try {
             const { error: profileError } = await supabase
@@ -4258,6 +4292,8 @@ function wireProfileForm() {
             );
         } catch (error) {
             setFormMessage(profileMessage, `Failed to update profile: ${error.message}`, 'error');
+        } finally {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }
         }
     });
 }
@@ -4269,21 +4305,23 @@ function wirePasswordForm() {
     passwordForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
 
+        const updateBtn = document.getElementById('update-password-btn');
         const currentPassword = document.getElementById('current-password')?.value || '';
         const newPassword = document.getElementById('new-password')?.value || '';
         const confirmPassword = document.getElementById('confirm-new-password')?.value || '';
 
         if (newPassword.length < 8) {
-            passwordMessage.textContent = 'New password must be at least 8 characters long.';
+            setFormMessage(passwordMessage, 'New password must be at least 8 characters long.', 'error');
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            passwordMessage.textContent = 'New password and confirmation do not match.';
+            setFormMessage(passwordMessage, 'New password and confirmation do not match.', 'error');
             return;
         }
 
-        passwordMessage.textContent = 'Updating password...';
+        setFormMessage(passwordMessage, 'Updating password...');
+        if (updateBtn) { updateBtn.disabled = true; updateBtn.textContent = 'Updating...'; }
 
         try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -4296,10 +4334,12 @@ function wirePasswordForm() {
             const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
             if (updateError) throw updateError;
 
-            passwordMessage.textContent = 'Password updated successfully.';
+            setFormMessage(passwordMessage, 'Password updated successfully.', 'success');
             passwordForm.reset();
         } catch (error) {
-            passwordMessage.textContent = `Failed to update password: ${error.message}`;
+            setFormMessage(passwordMessage, `Failed to update password: ${error.message}`, 'error');
+        } finally {
+            if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = 'Update Password'; }
         }
     });
 }
@@ -4329,6 +4369,50 @@ function wireLogout() {
     });
 }
 
+function wireEditProfileToggle() {
+    const editBtn      = document.getElementById('edit-profile-btn');
+    const cancelBtn    = document.getElementById('cancel-edit-btn');
+    const readonlyView = document.getElementById('info-readonly-view');
+    const editView     = document.getElementById('info-edit-view');
+
+    editBtn?.addEventListener('click', () => {
+        readonlyView?.setAttribute('hidden', '');
+        editView?.removeAttribute('hidden');
+        if (editBtn) editBtn.innerHTML = '<i class="ti ti-x"></i> Cancel Edit';
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+        editView?.setAttribute('hidden', '');
+        readonlyView?.removeAttribute('hidden');
+        if (editBtn) editBtn.innerHTML = '<i class="ti ti-edit"></i> Edit Profile';
+    });
+}
+
+function wireChangePasswordCard() {
+    const openBtn    = document.getElementById('change-password-btn');
+    const closeBtn   = document.getElementById('close-password-card-btn');
+    const card       = document.getElementById('password-card');
+
+    openBtn?.addEventListener('click', () => {
+        card?.removeAttribute('hidden');
+        card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    closeBtn?.addEventListener('click', () => {
+        card?.setAttribute('hidden', '');
+        document.getElementById('password-form')?.reset();
+        const msg = document.getElementById('password-msg');
+        if (msg) { msg.textContent = ''; msg.className = 'form-msg'; }
+    });
+}
+
+function wireDeleteAccount() {
+    document.getElementById('delete-account-btn')?.addEventListener('click', () => {
+        // Deletion requires admin-level API access; direct users to contact support.
+        alert('To permanently delete your account, please contact us directly at the café or reach out via email. This action cannot be undone.');
+    });
+}
+
 wireAccountNavigation();
 wireReservationActions();
 wireReservationDetailsModal();
@@ -4341,6 +4425,9 @@ wireSubmissionFeedbackModal();
 wireProfileForm();
 wirePasswordForm();
 wireLogout();
+wireEditProfileToggle();
+wireChangePasswordCard();
+wireDeleteAccount();
 
 await Promise.all([
     loadProfile(),

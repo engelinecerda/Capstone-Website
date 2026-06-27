@@ -145,18 +145,12 @@ async function markAll(supabase, userId, listEl, badgeEl) {
   } catch { /* ignore */ }
 }
 
-async function markOne(supabase, id, listEl, badgeEl) {
+async function markOne(supabase, userId, id, listEl, badgeEl) {
   try {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    const item = listEl.querySelector(`[data-id="${id}"]`);
-    if (item) {
-      item.classList.remove('unread');
-      const dot = item.querySelector('.notif-unread-dot');
-      if (dot) dot.replaceWith(document.createElement('span'));
-    }
-    const unread = listEl.querySelectorAll('.notif-item.unread').length;
-    syncBadge(badgeEl, unread);
-    syncUnreadPill(unread);
+    // Re-fetch from DB so badge + list are always derived from source-of-truth,
+    // not from DOM state (which can drift when >20 notifications are loaded).
+    await fetchAndRender(supabase, userId, listEl, badgeEl);
   } catch { /* ignore */ }
 }
 
@@ -164,7 +158,7 @@ function subscribeRealtime(supabase, userId, listEl, badgeEl) {
   supabase
     .channel(`notif_bell_${userId}`)
     .on('postgres_changes', {
-      event: 'INSERT',
+      event: '*',   // INSERT + UPDATE + DELETE — catches mark-read from any tab
       schema: 'public',
       table: 'notifications',
       filter: `user_id=eq.${userId}`,
@@ -201,7 +195,7 @@ function wirePanelEvents({ supabase, userId, bellBtn, panel, listEl, badgeEl, ma
     if (!item) return;
     const { id, link } = item.dataset;
     if (id && item.classList.contains('unread')) {
-      await markOne(supabase, id, listEl, badgeEl);
+      await markOne(supabase, userId, id, listEl, badgeEl);
     }
     if (link) {
       panel.hidden = true;

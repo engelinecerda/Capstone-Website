@@ -117,6 +117,7 @@
 }
 
 .notif-panel-unread-count[hidden] { display: none; }
+.notif-badge[hidden] { display: none !important; }
 
 .notif-mark-all-btn {
   background: none;

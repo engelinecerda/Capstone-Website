@@ -157,10 +157,15 @@ html {
     transition: all 0.3s ease;
 }
 
+/* Drawer-only elements — hidden on desktop, revealed by mobile media query */
+.nav-drawer-header { display: none; }
+.nav-drawer-logo   { display: none; }
+
+/* ── Mobile & Tablet Navigation ── */
 @media screen and (max-width: 960px) {
     .navbar {
         height: 64px;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     }
     .navbar__container {
         display: flex;
@@ -204,132 +209,229 @@ html {
         color: #6B3A1F;
         z-index: 2;
     }
+
+    /* Reset desktop li margin so drawer items are not indented */
+    .navbar__menu li { margin-left: 0; }
+
+    /* ── Drawer: slides in from the left ── */
     .navbar__menu {
-        display: grid;
-        grid-template-columns: auto;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(80vw, 320px);
+        height: 100%;
+        height: 100dvh;
+        transform: translateX(-110%);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #FAF8F4;
+        z-index: 10001;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        text-align: left;
+        overflow-y: auto;
+        overflow-x: hidden;
         margin: 0;
-        width: 100%;
-        position: absolute;
-        top: -1000px;
-        opacity: 0;
-        transition: all 0.5s ease;
-        height: auto;
-        z-index: -1;
+        padding: 0;
     }
     .navbar__menu.active {
-        background: #f5f0eb;
-        position: fixed;
-        top: 64px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        opacity: 1;
-        transition: opacity 0.25s ease;
-        z-index: 9999;
-        overflow-y: auto;
-        scrollbar-width: none;
-        padding-top: 8px;
+        transform: translateX(0);
+        box-shadow: 16px 0 56px rgba(20, 8, 2, 0.22);
     }
-    /* Greeting at top of drawer */
-    .navbar__menu.active .navbar__greeting {
-        display: block;
-        padding: 20px 32px 16px;
-        font-size: 18px;
-        font-weight: 700;
-        color: #2A1408;
+
+    /* ── Item stagger: each child fades up on open ── */
+    .navbar__menu.active > li {
+        animation: drawerItemIn 0.28s ease both;
+    }
+    .navbar__menu.active > li:nth-child(1) { animation-delay: 0.00s; }
+    .navbar__menu.active > li:nth-child(2) { animation-delay: 0.05s; }
+    .navbar__menu.active > li:nth-child(3) { animation-delay: 0.09s; }
+    .navbar__menu.active > li:nth-child(4) { animation-delay: 0.13s; }
+    .navbar__menu.active > li:nth-child(5) { animation-delay: 0.17s; }
+    .navbar__menu.active > li:nth-child(6) { animation-delay: 0.21s; }
+    .navbar__menu.active > li:nth-child(7) { animation-delay: 0.25s; }
+    .navbar__menu.active > li:nth-child(8) { animation-delay: 0.29s; }
+    .navbar__menu.active > li:nth-child(9) { animation-delay: 0.33s; }
+
+    /* ── Header: X button only, no logo ── */
+    .nav-drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 20px 20px 8px;
+        flex-shrink: 0;
         list-style: none;
+        position: sticky;
+        top: 0;
+        background: #FAF8F4;
+        z-index: 2;
+    }
+    .nav-drawer-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border: none;
+        background: rgba(61, 26, 10, 0.07);
+        cursor: pointer;
+        color: #3D1A0A;
+        border-radius: 50%;
+        transition: background 0.2s;
+        flex-shrink: 0;
+        padding: 0;
+    }
+    .nav-drawer-close:hover { background: rgba(61, 26, 10, 0.14); }
+    .nav-drawer-close .ti { font-size: 18px; line-height: 1; }
+
+    /* ── Greeting row (logged-in) ── */
+    .navbar__greeting { display: none; }
+    .navbar__menu.active .navbar__greeting {
+        display: flex;
+        align-items: center;
         height: auto;
+        list-style: none;
+        flex-shrink: 0;
+        padding: 20px 24px 12px;
     }
     .navbar__greeting-link {
-        color: #2A1408;
+        color: #3D1A0A;
         text-decoration: none;
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        padding: 16px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        background: rgba(176, 125, 90, 0.09);
+        border-radius: 12px;
+        transition: background 0.18s;
     }
-    .navbar__greeting-link:hover {
-        color: #6B3A1F;
+    .navbar__greeting-link:hover { background: rgba(176, 125, 90, 0.16); }
+    .navbar__greeting-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(61, 26, 10, 0.12);
+        color: #3D1A0A;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: 700;
+        flex-shrink: 0;
+        letter-spacing: 0;
+    }
+    .navbar__greeting-text {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        flex: 1;
+    }
+    .navbar__greeting-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: #3D1A0A;
     }
     .navbar__greeting-account-hint {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
-        color: #9e7151;
+        color: #B07D5A;
         letter-spacing: 0.02em;
     }
+
+    /* ── Nav items ── */
     .navbar__item {
         height: auto;
         min-height: 56px;
-        border-bottom: none;
-        background: #fff;
-        border-radius: 14px;
-        margin: 0 16px 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-        overflow: hidden;
+        background: transparent;
+        border-radius: 0;
+        margin: 4px 0;
+        box-shadow: none;
+        overflow: visible;
+        list-style: none;
+        flex-shrink: 0;
     }
     .navbar__links {
-        color: #2A1408;
+        color: #3D1A0A;
         display: flex;
         align-items: center;
+        justify-content: flex-start;
         text-decoration: none;
-        padding: 0 20px;
+        padding: 0 24px;
         min-height: 56px;
-        font-size: 0.95rem;
+        font-size: 15px;
         font-weight: 600;
-        gap: 0;
+        gap: 16px;
+        border-radius: 11px;
+        transition: background 0.18s, color 0.18s;
     }
-    /* Icon on the left of each nav item */
+    /* Icon left */
     .navbar__links::before {
         font-family: 'Font Awesome 6 Free';
         font-weight: 900;
-        font-size: 15px;
-        color: #6B3A1F;
+        font-size: 16px;
+        color: #B07D5A;
         width: 22px;
-        margin-right: 14px;
         text-align: center;
         flex-shrink: 0;
     }
-    .navbar__links[href="/index.html"]::before      { content: "\f015"; }
-    .navbar__links[href="/packages.html"]::before   { content: "\f06b"; }
+    .navbar__links[href="/index.html"]::before        { content: "\f015"; }
+    .navbar__links[href="/packages.html"]::before     { content: "\f06b"; }
     .navbar__links[href="/reservations.html"]::before { content: "\f073"; }
-    .navbar__links[href="/reviews.html"]::before    { content: "\f005"; }
-    .navbar__links[href="/faqs.html"]::before       { content: "\f059"; }
-    .navbar__links[href="/about.html"]::before      { content: "\f05a"; }
-    /* Chevron pushed to the right */
-    .navbar__links::after {
-        content: '›';
-        font-size: 20px;
-        color: #c4a48a;
-        margin-left: auto;
-        padding-left: 8px;
-    }
+    .navbar__links[href="/reviews.html"]::before      { content: "\f005"; }
+    .navbar__links[href="/faqs.html"]::before         { content: "\f059"; }
+    .navbar__links[href="/about.html"]::before        { content: "\f05a"; }
+    /* No chevron */
+    .navbar__links::after { content: none; }
     .navbar__links:hover {
-        background: #fdf6ef;
+        background: rgba(176, 125, 90, 0.10);
+        color: #3D1A0A;
     }
-    /* Hide name button in drawer when logged in — greeting handles account access */
-    .user-logged-in .navbar__btn { display: none; }
+    /* Beat home.css text-transform with higher specificity */
+    .navbar__menu .navbar__links {
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 15px;
+        color: #3D1A0A;
+    }
 
-    /* CTA button pinned at bottom of drawer */
+    /* ── Login CTA — pinned to bottom ── */
+    .user-logged-in .navbar__btn { display: none; }
     .navbar__btn {
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 20px 24px;
+        padding: 20px 20px 32px;
         width: 100%;
         height: auto;
-        min-height: 76px;
-        border-top: 1px solid #e0d4c8;
-        background: #f5f0eb;
+        background: #FAF8F4;
         margin-top: auto;
+        list-style: none;
+        flex-shrink: 0;
+        border-top: 1px solid rgba(61, 26, 10, 0.08);
+        position: sticky;
+        bottom: 0;
+        z-index: 1;
     }
     .navbar__btn .button {
         width: 100%;
-        text-align: center;
-        padding: 14px 20px;
-        font-size: 15px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
         font-weight: 600;
-        border-radius: 10px;
-        max-width: 320px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border-radius: 12px;
+        background: #6B3A1F;
+        padding: 0;
+        transition: background 0.2s;
     }
+    .navbar__btn .button:hover { background: #5A2E17; }
+
     /* Bell in topbar */
     .navbar__topbar-right .notif-bell-btn {
         color: #6B3A1F;
@@ -337,17 +439,47 @@ html {
         width: 40px;
         height: 40px;
     }
-    .navbar__topbar-right .notif-bell-btn:hover {
-        background: #f0e8e0;
+    .navbar__topbar-right .notif-bell-btn:hover { background: #f0e8e0; }
+}
+
+/* ── Drawer item entrance animation ── */
+@keyframes drawerItemIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
-/* Hide scroll bar for mobile menu */
-.navbar__menu.active::-webkit-scrollbar {
-    display: none;
+/* Semi-transparent overlay fades in behind the drawer.
+   z-index must be below .navbar (999) because the drawer lives inside the navbar's
+   stacking context — a child z-index of 10001 is scoped to that context and loses
+   to any outside element with z-index > 999. Keeping the overlay at 998 keeps it
+   between page content (0) and the navbar/drawer (999). */
+.nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 6, 2, 0.50);
+    z-index: 998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
 }
-.navbar__menu.active {
-    scrollbar-width: none;
+/* Scoped to mobile only so a stale .active class on desktop doesn't show the backdrop */
+@media screen and (max-width: 960px) {
+    .nav-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+/* Lock scroll while drawer is open — must target html too because html { overflow-y: scroll } */
+html.nav-open,
+body.nav-open {
+    overflow: hidden;
 }
 
 /* ========================
