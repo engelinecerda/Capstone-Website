@@ -1,72 +1,284 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ELI Coffee Events Cafe</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ELI Coffee Events Cafe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/home.css" />
+  <style>.hidden { display: none !important; }</style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar__container">
-            <a href="#">
-                <img class="logo" src="images/logo.png" alt="ELI Coffee Events Cafe Logo">
-            </a>
 
-            <div class="navbar__toggle" id="mobile-menu">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-            </div>
+  <!-- NAVBAR — class names kept for navbar.js and app.js compatibility -->
+  <nav class="navbar">
+    <div class="navbar__container">
+      <a href="/index.html" id="navbar__logo">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo" />
+      </a>
+      <div class="navbar__toggle" id="mobile-menu">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </div>
+      <div class="navbar__topbar-right" id="navTopbarRight"></div>
+      <ul class="navbar__menu">
+        <li class="nav-drawer-header">
+          <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
+          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">
+            <i class="ti ti-x"></i>
+          </button>
+        </li>
+        <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
+        <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/reviews.html" class="navbar__links">Reviews</a></li>
+        <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
+        <li class="navbar__btn"></li>
+      </ul>
+    </div>
+  </nav>
+  <div class="nav-overlay" id="nav-drawer-overlay"></div>
 
-        
-        <ul class="navbar__menu">
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    Home
-                </a>
-            </li>
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    Packages
-                </a>
-            </li>
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    Reservations
-                </a>
-            </li>
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    FAQs
-                </a>
-            </li>
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    About
-                </a>
-            </li>
-            <li class="navbar__item">
-                <a href="/" class="navbar__links">
-                    Contact
-                </a>
-            </li>
-            <li class="navbar__btn">
-                <a href="/" class="button">
-                    Login / Sign Up
-                </a>
-            </li>
-        </ul>
+  <!-- HERO -->
+  <section class="hero-section">
+    <img
+      class="hero-bg"
+      src="/images/637347619_904793605590427_6779978724130647558_n.jpg"
+      alt="ELI Coffee Events Cafe at night"
+    />
+    <div class="hero-overlay"></div>
+    <div class="hero-body">
+      <p class="hero-eyebrow">Binangonan, Rizal &nbsp;·&nbsp; Antipolo City</p>
+      <h1 class="hero-title">Where every sip<br>tells a <em>story</em></h1>
+      <p class="hero-sub">Specialty coffee, desserts, and cozy lounge spaces for meetups, study sessions, and private gatherings.</p>
+      <div class="hero-actions">
+        <a href="/packages.html" class="btn-primary">Explore Packages</a>
+        <a href="/about.html" class="btn-ghost">Our Story</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section-wrap" id="about">
+    <div class="about-grid">
+      <div class="about-img-wrap">
+        <img
+          class="about-img"
+          src="/images/eli coffee binangonan.jpg"
+          alt="ELI Coffee interior"
+        />
+        <div class="about-badge">
+          <span class="about-badge-num">2</span>
+          <span class="about-badge-lbl">Locations</span>
         </div>
-    </nav>
+      </div>
+      <div class="about-text">
+        <p class="eyebrow">Our Story</p>
+        <h2 class="h2">More than a cafe —<br>a <em>gathering place</em></h2>
+        <blockquote class="about-quote">
+          "A space where good coffee meets good company."
+        </blockquote>
+        <p class="about-body">ELI Coffee Events Cafe is more than your neighborhood coffee shop. We are a warm, inviting space in the heart of Binangonan, Rizal, designed for those who appreciate the finer moments — a quiet afternoon with a book, a milestone celebration with loved ones, or an intimate corporate gathering.</p>
+        <p class="about-body">From handcrafted specialty beverages to full event catering, every detail is curated with care to give you an experience worth returning to.</p>
+        <a href="/about.html" class="btn-primary" style="margin-top: 8px;">Learn More</a>
+      </div>
+    </div>
+  </section>
 
-    <div class="hero">
+  <!-- SERVICES -->
+  <section class="section-wrap section-bg" id="services">
+    <div class="services-head">
+      <div>
+        <p class="eyebrow">What We Offer</p>
+        <h2 class="h2">Our <em>services</em></h2>
+      </div>
+      <p class="services-head-desc">From cafe favorites to full event catering — we make every occasion something to remember.</p>
     </div>
-    <div class="overlay-private-event-packages">
-        <img src="images/private event packages.png" alt="private-event-packages" class="private-event-packages">
-        <p>PERFECT FOR SMALL GATHERING, BIRTHDAY, BRIDAL SHOWER, TEAM MEETING, AND ETC.</p>
+    <div class="services-grid">
+
+      <div class="service-card">
+        <img class="service-card-img" src="/images/625975201_26971266315797097_6450646982903854248_n.jpg" alt="Cafe and lounge" />
+        <div class="service-card-body">
+          <p class="service-num">01</p>
+          <h3 class="service-title">Cafe &amp; Lounge</h3>
+          <p class="service-desc">A cozy spot for relaxation, conversation, or the perfect cup. Enjoy specialty coffee, teas, and homemade desserts in a warm, welcoming atmosphere.</p>
+          <a href="/menu.html" class="service-link">View Menu</a>
+        </div>
+      </div>
+
+      <div class="service-card">
+        <img class="service-card-img" src="/images/crop-background-img.jpg" alt="Private events" />
+        <div class="service-card-body">
+          <p class="service-num">02</p>
+          <h3 class="service-title">Private Events</h3>
+          <p class="service-desc">Book the lounge exclusively for birthdays, bridal showers, team gatherings, and more. We handle the setup so you can focus on the moments that matter.</p>
+          <a href="/packages.html" class="service-link">View packages</a>
+        </div>
+      </div>
+
+      <div class="service-card">
+        <img class="service-card-img" src="/images/catering img.jpg" alt="Catering" />
+        <div class="service-card-body">
+          <p class="service-num">03</p>
+          <h3 class="service-title">Catering</h3>
+          <p class="service-desc">Customizable menus for weddings, birthdays, and corporate events. Our kitchen brings the ELI Coffee experience directly to your chosen venue.</p>
+          <a href="/packages.html" class="service-link">Get a quote</a>
+        </div>
+      </div>
+
     </div>
-    <button class="reserve-btn">Reserve Your Event</button>
-    <script src="app.js"></script>
+  </section>
+
+  <!-- GALLERY -->
+  <section class="section-wrap" id="gallery">
+    <div class="gallery-header">
+      <p class="eyebrow">Gallery</p>
+      <h2 class="h2" style="margin-bottom: 14px;">A taste of <em>ELI</em></h2>
+      <p style="font-size: 14px; color: var(--text-light); line-height: 1.75;">Moments captured inside our walls — from quiet afternoons to full-on celebrations.</p>
+    </div>
+    <div class="gallery-grid">
+      <div class="g-item gi1">
+        <img src="/images/snack bar corner.jpg" alt="ELI Coffee lounge" />
+      </div>
+      <div class="g-item gi2">
+        <img src="/images/625975201_26971266315797097_6450646982903854248_n.jpg" alt="Coffee and desserts" />
+      </div>
+      <div class="g-item gi3">
+        <img src="/images/crop-background-img.jpg" alt="Event decor" />
+      </div>
+      <div class="g-item gi4">
+        <img src="/images/629336028_26971264995797229_7811559806777201812_n.jpg" alt="Food spread" />
+      </div>
+      <div class="g-item gi5">
+        <img src="/images/mini gathering.jpg" alt="Private gathering" />
+      </div>
+      <div class="g-item gi6">
+        <img src="/images/eli coffee binangonan.jpg" alt="Interior dining" />
+      </div>
+    </div>
+  </section>
+
+  <!-- LOCATIONS -->
+  <section class="section-wrap-sm section-bg" id="locations">
+    <p class="eyebrow">Find Us</p>
+    <h2 class="h2">Our <em>locations</em></h2>
+    <div class="locations-grid">
+
+      <div class="loc-card">
+        <p class="loc-tag">Flagship</p>
+        <h3 class="loc-name">ELI Coffee Events Cafe<br>Binangonan</h3>
+        <div class="loc-row">
+          <i class="ti ti-map-pin"></i>
+          <span>2nd Floor, Pearl Building, National Road, Calumpang, Binangonan, Rizal</span>
+        </div>
+        <hr class="loc-divider" />
+        <div class="loc-hours">
+          <span class="badge-open">Open</span>
+          <span>Daily &nbsp;·&nbsp; 1:00 PM – 10:00 PM</span>
+        </div>
+      </div>
+
+      <div class="loc-card">
+        <p class="loc-tag">Branch</p>
+        <h3 class="loc-name">ELI Coffee<br>Antipolo</h3>
+        <div class="loc-row">
+          <i class="ti ti-map-pin"></i>
+          <span>2nd Floor, Pobel Building, M.L. Quezon Avenue Extension, Antipolo City</span>
+        </div>
+        <hr class="loc-divider" />
+        <div class="loc-hours">
+          <span class="badge-open">Open</span>
+          <span>Daily &nbsp;·&nbsp; 1:00 PM – 2:00 AM</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CTA BANNER -->
+  <section class="cta-banner">
+    <img
+      class="cta-banner-img"
+      src="/images/background-img.jpg"
+      alt="Private event at ELI Coffee"
+    />
+    <div class="cta-banner-overlay">
+      <h2 class="cta-banner-title">Plan your next<br><em>event with us</em></h2>
+      <p class="cta-banner-sub">Whether it's an intimate birthday or a grand celebration, our team is ready to make it unforgettable.</p>
+      <a href="/reservations.html" class="btn-primary">Reserve a Date</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer-new">
+    <div class="footer-new-grid">
+
+      <div>
+        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
+        <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
+        <div class="footer-new-social">
+          <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+            <i class="ti ti-brand-facebook"></i>
+          </a>
+          <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+            <i class="ti ti-brand-instagram"></i>
+          </a>
+        </div>
+      </div>
+
+      <div>
+        <p class="footer-new-heading">Explore</p>
+        <ul class="footer-new-links">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/packages.html">Packages</a></li>
+          <li><a href="/reservations.html">Reservations</a></li>
+          <li><a href="/reviews.html">Reviews</a></li>
+          <li><a href="/faqs.html">FAQs</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="footer-new-heading">Services</p>
+        <ul class="footer-new-links">
+          <li><a href="/packages.html">Cafe &amp; Lounge</a></li>
+          <li><a href="/packages.html">Private Events</a></li>
+          <li><a href="/packages.html">Catering</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="footer-new-heading">Contact</p>
+        <div class="footer-new-contact-row">
+          <i class="ti ti-phone"></i>
+          <span>0917 562 0306 | 0917 562 0308</span>
+        </div>
+        <div class="footer-new-contact-row">
+          <i class="ti ti-mail"></i>
+          <span>elicoffeetea@gmail.com</span>
+        </div>
+        <div class="footer-new-contact-row">
+          <i class="ti ti-map-pin"></i>
+          <span>Binangonan, Rizal &amp; Antipolo City</span>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-new-bottom">
+      <span>© 2026 ELI Coffee Events Cafe. All rights reserved.</span>
+      <span>Designed with care for every cup.</span>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script type="module" src="/js/navbar.js"></script>
 </body>
 </html>

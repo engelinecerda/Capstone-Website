@@ -1,0 +1,927 @@
+/* packages.css — ELI Coffee Events packages page */
+
+body { background: var(--cream); }
+
+/* ── PAGE HERO ─────────────────────────────────────────────────────────── */
+.page-hero {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  overflow: hidden;
+}
+.page-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  display: block;
+}
+.page-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(20,8,2,.28) 0%, rgba(20,8,2,.62) 60%, rgba(20,8,2,.74) 100%);
+}
+.page-hero-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 40px;
+  color: var(--white);
+}
+.page-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 6vw, 80px);
+  font-weight: 300;
+  line-height: 1.06;
+  margin-bottom: 14px;
+  letter-spacing: -.01em;
+}
+.page-hero-title em { font-style: italic; }
+.page-hero-sub {
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.7);
+}
+
+/* ── SHARED LAYOUT ─────────────────────────────────────────────────────── */
+.pkg-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+/* ── LOADING / ERROR / EMPTY STATES ────────────────────────────────────── */
+.pkg-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 72px 20px;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 14px;
+}
+.pkg-state-icon { font-size: 40px; color: var(--brown-pale); }
+.pkg-state-icon--error { font-size: 40px; color: #d97706; }
+.pkg-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--brown-pale);
+  border-top-color: var(--brown-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.pkg-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--brown-primary);
+  color: var(--white);
+  border: none;
+  border-radius: 6px;
+  padding: 11px 24px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s;
+}
+.pkg-retry-btn:hover { background: var(--brown-dark); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SECTION 1 · CATEGORY TABS
+   ══════════════════════════════════════════════════════════════════════════ */
+.pkg-cat-section {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 40px 0 36px;
+}
+
+/* Auto-fit grid — handles 3, 5, 8+ categories without breakpoints */
+.pkg-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+/* ── Category card (icon-based, no image) ────────────────────────────── */
+.pkg-cat-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 22px 16px 18px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .15s, background .15s, color .15s;
+  outline: none;
+}
+.pkg-cat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brown-light);
+  box-shadow: 0 6px 20px rgba(44,20,6,.08);
+}
+
+/* Active state */
+.pkg-cat-card.active {
+  background: var(--brown-primary);
+  border-color: var(--brown-primary);
+  box-shadow: 0 6px 24px rgba(61,26,10,.22);
+  transform: none;
+}
+
+/* Checkmark badge in top-right (only shown when active) */
+.pkg-cat-check {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity .15s, transform .15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.pkg-cat-check i {
+  font-size: 11px;
+  color: var(--brown-primary);
+  font-weight: 700;
+}
+.pkg-cat-card.active .pkg-cat-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pkg-cat-icon {
+  font-size: 22px;
+  color: var(--brown-primary);
+  transition: color .15s;
+}
+.pkg-cat-card.active .pkg-cat-icon {
+  color: rgba(255,255,255,.9);
+}
+
+.pkg-cat-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.3;
+  transition: color .15s;
+}
+.pkg-cat-card.active .pkg-cat-name { color: var(--white); }
+
+.pkg-cat-count {
+  font-size: 11.5px;
+  color: var(--text-light);
+  transition: color .15s;
+}
+.pkg-cat-card.active .pkg-cat-count { color: rgba(255,255,255,.7); }
+
+/* Hover only on inactive cards */
+.pkg-cat-card:not(.active):hover .pkg-cat-icon { color: var(--brown-primary); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SECTION 2 · CATEGORY OVERVIEW
+   ══════════════════════════════════════════════════════════════════════════ */
+.pkg-overview-section {
+  background: var(--cream-dark);
+  border-bottom: 1px solid var(--border);
+  padding: 56px 0;
+}
+
+/* Two-column layout — both cards stretch to the same row height */
+.pkg-overview-layout {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Shared card shell — flex column so inner sections can anchor at bottom */
+.pkg-ov-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 2px 12px rgba(44,20,6,.04);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Left card ─────────────────────────────────────────────────────────── */
+.pkg-ov-name {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 400;
+  color: var(--text-dark);
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+.pkg-ov-desc {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.8;
+  margin-bottom: 0;
+}
+.pkg-ov-incl-wrap {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.pkg-ov-incl-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 14px;
+}
+/* Right card — body fills leftover height so divider + bottom row anchor low */
+.pkg-ov-card--right {}
+#ovInfoCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+/* Scoped to the info card body: push divider (and the row below it) to the bottom */
+#ovInfoCardBody .pkg-svc-divider {
+  margin-top: auto;
+}
+.pkg-ov-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 18px;
+}
+
+/* Service detail rows */
+.pkg-svc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+}
+.pkg-svc-row:first-of-type { padding-top: 0; }
+.pkg-svc-row i {
+  font-size: 17px;
+  color: var(--brown-primary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.pkg-svc-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 3px;
+}
+.pkg-svc-value {
+  font-size: 12.5px;
+  color: var(--text-dark);
+  line-height: 1.5;
+}
+.pkg-svc-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0 8px;
+}
+
+/* ── Overview "What's included" — compact icon-row list ────────────── */
+/* Two columns so the card stays scannable; no box chrome to compete
+   with the white card background or the cream-dark page behind it.   */
+.pkg-ov-incl-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 20px;
+}
+.pkg-ov-incl-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.4;
+  padding: 4px 0;
+}
+.pkg-ov-incl-row i {
+  font-size: 16px;
+  color: var(--brown-primary);
+  flex-shrink: 0;
+}
+.pkg-ov-incl-more {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* ── Detail panel Inclusions tab — full tile grid ────────────────── */
+.pkg-incl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+.pkg-incl-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  gap: 7px;
+  background: var(--cream-dark);
+  border-radius: 8px;
+  padding: 12px 8px;
+  transition: background .15s;
+}
+.pkg-incl-tile i {
+  font-size: 18px;
+  color: var(--brown-primary);
+}
+.pkg-incl-tile span {
+  font-size: 11.5px;
+  color: var(--text-mid);
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+/* Flat fallback list (for <4 items) */
+.pkg-incl-flat {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pkg-incl-flat li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.6;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pkg-incl-flat li:last-child { border-bottom: none; }
+.pkg-incl-flat li::before {
+  content: '✔';
+  color: var(--brown-primary);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SECTION 3 · PACKAGE PRICING CARDS
+   ══════════════════════════════════════════════════════════════════════════ */
+.pkg-options-section {
+  background: var(--cream);
+  padding: 60px 0;
+}
+
+/* Section label above both main and add-on grids */
+.pkg-options-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--brown-light);
+  margin-bottom: 18px;
+}
+.pkg-options-label--addon {
+  margin-top: 48px;
+  padding-top: 36px;
+  border-top: 1px solid var(--border);
+}
+
+/* Hard 3-column grid: gives 2 full rows of 3 for the standard 5-package
+   category. The 6th slot is intentionally empty — reserved for a future
+   package rather than having one card float alone on a half-empty row.   */
+.pkg-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* ── Package card ───────────────────────────────────────────────────── */
+.pkg-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-top: 4px solid var(--brown-light);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .15s;
+}
+.pkg-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(44,20,6,.10);
+}
+.pkg-card.selected {
+  border-color: var(--brown-primary);
+  border-top-color: var(--brown-primary);
+  box-shadow: 0 0 0 3px rgba(61,26,10,.10);
+}
+
+/* ── Best-value tier highlight ──────────────────────────────────────── */
+/* Replaces the 1.5px neutral border with a 2px golden border on all
+   sides; the 4px top accent is preserved to stay consistent with the
+   card family, but the colour shifts to the golden highlight tone.   */
+.pkg-card--best {
+  border: 2px solid #C98A4B;
+  border-top: 4px solid #C98A4B;
+}
+/* Small downward-pointing tab that sits in the card's top padding area
+   so it overlaps no content — the 20px body padding-top is taller than
+   the badge's ~18px height.                                            */
+.pkg-card-best-badge {
+  position: absolute;
+  top: 0;
+  right: 16px;
+  background: #FAEEDA;
+  color: #854F0B;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 5px 10px 4px;
+  border-radius: 0 0 7px 7px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pkg-card-body {
+  padding: 20px 20px 22px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 210px; /* guarantees a dignified card height even for minimal-data packages */
+}
+
+/* Badge + corner icon row */
+.pkg-card-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  min-height: 22px;
+}
+.pkg-card-loc-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 100px;
+  color: var(--white);
+}
+.pkg-card-loc-badge--onsite  { background: rgba(61,26,10,.72); }
+.pkg-card-loc-badge--offsite { background: rgba(20,80,30,.72); }
+
+.pkg-card-cat-icon {
+  font-size: 18px;
+  color: var(--brown-pale);
+  flex-shrink: 0;
+}
+
+/* Package name — always occupies exactly 2 lines so the price block starts
+   at the same vertical position across all cards in the same grid row.
+   line-clamp clips longer names cleanly rather than pushing everything below. */
+.pkg-card-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.3;
+  margin-bottom: 10px;
+  min-height: calc(14.5px * 1.3 * 2); /* reserve 2 line-heights = ~37.7px */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Price block — Inter font to prevent ₱ glyph fallback artifacts.
+   Price is the primary comparison axis; it needs clear visual weight. */
+.pkg-card-price {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brown-primary);
+  letter-spacing: -.02em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.pkg-card-price--contact {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-light);
+  font-style: italic;
+  margin-bottom: 4px;
+}
+/* Border-bottom creates a visual zone break between [price] and [pills + actions],
+   so scanning eyes can lock onto the price row across all five cards at once.   */
+.pkg-card-price-note {
+  font-size: 10.5px;
+  color: var(--text-light);
+  margin-bottom: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Pills row — min-height reserves one pill-row of space even when the container
+   is empty (packages with no capacity/duration data), preventing the actions
+   row from floating at inconsistent distances from the price separator.
+   margin-bottom: 20px gives clear breathing room between pills and the divider
+   above the buttons — previously 14px felt tight on shorter cards.            */
+.pkg-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+  margin-bottom: 20px;
+  min-height: 26px;
+  align-items: flex-start;
+}
+.pkg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-mid);
+  background: var(--cream-dark);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 3px 9px;
+}
+.pkg-pill i { font-size: 12px; color: var(--brown-light); }
+.pkg-pill--offsite { background: rgba(20,80,30,.07); border-color: rgba(20,80,30,.2); color: #145020; }
+
+/* Button row — "Details" ghost, "Book" solid primary */
+.pkg-card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+.pkg-card-btn-details {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.pkg-card-btn-details:hover {
+  border-color: var(--brown-light);
+  color: var(--brown-primary);
+}
+.pkg-card-btn-book {
+  flex: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brown-primary);
+  color: var(--white);
+  border: none;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.pkg-card-btn-book:hover { background: var(--brown-dark); color: var(--white); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SECTION 4 · PACKAGE DETAIL PANEL
+   ══════════════════════════════════════════════════════════════════════════ */
+.pkg-detail-section {
+  background: var(--cream-dark);
+  border-top: 1px solid var(--border);
+  padding: 48px 0 64px;
+}
+
+/* Left-accent panel — anchors the section visually */
+.pkg-detail-panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brown-primary);
+  border-radius: 0 10px 10px 0;
+  box-shadow: 0 4px 24px rgba(44,20,6,.06);
+  overflow: hidden;
+}
+
+/* ── Two-column header ─────────────────────────────────────────────── */
+.pkg-detail-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: start;
+  padding: 32px 36px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--cream);
+}
+
+.pkg-detail-eyebrow {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--brown-light);
+  margin-bottom: 8px;
+}
+.pkg-detail-name {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 400;
+  color: var(--text-dark);
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+.pkg-detail-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.pkg-detail-head-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* Price — Inter font prevents ₱ glyph fallback rendering issue */
+.pkg-detail-price {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--brown-primary);
+  line-height: 1;
+  text-align: right;
+}
+.pkg-detail-price--contact {
+  font-size: 20px;
+  font-style: italic;
+  color: var(--text-light);
+}
+.pkg-detail-price-note {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 3px;
+  text-align: right;
+}
+.pkg-detail-book-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--brown-primary);
+  color: var(--white);
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.pkg-detail-book-btn:hover { background: var(--brown-dark); color: var(--white); }
+
+/* "Hide details" text link (replaces ✕ modal-style close) */
+.pkg-hide-link {
+  display: block;
+  background: none;
+  border: none;
+  padding: 8px 36px;
+  font-size: 12px;
+  color: var(--text-light);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color .15s;
+}
+.pkg-hide-link:hover { color: var(--text-mid); }
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+.pkg-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 36px;
+  background: var(--cream);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pkg-tabs::-webkit-scrollbar { display: none; }
+
+.pkg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-light);
+  cursor: pointer;
+  white-space: nowrap;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+}
+.pkg-tab:hover { color: var(--text-mid); }
+.pkg-tab.active {
+  color: var(--brown-primary);
+  border-bottom-color: var(--brown-primary);
+}
+
+/* ── Tab panels ──────────────────────────────────────────────────── */
+.pkg-tab-panels { padding: 36px; }
+.pkg-tab-panel  {}
+
+.pkg-overview-content { max-width: 760px; }
+.pkg-overview-para {
+  font-size: 14.5px;
+  color: var(--text-mid);
+  line-height: 1.82;
+  margin-bottom: 16px;
+}
+
+.pkg-tier-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-top: 24px;
+}
+.pkg-tier-block { margin-bottom: 28px; }
+.pkg-tier-head {
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.pkg-tier-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-dark);
+  margin-bottom: 2px;
+}
+.pkg-tier-sub { font-size: 13px; color: var(--text-light); }
+
+/* Area coverage */
+.pkg-area-content { max-width: 680px; }
+.pkg-area-note {
+  display: flex;
+  gap: 16px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.pkg-area-note i { font-size: 20px; color: var(--brown-primary); flex-shrink: 0; margin-top: 2px; }
+.pkg-area-note p { font-size: 13.5px; color: var(--text-mid); line-height: 1.7; margin: 0; }
+.pkg-area-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.pkg-area-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.pkg-area-card i { font-size: 17px; color: var(--brown-primary); flex-shrink: 0; }
+.pkg-area-loc { font-size: 13.5px; font-weight: 500; color: var(--text-dark); margin-bottom: 2px; }
+.pkg-area-note-text { font-size: 11.5px; color: var(--text-light); }
+
+/* Policies */
+.pkg-policies {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pkg-policy-item {
+  display: flex;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.pkg-policy-item > i { font-size: 20px; color: var(--brown-primary); flex-shrink: 0; margin-top: 2px; }
+.pkg-policy-item strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
+.pkg-policy-item p { font-size: 13px; color: var(--text-mid); line-height: 1.7; margin: 0; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .pkg-wrap { padding: 0 32px; }
+  .pkg-overview-layout { grid-template-columns: 1.5fr 1fr; }
+  .pkg-detail-head { padding: 28px 28px 24px; gap: 24px; }
+  .pkg-tabs { padding: 0 28px; }
+  .pkg-tab-panels { padding: 28px; }
+}
+
+@media (max-width: 900px) {
+  .pkg-overview-layout { grid-template-columns: 1fr; }
+  .pkg-ov-card--right { max-width: 480px; }
+  .pkg-detail-head { grid-template-columns: 1fr; gap: 20px; }
+  .pkg-detail-head-right { flex-direction: row; align-items: center; justify-content: space-between; }
+  .pkg-detail-price { text-align: left; }
+  .pkg-detail-price-note { text-align: left; }
+}
+
+@media (max-width: 640px) {
+  .pkg-wrap { padding: 0 18px; }
+  .page-hero { height: 300px; }
+  .pkg-cat-section { padding: 28px 0 24px; }
+
+  .pkg-cat-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+  .pkg-cat-card { padding: 18px 12px 14px; }
+  .pkg-cat-icon { font-size: 20px; }
+  .pkg-cat-name { font-size: 12px; }
+  .pkg-cat-count { display: none; }
+
+  .pkg-overview-section { padding: 36px 0; }
+  .pkg-ov-card { padding: 22px; }
+  .pkg-ov-name { font-size: 24px; }
+  .pkg-ov-incl-list { grid-template-columns: 1fr; }
+
+  .pkg-options-section { padding: 40px 0; }
+  /* 3-column grid collapses to 2 at 640px — 3 cards at 604px usable
+     would be ~185px each, too narrow for readable pricing cards.    */
+  .pkg-cards-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .pkg-card-body { padding: 14px; }
+  .pkg-card-name { font-size: 12.5px; }
+  .pkg-card-price { font-size: 17px; }
+
+  .pkg-detail-section { padding: 32px 0 48px; }
+  .pkg-detail-head { padding: 20px; }
+  .pkg-detail-head-right { flex-direction: column; align-items: stretch; }
+  .pkg-detail-book-btn { justify-content: center; }
+  .pkg-hide-link { padding: 6px 20px; }
+  .pkg-tabs { padding: 0 16px; }
+  .pkg-tab { padding: 12px 10px; font-size: 12.5px; gap: 4px; }
+  .pkg-tab-panels { padding: 20px; }
+  .pkg-incl-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 420px) {
+  .pkg-cat-grid { grid-template-columns: repeat(2, 1fr); }
+  .pkg-cards-grid { grid-template-columns: 1fr; }
+}

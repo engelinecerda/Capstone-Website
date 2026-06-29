@@ -1,0 +1,587 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Kumbh Sans', sans-serif;
+}
+
+body {
+    font-family: 'Kumbh Sans', sans-serif;
+    background-color: #FFF8F0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========================
+   Top Bar
+======================== */
+.top-bar {
+    background-color: #2A1408;
+    color: #fff;
+    text-align: center;
+    padding: 10px;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+/* ========================
+   Page Wrapper
+======================== */
+.admin-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    padding: 40px 20px;
+}
+
+.admin-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 520px;
+}
+
+/* ========================
+   Portal Header
+======================== */
+.portal-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.portal-icon {
+    width: 72px;
+    height: 72px;
+    background-color: #2A1408;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.portal-icon svg {
+    width: 36px;
+    height: 36px;
+    fill: #fff;
+}
+
+.portal-header h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #2A1408;
+    margin-bottom: 4px;
+}
+
+.portal-header p {
+    font-size: 0.9rem;
+    color: #6B3A1F;
+    font-weight: 400;
+}
+
+/* ========================
+   Login Card
+======================== */
+.admin-card {
+    background: #fff;
+    padding: 50px 60px;
+    border-radius: 16px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.09);
+    width: 100%;
+}
+
+.admin-card h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #2A1408;
+    margin-bottom: 4px;
+}
+
+.admin-card .subtitle {
+    font-size: 0.875rem;
+    color: #777;
+    margin-bottom: 28px;
+}
+
+/* ========================
+   Form Groups
+======================== */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #2A1408;
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Kumbh Sans', sans-serif;
+    color: #2A1408;
+    background-color: #fff;
+    transition: border-color 0.3s ease;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #6B3A1F;
+}
+
+/* Select wrapper for custom arrow */
+.select-wrapper {
+    position: relative;
+}
+
+.select-wrapper select {
+    width: 100%;
+    cursor: pointer;
+}
+
+.select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #6B3A1F;
+    pointer-events: none;
+}
+
+/* ========================
+   Password Wrapper
+======================== */
+.password-wrapper {
+    position: relative;
+}
+
+.password-wrapper input {
+    padding-right: 44px;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+}
+
+/* Hide browser-native password reveal button (Edge, IE, Chrome) */
+.password-wrapper input[type="password"]::-ms-reveal,
+.password-wrapper input[type="password"]::-ms-clear {
+    display: none;
+}
+
+.password-wrapper input::placeholder {
+    font-size: 16px;
+    letter-spacing: 0.08em;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.toggle-password:hover {
+    color: #6B3A1F;
+}
+
+.toggle-password svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ========================
+   Options Row
+======================== */
+.options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.options-forgot-only {
+    justify-content: flex-end;
+}
+
+.options label {
+    font-size: 0.875rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.options input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: #6B3A1F;
+    cursor: pointer;
+}
+
+.forgot {
+    font-size: 0.875rem;
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.forgot:hover {
+    text-decoration: underline;
+}
+
+/* ========================
+   Login Button
+======================== */
+.login-btn {
+    width: 100%;
+    padding: 14px;
+    background: #6B3A1F;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Kumbh Sans', sans-serif;
+    transition: background 0.3s ease;
+    letter-spacing: 0.3px;
+}
+
+.login-btn:hover {
+    background: #2A1408;
+}
+
+/* ========================
+   Form Message
+======================== */
+.form-msg {
+    margin-top: 16px;
+    font-size: 0.875rem;
+    text-align: center;
+    min-height: 1.2em;
+}
+
+.form-msg.success { color: #1e8449; }
+.form-msg.error   { color: #c0392b; }
+
+/* ========================
+   Divider
+======================== */
+.divider {
+    border: none;
+    border-top: 1px solid #f0e8e0;
+    margin: 20px 0;
+}
+
+.security-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: #aaa;
+    justify-content: center;
+}
+
+.security-note svg {
+    width: 14px;
+    height: 14px;
+    fill: #bbb;
+    flex-shrink: 0;
+}
+
+/* ========================
+   Responsive
+======================== */
+@media (max-width: 480px) {
+    .admin-card {
+        padding: 32px 24px;
+    }
+}
+
+/* ========================
+   MFA Card
+======================== */
+.mfa-icon {
+    width: 52px;
+    height: 52px;
+    background: #f5efe7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 18px;
+    color: #6B3A1F;
+}
+
+.mfa-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.mfa-code-input {
+    font-size: 24px !important;
+    letter-spacing: 0.25em;
+    text-align: center;
+    font-weight: 700;
+}
+
+.mfa-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6B3A1F;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Kumbh Sans', sans-serif;
+    padding: 0;
+}
+
+.mfa-back-link:hover {
+    text-decoration: underline;
+}
+
+/* ========================
+   Forgot Password Modal
+======================== */
+.forgot {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.fp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(42, 20, 8, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.fp-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.fp-modal {
+    background: #fff;
+    border-radius: 16px;
+    padding: 36px 40px;
+    max-width: 480px;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(42, 20, 8, 0.18);
+    transform: translateY(8px);
+    transition: transform 0.2s ease;
+}
+
+.fp-overlay.open .fp-modal {
+    transform: translateY(0);
+}
+
+.fp-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #aaa;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.fp-close:hover {
+    color: #2A1408;
+    background: #f5efe7;
+}
+
+.fp-icon {
+    width: 52px;
+    height: 52px;
+    background: #f5efe7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: #6B3A1F;
+}
+
+.fp-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.fp-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #2A1408;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.fp-intro {
+    font-size: 0.875rem;
+    color: #666;
+    text-align: center;
+    line-height: 1.65;
+    margin-bottom: 24px;
+}
+
+.fp-section {
+    margin-bottom: 20px;
+}
+
+.fp-section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+
+.fp-contact-card {
+    background: #fdf7f2;
+    border: 1px solid #ead9c8;
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fp-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fp-contact-icon {
+    color: #6B3A1F;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.fp-contact-text {
+    font-size: 0.875rem;
+    color: #2A1408;
+}
+
+.fp-contact-link {
+    font-size: 0.875rem;
+    color: #6B3A1F;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.fp-contact-link:hover {
+    text-decoration: underline;
+}
+
+.fp-checklist {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fp-checklist li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.875rem;
+    color: #444;
+}
+
+.fp-checklist li svg {
+    color: #6B3A1F;
+    flex-shrink: 0;
+}
+
+.fp-response-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #888;
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 11px 14px;
+    margin-bottom: 24px;
+}
+
+.fp-response-note svg {
+    color: #6B3A1F;
+    flex-shrink: 0;
+}
+
+.fp-response-note strong {
+    color: #2A1408;
+}
+
+.fp-back-btn {
+    width: 100%;
+    padding: 13px;
+    background: #2A1408;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Kumbh Sans', sans-serif;
+    transition: background 0.2s ease;
+    letter-spacing: 0.2px;
+}
+
+.fp-back-btn:hover {
+    background: #6B3A1F;
+}
+
+@media (max-width: 520px) {
+    .fp-modal {
+        padding: 28px 22px;
+    }
+}
