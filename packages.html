@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,33 +10,29 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="/css/styles.css" />
-  <link rel="stylesheet" href="/css/modals.css" />
   <link rel="stylesheet" href="/css/packages.css" />
   <link rel="stylesheet" href="/css/home.css" />
   <style>.hidden { display: none !important; }</style>
 </head>
 <body>
 
-  <!-- NAVBAR — class names kept for navbar.js and app.js compatibility -->
+  <!-- NAVBAR -->
   <nav class="navbar">
     <div class="navbar__container">
       <a href="/index.html" id="navbar__logo">
         <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo" />
       </a>
       <div class="navbar__toggle" id="mobile-menu">
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </div>
       <div class="navbar__topbar-right" id="navTopbarRight"></div>
       <ul class="navbar__menu">
         <li class="nav-drawer-header">
           <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
-          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">
-            <i class="ti ti-x"></i>
-          </button>
+          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu"><i class="ti ti-x"></i></button>
         </li>
         <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
         <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
         <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
         <li class="navbar__item"><a href="/reviews.html" class="navbar__links">Reviews</a></li>
@@ -59,100 +55,178 @@
     </div>
   </section>
 
-  <!-- INTRO -->
-  <section class="section-wrap pkg-intro-wrap">
-    <div class="pkg-intro-inner">
-      <p class="eyebrow pkg-intro-eyebrow">What We Offer</p>
-      <h2 class="h2">Celebrate <em>life's moments</em></h2>
-      <p class="pkg-intro-body">Choose from our curated packages and enjoy great coffee, delicious food, and warm hospitality — all tailored to make your occasion unforgettable.</p>
+  <!-- ══════════════════════════════════════════════════
+       SECTION 1 · CATEGORY TABS
+       ══════════════════════════════════════════════════ -->
+  <section class="pkg-cat-section" id="section-categories">
+    <div class="pkg-wrap">
+      <!-- States -->
+      <div class="pkg-state" id="pkgCatLoading">
+        <div class="pkg-spinner"></div>
+        <p>Loading packages…</p>
+      </div>
+      <div class="pkg-state hidden" id="pkgCatError">
+        <i class="ti ti-alert-circle pkg-state-icon--error"></i>
+        <p id="pkgCatErrorMsg">Failed to load packages.</p>
+        <button class="pkg-retry-btn" id="pkgRetryBtn">Try Again</button>
+      </div>
+      <div class="pkg-state hidden" id="pkgCatEmpty">
+        <i class="ti ti-package-off pkg-state-icon"></i>
+        <p>No packages available at the moment.</p>
+      </div>
+      <!-- Category tab grid -->
+      <div class="pkg-cat-grid hidden" id="pkgCatGrid"></div>
     </div>
   </section>
 
-  <!-- DYNAMIC PACKAGES SECTION -->
-  <div class="packages-section" id="packages">
+  <!-- ══════════════════════════════════════════════════
+       SECTION 2 · CATEGORY OVERVIEW
+       ══════════════════════════════════════════════════ -->
+  <section class="pkg-overview-section hidden" id="section-overview">
+    <div class="pkg-wrap">
+      <div class="pkg-overview-layout">
 
-    <!-- Loading state -->
-    <div class="packages-loading" id="packagesLoading">
-      <div class="loading-spinner"></div>
-      <p>Loading packages...</p>
-    </div>
+        <!-- Left card: name + description + what's included icon grid -->
+        <div class="pkg-ov-card pkg-ov-card--left">
+          <h2 class="pkg-ov-name" id="ovName"></h2>
+          <p class="pkg-ov-desc" id="ovDesc"></p>
+          <div class="pkg-ov-incl-wrap hidden" id="ovInclSection">
+            <p class="pkg-ov-incl-title">What's included</p>
+            <div class="pkg-ov-incl-grid" id="ovHighlights"></div>
+          </div>
+        </div>
 
-    <!-- Error state -->
-    <div class="packages-error hidden" id="packagesError">
-      <i class="ti ti-alert-circle"></i>
-      <p id="packagesErrorMsg">Failed to load packages.</p>
-      <button type="button" class="retry-btn" id="retryBtn">Try Again</button>
-    </div>
+        <!-- Right card: service details — hidden when no area coverage -->
+        <div class="pkg-ov-card pkg-ov-card--right hidden" id="ovInfoCardWrap">
+          <p class="pkg-ov-card-label">Service details</p>
+          <div id="ovInfoCardBody"></div>
+        </div>
 
-    <!-- Empty state -->
-    <div class="packages-empty hidden" id="packagesEmpty">
-      <i class="ti ti-package-off"></i>
-      <p>No packages available at the moment. Check back soon!</p>
-    </div>
-
-    <!-- Dynamic cards container -->
-    <div class="cards-container hidden" id="categoriesContainer"></div>
-  </div>
-
-  <!-- SINGLE REUSABLE MODAL FOR PACKAGES -->
-  <div id="packageCategoryModal" class="modal" style="display:none;">
-    <div class="modal-content package-category-modal-content">
-      <span class="close-btn" id="modalCloseBtn">&times;</span>
-
-      <!-- Category header -->
-      <div class="pkg-modal-header">
-        <h2 id="pkgModalCatName">Category</h2>
-        <p class="pkg-modal-cat-desc hidden" id="pkgModalCatDesc"></p>
       </div>
+    </div>
+  </section>
 
-      <!-- Inclusions section -->
-      <div class="pkg-modal-inclusions hidden" id="pkgModalInclusions">
-        <h3 class="pkg-modal-section-title">Overview</h3>
-        <ul class="pkg-modal-inclusions-list" id="pkgModalInclusionsList"></ul>
+  <!-- ══════════════════════════════════════════════════
+       SECTION 3 · PACKAGE PRICING CARDS
+       ══════════════════════════════════════════════════ -->
+  <section class="pkg-options-section hidden" id="section-options">
+    <div class="pkg-wrap">
+      <p class="pkg-options-label" id="optTitle"></p>
+
+      <div class="pkg-state hidden" id="pkgOptLoading">
+        <div class="pkg-spinner"></div>
+        <p>Loading packages…</p>
       </div>
-
-      <!-- Modal loading -->
-      <div class="pkg-modal-loading" id="pkgModalLoading">
-        <div class="loading-spinner"></div>
-        <p>Loading packages...</p>
-      </div>
-
-      <!-- Modal empty -->
-      <div class="pkg-modal-empty hidden" id="pkgModalEmpty">
+      <div class="pkg-state hidden" id="pkgOptEmpty">
+        <i class="ti ti-package-off pkg-state-icon"></i>
         <p>No packages available in this category yet.</p>
       </div>
 
       <!-- Main packages -->
-      <div class="pkg-modal-list hidden" id="pkgModalList">
-        <h3 class="pkg-modal-section-title" id="pkgModalMainTitle">Main Packages</h3>
-        <div id="pkgModalCards"></div>
-      </div>
+      <div class="pkg-cards-grid" id="pkgMainGrid"></div>
 
-      <!-- Add-ons -->
-      <div class="pkg-modal-list hidden" id="pkgModalAddOns">
-        <h3 class="pkg-modal-section-title" id="pkgModalAddOnTitle">Add-On Packages</h3>
-        <div id="pkgModalAddOnCards"></div>
+      <!-- Add-on packages -->
+      <div class="pkg-addon-section hidden" id="pkgAddonSection">
+        <p class="pkg-options-label pkg-options-label--addon">Add-on packages</p>
+        <div class="pkg-cards-grid" id="pkgAddonGrid"></div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SECTION 4 · PACKAGE DETAIL PANEL
+       ══════════════════════════════════════════════════ -->
+  <section class="pkg-detail-section hidden" id="section-detail">
+    <div class="pkg-wrap">
+      <div class="pkg-detail-panel">
+
+        <!-- Two-column header -->
+        <div class="pkg-detail-head">
+          <div class="pkg-detail-head-left">
+            <span class="pkg-detail-eyebrow" id="pkgDetailCatTag"></span>
+            <h3 class="pkg-detail-name" id="pkgDetailName"></h3>
+            <div class="pkg-detail-pills" id="pkgDetailPills"></div>
+          </div>
+          <div class="pkg-detail-head-right">
+            <div id="pkgDetailPricing"></div>
+            <a href="/reservations.html" class="pkg-detail-book-btn" id="pkgDetailBookBtn">
+              <i class="ti ti-calendar-plus"></i> Book This Package
+            </a>
+          </div>
+        </div>
+
+        <!-- "Hide details" text link -->
+        <button class="pkg-hide-link" id="pkgDetailClose">Hide details</button>
+
+        <!-- Tab row -->
+        <div class="pkg-tabs" id="pkgTabs" role="tablist" aria-label="Package information">
+          <button role="tab" class="pkg-tab active" data-tab="overview" aria-selected="true">Overview</button>
+          <button role="tab" class="pkg-tab" data-tab="inclusions" aria-selected="false">Inclusions</button>
+          <button role="tab" class="pkg-tab hidden" id="tabAreaCoverage" data-tab="area" aria-selected="false">Area Coverage</button>
+          <button role="tab" class="pkg-tab" data-tab="policies" aria-selected="false">Policies</button>
+        </div>
+
+        <!-- Tab panels -->
+        <div class="pkg-tab-panels">
+          <div class="pkg-tab-panel active" id="panelOverview" role="tabpanel"></div>
+          <div class="pkg-tab-panel hidden" id="panelInclusions" role="tabpanel"></div>
+          <div class="pkg-tab-panel hidden" id="panelArea" role="tabpanel"></div>
+          <div class="pkg-tab-panel hidden" id="panelPolicies" role="tabpanel">
+            <div class="pkg-policies">
+              <div class="pkg-policy-item">
+                <i class="ti ti-file-invoice"></i>
+                <div>
+                  <strong>Contract &amp; Downpayment</strong>
+                  <p>A signed contract and initial downpayment are required to confirm your reservation. Dates are only secured upon receipt of both.</p>
+                </div>
+              </div>
+              <div class="pkg-policy-item">
+                <i class="ti ti-calendar-x"></i>
+                <div>
+                  <strong>Cancellation Policy</strong>
+                  <p>Cancellations must be submitted at least 7 days before your event date. Cancellations within 7 days may forfeit the downpayment.</p>
+                </div>
+              </div>
+              <div class="pkg-policy-item">
+                <i class="ti ti-users"></i>
+                <div>
+                  <strong>Guest Count Changes</strong>
+                  <p>Changes to the final guest count must be communicated at least 48 hours before the event. Last-minute additions may not be accommodated.</p>
+                </div>
+              </div>
+              <div class="pkg-policy-item">
+                <i class="ti ti-clock"></i>
+                <div>
+                  <strong>Duration &amp; Extensions</strong>
+                  <p>All packages include setup and breakdown time within the stated hours. Extension fees apply if the event exceeds the booked duration.</p>
+                </div>
+              </div>
+              <div class="pkg-policy-item">
+                <i class="ti ti-edit"></i>
+                <div>
+                  <strong>Customization Requests</strong>
+                  <p>Special requests, theme adjustments, or menu modifications should be communicated at least 3 days prior to the event.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
 
   <!-- FOOTER -->
   <footer class="footer-new">
     <div class="footer-new-grid">
-
       <div>
         <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
         <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
         <div class="footer-new-social">
-          <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
-            <i class="ti ti-brand-facebook"></i>
-          </a>
-          <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-            <i class="ti ti-brand-instagram"></i>
-          </a>
+          <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>
+          <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>
         </div>
       </div>
-
       <div>
         <p class="footer-new-heading">Explore</p>
         <ul class="footer-new-links">
@@ -164,7 +238,6 @@
           <li><a href="/about.html">About</a></li>
         </ul>
       </div>
-
       <div>
         <p class="footer-new-heading">Services</p>
         <ul class="footer-new-links">
@@ -173,23 +246,12 @@
           <li><a href="/packages.html">Catering</a></li>
         </ul>
       </div>
-
       <div>
         <p class="footer-new-heading">Contact</p>
-        <div class="footer-new-contact-row">
-          <i class="ti ti-phone"></i>
-          <span>0917 562 0306 | 0917 562 0308</span>
-        </div>
-        <div class="footer-new-contact-row">
-          <i class="ti ti-mail"></i>
-          <span>elicoffeetea@gmail.com</span>
-        </div>
-        <div class="footer-new-contact-row">
-          <i class="ti ti-map-pin"></i>
-          <span>Binangonan, Rizal &amp; Antipolo City</span>
-        </div>
+        <div class="footer-new-contact-row"><i class="ti ti-phone"></i><span>0917 562 0306 | 0917 562 0308</span></div>
+        <div class="footer-new-contact-row"><i class="ti ti-mail"></i><span>elicoffeetea@gmail.com</span></div>
+        <div class="footer-new-contact-row"><i class="ti ti-map-pin"></i><span>Binangonan, Rizal &amp; Antipolo City</span></div>
       </div>
-
     </div>
     <div class="footer-new-bottom">
       <span>© 2026 ELI Coffee Events Cafe. All rights reserved.</span>

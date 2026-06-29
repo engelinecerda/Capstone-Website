@@ -4375,17 +4375,29 @@ function wireEditProfileToggle() {
     const readonlyView = document.getElementById('info-readonly-view');
     const editView     = document.getElementById('info-edit-view');
 
-    editBtn?.addEventListener('click', () => {
+    function enterEditMode() {
         readonlyView?.setAttribute('hidden', '');
         editView?.removeAttribute('hidden');
         if (editBtn) editBtn.innerHTML = '<i class="ti ti-x"></i> Cancel Edit';
-    });
+    }
 
-    cancelBtn?.addEventListener('click', () => {
+    function exitEditMode() {
         editView?.setAttribute('hidden', '');
         readonlyView?.removeAttribute('hidden');
         if (editBtn) editBtn.innerHTML = '<i class="ti ti-edit"></i> Edit Profile';
+    }
+
+    // Toggle: if already in edit mode, cancel; otherwise open
+    editBtn?.addEventListener('click', () => {
+        if (editView && !editView.hasAttribute('hidden')) {
+            exitEditMode();
+        } else {
+            enterEditMode();
+        }
     });
+
+    // The "Cancel" button next to Save Changes also exits edit mode
+    cancelBtn?.addEventListener('click', exitEditMode);
 }
 
 function wireChangePasswordCard() {

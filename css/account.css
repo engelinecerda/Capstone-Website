@@ -3661,6 +3661,10 @@ body {
    Responsive
 ======================== */
 @media (max-width: 960px) {
+    /* account.css sets navbar to 72px globally, so body offset must match */
+    body {
+        padding-top: 72px;
+    }
     .account-hero-inner,
     .account-tabs-inner,
     .account-content-inner {
@@ -3710,7 +3714,7 @@ body {
         max-width: none;
     }
     .account-tabs-bar {
-        top: 64px;
+        top: 72px;
     }
     .account-content {
         padding: 24px 0 48px;
@@ -3726,10 +3730,21 @@ body {
         flex-direction: column;
         gap: 12px;
     }
+    /* Edit/Cancel header button: full width when stacked */
     .btn-edit-profile,
     .btn-cancel-edit {
         width: 100%;
         justify-content: center;
+    }
+
+    /* Save + Cancel row → stack vertically, both full width */
+    .edit-form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .edit-form-actions .save-btn {
+        width: 100%;
+        align-self: auto;
     }
 
     .form-row {

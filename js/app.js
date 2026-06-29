@@ -6,14 +6,14 @@ const drawerClose = document.getElementById('nav-drawer-close');
 
 function openDrawer() {
     menu.classList.add('active');
-    navOverlay.classList.add('active');
+    if (navOverlay) navOverlay.classList.add('active');
     document.documentElement.classList.add('nav-open');
     document.body.classList.add('nav-open');
 }
 
 function closeDrawer() {
     menu.classList.remove('active');
-    navOverlay.classList.remove('active');
+    if (navOverlay) navOverlay.classList.remove('active');
     document.documentElement.classList.remove('nav-open');
     document.body.classList.remove('nav-open');
 }

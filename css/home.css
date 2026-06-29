@@ -167,9 +167,10 @@ body {
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(20,8,2,.28) 0%,
-    rgba(20,8,2,.52) 55%,
-    rgba(20,8,2,.72) 100%
+    rgba(20,8,2,.30) 0%,
+    rgba(20,8,2,.62) 45%,
+    rgba(20,8,2,.75) 70%,
+    rgba(20,8,2,.80) 100%
   );
 }
 .hero-body {
@@ -203,11 +204,14 @@ body {
 .hero-title em { font-style: italic; }
 .hero-sub {
   font-size: 15px;
-  font-weight: 300;
-  color: rgba(255,255,255,.78);
+  font-weight: 400;
+  color: #fff;
   max-width: 460px;
   line-height: 1.75;
   margin-bottom: 44px;
+  text-shadow:
+    0 1px 10px rgba(0,0,0,.70),
+    0 0  28px rgba(0,0,0,.45);
 }
 .hero-actions {
   display: flex;
@@ -588,6 +592,11 @@ body {
 }
 
 /* ─── RESPONSIVE ─────────────────────────────────────────────────── */
+
+/* ── Mobile: body offset for fixed 72px navbar ── */
+@media (max-width: 960px) {
+  body { padding-top: 72px; }
+}
 
 /* ── Large tablet / small desktop ── */
 @media (max-width: 1100px) {

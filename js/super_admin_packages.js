@@ -962,19 +962,19 @@ confirmOk.addEventListener('click', async () => {
     const isActive = type === 'restore';
 
     if (scope === 'category') {
-      const { data, error } = await supabase
+      const cat = allCategories.find(c => c.package_category_id === id);
+      const { error, count } = await supabase
         .from(CATEGORY_TABLE)
-        .update({ is_active: isActive })
-        .eq('package_category_id', id)
-        .select()
-        .single();
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('package_category_id', id);
       if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
       const idx = allCategories.findIndex(c => c.package_category_id === id);
-      if (idx !== -1) allCategories[idx] = data;
+      if (idx !== -1) allCategories[idx] = { ...allCategories[idx], is_active: isActive };
       await logAudit({
         action:   type === 'archive' ? 'Archived Category' : 'Restored Category',
         category: 'package',
-        details:  `Category ${type === 'archive' ? 'archived' : 'restored'}: ${data.category_name}`,
+        details:  `Category ${type === 'archive' ? 'archived' : 'restored'}: ${cat?.category_name}`,
         entityId: id
       });
       catShowingArchived = !isActive;
@@ -984,19 +984,19 @@ confirmOk.addEventListener('click', async () => {
     }
 
     if (scope === 'package') {
-      const { data, error } = await supabase
+      const pkg = allPackages.find(p => p.package_id === id);
+      const { error, count } = await supabase
         .from('package')
-        .update({ is_active: isActive })
-        .eq('package_id', id)
-        .select()
-        .single();
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('package_id', id);
       if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
       const idx = allPackages.findIndex(p => p.package_id === id);
-      if (idx !== -1) allPackages[idx] = data;
+      if (idx !== -1) allPackages[idx] = { ...allPackages[idx], is_active: isActive };
       await logAudit({
         action:   type === 'archive' ? 'Archived Package' : 'Restored Package',
         category: 'package',
-        details:  `Package ${type === 'archive' ? 'archived' : 'restored'}: ${data.package_name} (Category: ${activeCategoryName})`,
+        details:  `Package ${type === 'archive' ? 'archived' : 'restored'}: ${pkg?.package_name} (Category: ${activeCategoryName})`,
         entityId: id
       });
       pkgShowingArchived = !isActive;
@@ -1006,19 +1006,19 @@ confirmOk.addEventListener('click', async () => {
     }
 
     if (scope === 'tier') {
-      const { data, error } = await supabase
+      const tier = allTiers.find(t => t.tier_id === id);
+      const { error, count } = await supabase
         .from(TIER_TABLE)
-        .update({ is_active: isActive })
-        .eq('tier_id', id)
-        .select()
-        .single();
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('tier_id', id);
       if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
       const idx = allTiers.findIndex(t => t.tier_id === id);
-      if (idx !== -1) allTiers[idx] = data;
+      if (idx !== -1) allTiers[idx] = { ...allTiers[idx], is_active: isActive };
       await logAudit({
         action:   type === 'archive' ? 'Archived Tier' : 'Restored Tier',
         category: 'package',
-        details:  `Tier ${type === 'archive' ? 'archived' : 'restored'}: ${data.tier_name} (Package: ${tierForPackageName})`,
+        details:  `Tier ${type === 'archive' ? 'archived' : 'restored'}: ${tier?.tier_name} (Package: ${tierForPackageName})`,
         entityId: id
       });
       renderTierTable();

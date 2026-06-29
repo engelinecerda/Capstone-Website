@@ -34,6 +34,7 @@
                     </button>
                 </li>
                 <li class="navbar__item"><a href="/index.html"        class="navbar__links">Home</a></li>
+                <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
                 <li class="navbar__item"><a href="/packages.html"     class="navbar__links">Packages</a></li>
                 <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
                 <li class="navbar__item"><a href="/reviews.html"      class="navbar__links">Reviews</a></li>
@@ -57,7 +58,14 @@
     </section>
 
     <section class="reservation-section">
+
         <div class="reservation-container">
+
+            <!-- GUEST NOTICE — injected/shown by JS for unauthenticated visitors -->
+            <div class="res-guest-notice hidden" id="resGuestNotice" role="status" aria-live="polite">
+                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                <p>You're browsing as a guest. <a href="/login.html">Sign in</a> or <a href="/login.html">create an account</a> to complete your booking.</p>
+            </div>
 
             <!-- Progress -->
             <div class="progress-container">
@@ -400,6 +408,10 @@
 
     const { data: { session } } = await supabase.auth.getSession();
     const isLoggedIn = !!session;
+
+    if (!isLoggedIn) {
+        document.getElementById('resGuestNotice').classList.remove('hidden');
+    }
 
     const S = {
         eventType: '', guestCount: '', eventDate: '',
@@ -1284,17 +1296,20 @@
     async function loadPackages() {
         const { data: pkgs, error } = await supabase
             .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type, duration_hours')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type, duration_hours, package_category(is_active)')
             .eq('is_active', true)
             .order('price', { ascending: true });
 
         if (error || !pkgs) { console.error('Failed to load packages:', error); return; }
 
+        // Exclude packages whose parent category is archived (null category = no restriction)
+        const visiblePkgs = pkgs.filter(p => p.package_category?.is_active !== false);
+
         MINI  = [];
         SNACK = [];
         OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
 
-        pkgs.forEach(p => {
+        visiblePkgs.forEach(p => {
             const desc = (p.description || '').trim();
             if (p.price === 0 && (desc === '' || desc === '.')) return;
 
@@ -2029,6 +2044,13 @@
     }
 
     document.getElementById('nextBtn').onclick = () => {
+        if (!isLoggedIn) {
+            const notice = document.getElementById('resGuestNotice');
+            notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            notice.classList.add('res-guest-notice--pulse');
+            setTimeout(() => notice.classList.remove('res-guest-notice--pulse'), 800);
+            return;
+        }
         if (!validate(cur)) return;
         if (cur < total()) { cur++; showStep(cur); }
         else { submitDone(); }

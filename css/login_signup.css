@@ -39,6 +39,29 @@
     );
 }
 
+/* Blurred frosted strip at the bottom — sits between the image+overlay (z-index: auto)
+   and the content layer (z-index: 2). Blurs the image behind the location footer text. */
+.auth-panel-left::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 190px;
+    background: linear-gradient(
+        to top,
+        rgba(10,4,1,.62) 0%,
+        rgba(10,4,1,.20) 55%,
+        transparent 100%
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    -webkit-mask: linear-gradient(to top, black 35%, transparent 100%);
+    mask: linear-gradient(to top, black 35%, transparent 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+
 .auth-panel-content {
     position: relative;
     z-index: 2;
@@ -128,7 +151,7 @@
     align-items: center;
     gap: 8px;
     font-size: 11.5px;
-    color: rgba(255,255,255,0.40);
+    color: rgba(255,255,255,0.80);
     letter-spacing: 0.05em;
 }
 
@@ -154,6 +177,7 @@
     width: 100%;
     max-width: 420px;
 }
+
 
 /* ================================================
    Form Head — title & subtitle
@@ -391,6 +415,12 @@
     border: 1px solid #fecaca;
 }
 
+.form-msg.lockout {
+    color: #7c4a1a;
+    background: #fef9f0;
+    border: 1px solid #c98a4b;
+}
+
 /* ================================================
    Auth Switch Link ("Don't have an account?")
 ================================================ */
@@ -449,63 +479,32 @@
 
 /* ================================================
    Responsive — 768px (Mobile)
-   Hero image collapses to a short top banner
+   Hero panel hidden; form fills the full screen
 ================================================ */
 @media (max-width: 768px) {
     .auth-split {
         flex-direction: column;
-        height: auto;
         min-height: calc(100vh - 72px);
         overflow: visible;
     }
 
-    /* Collapsed hero image strip on mobile */
+    /* Hide the decorative hero panel entirely on mobile */
     .auth-panel-left {
-        flex: 0 0 auto;
-        height: 220px;
-    }
-
-    .auth-panel-content {
-        padding: 28px 28px 24px;
-        flex-direction: row;
-        align-items: flex-end;
-        justify-content: space-between;
-        height: 100%;
-    }
-
-    .auth-panel-logo {
-        height: 38px;
-    }
-
-    .auth-panel-body {
         display: none;
     }
 
-    .auth-panel-social {
-        display: none;
-    }
-
-    .auth-panel-footer {
-        flex-direction: row;
-        gap: 16px;
-        align-items: center;
-        margin-top: 0;
-    }
-
-    .auth-panel-footer span {
-        font-size: 11px;
-    }
-
-    /* Form panel takes remaining space */
+    /* Form panel expands to full width and centers the card vertically */
     .auth-panel-right {
         flex: 1;
-        padding: 40px 24px 56px;
-        align-items: flex-start;
+        width: 100%;
+        padding: 48px 32px 56px;
+        align-items: center;
         justify-content: center;
     }
 
     .auth-form-card {
-        max-width: 100%;
+        width: 100%;
+        max-width: 440px;
     }
 
     .auth-form-title {
@@ -518,11 +517,8 @@
 }
 
 @media (max-width: 480px) {
-    .auth-panel-left { height: 180px; }
-
     .auth-panel-right {
-        padding: 32px 20px 48px;
+        padding: 40px 24px 48px;
     }
 
-    .auth-panel-footer { display: none; }
 }

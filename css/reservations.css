@@ -1296,3 +1296,46 @@
             .policy-modal-actions { flex-direction: column-reverse; }
             .policy-btn { width: 100%; }
         }
+
+/* ── Guest notice banner ────────────────────────────────────────────────── */
+.res-guest-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #FEFAF4;
+    border: 1.5px solid #C98A4B;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-dark, #2A1408);
+}
+
+.res-guest-notice i {
+    font-size: 20px;
+    color: #C98A4B;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.res-guest-notice p { margin: 0; }
+
+.res-guest-notice a {
+    color: var(--brown-primary, #3D1A0A);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.res-guest-notice a:hover { opacity: .75; }
+
+@keyframes res-notice-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(201, 138, 75, .55); }
+    70%  { box-shadow: 0 0 0 8px rgba(201, 138, 75, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(201, 138, 75, 0); }
+}
+
+.res-guest-notice--pulse {
+    animation: res-notice-pulse .8s ease-out;
+}

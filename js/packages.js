@@ -1,461 +1,375 @@
-// packages.js
-// Customer-facing: Dynamic categories → packages from Supabase
+// packages.js — Customer-facing packages page
+// Inline flow: category tabs → overview → pricing cards → detail panel
 
-import { portalSupabase as supabase } from './supabase.js';
+import { customerSupabase as supabase } from './supabase.js';
 
-// ─── Constants & Supabase Tables ────────────────────────────────────────────────────────────────
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
 const TIER_TABLE     = 'package_tier';
-const TIER_VISIBLE_COUNT = 5; 
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allCategories      = [];
+let packageCountMap    = {};
+let selectedCategoryId = null;
+let selectedPackageId  = null;
+let allPackagesCache   = [];
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
-const packagesLoading     = document.getElementById('packagesLoading');
-const packagesError       = document.getElementById('packagesError');
-const packagesErrorMsg    = document.getElementById('packagesErrorMsg');
-const packagesEmpty       = document.getElementById('packagesEmpty');
-const categoriesContainer = document.getElementById('categoriesContainer');
-const retryBtn            = document.getElementById('retryBtn');
+const sectionCategories = document.getElementById('section-categories');
+const sectionOverview   = document.getElementById('section-overview');
+const sectionOptions    = document.getElementById('section-options');
+const sectionDetail     = document.getElementById('section-detail');
 
-const modal              = document.getElementById('packageCategoryModal');
-const modalCloseBtn      = document.getElementById('modalCloseBtn');
-const pkgModalCatName    = document.getElementById('pkgModalCatName');
-const pkgModalCatDesc    = document.getElementById('pkgModalCatDesc');
-const pkgModalInclusions     = document.getElementById('pkgModalInclusions');
-const pkgModalInclusionsList = document.getElementById('pkgModalInclusionsList');
-const pkgModalLoading    = document.getElementById('pkgModalLoading');
-const pkgModalEmpty      = document.getElementById('pkgModalEmpty');
-const pkgModalList       = document.getElementById('pkgModalList');
-const pkgModalCards      = document.getElementById('pkgModalCards');
-const pkgModalAddOns     = document.getElementById('pkgModalAddOns');
-const pkgModalAddOnCards = document.getElementById('pkgModalAddOnCards');
+const pkgCatLoading  = document.getElementById('pkgCatLoading');
+const pkgCatError    = document.getElementById('pkgCatError');
+const pkgCatErrorMsg = document.getElementById('pkgCatErrorMsg');
+const pkgCatEmpty    = document.getElementById('pkgCatEmpty');
+const pkgCatGrid     = document.getElementById('pkgCatGrid');
+const pkgRetryBtn    = document.getElementById('pkgRetryBtn');
+
+const ovName         = document.getElementById('ovName');
+const ovDesc         = document.getElementById('ovDesc');
+const ovInclSection  = document.getElementById('ovInclSection');
+const ovHighlights   = document.getElementById('ovHighlights');
+const ovInfoCardWrap = document.getElementById('ovInfoCardWrap');
+const ovInfoCardBody = document.getElementById('ovInfoCardBody');
+
+const optTitle        = document.getElementById('optTitle');
+const pkgOptLoading   = document.getElementById('pkgOptLoading');
+const pkgOptEmpty     = document.getElementById('pkgOptEmpty');
+const pkgMainGrid     = document.getElementById('pkgMainGrid');
+const pkgAddonSection = document.getElementById('pkgAddonSection');
+const pkgAddonGrid    = document.getElementById('pkgAddonGrid');
+
+const pkgDetailCatTag  = document.getElementById('pkgDetailCatTag');
+const pkgDetailName    = document.getElementById('pkgDetailName');
+const pkgDetailPills   = document.getElementById('pkgDetailPills');
+const pkgDetailPricing = document.getElementById('pkgDetailPricing');
+const pkgDetailBookBtn = document.getElementById('pkgDetailBookBtn');
+const pkgDetailClose   = document.getElementById('pkgDetailClose');
+const pkgTabs          = document.getElementById('pkgTabs');
+const tabAreaCoverage  = document.getElementById('tabAreaCoverage');
+const panelOverview    = document.getElementById('panelOverview');
+const panelInclusions  = document.getElementById('panelInclusions');
+const panelArea        = document.getElementById('panelArea');
+const panelPolicies    = document.getElementById('panelPolicies');
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
-function escapeHtml(str) {
+function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, m =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
-function formatCurrency(v) {
-  return `₱${Number(v || 0).toLocaleString()}`;
+function show(el) { if (el) el.classList.remove('hidden'); }
+function hide(el) { if (el) el.classList.add('hidden'); }
+
+function smoothScrollTo(el, offset = 80) {
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top, behavior: 'smooth' });
 }
 
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.add('hidden'); }
+// ─── Category keyword → icon map ─────────────────────────────────────────────
+function getCategoryIcon(name) {
+  const n = (name || '').toLowerCase();
+  if (/coffee.*bar|coffee/i.test(n)) return 'ti-coffee';
+  if (/snack.*bar|snack/i.test(n))   return 'ti-cookie';
+  if (/gather|private/i.test(n))     return 'ti-users';
+  if (/cater/i.test(n))              return 'ti-tools-kitchen-2';
+  if (/all.?in/i.test(n))            return 'ti-stars';
+  if (/grazing/i.test(n))            return 'ti-grape';
+  return 'ti-package';
+}
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SMART DESCRIPTION PARSER
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Inclusion keyword → icon map ────────────────────────────────────────────
+const ICON_MAP = [
+  { test: /transport|delivery|truck/i,                  icon: 'ti-truck-delivery' },
+  { test: /table|setup|preparation/i,                   icon: 'ti-table' },
+  { test: /barista|staff|crew|team|personnel/i,         icon: 'ti-users' },
+  { test: /\bserving\b|\bcup\b/i,                       icon: 'ti-cup' },
+  { test: /tasting|espresso|brew|americano|latte/i,     icon: 'ti-coffee' },
+  { test: /coffee/i,                                    icon: 'ti-coffee' },
+  { test: /hot|iced|temperature/i,                      icon: 'ti-cup-hot' },
+  { test: /hall|venue|room|space|lounge|building/i,     icon: 'ti-building' },
+  { test: /lights?|led|bulb|lamp|sound|audio|speaker/i, icon: 'ti-speakerphone' },
+  { test: /decor|styling|accent|balloon/i,              icon: 'ti-sparkles' },
+  { test: /flower|floral|bouquet/i,                     icon: 'ti-flower' },
+  { test: /photobooth|photograph|camera/i,              icon: 'ti-camera' },
+  { test: /backdrop|banner|signage/i,                   icon: 'ti-photo' },
+  { test: /buffet|catering|meal|food|dish|menu|rice/i,  icon: 'ti-tools-kitchen-2' },
+  { test: /drink|beverage|juice|water/i,                icon: 'ti-glass' },
+  { test: /dessert|cake|pastry|sweet|chocolate/i,       icon: 'ti-cake' },
+  { test: /coordinator|organizer/i,                     icon: 'ti-user-star' },
+  { test: /wifi|internet/i,                             icon: 'ti-wifi' },
+  { test: /projector|screen/i,                          icon: 'ti-device-projector' },
+  { test: /snack/i,                                     icon: 'ti-cookie' },
+  { test: /contract|document/i,                         icon: 'ti-file-text' },
+];
 
-function buildDescriptionHtml(text) {
-  if (!text || !text.trim()) return '';
-
-  const raw = text.trim();
-
-  // Step 1: Split by newlines first
-  const lines = raw.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
-
-  // Step 2: If multiple lines exist, treat each line as a potential section or item
-  if (lines.length > 1) {
-    return buildMultiLineDesc(lines);
+function getInclusionIcon(text) {
+  for (const { test, icon } of ICON_MAP) {
+    if (test.test(text)) return icon;
   }
+  return 'ti-check';
+}
 
-  // Step 3: Single line — try splitting by bullet separators
-  const bulletSeparators = /\s*[•·|]\s*/;
-  if (bulletSeparators.test(raw)) {
-    const items = raw.split(bulletSeparators).map(s => s.trim()).filter(s => s.length > 0);
-    if (items.length > 1) {
-      return buildBulletList(items);
-    }
+// ─── Text helpers ─────────────────────────────────────────────────────────────
+function parseItemList(text) {
+  if (!text || !text.trim()) return [];
+  let items = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
+  if (items.length === 1) {
+    const byComma = items[0].split(',').map(s => s.trim()).filter(s => s.length > 0);
+    if (byComma.length > 1 && byComma.every(s => s.length < 60)) items = byComma;
   }
-
-  // Step 4: Try splitting by commas — only if resulting items are short
-  if (raw.includes(',')) {
-    const items = raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
-    const avgLen = items.reduce((sum, i) => sum + i.length, 0) / items.length;
-    if (items.length >= 3 && avgLen < 60) {
-      return buildBulletList(items);
-    }
-  }
-
-  // Step 5: Fallback — just a paragraph
-  return `<p class="pkg-card-desc">${escapeHtml(raw)}</p>`;
+  return items.map(s => s.replace(/^[-•*·]\s*/, '').trim()).filter(s => s.length > 0);
 }
 
-function buildMultiLineDesc(lines) {
-  let html = '';
-  let currentTitle = null;
-  let currentItems = [];
-  let introLines = [];
-
-  for (const line of lines) {
-    if (isLikelySectionHeader(line)) {
-      if (currentTitle) {
-        html += buildSection(currentTitle, currentItems);
-        currentItems = [];
-      }
-      currentTitle = line.replace(/[:]\s*$/, '').trim();
-    } else if (currentTitle) {
-      const subItems = splitLineIntoItems(line);
-      currentItems.push(...subItems);
-    } else {
-      introLines.push(line);
-    }
-  }
-
-  if (currentTitle) {
-    html += buildSection(currentTitle, currentItems);
-  }
-
-  if (introLines.length > 0) {
-    const avgLen = introLines.reduce((sum, l) => sum + l.length, 0) / introLines.length;
-    if (introLines.length >= 2 && avgLen < 80) {
-      const allItems = [];
-      for (const il of introLines) {
-        allItems.push(...splitLineIntoItems(il));
-      }
-      html = buildBulletList(allItems) + html;
-    } else {
-      html = `<p class="pkg-card-desc">${escapeHtml(introLines.join(' '))}</p>` + html;
-    }
-  }
-
-  return html;
+// Compact icon-row list for the category overview "What's included" summary.
+// Max 6 items; shows a "+N more" label if the category has additional inclusions.
+// Two-column layout so the card doesn't become a wall of tiles.
+function buildOverviewInclList(items) {
+  if (!items.length) return '';
+  const visible = items.slice(0, 6);
+  const overflow = items.length - visible.length;
+  const rows = visible.map(item => `
+    <div class="pkg-ov-incl-row">
+      <i class="ti ${esc(getInclusionIcon(item))}"></i>
+      <span>${esc(item)}</span>
+    </div>`).join('');
+  const more = overflow > 0
+    ? `<p class="pkg-ov-incl-more">+${overflow} more included — see package details</p>`
+    : '';
+  return `<div class="pkg-ov-incl-list">${rows}</div>${more}`;
 }
 
-function isLikelySectionHeader(line) {
-  if (line.endsWith(':') && line.length <= 60) return true;
-  return false;
+// Icon tile grid — used in the detail panel Inclusions tab (full, browsable view)
+function buildTileGrid(items) {
+  if (!items.length) return '';
+  return `<div class="pkg-incl-grid">${
+    items.map(item => `
+      <div class="pkg-incl-tile">
+        <i class="ti ${esc(getInclusionIcon(item))}"></i>
+        <span>${esc(item)}</span>
+      </div>`).join('')
+  }</div>`;
 }
 
-function splitLineIntoItems(line) {
-  const bulletSeparators = /\s*[•·|;]\s*/;
-  if (bulletSeparators.test(line)) {
-    return line.split(bulletSeparators).map(s => s.trim()).filter(s => s.length > 0);
-  }
-  if (line.includes(',')) {
-    const parts = line.split(',').map(s => s.trim()).filter(s => s.length > 0);
-    const avgLen = parts.reduce((sum, p) => sum + p.length, 0) / parts.length;
-    if (parts.length >= 2 && avgLen < 50) {
-      return parts;
-    }
-  }
-  return [line];
+function buildFlatList(items) {
+  if (!items.length) return '';
+  return `<ul class="pkg-incl-flat">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
 }
 
-function buildSection(title, items) {
-  let html = `<div class="pkg-desc-section">`;
-  html += `<h4 class="pkg-desc-section-title">${escapeHtml(title)}</h4>`;
-  if (items.length > 0) {
-    html += `<ul class="pkg-desc-list">`;
-    for (const item of items) {
-      html += `<li>${escapeHtml(item)}</li>`;
-    }
-    html += `</ul>`;
-  }
-  html += `</div>`;
-  return html;
-}
-
-function buildBulletList(items) {
-  let html = `<ul class="pkg-desc-list">`;
-  for (const item of items) {
-    html += `<li>${escapeHtml(item)}</li>`;
-  }
-  html += `</ul>`;
-  return html;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// INCLUSIONS PARSER
-// Detects section headers (lines ending with :) for grouped layout
-// Falls back to flat bullet list for plain text
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function parseInclusionsStructured(text) {
-  if (!text || !text.trim()) return { type: 'empty', sections: [], items: [] };
-
-  const lines = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
-
-  // Check if any line looks like a section header (ends with :)
-  const hasHeaders = lines.some(line => /^.{1,50}:\s*$/.test(line) || (line.endsWith(':') && line.length <= 50));
-
-  if (hasHeaders) {
-    // Parse into grouped sections
-    const sections = [];
-    let currentSection = null;
-
-    for (const line of lines) {
-      if (line.endsWith(':') && line.length <= 50) {
-        // New section header
-        if (currentSection) sections.push(currentSection);
-        currentSection = {
-          title: line.replace(/:\s*$/, '').trim(),
-          items: []
-        };
-      } else if (currentSection) {
-        // Item under current section — split by comma if short items
-        const subItems = splitInclusionLine(line);
-        currentSection.items.push(...subItems);
-      } else {
-        // Item before any header — create unnamed section
-        if (!currentSection) {
-          currentSection = { title: '', items: [] };
-        }
-        const subItems = splitInclusionLine(line);
-        currentSection.items.push(...subItems);
-      }
-    }
-
-    if (currentSection) sections.push(currentSection);
-
-    // If we got real titled sections, return grouped
-    const titledSections = sections.filter(s => s.title);
-    if (titledSections.length > 0) {
-      return { type: 'grouped', sections };
-    }
-  }
-
-  // Flat list fallback
-  let items = [];
-  for (const line of lines) {
-    const subItems = splitInclusionLine(line);
-    items.push(...subItems);
-  }
-
-  return { type: 'flat', sections: [], items };
-}
-
-function splitInclusionLine(line) {
-  // Try comma split for short items
-  if (line.includes(',')) {
-    const parts = line.split(',').map(s => s.trim()).filter(s => s.length > 0);
-    const avgLen = parts.reduce((sum, p) => sum + p.length, 0) / parts.length;
-    if (parts.length >= 2 && avgLen < 50) {
-      return parts;
-    }
-  }
-  return [line];
-}
-function buildInclusionsHtml(text) {
-  const parsed = parseInclusionsStructured(text);
-
-  if (parsed.type === 'empty') return '';
-
-  if (parsed.type === 'grouped') {
-    // Render as 3-column grid with cards
-    const groupCards = parsed.sections.map(section => {
-      if (!section.title && section.items.length === 0) return '';
-
-      const titleHtml = section.title
-        ? `<h4 class="inclusions-group-title">${escapeHtml(section.title)}</h4>`
-        : '';
-
-      const listHtml = section.items.length > 0
-        ? `<ul class="inclusions-group-list">${section.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
-        : '';
-
-      return `<div class="inclusions-group">${titleHtml}${listHtml}</div>`;
-    }).join('');
-
-    return `<div class="inclusions-grid">${groupCards}</div>`;
-  }
-
-  // Flat list
-  if (parsed.items.length === 0) return '';
-  return `<ul class="pkg-modal-inclusions-list">${parsed.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// PAGE STATES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function showPageLoading() {
-  show(packagesLoading);
-  hide(packagesError);
-  hide(packagesEmpty);
-  hide(categoriesContainer);
-}
-
-function showPageError(msg) {
-  hide(packagesLoading);
-  show(packagesError);
-  hide(packagesEmpty);
-  hide(categoriesContainer);
-  packagesErrorMsg.textContent = msg || 'Failed to load packages.';
-}
-
-function showPageEmpty() {
-  hide(packagesLoading);
-  hide(packagesError);
-  show(packagesEmpty);
-  hide(categoriesContainer);
-}
-
-function showPageContent() {
-  hide(packagesLoading);
-  hide(packagesError);
-  hide(packagesEmpty);
-  show(categoriesContainer);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODAL STATES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function showModalLoading() {
-  show(pkgModalLoading);
-  hide(pkgModalEmpty);
-  hide(pkgModalList);
-  hide(pkgModalAddOns);
-}
-
-function showModalEmpty() {
-  hide(pkgModalLoading);
-  show(pkgModalEmpty);
-  hide(pkgModalList);
-  hide(pkgModalAddOns);
-}
-
-function showModalContent(hasMain, hasAddOns) {
-  hide(pkgModalLoading);
-  hide(pkgModalEmpty);
-  if (hasMain)   show(pkgModalList);    else hide(pkgModalList);
-  if (hasAddOns) show(pkgModalAddOns);  else hide(pkgModalAddOns);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODAL OPEN / CLOSE
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function openModal() {
-  modal.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-  modal.style.display = 'none';
-  document.body.style.overflow = '';
-}
-
-modalCloseBtn.addEventListener('click', closeModal);
-window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOAD & RENDER CATEGORIES
-// ═══════════════════════════════════════════════════════════════════════════════
-
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 1 — LOAD & RENDER CATEGORY TABS
+// ══════════════════════════════════════════════════════════════════════════════
 async function loadCategories() {
-  showPageLoading();
+  show(pkgCatLoading);
+  hide(pkgCatError);
+  hide(pkgCatEmpty);
+  hide(pkgCatGrid);
+
   try {
-    const { data, error } = await supabase
+    const { data: cats, error: catErr } = await supabase
       .from(CATEGORY_TABLE)
       .select('*')
       .eq('is_active', true)
       .order('created_at', { ascending: true });
-    if (error) throw error;
-    if (!data || data.length === 0) { showPageEmpty(); return; }
-    renderCategoryCards(data);
-    showPageContent();
+    if (catErr) throw catErr;
+
+    if (!cats || cats.length === 0) {
+      hide(pkgCatLoading);
+      show(pkgCatEmpty);
+      return;
+    }
+    allCategories = cats;
+
+    // Batch-fetch package counts
+    const { data: countRows } = await supabase
+      .from(PACKAGE_TABLE)
+      .select('package_category_id')
+      .eq('is_active', true);
+
+    packageCountMap = {};
+    (countRows || []).forEach(r => {
+      if (r.package_category_id)
+        packageCountMap[r.package_category_id] = (packageCountMap[r.package_category_id] || 0) + 1;
+    });
+
+    renderCategoryGrid(cats);
+    hide(pkgCatLoading);
+    show(pkgCatGrid);
+
+    // Auto-select first category without scrolling (data loads immediately on page open)
+    selectCategory(cats[0], { scroll: false });
+
   } catch (err) {
-    console.error('Failed to load categories:', err);
-    showPageError('Unable to load packages right now. Please try again later.');
+    console.error('loadCategories:', err);
+    hide(pkgCatLoading);
+    show(pkgCatError);
+    if (pkgCatErrorMsg) pkgCatErrorMsg.textContent = 'Unable to load packages right now. Please try again.';
   }
 }
 
-function buildCategoryCardImage(cat) {
-  if (cat.category_image) {
-    return `<img src="${escapeHtml(cat.category_image)}" class="card-img" alt="${escapeHtml(cat.category_name)}" loading="lazy">`;
-  }
-  return `<div class="card-img card-img-placeholder"><i class="fa-solid fa-utensils"></i></div>`;
+function buildCategoryCard(cat) {
+  const name       = cat.category_name || '';
+  const count      = packageCountMap[cat.package_category_id] || 0;
+  const countLabel = count === 1 ? '1 package' : `${count} packages`;
+  const icon       = getCategoryIcon(name);
+
+  return `
+    <div class="pkg-cat-card" data-cat-id="${esc(cat.package_category_id)}"
+         role="button" tabindex="0" aria-label="View ${esc(name)} packages">
+      <div class="pkg-cat-check"><i class="ti ti-check"></i></div>
+      <i class="ti ${esc(icon)} pkg-cat-icon"></i>
+      <p class="pkg-cat-name">${esc(name)}</p>
+      <p class="pkg-cat-count">${esc(countLabel)}</p>
+    </div>`;
 }
 
-function renderCategoryCards(categories) {
-  categoriesContainer.innerHTML = categories.map(cat => {
-    const desc = cat.description || '';
-    const inclusions = cat.package_category_inclusions || '';
-    const displayText = desc ? escapeHtml(desc) : 'Tap to view available packages';
+function renderCategoryGrid(cats) {
+  pkgCatGrid.innerHTML = cats.map(buildCategoryCard).join('');
 
-    return `
-      <div class="card" 
-           data-category-id="${cat.package_category_id}" 
-           data-category-name="${escapeHtml(cat.category_name)}"
-           data-category-desc="${escapeHtml(desc)}"
-           data-category-inclusions="${escapeHtml(inclusions)}">
-        ${buildCategoryCardImage(cat)}
-        <div class="card-body">
-          <div class="card-title"><h3>${escapeHtml(cat.category_name)}</h3></div>
-          <p>${displayText}</p>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  categoriesContainer.querySelectorAll('.card[data-category-id]').forEach(card => {
-    card.addEventListener('click', () => {
-      openCategoryModal(
-        card.dataset.categoryId,
-        card.dataset.categoryName,
-        card.dataset.categoryDesc || '',
-        card.dataset.categoryInclusions || ''
-      );
+  pkgCatGrid.querySelectorAll('.pkg-cat-card').forEach(card => {
+    const handler = () => {
+      const cat = allCategories.find(c => c.package_category_id === card.dataset.catId);
+      if (cat) selectCategory(cat, { scroll: true });
+    };
+    card.addEventListener('click', handler);
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
     });
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOAD & RENDER PACKAGES IN MODAL
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 2 — CATEGORY OVERVIEW
+// ══════════════════════════════════════════════════════════════════════════════
+function selectCategory(cat, { scroll = true } = {}) {
+  selectedCategoryId = cat.package_category_id;
+  selectedPackageId  = null;
 
-async function openCategoryModal(categoryId, categoryName, categoryDesc, categoryInclusions) {
-  // ── Set header ──
-  pkgModalCatName.textContent = categoryName;
+  pkgCatGrid.querySelectorAll('.pkg-cat-card').forEach(el =>
+    el.classList.toggle('active', el.dataset.catId === selectedCategoryId));
 
-  // ── Set category description ──
-  if (categoryDesc && categoryDesc.trim()) {
-    pkgModalCatDesc.textContent = categoryDesc;
-    show(pkgModalCatDesc);
+  // Left card: name + description + inclusions icon grid
+  ovName.textContent = cat.category_name || '';
+  ovDesc.textContent = cat.description  || '';
+
+  const inclItems = parseItemList(cat.package_category_inclusions || '');
+  if (inclItems.length) {
+    ovHighlights.innerHTML = buildOverviewInclList(inclItems);
+    show(ovInclSection);
   } else {
-    pkgModalCatDesc.textContent = '';
-    hide(pkgModalCatDesc);
+    ovHighlights.innerHTML = '';
+    hide(ovInclSection);
   }
 
-    // ── Set category inclusions ──
-  const inclusionsHtml = buildInclusionsHtml(categoryInclusions);
-  if (inclusionsHtml) {
-    pkgModalInclusionsList.innerHTML = inclusionsHtml;
-    show(pkgModalInclusions);
-  } else {
-    pkgModalInclusionsList.innerHTML = '';
-    hide(pkgModalInclusions);
+  show(sectionOverview);
+  show(sectionOptions);
+  hide(sectionDetail);
+
+  optTitle.textContent = `${cat.category_name || ''} packages`;
+
+  if (scroll) smoothScrollTo(sectionOverview, 88);
+
+  loadPackages(cat.package_category_id, cat.category_name || '');
+}
+
+// Right card — always shown; bottom row adapts to onsite vs offsite vs mixed.
+// Onsite: venue address. Offsite: area coverage. Mixed: area coverage (travel is the key detail).
+function buildInfoCard(pkgs) {
+  const locationTypes = [...new Set(pkgs.map(p => p.location_type).filter(Boolean))];
+  const hasOffsite    = locationTypes.includes('offsite');
+  const hasOnsite     = locationTypes.includes('onsite');
+
+  const durations  = pkgs.map(p => Number(p.duration_hours)).filter(d => d > 0);
+  const minDur     = durations.length ? Math.min(...durations) : null;
+  const maxDur     = durations.length ? Math.max(...durations) : null;
+  const capacities = pkgs.map(p => Number(p.guest_capacity)).filter(c => c > 0);
+  const maxCap     = capacities.length ? Math.max(...capacities) : null;
+
+  let locationLabel = '';
+  if (hasOnsite && hasOffsite) locationLabel = 'Onsite &amp; Offsite';
+  else if (hasOffsite)          locationLabel = 'Offsite — we come to you';
+  else if (hasOnsite)           locationLabel = 'At our venue';
+
+  let html = '';
+
+  if (locationLabel) {
+    html += `<div class="pkg-svc-row">
+      <i class="ti ti-map-pin"></i>
+      <div><p class="pkg-svc-label">Location</p><p class="pkg-svc-value">${locationLabel}</p></div>
+    </div>`;
   }
 
-  // ── Reset content ──
-  pkgModalCards.innerHTML = '';
-  pkgModalAddOnCards.innerHTML = '';
-  showModalLoading();
-  openModal();
+  if (minDur !== null) {
+    const durLabel = minDur === maxDur
+      ? `${minDur} hour${minDur !== 1 ? 's' : ''}`
+      : `${minDur}–${maxDur} hours`;
+    html += `<div class="pkg-svc-row">
+      <i class="ti ti-clock"></i>
+      <div><p class="pkg-svc-label">Duration</p><p class="pkg-svc-value">${durLabel}</p></div>
+    </div>`;
+  }
+
+  if (maxCap !== null) {
+    html += `<div class="pkg-svc-row">
+      <i class="ti ti-users"></i>
+      <div><p class="pkg-svc-label">Guest capacity</p><p class="pkg-svc-value">Up to ${maxCap} guests</p></div>
+    </div>`;
+  }
+
+  html += `<hr class="pkg-svc-divider" />`;
+
+  if (hasOffsite) {
+    // Offsite or mixed: official distance zones from ELI Coffee Binangonan
+    html += `<div class="pkg-svc-row">
+      <i class="ti ti-map-2"></i>
+      <div><p class="pkg-svc-label">Area coverage</p>
+      <p class="pkg-svc-value">Rizal Area — within 10km<br>Out of Town — 11km and above</p></div>
+    </div>`;
+  } else {
+    // Onsite-only: show the venue so customers know where they're going
+    html += `<div class="pkg-svc-row">
+      <i class="ti ti-building"></i>
+      <div><p class="pkg-svc-label">Our venue</p>
+      <p class="pkg-svc-value">ELI Coffee Events Cafe<br>Binangonan, Rizal &amp; Antipolo City</p></div>
+    </div>`;
+  }
+
+  ovInfoCardBody.innerHTML = html;
+  show(ovInfoCardWrap);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 3 — PACKAGE PRICING CARDS
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadPackages(categoryId, categoryName) {
+  pkgMainGrid.innerHTML  = '';
+  pkgAddonGrid.innerHTML = '';
+  hide(pkgAddonSection);
+  hide(pkgOptEmpty);
+  show(pkgOptLoading);
+  hide(sectionDetail);
 
   try {
-    const { data, error } = await supabase
+    const { data: pkgs, error: pkgErr } = await supabase
       .from(PACKAGE_TABLE)
       .select('*')
       .eq('package_category_id', categoryId)
       .eq('is_active', true)
       .order('price', { ascending: true });
+    if (pkgErr) throw pkgErr;
 
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      showModalEmpty();
+    if (!pkgs || pkgs.length === 0) {
+      hide(pkgOptLoading);
+      show(pkgOptEmpty);
       return;
     }
 
-    // ── Fetch active tiers for all packages in this category ──
-    const packageIds = data.map(p => p.package_id);
+    // Batch-fetch tiers
+    const packageIds = pkgs.map(p => p.package_id);
     let tierMap = {};
-
     try {
       const { data: tiers } = await supabase
         .from(TIER_TABLE)
@@ -463,195 +377,265 @@ async function openCategoryModal(categoryId, categoryName, categoryDesc, categor
         .in('package_id', packageIds)
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
-
       (tiers || []).forEach(t => {
         if (!tierMap[t.package_id]) tierMap[t.package_id] = [];
         tierMap[t.package_id].push(t);
       });
-    } catch (tierErr) {
-      console.warn('Could not load tiers:', tierErr);
+    } catch { /* tiers optional */ }
+
+    pkgs.forEach(p => { p._tiers = tierMap[p.package_id] || []; });
+    allPackagesCache = pkgs;
+
+    const mainPkgs  = pkgs.filter(p => p.package_type !== 'add on');
+    const addonPkgs = pkgs.filter(p => p.package_type === 'add on');
+
+    // Identify the highest-priced main package for the "Best value" badge.
+    // Excludes contact-for-quote packages (price = 0) so the badge is only
+    // shown when there's an actual price to justify the tier recommendation.
+    const displayPkgs   = mainPkgs.length ? mainPkgs : pkgs;
+    const highestPrice  = Math.max(...displayPkgs.map(p => Number(p.price) || 0));
+    pkgMainGrid.innerHTML = displayPkgs
+      .map(p => buildPackageCard(p, categoryName, highestPrice > 0 && Number(p.price) === highestPrice))
+      .join('');
+
+    if (addonPkgs.length > 0) {
+      pkgAddonGrid.innerHTML = addonPkgs.map(p => buildPackageCard(p, categoryName)).join('');
+      show(pkgAddonSection);
     }
 
-    // ── Attach tiers to packages ──
-    data.forEach(pkg => { pkg._tiers = tierMap[pkg.package_id] || []; });
-
-    const mainPackages  = data.filter(p => p.package_type === 'main');
-    const addOnPackages = data.filter(p => p.package_type === 'add on');
-
-    const mainTitle  = document.getElementById('pkgModalMainTitle');
-    const addOnTitle = document.getElementById('pkgModalAddOnTitle');
-
-    if (mainPackages.length > 0) {
-      pkgModalCards.innerHTML = mainPackages.map(buildPackageCard).join('');
-    }
-
-    if (addOnPackages.length > 0) {
-      pkgModalAddOnCards.innerHTML = addOnPackages.map(buildPackageCard).join('');
-    }
-
-    if (mainPackages.length === 0 && addOnPackages.length > 0) {
-      pkgModalCards.innerHTML = addOnPackages.map(buildPackageCard).join('');
-      if (mainTitle) mainTitle.textContent = 'Add-On Packages';
-      showModalContent(true, false);
-    } else if (mainPackages.length === 0 && addOnPackages.length === 0) {
-      pkgModalCards.innerHTML = data.map(buildPackageCard).join('');
-      if (mainTitle) mainTitle.textContent = 'Package Options';
-      showModalContent(true, false);
-    } else {
-      if (mainTitle) mainTitle.textContent = mainPackages.length > 0 && addOnPackages.length > 0
-        ? 'Main Packages' : 'Package Options';
-      if (addOnTitle) addOnTitle.textContent = 'Add-On Packages';
-      showModalContent(mainPackages.length > 0, addOnPackages.length > 0);
-    }
-
-    // ── Wire tier toggle buttons ──
-    wireTierToggleButtons();
+    buildInfoCard(pkgs);
+    wirePackageCards();
+    hide(pkgOptLoading);
 
   } catch (err) {
-    console.error('Failed to load packages:', err);
-    pkgModalCards.innerHTML = `<div class="pkg-modal-error"><p>Failed to load packages. Please try again.</p></div>`;
-    showModalContent(true, false);
+    console.error('loadPackages:', err);
+    hide(pkgOptLoading);
+    pkgMainGrid.innerHTML = `<p style="color:#b91c1c;font-size:14px">Failed to load packages. Please try again.</p>`;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TIER TOGGLE BUTTONS
-// ═══════════════════════════════════════════════════════════════════════════════
+function buildPackageCard(pkg, categoryName, isBest = false) {
+  const name     = pkg.package_name || 'Package';
+  const price    = Number(pkg.price || 0);
+  const loc      = (pkg.location_type || '').toLowerCase();
+  const locLabel = loc === 'offsite' ? 'Offsite' : loc === 'onsite' ? 'Onsite' : '';
 
-function wireTierToggleButtons() {
-  modal.querySelectorAll('.tier-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
-      const extra = btn.nextElementSibling;
-      btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-      btn.textContent = expanded ? 'View full inclusions' : 'Hide full inclusions';
-      if (extra) {
-        if (expanded) extra.setAttribute('hidden', '');
-        else extra.removeAttribute('hidden');
-      }
+  const locBadge = locLabel
+    ? `<span class="pkg-card-loc-badge pkg-card-loc-badge--${loc}">${esc(locLabel)}</span>`
+    : `<span></span>`;
+
+  // "Best value" badge — positioned absolutely at top-right of card, sits in
+  // the card's top padding area so it doesn't displace any content below it.
+  const bestBadge = isBest
+    ? `<span class="pkg-card-best-badge" aria-label="Best value package">Best value</span>`
+    : '';
+
+  const pills = [];
+  if (pkg.guest_capacity) pills.push(`<span class="pkg-pill"><i class="ti ti-users"></i>${pkg.guest_capacity} guests</span>`);
+  if (pkg.duration_hours) pills.push(`<span class="pkg-pill"><i class="ti ti-clock"></i>${pkg.duration_hours} hr${pkg.duration_hours !== 1 ? 's' : ''}</span>`);
+  // Always render the pills container — even when empty it reserves consistent
+  // vertical space so all cards in the same row share the same pill-row height.
+  const pillsHtml = `<div class="pkg-card-pills">${pills.join('')}</div>`;
+
+  // Always render pkg-card-price-note so every card has the border-bottom zone
+  // separator between the price block and the pills/actions below it.
+  const priceHtml = price > 0
+    ? `<p class="pkg-card-price">₱${price.toLocaleString()}</p>
+       <p class="pkg-card-price-note">Starting price</p>`
+    : `<p class="pkg-card-price pkg-card-price--contact">Contact for quote</p>
+       <p class="pkg-card-price-note">Custom pricing</p>`;
+
+  return `
+    <div class="pkg-card${isBest ? ' pkg-card--best' : ''}" data-pkg-id="${esc(pkg.package_id)}" data-cat-name="${esc(categoryName || '')}">
+      ${bestBadge}
+      <div class="pkg-card-body">
+        <div class="pkg-card-top-row">
+          ${locBadge}
+        </div>
+        <h4 class="pkg-card-name">${esc(name)}</h4>
+        ${priceHtml}
+        ${pillsHtml}
+        <div class="pkg-card-actions">
+          <button class="pkg-card-btn-details" data-action="view" aria-label="View details for ${esc(name)}">Details</button>
+          <a href="/reservations.html" class="pkg-card-btn-book" aria-label="Book ${esc(name)}">
+            Book
+          </a>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wirePackageCards() {
+  [pkgMainGrid, pkgAddonGrid].forEach(grid => {
+    grid.querySelectorAll('.pkg-card').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.closest('.pkg-card-actions')) return;
+        triggerDetail(card.dataset.pkgId, card.dataset.catName);
+      });
+      card.querySelector('[data-action="view"]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        triggerDetail(card.dataset.pkgId, card.dataset.catName);
+      });
     });
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// BUILD PACKAGE CARD
-// ═══════════════════════════════════════════════════════════════════════════════
+function triggerDetail(pkgId, catName) {
+  const pkg = allPackagesCache.find(p => p.package_id === pkgId);
+  if (pkg) selectPackage(pkg, catName);
+}
 
-function buildPackageCard(pkg) {
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 4 — PACKAGE DETAIL PANEL
+// ══════════════════════════════════════════════════════════════════════════════
+function selectPackage(pkg, catName) {
+  selectedPackageId = pkg.package_id;
+
+  [pkgMainGrid, pkgAddonGrid].forEach(grid =>
+    grid.querySelectorAll('.pkg-card').forEach(c =>
+      c.classList.toggle('selected', c.dataset.pkgId === selectedPackageId)));
+
+  // Header — left
+  pkgDetailCatTag.textContent = catName || '';
+  pkgDetailName.textContent   = pkg.package_name || '';
+
+  const loc   = (pkg.location_type || '').toLowerCase();
   const pills = [];
+  if (pkg.guest_capacity) pills.push(`<span class="pkg-pill"><i class="ti ti-users"></i>${pkg.guest_capacity} guests</span>`);
+  if (pkg.duration_hours) pills.push(`<span class="pkg-pill"><i class="ti ti-clock"></i>${pkg.duration_hours} hr${pkg.duration_hours !== 1 ? 's' : ''}</span>`);
+  if (loc) pills.push(`<span class="pkg-pill${loc === 'offsite' ? ' pkg-pill--offsite' : ''}">${loc === 'offsite' ? 'Offsite' : 'Onsite'}</span>`);
+  pkgDetailPills.innerHTML = pills.join('');
 
-  if (pkg.guest_capacity) {
-    pills.push(`<span class="pkg-pill">${pkg.guest_capacity} pax</span>`);
+  // Header — right (Inter font applied via CSS class to prevent ₱ glyph fallback)
+  const price = Number(pkg.price || 0);
+  pkgDetailPricing.innerHTML = price > 0
+    ? `<p class="pkg-detail-price">₱${price.toLocaleString()}</p>
+       <p class="pkg-detail-price-note">Starting price · inclusive of setup</p>`
+    : `<p class="pkg-detail-price pkg-detail-price--contact">Contact for Quote</p>
+       <p class="pkg-detail-price-note">Customized pricing available</p>`;
+
+  // Area coverage tab
+  if (loc === 'offsite') show(tabAreaCoverage);
+  else hide(tabAreaCoverage);
+
+  // Panels
+  panelOverview.innerHTML   = buildOverviewPanel(pkg);
+  panelInclusions.innerHTML = buildInclusionsPanel(pkg);
+  if (loc === 'offsite') panelArea.innerHTML = buildAreaPanel();
+
+  switchTab('overview');
+  show(sectionDetail);
+  smoothScrollTo(sectionDetail, 88);
+}
+
+// ─── Panel builders ───────────────────────────────────────────────────────────
+function buildOverviewPanel(pkg) {
+  let html = '<div class="pkg-overview-content">';
+
+  if (pkg.description && pkg.description.trim()) {
+    pkg.description.split('\n').map(s => s.trim()).filter(Boolean).forEach(line => {
+      html += `<p class="pkg-overview-para">${esc(line)}</p>`;
+    });
+  } else {
+    html += `<p class="pkg-overview-para" style="color:var(--text-light)">No description available for this package.</p>`;
   }
 
-  if (pkg.duration_hours) {
-    pills.push(`<span class="pkg-pill">${pkg.duration_hours} hr${pkg.duration_hours !== 1 ? 's' : ''}</span>`);
+  if (pkg._tiers && pkg._tiers.length > 0) {
+    html += `<p class="pkg-tier-label">Available tiers</p>
+             <div class="pkg-card-pills" style="margin-top:10px;flex-wrap:wrap;gap:8px">`;
+    pkg._tiers.forEach(t => {
+      html += `<span class="pkg-pill"><i class="ti ti-layers-intersect"></i>${esc(t.tier_name)}</span>`;
+    });
+    html += `</div>
+             <p style="font-size:13px;color:var(--text-light);margin-top:12px">See the <strong>Inclusions</strong> tab for a full breakdown per tier.</p>`;
   }
 
-  if (pkg.location_type) {
-    const locLabel = pkg.location_type.charAt(0).toUpperCase() + pkg.location_type.slice(1);
-    pills.push(`<span class="pkg-pill">${escapeHtml(locLabel)}</span>`);
+  html += '</div>';
+  return html;
+}
+
+function buildInclusionsPanel(pkg) {
+  if (pkg._tiers && pkg._tiers.length > 0) {
+    return pkg._tiers.map(tier => {
+      const items   = parseItemList(tier.tier_full_inclusions || '');
+      const content = items.length >= 4 ? buildTileGrid(items) : buildFlatList(items);
+      return `
+        <div class="pkg-tier-block">
+          <div class="pkg-tier-head">
+            <p class="pkg-tier-name">${esc(tier.tier_name)}</p>
+            ${tier.tier_subtitle ? `<p class="pkg-tier-sub">${esc(tier.tier_subtitle)}</p>` : ''}
+          </div>
+          ${items.length ? content : '<p style="font-size:14px;color:var(--text-light)">No inclusions listed for this tier.</p>'}
+        </div>`;
+    }).join('');
   }
 
-  if (pkg.extension_price) {
-    pills.push(`<span class="pkg-pill">+${formatCurrency(pkg.extension_price)}/hr ext.</span>`);
+  const items = parseItemList(pkg.description || '');
+  if (!items.length) {
+    return `<p style="font-size:14px;color:var(--text-light)">Inclusions are provided upon inquiry. Please contact us for details.</p>`;
   }
+  return items.length >= 4 ? buildTileGrid(items) : buildFlatList(items);
+}
 
-  const pillsHtml = pills.length
-    ? `<div class="pkg-card-pills">${pills.join('')}</div>`
-    : '';
-
-  const descHtml = buildDescriptionHtml(pkg.description);
-
-  // ── Build tier cards ──
-  const tiersHtml = buildTiersHtml(pkg._tiers || []);
-
+function buildAreaPanel() {
   return `
-    <div class="pkg-modal-card">
-      <div class="pkg-card-header">
-        <span class="pkg-card-name">${escapeHtml(pkg.package_name)}</span>
-        <span class="pkg-card-price">${formatCurrency(pkg.price)}</span>
+    <div class="pkg-area-content">
+      <div class="pkg-area-note">
+        <i class="ti ti-info-circle"></i>
+        <p>This is an offsite service — our team travels to your chosen venue. Travel rates are based on distance from ELI Coffee Binangonan. Contact us to confirm availability and the applicable rate for your location.</p>
       </div>
-      ${pillsHtml}
-      ${descHtml ? `<div class="pkg-card-desc-wrap">${descHtml}</div>` : ''}
-      ${tiersHtml}
-    </div>
-  `;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// BUILD TIERS HTML
-// Uses only DB columns: tier_name, tier_subtitle, tier_full_inclusions, sort_order
-// Splits tier_full_inclusions by newline or comma
-// Shows first 5 items, "View full inclusions" button if more than 5
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function parseTierInclusions(text) {
-  if (!text || !text.trim()) return [];
-
-  // Split by newlines first
-  let items = text.split(/\n/).map(s => s.trim()).filter(s => s.length > 0);
-
-  // If only one line, try splitting by commas
-  if (items.length === 1) {
-    const commaSplit = items[0].split(',').map(s => s.trim()).filter(s => s.length > 0);
-    if (commaSplit.length > 1) {
-      items = commaSplit;
-    }
-  }
-
-  return items;
-}
-
-function buildTiersHtml(tiers) {
-  if (!tiers || tiers.length === 0) return '';
-
-  const tierCards = tiers.map(tier => {
-    const allInclusions = parseTierInclusions(tier.tier_full_inclusions);
-    const hasMany = allInclusions.length > TIER_VISIBLE_COUNT;
-    const visibleItems = hasMany ? allInclusions.slice(0, TIER_VISIBLE_COUNT) : allInclusions;
-    const hiddenItems = hasMany ? allInclusions.slice(TIER_VISIBLE_COUNT) : [];
-
-    // Build visible inclusions list
-    const visibleListHtml = visibleItems.length > 0
-      ? `<ul class="tier-list">${visibleItems.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
-      : '';
-
-    // Build toggle + hidden inclusions (only if > 5 items)
-    let toggleHtml = '';
-    if (hiddenItems.length > 0) {
-      toggleHtml = `
-        <button type="button" class="tier-toggle-btn" aria-expanded="false">View full inclusions</button>
-        <div class="tier-extra" hidden>
-          <ul class="tier-list">${hiddenItems.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+      <div class="pkg-area-cards">
+        <div class="pkg-area-card">
+          <i class="ti ti-map-pin"></i>
+          <div>
+            <p class="pkg-area-loc">Rizal Area</p>
+            <p class="pkg-area-note-text">Less than 10km from ELI Coffee Binangonan</p>
+          </div>
         </div>
-      `;
-    }
-
-    return `
-      <div class="tier-card">
-        <div class="tier-card-head">
-          <h4>${escapeHtml(tier.tier_name)}</h4>
-          ${tier.tier_subtitle ? `<p>${escapeHtml(tier.tier_subtitle)}</p>` : ''}
-        </div>
-        <div class="tier-card-body">
-          ${visibleListHtml}
-          ${toggleHtml}
+        <div class="pkg-area-card">
+          <i class="ti ti-map-2"></i>
+          <div>
+            <p class="pkg-area-loc">Out of Town Area</p>
+            <p class="pkg-area-note-text">11km and above from ELI Coffee Binangonan</p>
+          </div>
         </div>
       </div>
-    `;
-  }).join('');
-
-  return `
-    <div class="pkg-tiers-section">
-      <h4 class="pkg-tiers-title">Package Tiers:</h4>
-      <div class="tier-grid">${tierCards}</div>
-    </div>
-  `;
+    </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════════════════════
-retryBtn.addEventListener('click', loadCategories);
+// ─── Tab switching ────────────────────────────────────────────────────────────
+function switchTab(targetTab) {
+  const panels = { overview: panelOverview, inclusions: panelInclusions, area: panelArea, policies: panelPolicies };
+
+  pkgTabs.querySelectorAll('.pkg-tab').forEach(btn => {
+    const active = btn.dataset.tab === targetTab;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+
+  Object.entries(panels).forEach(([tab, panel]) => {
+    if (!panel) return;
+    if (tab === targetTab) show(panel);
+    else hide(panel);
+  });
+}
+
+pkgTabs.addEventListener('click', e => {
+  const btn = e.target.closest('.pkg-tab');
+  if (btn?.dataset.tab) switchTab(btn.dataset.tab);
+});
+
+// ─── "Hide details" collapses the detail panel ───────────────────────────────
+pkgDetailClose.addEventListener('click', () => {
+  hide(sectionDetail);
+  selectedPackageId = null;
+  [pkgMainGrid, pkgAddonGrid].forEach(grid =>
+    grid.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('selected')));
+  smoothScrollTo(sectionOptions, 88);
+});
+
+// ─── Retry ────────────────────────────────────────────────────────────────────
+pkgRetryBtn.addEventListener('click', loadCategories);
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
 loadCategories();

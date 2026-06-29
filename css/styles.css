@@ -163,9 +163,19 @@ html {
 
 /* ── Mobile & Tablet Navigation ── */
 @media screen and (max-width: 960px) {
+    /* Fix: position:fixed keeps the hamburger in the viewport regardless of scroll.
+       position:sticky was breaking because html{overflow-y:scroll} makes html
+       the scroll container, causing the navbar to scroll out of view on mobile. */
     .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
         height: 64px;
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    body {
+        padding-top: 64px;
     }
     .navbar__container {
         display: flex;
@@ -251,7 +261,8 @@ html {
     .navbar__menu.active > li:nth-child(6) { animation-delay: 0.21s; }
     .navbar__menu.active > li:nth-child(7) { animation-delay: 0.25s; }
     .navbar__menu.active > li:nth-child(8) { animation-delay: 0.29s; }
-    .navbar__menu.active > li:nth-child(9) { animation-delay: 0.33s; }
+    .navbar__menu.active > li:nth-child(9)  { animation-delay: 0.33s; }
+    .navbar__menu.active > li:nth-child(10) { animation-delay: 0.37s; }
 
     /* ── Header: X button only, no logo ── */
     .nav-drawer-header {
@@ -378,6 +389,7 @@ html {
         flex-shrink: 0;
     }
     .navbar__links[href="/index.html"]::before        { content: "\f015"; }
+    .navbar__links[href="/menu.html"]::before         { content: "\f2e7"; }
     .navbar__links[href="/packages.html"]::before     { content: "\f06b"; }
     .navbar__links[href="/reservations.html"]::before { content: "\f073"; }
     .navbar__links[href="/reviews.html"]::before      { content: "\f005"; }
