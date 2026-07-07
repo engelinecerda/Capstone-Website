@@ -407,6 +407,31 @@
     </div>
   </div>
 
+  <div class="modal-backdrop hidden" id="dayTimelineModal" aria-hidden="true">
+    <div class="modal-card day-timeline-modal-card" role="dialog" aria-modal="true" aria-labelledby="dayTimelineTitle">
+      <button type="button" class="modal-close" id="dayTimelineClose" aria-label="Close day schedule">x</button>
+      <p class="modal-eyebrow">Day Schedule</p>
+      <h2 class="modal-title" id="dayTimelineTitle">Loading...</h2>
+      <p class="modal-copy">Time blocks show each active reservation's occupied period for this date.</p>
+
+      <div class="day-timeline-wrap">
+        <div class="day-timeline-ruler" id="dayTimelineRuler"></div>
+        <div class="day-timeline-track" id="dayTimelineTrack"></div>
+      </div>
+
+      <div class="day-timeline-legend">
+        <span class="legend-item"><span class="dot dot-onsite"></span>Onsite</span>
+        <span class="legend-item"><span class="dot dot-offsite"></span>Offsite</span>
+      </div>
+
+      <div class="day-timeline-list" id="dayTimelineList"></div>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="dayTimelineDismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="../js/admin_reservations.js"></script>
 </body>
 </html>

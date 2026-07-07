@@ -1068,6 +1068,19 @@
             color: #6B3A1F;
             line-height: 1.6;
         }
+        .time-end-readout {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2A1408;
+        }
+        .time-grid-loading {
+            grid-column: 1 / -1;
+            font-size: 13px;
+            color: #9c8f84;
+            text-align: center;
+            padding: 12px 0;
+        }
 
         /* Summary */
         .summary-box { background: var(--cream, #FAF8F4); border: 1px solid var(--border, rgba(61,26,10,0.10)); border-radius: 4px; padding: 22px 24px; width: 100%; box-sizing: border-box; }
@@ -1086,31 +1099,95 @@
 
         /* Contract */
         .contract-box { width: 100%; }
-        .contract-download { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
+        .contract-viewer-head { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
         .contract-icon { font-size: 32px; flex-shrink: 0; }
         .contract-info { flex: 1; }
         .contract-info h4 { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 3px; }
         .contract-info p  { font-size: 13px; color: #777; margin: 0; }
-        .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; }
+        .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; display: inline-block; }
         .dl-btn:hover { background: var(--brown-dark, #1E0C03); }
-        .contract-steps { margin-bottom: 16px; }
-        .c-step { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #444; margin-bottom: 10px; }
-        .c-num { background: #6B3A1F; color: #fff; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-        .contract-upload label { display: block; font-size: 14px; font-weight: 600; color: #2A1408; margin-bottom: 8px; }
-        .contract-upload input[type="file"] { width: 100%; border: 2px dashed #e0d0c0; border-radius: 10px; padding: 16px; background: #FFF8F0; cursor: pointer; box-sizing: border-box; font-family: inherit; }
-        .contract-note { font-size: 12px; color: #aaa; margin-top: 6px; }
-        .contract-file-status {
+
+        .contract-viewer {
+            max-height: 340px;
+            overflow-y: auto;
+            border: 1px solid #e0d0c0;
+            border-radius: 12px;
+            padding: 20px 22px;
+            background: #fff;
+            margin-bottom: 20px;
+        }
+        .contract-viewer p { font-size: 13.5px; line-height: 1.7; color: #3a2a1c; margin-bottom: 12px; }
+        .contract-viewer-gap { height: 6px; }
+        .contract-viewer-loading { font-size: 13px; color: #9c8f84; text-align: center; padding: 24px 0; }
+
+        .signature-section { margin-bottom: 20px; }
+        .signature-heading { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 10px; }
+        .signature-mode-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+        .signature-mode-btn {
+            border: 1px solid #e0d0c0;
+            background: #fff;
+            color: #6B3A1F;
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 7px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .signature-mode-btn.active { background: #6B3A1F; color: #fff; border-color: #6B3A1F; }
+        .signature-mode-btn:not(.active):hover { background: #FFF8F0; }
+
+        .signature-draw-panel.hidden, .signature-type-panel.hidden { display: none; }
+        .signature-canvas {
+            width: 100%;
+            height: 180px;
+            border: 2px dashed #e0d0c0;
+            border-radius: 12px;
+            background: #fff;
+            touch-action: none;
+            cursor: crosshair;
+        }
+        .signature-clear-btn {
+            margin-top: 8px;
+            border: 1px solid #e0d0c0;
+            background: #fff;
+            color: #6B3A1F;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .signature-clear-btn:hover { background: #FFF8F0; }
+
+        .signature-type-input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 2px dashed #e0d0c0;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            background: #fff;
+        }
+        .signature-type-preview {
+            margin-top: 10px;
+            min-height: 56px;
+            font-family: 'Dancing Script', cursive;
+            font-size: 40px;
+            font-weight: 700;
+            color: #2A1408;
+            padding: 6px 4px;
+            border-bottom: 1px solid #e0d0c0;
+        }
+        .signature-status {
+            min-height: 18px;
             margin-top: 8px;
             font-size: 12px;
             color: #7b6a5d;
-            line-height: 1.5;
         }
-        .contract-file-status.error {
-            color: #b42318;
-        }
-        .contract-file-status.success {
-            color: #166534;
-        }
+        .signature-status.error { color: #b42318; }
+
         .contract-agreement-box {
             margin-top: 18px;
             padding: 16px 18px;
@@ -1338,4 +1415,330 @@
 
 .res-guest-notice--pulse {
     animation: res-notice-pulse .8s ease-out;
+}
+
+/* ── Event-type chips ───────────────────────────────────────────────────────── */
+.event-type-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.event-chip {
+    padding: 10px 20px;
+    border-radius: 50px;
+    border: 1.5px solid var(--brown-light, #B07D5A);
+    background: #fff;
+    color: var(--brown-primary, #3D1A0A);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+    user-select: none;
+    line-height: 1.4;
+}
+
+.event-chip:hover {
+    border-color: var(--brown-primary, #3D1A0A);
+    background: var(--cream-dark, #F2EBE0);
+}
+
+.event-chip.active {
+    background: var(--brown-primary, #3D1A0A);
+    border-color: var(--brown-primary, #3D1A0A);
+    color: #fff;
+}
+
+.event-type-other-wrap {
+    margin-top: 22px;
+}
+
+.event-type-other-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brown-mid, #6B3820);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* ── Guest count input ──────────────────────────────────────────────────────── */
+/* .guest-count-wrap no longer exists in the DOM — removed when switching to two-column grid */
+
+.guest-count-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #999;
+    font-style: italic;
+    line-height: 1.55;
+    padding-top: 2px;
+    border-top: 1px solid #f0ece8;
+}
+
+/* ── Time-slot info note ────────────────────────────────────────────────────── */
+.time-alt-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 22px;
+    padding: 14px 18px;
+    background: var(--cream, #FAF8F4);
+    border: 1.5px solid var(--brown-pale, #DFC3A8);
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--brown-mid, #6B3820);
+}
+
+.time-alt-note i {
+    font-size: 18px;
+    color: var(--brown-light, #B07D5A);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ── Service card icon (offsite category grid) ──────────────────────────────── */
+.service-card { text-align: center; }
+
+.service-card-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+    color: var(--brown-mid, #6B3820);
+}
+
+/* ── Venue map ──────────────────────────────────────────────────────────────── */
+.venue-search-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.venue-search-row .res-input { flex: 1; min-width: 200px; }
+
+.venue-search-btn {
+    padding: 10px 20px;
+    background: var(--brown-primary, #3D1A0A);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+    transition: opacity 0.18s;
+}
+
+.venue-search-btn:hover { opacity: 0.82; }
+
+.venue-pinned-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--brown-mid, #6B3820);
+    line-height: 1.55;
+    word-break: break-word;
+}
+
+.venue-pin-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.venue-map-hint {
+    font-size: 13px;
+    color: #777;
+    margin-bottom: 14px;
+    line-height: 1.55;
+}
+
+/* ── Pkg card Phase 1 display ───────────────────────────────────────────────── */
+.pkg-price {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--brown-primary, #3D1A0A);
+    margin: 6px 0 4px;
+    font-family: 'Inter', sans-serif;
+}
+
+.pkg-desc {
+    font-size: 13px;
+    color: #777;
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* ── Summary divider + section title ───────────────────────────────────────── */
+.summary-divider {
+    border: none;
+    border-top: 1px solid var(--brown-pale, #DFC3A8);
+    margin: 14px 0;
+}
+
+.summary-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brown-light, #B07D5A);
+    margin-bottom: 10px;
+}
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--brown-primary, #3D1A0A);
+    margin-top: 4px;
+}
+
+/* ── Single-page event-info sub-sections ────────────────────────────────────── */
+/* Each sub-section (Location, Package, Guests+Type, Add-ons/Venue, Date, Time)
+   is separated by a divider, matching the visual pattern used for Calendar/Time. */
+.res-section {
+    margin-top: 40px;
+    padding-top: 36px;
+    border-top: 1px solid var(--brown-pale, #DFC3A8);
+}
+
+.res-section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.res-section h2 {
+    /* Inherit existing h2 styling from the step; just ensure consistent spacing */
+    margin-bottom: 8px;
+}
+
+/* ── Section status note (lock message) ─────────────────────────────────────── */
+/* Same visual pattern as .availability-message and .time-status-note:
+   a short explanatory paragraph shown when a section is waiting on a prior answer. */
+.section-status-note {
+    display: block;
+    font-size: 14px;
+    color: #999;
+    font-style: italic;
+    margin: 6px 0 0;
+    line-height: 1.6;
+}
+
+/* When the section IS answerable, the status note is replaced by normal content
+   so we hide it via JS (toggle .hidden). No extra CSS needed there. */
+
+/* ── Locked content overlay ─────────────────────────────────────────────────── */
+/* Applied to #guests-type-content and #addon-venue-content while their
+   prerequisite section hasn't been answered yet.
+   Matches the intent of .context-disabled on calendar days and
+   .time-card.disabled on time slots: visible but clearly non-interactive. */
+.res-locked-content {
+    opacity: 0.38;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Disabled guest-count input inside locked content (also controlled by .disabled attr) */
+.guest-count-input:disabled {
+    background: var(--cream, #FAF8F4);
+    color: #bbb;
+    cursor: not-allowed;
+}
+
+/* ── Section status note responsive tweak ───────────────────────────────────── */
+@media (max-width: 600px) {
+    .res-section {
+        margin-top: 32px;
+        padding-top: 28px;
+    }
+}
+
+/* ── Guests & Event Type — two-column grid ──────────────────────────────────── */
+.guests-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 32px;
+    align-items: start;
+    margin-top: 4px;
+}
+
+/* Each column: label → input → optional note — identical structure both sides */
+.guests-col,
+.event-type-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+/* Zero the global res-input margin-bottom inside the grid so hint/nothing below
+   the input is not pushed further than intended */
+.guests-type-grid .res-input {
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 400;
+    padding: 12px 16px;
+    text-align: left;
+    height: 46px;
+    box-sizing: border-box;
+}
+
+.event-type-select {
+    cursor: pointer;
+    appearance: auto;
+}
+
+/* "Other" reveal sits flush below the select with consistent spacing */
+.event-type-other-wrap {
+    margin-top: 16px;
+}
+
+.event-type-other-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+@media (max-width: 600px) {
+    .guests-type-grid {
+        grid-template-columns: 1fr;
+        gap: 24px 0;
+    }
+}
+
+/* ── Package description truncation — expand/collapse ───────────────────────── */
+.pkg-desc-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--brown, #8B5E3C);
+    font-size: inherit;
+    font-family: inherit;
+    font-style: italic;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    display: inline;
+    line-height: inherit;
+}
+
+.pkg-desc-toggle:hover {
+    color: var(--dark-brown, #5c3d1e);
 }

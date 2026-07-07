@@ -69,6 +69,13 @@ const assignmentReservationSummary = document.getElementById('assignmentReservat
 const assignmentReservationMeta = document.getElementById('assignmentReservationMeta');
 const assignmentSelectionCount = document.getElementById('assignmentSelectionCount');
 const assignmentNoteInput = document.getElementById('assignmentNoteInput');
+const dayTimelineModal = document.getElementById('dayTimelineModal');
+const dayTimelineClose = document.getElementById('dayTimelineClose');
+const dayTimelineDismiss = document.getElementById('dayTimelineDismiss');
+const dayTimelineTitle = document.getElementById('dayTimelineTitle');
+const dayTimelineRuler = document.getElementById('dayTimelineRuler');
+const dayTimelineTrack = document.getElementById('dayTimelineTrack');
+const dayTimelineList = document.getElementById('dayTimelineList');
 const PAYMENT_METHOD_LABELS = {
   card: 'Card',
   bancnet: 'BancNet',
@@ -84,6 +91,10 @@ const PAYMENT_TYPE_LABELS = {
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
+const CAPACITY_BLOCKING_STATUSES = new Set([
+  'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
+  'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
+]);
 
 let reservationsCache = [];
 let blackouts = new Set();
@@ -458,6 +469,138 @@ function setCalendarExpanded(nextExpanded) {
   }
 }
 
+// ── Day timeline (time-block schedule view) ──────────────────────────────────
+let cachedOperatingHours = null;
+
+function parseTimeStringToMinutes(value) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function parseTimeLabelToMinutes(label) {
+  if (!label) return null;
+  const match = String(label).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hours = Number(match[1]) % 12;
+  if (/pm/i.test(match[3])) hours += 12;
+  return hours * 60 + Number(match[2]);
+}
+
+function formatMinutesAsLabel(minutes) {
+  if (minutes == null) return '';
+  let h = Math.floor(minutes / 60);
+  const m = String(minutes % 60).padStart(2, '0');
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${m} ${suffix}`;
+}
+
+async function getOperatingHoursCached() {
+  if (cachedOperatingHours) return cachedOperatingHours;
+
+  const defaults = { openMinutes: 13 * 60, closeMinutes: 22 * 60 };
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'booking_operating_hours')
+      .maybeSingle();
+
+    if (error || !data) { cachedOperatingHours = defaults; return defaults; }
+
+    const parsed = JSON.parse(data.setting_value);
+    cachedOperatingHours = {
+      openMinutes: parseTimeStringToMinutes(parsed.open_time) ?? defaults.openMinutes,
+      closeMinutes: parseTimeStringToMinutes(parsed.close_time) ?? defaults.closeMinutes
+    };
+  } catch {
+    cachedOperatingHours = defaults;
+  }
+  return cachedOperatingHours;
+}
+
+function getReservationStartEndMinutes(reservation) {
+  const start = parseTimeStringToMinutes(reservation?.start_time) ?? parseTimeLabelToMinutes(reservation?.event_time);
+  if (start == null) return { start: null, end: null };
+  const end = parseTimeStringToMinutes(reservation?.event_end_time)
+    ?? (start + getReservationDurationHours(reservation) * 60);
+  return { start, end };
+}
+
+function closeDayTimeline() {
+  dayTimelineModal?.classList.add('hidden');
+  dayTimelineModal?.setAttribute('aria-hidden', 'true');
+}
+
+async function openDayTimeline(dateIso) {
+  if (dayTimelineTitle) dayTimelineTitle.textContent = `Schedule for ${formatBlackoutDate(dateIso)}`;
+  if (dayTimelineTrack) dayTimelineTrack.innerHTML = '<p class="day-timeline-empty">Loading...</p>';
+  if (dayTimelineRuler) dayTimelineRuler.innerHTML = '';
+  if (dayTimelineList) dayTimelineList.innerHTML = '';
+  dayTimelineModal?.classList.remove('hidden');
+  dayTimelineModal?.setAttribute('aria-hidden', 'false');
+
+  const { openMinutes, closeMinutes } = await getOperatingHoursCached();
+  const windowMinutes = Math.max(closeMinutes - openMinutes, 1);
+
+  const dayReservations = (reservationsCache || []).filter((r) =>
+    String(r.event_date || '').split('T')[0] === dateIso &&
+    CAPACITY_BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
+  );
+
+  if (dayTimelineRuler) {
+    const steps = 5;
+    for (let i = 0; i <= steps; i += 1) {
+      const label = document.createElement('span');
+      label.textContent = formatMinutesAsLabel(Math.round(openMinutes + (windowMinutes * i) / steps));
+      dayTimelineRuler.appendChild(label);
+    }
+  }
+
+  if (dayTimelineTrack) dayTimelineTrack.innerHTML = '';
+
+  if (!dayReservations.length) {
+    if (dayTimelineTrack) dayTimelineTrack.innerHTML = '<p class="day-timeline-empty">No active reservations on this date.</p>';
+    return;
+  }
+
+  dayReservations.forEach((reservation) => {
+    const { start, end } = getReservationStartEndMinutes(reservation);
+    const packageName = reservation?.package?.package_name || 'Package';
+    const isOffsite = String(reservation?.location_type || '').toLowerCase() === 'offsite';
+
+    if (start != null && end != null && dayTimelineTrack) {
+      const clampedStart = Math.max(start, openMinutes);
+      const clampedEnd = Math.min(end, closeMinutes);
+      const leftPct = ((clampedStart - openMinutes) / windowMinutes) * 100;
+      const widthPct = Math.max(((clampedEnd - clampedStart) / windowMinutes) * 100, 2);
+
+      const block = document.createElement('div');
+      block.className = 'day-timeline-block' + (isOffsite ? ' offsite' : '');
+      block.style.left = `${leftPct}%`;
+      block.style.width = `${widthPct}%`;
+      block.title = `${reservation.contact_name || 'Customer'} — ${packageName} (${formatMinutesAsLabel(start)}–${formatMinutesAsLabel(end)})`;
+      block.innerHTML = `<strong>${reservation.contact_name || 'Customer'}</strong>${packageName}`;
+      dayTimelineTrack.appendChild(block);
+    }
+
+    if (dayTimelineList) {
+      const item = document.createElement('div');
+      item.className = 'day-timeline-item';
+      item.innerHTML = `
+        <div>
+          <div class="day-timeline-item-main">${reservation.contact_name || 'Customer'} — ${packageName}</div>
+          <div class="day-timeline-item-sub">${isOffsite ? 'Offsite' : 'Onsite'} · ${getReservationDurationHours(reservation)}h · ${String(reservation.status || '').replace(/_/g, ' ')}</div>
+        </div>
+        <div class="day-timeline-item-time">${start != null ? `${formatMinutesAsLabel(start)} – ${formatMinutesAsLabel(end)}` : (reservation.event_time || 'No time selected')}</div>
+      `;
+      dayTimelineList.appendChild(item);
+    }
+  });
+}
+
 function closeBlackoutModal() {
   pendingBlackoutDate = null;
   pendingBlackoutAction = 'close';
@@ -583,7 +726,8 @@ function formatStatusPill(status) {
 function getBookingScope(reservation) {
   return getSharedBookingScope(
     reservation?.location_type,
-    reservation?.package?.package_name || reservation?.package_name || ''
+    reservation?.package?.package_name || reservation?.package_name || '',
+    reservation?.booking_scope || reservation?.package?.booking_scope || null
   );
 }
 
@@ -614,6 +758,9 @@ function getApprovalLimitMessage(reservation) {
 }
 
 function getReservationDurationHours(reservation) {
+  const storedDuration = Number(reservation?.duration_hours || 0);
+  if (storedDuration > 0) return storedDuration;
+
   const packageDuration = Number(reservation?.package?.duration_hours || 0);
   if (packageDuration > 0) return packageDuration;
 
@@ -921,7 +1068,8 @@ function matchesSearch(res, term) {
   const needle = term.toLowerCase();
   return (res.contact_name || '').toLowerCase().includes(needle)
       || (res.contact_email || '').toLowerCase().includes(needle)
-      || (res.package?.package_name || '').toLowerCase().includes(needle);
+      || (res.package?.package_name || '').toLowerCase().includes(needle)
+      || (res.reservation_number || '').toLowerCase().includes(needle);
 }
 
 function matchesStatus(res, status) {
@@ -970,6 +1118,7 @@ function renderTable(list) {
           <div class="reservation-customer">
             <span class="reservation-avatar">${escapeHtml(getCustomerInitials(res.contact_name, res.contact_email))}</span>
             <div class="reservation-customer-copy">
+              ${res.reservation_number ? `<span class="table-reservation-number">${escapeHtml(res.reservation_number)}</span>` : ''}
               <span class="table-main">${escapeHtml(res.contact_name || 'Unknown')}</span>
               <span class="table-sub">${escapeHtml(res.contact_email || '')}</span>
               <span class="table-meta">${escapeHtml(pkg)}</span>
@@ -1065,6 +1214,7 @@ function renderReservationDetailsModal() {
 
   if (reservationSummaryGrid) {
     reservationSummaryGrid.innerHTML = [
+      buildDetailCard('Reservation Number', reservation.reservation_number || 'Not assigned'),
       buildDetailCard('Event Type', reservation.event_type || 'Not specified'),
       buildDetailCard('Guest Count', reservation.guest_count ? `${reservation.guest_count} pax` : 'Not specified'),
       buildDetailCard('Total Amount', formatCurrency(reservation.total_price)),
@@ -1321,6 +1471,7 @@ async function fetchReservations() {
     .from('reservations')
     .select(`
       reservation_id,
+      reservation_number,
       contact_name,
       contact_email,
       contact_phone,
@@ -1328,13 +1479,17 @@ async function fetchReservations() {
       event_type,
       event_date,
       event_time,
+      start_time,
+      event_end_time,
+      duration_hours,
       guest_count,
       location_type,
       venue_location,
       special_requests,
       total_price,
       created_at,
-      package:package_id ( package_name, duration_hours )
+      booking_scope,
+      package:package_id ( package_name, duration_hours, booking_scope )
     `)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -2085,13 +2240,9 @@ function renderCalendar(bookedDates = []) {
     const booked = bookedSet.has(iso);
     const closed = closedSet.has(iso);
     const formattedDate = formatBlackoutDate(iso);
-    const BLOCKING_STATUSES = new Set([
-      'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
-      'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
-    ]);
     const dayCount = (reservationsCache || []).filter((r) =>
       String(r.event_date || '').split('T')[0] === iso &&
-      BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
+      CAPACITY_BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
     ).length;
     let statusKey = 'open';
     let statusLabel = 'Open';
@@ -2144,6 +2295,10 @@ function renderCalendar(bookedDates = []) {
     } else if (isCurrentMonth && !isPast && closed) {
       cell.classList.add('is-actionable');
       bindCalendarAction(cell, () => openBlackoutModal(iso, 'reopen'));
+    } else if (isCurrentMonth && booked) {
+      cell.classList.add('is-actionable');
+      cell.title = `${titleText} Click to view the day's schedule.`;
+      bindCalendarAction(cell, () => openDayTimeline(iso));
     } else {
       cell.setAttribute('aria-disabled', 'true');
     }
@@ -2295,6 +2450,17 @@ function wireBlackoutModal() {
   });
 }
 
+function wireDayTimelineModal() {
+  dayTimelineClose?.addEventListener('click', closeDayTimeline);
+  dayTimelineDismiss?.addEventListener('click', closeDayTimeline);
+  dayTimelineModal?.addEventListener('click', (event) => {
+    if (event.target === dayTimelineModal) closeDayTimeline();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !dayTimelineModal?.classList.contains('hidden')) closeDayTimeline();
+  });
+}
+
 function wireAssignmentModal() {
   assignmentCancelBtn?.addEventListener('click', closeAssignmentModal);
   assignmentModalClose?.addEventListener('click', closeAssignmentModal);
@@ -2354,6 +2520,7 @@ wireCalendarToggle();
 wireCalendarNav();
 wireBlackoutModal();
 wireAssignmentModal();
+wireDayTimelineModal();
 
 wireLogoutButton();
 watchAuthState();

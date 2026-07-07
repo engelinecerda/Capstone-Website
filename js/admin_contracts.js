@@ -361,6 +361,7 @@ function matchesSearch(reservation, term) {
     reservation.package?.package_name,
     reservation.event_type,
     reservation.venue_location,
+    reservation.reservation_number,
     contract.note,
     contract.label
   ]
@@ -403,6 +404,7 @@ function renderTable(list) {
           <div class="reservation-customer">
             <span class="reservation-avatar">${escapeHtml(getCustomerInitials(reservation.contact_name, reservation.contact_email))}</span>
             <div class="reservation-customer-copy">
+              ${reservation.reservation_number ? `<span class="table-reservation-number">${escapeHtml(reservation.reservation_number)}</span>` : ''}
               <span class="table-main">${escapeHtml(reservation.contact_name || 'Unknown customer')}</span>
               <span class="table-sub">${escapeHtml(reservation.contact_email || 'No email on file')}</span>
               <span class="table-meta">${escapeHtml(reservation.package?.package_name || 'Package pending')}</span>
@@ -512,6 +514,7 @@ async function fetchReservations() {
     .from('reservations')
     .select(`
       reservation_id,
+      reservation_number,
       contact_name,
       contact_email,
       contact_phone,
@@ -686,6 +689,7 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
   `;
 
   contractDetailsMeta.innerHTML = [
+    buildDetailCard('Reservation Number', reservation.reservation_number || 'Not assigned'),
     buildDetailCard('Event Schedule', `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`),
     buildDetailCard('Latest Activity', contract.resubmittedAt || contract.reviewedAt || formatDateTime(getContractActivityDate(reservation))),
     buildDetailCard('Reservation Submitted', formatDateTime(reservation.created_at))

@@ -736,6 +736,15 @@ body {
   word-break: break-word;
 }
 
+.table-reservation-number {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--primary, #6B3A1F);
+  word-break: break-word;
+}
+
 .table-date {
   display: grid;
   gap: 4px;
@@ -1323,6 +1332,96 @@ body {
 .assignment-modal-card {
   width: min(100%, 720px);
 }
+
+.day-timeline-modal-card {
+  width: min(100%, 720px);
+}
+
+.dot-onsite { background: #6b3a1f; }
+.dot-offsite { background: #b08968; }
+
+.day-timeline-wrap {
+  margin-top: 18px;
+  padding-top: 8px;
+}
+
+.day-timeline-ruler {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  padding: 0 2px;
+}
+
+.day-timeline-track {
+  position: relative;
+  height: 96px;
+  background: #f5efe7;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.day-timeline-block {
+  position: absolute;
+  top: 10px;
+  height: 76px;
+  border-radius: 8px;
+  background: #6b3a1f;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 6px 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(58, 34, 17, 0.18);
+}
+
+.day-timeline-block.offsite {
+  background: #b08968;
+}
+
+.day-timeline-block strong {
+  display: block;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.day-timeline-empty {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  padding: 30px 0;
+}
+
+.day-timeline-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.day-timeline-list {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.day-timeline-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.day-timeline-item-main { font-weight: 600; color: #2A1408; }
+.day-timeline-item-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.day-timeline-item-time { text-align: right; white-space: nowrap; color: #6b3a1f; font-weight: 600; }
 
 .modal-close {
   position: absolute;

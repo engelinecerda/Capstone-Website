@@ -596,16 +596,23 @@ body {
 /* ── Mobile: body offset for fixed 72px navbar ── */
 @media (max-width: 960px) {
   body { padding-top: 72px; }
+  /* Match the mobile hamburger/notification alignment used on account.css and styles.css */
+  .navbar__container { padding: 0 24px; }
 }
 
 /* ── Large tablet / small desktop ── */
 @media (max-width: 1100px) {
   .section-wrap    { padding: 80px 48px; }
   .section-wrap-sm { padding: 60px 48px; }
-  .navbar__container { padding: 0 48px; }
   .about-grid { gap: 56px; }
   .footer-new { padding: 64px 48px 36px; }
   .footer-new-grid { gap: 36px; }
+}
+
+/* Tablet-only navbar padding — scoped above the 960px hamburger breakpoint
+   so it never overrides the mobile 24px value set above. */
+@media (min-width: 961px) and (max-width: 1100px) {
+  .navbar__container { padding: 0 48px; }
 }
 
 /* ── Tablet ── */

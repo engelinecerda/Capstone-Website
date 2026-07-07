@@ -98,6 +98,18 @@
         </div>
       </div>
 
+      <!-- ── OCR/Vision API Usage Widget ── -->
+      <div class="usage-card" id="visionUsageCard">
+        <div class="usage-card-top">
+          <p class="usage-card-title">Vision API Usage (This Month)</p>
+          <span class="usage-badge" id="usageBadge">Loading…</span>
+        </div>
+        <div class="usage-bar-track">
+          <div class="usage-bar-fill" id="usageBarFill" style="width:0%"></div>
+        </div>
+        <p class="usage-card-sub" id="usageCardSub">Used for contract signature verification and payment receipt OCR. Google Cloud Vision's free tier covers 1,000 units/month.</p>
+      </div>
+
       <!-- Tab Strip -->
       <div class="settings-tabs" role="tablist">
         <button type="button" class="settings-tab-btn" data-tab="cancellation" role="tab">Cancellation Rules</button>
@@ -105,6 +117,7 @@
         <button type="button" class="settings-tab-btn active" data-tab="reservation-rules" role="tab">Reservation Rules</button>
         <button type="button" class="settings-tab-btn" data-tab="event-types" role="tab">Event Types</button>
         <button type="button" class="settings-tab-btn" data-tab="venue-map" role="tab">Venue Map</button>
+        <button type="button" class="settings-tab-btn" data-tab="operating-hours" role="tab">Operating Hours</button>
       </div>
 
       <!-- ══ TAB: CANCELLATION FEE ══ -->
@@ -473,6 +486,34 @@
           <div class="action-bar">
             <button type="button" class="btn-secondary" id="resetMapScopeBtn">Reset to Rizal Defaults</button>
             <button type="button" class="btn-primary" id="saveMapScopeBtn">Save Map Scope</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: OPERATING HOURS ══ -->
+      <div class="settings-panel" id="panel-operating-hours" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Booking Operating Hours</p>
+          <p class="settings-card-sub">Controls the earliest and latest times customers can select as a reservation start time. The last valid start time will always leave room for the full package duration before closing.</p>
+
+          <div class="form-grid" style="max-width:420px;">
+            <div class="form-group">
+              <label class="form-label">Opening Time</label>
+              <input type="time" class="form-input" id="field-open-time">
+              <span class="form-hint">Earliest bookable start time.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Closing Time</label>
+              <input type="time" class="form-input" id="field-close-time">
+              <span class="form-hint">Reservations cannot run past this time.</span>
+            </div>
+          </div>
+
+          <p class="map-settings-msg" id="hours-settings-msg"></p>
+
+          <div class="action-bar">
+            <button type="button" class="btn-secondary" id="resetHoursBtn">Reset to Default (1:00 PM – 10:00 PM)</button>
+            <button type="button" class="btn-primary" id="saveHoursBtn">Save Operating Hours</button>
           </div>
         </div>
       </div>

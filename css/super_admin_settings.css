@@ -162,6 +162,52 @@ body {
 }
 .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
+/* ── VISION API USAGE WIDGET ── */
+.usage-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 20px;
+}
+.usage-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.usage-card-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.usage-badge {
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eaf6ec;
+  border: 1px solid #bfe3c6;
+  color: #1e7a34;
+  white-space: nowrap;
+}
+.usage-badge.warn { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+.usage-badge.over { background: #fdecec; border-color: #f3b7b7; color: var(--danger); }
+.usage-bar-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #2e9e4d;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.usage-bar-fill.warn { background: var(--amber); }
+.usage-bar-fill.over { background: var(--danger); }
+.usage-card-sub { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
 /* ── TAB STRIP ── */
 .settings-tabs {
   display: flex;

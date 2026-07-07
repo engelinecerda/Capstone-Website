@@ -2502,6 +2502,14 @@ body {
     color: #2A1408;
 }
 
+.reservation-summary-number {
+    margin: 0 0 2px;
+    font-size: 12px;
+    color: #9c8f84;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
 .reservation-summary-package {
     margin: 0;
     font-size: 14px;

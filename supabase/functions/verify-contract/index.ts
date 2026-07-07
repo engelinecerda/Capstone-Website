@@ -89,7 +89,10 @@ function toImageUrl(contractUrl: string): string {
  *   3. Word check       — Any individual word with confidence < 0.60 strongly
  *                         suggests a cursive or handwritten word (e.g. a signature).
  */
-async function detectSignature(imageUrl: string): Promise<{
+async function detectSignature(
+  imageUrl: string,
+  supabase: ReturnType<typeof createClient>,
+): Promise<{
   signed: boolean;
   confidence: 'high' | 'medium' | 'none';
   detectedLabels: string[];
@@ -114,6 +117,10 @@ async function detectSignature(imageUrl: string): Promise<{
   if (!res.ok) {
     throw new Error(`GCP Vision error ${res.status}: ${await res.text()}`);
   }
+
+  supabase.rpc('increment_vision_usage', { p_units: 2 }).then(({ error }) => {
+    if (error) console.error('verify-contract usage tracking failed', error.message);
+  });
 
   const data = await res.json();
   const result = data?.responses?.[0] ?? {};
@@ -196,9 +203,11 @@ Deno.serve(async (req: Request) => {
 
   console.log('verify-contract started', { reservation_id });
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
   try {
     const imageUrl = toImageUrl(contract_url);
-    const { signed, confidence, detectedLabels } = await detectSignature(imageUrl);
+    const { signed, confidence, detectedLabels } = await detectSignature(imageUrl, supabase);
 
     console.log('verify-contract detection result', { reservation_id, signed, confidence, detectedLabels });
 
@@ -212,7 +221,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // Auto-verify: update reservation_contracts and advance reservation status
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const now = new Date().toISOString();
 
     const { error: contractError } = await supabase

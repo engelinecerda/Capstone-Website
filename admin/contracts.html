@@ -347,6 +347,13 @@
             </label>
             <textarea class="tmpl-textarea" id="tmplDescription" placeholder="Briefly describe what this template is for…"></textarea>
           </div>
+          <div class="tmpl-form-group full">
+            <label class="tmpl-label" for="tmplTemplateBody">
+              Contract Body (shown to customers for e-signing)
+            </label>
+            <textarea class="tmpl-textarea" id="tmplTemplateBody" rows="10" placeholder="One paragraph per line. Use {{customer_name}}, {{package_name}}, {{event_date}}, {{event_time}}, {{venue}}, {{reservation_number}}, {{total_price}}, {{guest_count}} as placeholders — they're filled in automatically when a customer reviews and signs."></textarea>
+            <p class="tmpl-hint">This is the text customers actually read and sign in-app. If left blank, a generic default contract is used instead.</p>
+          </div>
         </div>
 
         <!-- File source toggle -->

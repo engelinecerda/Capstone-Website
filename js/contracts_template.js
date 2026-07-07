@@ -15,6 +15,7 @@ const tmplContractType = document.getElementById('tmplContractType');
 const tmplVersionNo    = document.getElementById('tmplVersionNo');
 const tmplIsActive     = document.getElementById('tmplIsActive');
 const tmplDescription  = document.getElementById('tmplDescription');
+const tmplTemplateBody = document.getElementById('tmplTemplateBody');
 const tmplTemplateUrl  = document.getElementById('tmplTemplateUrl');
 const tmplFileInput    = document.getElementById('tmplFileInput');
 const tmplFileZone     = document.getElementById('tmplFileZone');
@@ -94,6 +95,7 @@ function resetModal() {
   tmplVersionNo.value      = '';
   tmplIsActive.value       = 'true';
   tmplDescription.value    = '';
+  tmplTemplateBody.value   = '';
   tmplTemplateUrl.value    = '';
   tmplFileInput.value      = '';
   tmplFileName.textContent = 'No file chosen';
@@ -207,6 +209,7 @@ addTemplateSave.addEventListener('click', async () => {
   const versionNo    = parseInt(tmplVersionNo.value, 10);
   const isActive     = tmplIsActive.value === 'true';
   const description  = tmplDescription.value.trim() || null;
+  const templateBody = tmplTemplateBody.value.trim() || null;
   const file         = tmplFileInput.files[0] ?? null;
   const pastedUrl    = tmplTemplateUrl.value.trim();
 
@@ -239,6 +242,7 @@ addTemplateSave.addEventListener('click', async () => {
         version_no:    versionNo,
         contract_type: contractType,
         description,
+        template_body: templateBody,
         template_url:  templateUrl,
         is_active:     isActive,
         created_by:    user.id,

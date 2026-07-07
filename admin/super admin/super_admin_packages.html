@@ -475,6 +475,17 @@
           </div>
         </div>
 
+        <div class="modal-field">
+          <label class="modal-label" for="pkgBookingScope">Booking Scope (Main packages only) *</label>
+          <select id="pkgBookingScope" class="modal-input modal-select">
+            <option value="">Select the team/resource this package occupies</option>
+            <option value="onsite_vip">VIP</option>
+            <option value="onsite_main_hall">Main Hall</option>
+            <option value="offsite">Offsite / Catering Team</option>
+          </select>
+          <span class="modal-hint">Determines which reservations block each other on the calendar. Required for Main packages — add-ons don't need this.</span>
+        </div>
+
         <p class="modal-message hidden" id="pkgModalMessage"></p>
       </div>
       <div class="modal-footer">

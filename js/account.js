@@ -1803,6 +1803,7 @@ function buildReservationCard(reservation, view) {
                         <span class="res-status ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
                     </div>
                     <div>
+                        ${reservation.reservation_number ? `<p class="reservation-summary-number">${escapeHtml(reservation.reservation_number)}</p>` : ''}
                         <p class="reservation-summary-package">${escapeHtml(packageName)}</p>
                     </div>
                 </div>
@@ -2141,6 +2142,11 @@ function renderReservationDetailsModal(reservationId = state.reservationDetailsR
                     </div>
                 </div>
                 <div class="reservation-details-grid">
+                    ${reservation.reservation_number ? `
+                    <div class="reservation-detail-field">
+                        <span class="reservation-detail-label">Reservation Number</span>
+                        <strong class="reservation-detail-value">${escapeHtml(reservation.reservation_number)}</strong>
+                    </div>` : ''}
                     <div class="reservation-detail-field">
                         <span class="reservation-detail-label">Reservation ID</span>
                         <strong class="reservation-detail-value">${escapeHtml(reservation.reservation_id)}</strong>
@@ -2946,6 +2952,7 @@ async function loadReservations() {
     try {
         const baseReservationSelect = `
             reservation_id,
+            reservation_number,
             user_id,
             event_type,
             event_date,

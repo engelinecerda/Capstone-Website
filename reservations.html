@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,7 +6,7 @@
     <title>Reservations — ELI Coffee Events Cafe</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -34,7 +34,7 @@
                     </button>
                 </li>
                 <li class="navbar__item"><a href="/index.html"        class="navbar__links">Home</a></li>
-                <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
+                <li class="navbar__item"><a href="/menu.html"         class="navbar__links">Menu</a></li>
                 <li class="navbar__item"><a href="/packages.html"     class="navbar__links">Packages</a></li>
                 <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
                 <li class="navbar__item"><a href="/reviews.html"      class="navbar__links">Reviews</a></li>
@@ -58,10 +58,9 @@
     </section>
 
     <section class="reservation-section">
-
         <div class="reservation-container">
 
-            <!-- GUEST NOTICE — injected/shown by JS for unauthenticated visitors -->
+            <!-- GUEST NOTICE — shown by JS for unauthenticated visitors -->
             <div class="res-guest-notice hidden" id="resGuestNotice" role="status" aria-live="polite">
                 <i class="ti ti-info-circle" aria-hidden="true"></i>
                 <p>You're browsing as a guest. <a href="/login.html">Sign in</a> or <a href="/login.html">create an account</a> to complete your booking.</p>
@@ -73,31 +72,22 @@
                 <span id="step-text"></span>
             </div>
 
-            <!-- STEP 1: Smart Reservation Setup -->
+            <!-- ═══════════════════════════════════════════════
+                 STEP 1 · Event Information  (single scrollable page)
+                 Sections within: Location → Package → Guests+Event Type
+                 → Add-ons/Venue → Calendar → Time
+                 ═══════════════════════════════════════════════ -->
             <div class="res-step active" id="rs1">
-                <h2>Event Information</h2>
-                <p>Complete your reservation setup here. Enter event details first, then choose your booking type so the calendar and time slots can reflect real availability.</p>
 
-                <div class="smart-step-section">
-                    <div class="input-row">
-                        <select class="res-input" id="event-type">
-                            <option value="">Event Type *</option>
-                        </select>
-                        <input class="res-input" type="number" id="guest-count" placeholder="Number of Guests *" min="1">
-                    </div>
-                </div>
-
-                <div class="smart-step-section">
-                    <div class="smart-step-heading">
-                        <span class="smart-step-kicker">Location Type</span>
-                        <h3>Where will the event happen?</h3>
-                        <p>Pick whether your reservation is onsite or offsite so we can narrow the correct booking scope.</p>
-                    </div>
+                <!-- ── 1A. Location Type ────────────────────── -->
+                <div class="res-section" id="sub-loc">
+                    <h2>Where will your <em>event</em> happen?</h2>
+                    <p>Choose whether to host at ELI Coffee Events Caf&eacute; or have our team come to you.</p>
                     <div class="location-options">
                         <div class="location-card" data-val="onsite">
                             <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-store"></i></div>
                             <h4>Onsite</h4>
-                            <p>Hold your event at ELI Coffee Events Caf&eacute;</p>
+                            <p>Hold your event at ELI Coffee Events Caf&eacute; Binangonan</p>
                         </div>
                         <div class="location-card" data-val="offsite">
                             <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></div>
@@ -105,37 +95,21 @@
                             <p>We bring the service to your venue</p>
                         </div>
                     </div>
-                    <div id="venue-wrapper" class="venue-wrapper hidden">
-                        <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically.</p>
-                        <div class="venue-search-row">
-                            <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)">
-                            <button type="button" id="venue-search-btn" class="venue-search-btn">Search</button>
-                        </div>
-                        <div id="venue-map" class="venue-map-container"></div>
-                        <div class="venue-pinned-row">
-                            <span class="venue-pin-icon">&#128205;</span>
-                            <span id="venue-pinned-label">Click the map or search an address to pin your venue.</span>
-                        </div>
-                        <input type="hidden" id="venue-location" value="">
-                    </div>
                 </div>
 
-                <div class="smart-step-section">
-                    <div class="smart-step-heading">
-                        <span class="smart-step-kicker">Package</span>
-                        <h3>Select the service you want</h3>
-                        <p id="rs3-desc">Choose your location type first to unlock package options.</p>
-                    </div>
+                <!-- ── 1B. Package Selection ─────────────────── -->
+                <!-- Locked until 1A is answered; same pattern as Calendar/Time locked states -->
+                <div class="res-section" id="sub-pkg">
+                    <h2>Select your <em>package</em></h2>
+                    <p id="rs-pkg-desc" class="section-status-note">Choose a location type first to see available packages.</p>
 
+                    <!-- Onsite packages -->
                     <div id="onsite-section" class="hidden">
-                        <div class="section-label">Mini Gathering Packages</div>
+                        <div class="section-label">Available Packages</div>
                         <div class="cards-grid" id="mini-grid"></div>
-                        <div id="snack-addon" class="addon-banner hidden">
-                            <div class="section-label">&#127850; Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
-                            <div class="cards-grid" id="snack-grid"></div>
-                        </div>
                     </div>
 
+                    <!-- Offsite categories + sub-packages + catering builder -->
                     <div id="offsite-section" class="hidden">
                         <div class="cards-grid" id="offsite-cat-grid"></div>
 
@@ -186,7 +160,6 @@
                                         <span class="cart-footer-right" id="catering-tray-total">&#8369;0</span>
                                     </div>
                                 </div>
-
                                 <div class="validation-notice" id="catering-validation-notice">
                                     <span class="vn-icon">&#9888;&#65039;</span>
                                     <span id="catering-validation-text">Select at least 1 main dish, 1 pasta, and 1 dessert to continue.</span>
@@ -196,14 +169,70 @@
                     </div>
                 </div>
 
-                <div class="smart-step-section">
-                    <div class="smart-step-heading">
-                        <span class="smart-step-kicker">Date</span>
-                        <h3>Choose your event date</h3>
-                        <p>The calendar stays locked until your booking type is fully selected.</p>
+                <!-- ── 1C. Guests + Event Type ────────────────── -->
+                <!-- Locked until 1B (package) is answered -->
+                <div class="res-section" id="sub-guests-type">
+                    <h2>Guests &amp; <em>event type</em></h2>
+                    <p class="section-status-note" id="guests-type-status">Choose your package first, then enter guest count and event type.</p>
+                    <div id="guests-type-content" class="res-locked-content">
+                        <div class="guests-type-grid">
+                            <div class="guests-col">
+                                <label class="field-label" for="guest-count">Number of guests</label>
+                                <input class="res-input guest-count-input" type="number" id="guest-count" placeholder="e.g. 50" min="1" inputmode="numeric" disabled>
+                                
+                            </div>
+                            <div class="event-type-col">
+                                <label class="field-label" for="event-type-select">Event type</label>
+                                <select class="res-input event-type-select" id="event-type-select" disabled>
+                                    <option value="">Select event type&hellip;</option>
+                                </select>
+                                <div class="event-type-other-wrap hidden" id="event-type-other-wrap">
+                                    <label class="event-type-other-label" for="event-type-other">Please specify</label>
+                                    <input class="res-input" type="text" id="event-type-other" placeholder="e.g., Debut, Team Building, Product Launch&hellip;" maxlength="120">
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                <!-- ── 1D. Add-ons / Venue ────────────────────── -->
+                <!-- Locked until 1B (package) is answered -->
+                <div class="res-section" id="sub-addon-venue">
+                    <h2 id="rs-addon-or-venue-title">Add-ons / Venue</h2>
+                    <p class="section-status-note" id="addon-venue-status">Choose your package first to continue with this section.</p>
+                    <div id="addon-venue-content" class="res-locked-content">
+                        <p id="rs-addon-or-venue-desc"></p>
+
+                        <!-- Onsite: optional snack add-on -->
+                        <div id="addon-section" class="hidden">
+                            <div class="section-label">&#127850; Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
+                            <div class="cards-grid" id="snack-grid"></div>
+                        </div>
+
+                        <!-- Offsite: venue details -->
+                        <div id="venue-section" class="hidden">
+                            <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically.</p>
+                            <div class="venue-search-row">
+                                <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)">
+                                <button type="button" id="venue-search-btn" class="venue-search-btn">Search</button>
+                            </div>
+                            <div id="venue-map" class="venue-map-container"></div>
+                            <div class="venue-pinned-row">
+                                <span class="venue-pin-icon">&#128205;</span>
+                                <span id="venue-pinned-label">Click the map or search an address to pin your venue.</span>
+                            </div>
+                            <input type="hidden" id="venue-location" value="">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── 1E. Date ───────────────────────────────── -->
+                <div class="res-section" id="sub-date">
+                    <h2>Choose your <em>date</em></h2>
+                    <p>Available dates are shown based on your selected package and location.</p>
+
                     <input type="hidden" id="event-date">
-                    <input class="res-input res-input-readonly" type="text" id="event-date-display" placeholder="Choose your location and package first, then select a date *" readonly>
+                    <input class="res-input res-input-readonly" type="text" id="event-date-display" placeholder="Select a date from the availability calendar below *" readonly>
                     <section class="availability-panel" aria-labelledby="availabilityTitle">
                         <div class="availability-head">
                             <div>
@@ -217,13 +246,7 @@
                             </div>
                         </div>
                         <div class="availability-weekdays" aria-hidden="true">
-                            <span>Su</span>
-                            <span>Mo</span>
-                            <span>Tu</span>
-                            <span>We</span>
-                            <span>Th</span>
-                            <span>Fr</span>
-                            <span>Sa</span>
+                            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
                         </div>
                         <div class="availability-grid" id="availabilityGrid"></div>
                         <div class="availability-legend">
@@ -239,30 +262,38 @@
                     </section>
                 </div>
 
-                <div class="smart-step-section">
-                    <div class="smart-step-heading">
-                        <span class="smart-step-kicker">Time</span>
-                        <h3>Pick your preferred start time</h3>
-                        <p>Time slots unlock only after you select a valid booking type and date.</p>
-                    </div>
+                <!-- ── 1F. Time Slot ──────────────────────────── -->
+                <div class="res-section" id="sub-time">
+                    <h2>Pick a <em>start time</em></h2>
+                    <p>Choose the time that works best for your event.</p>
                     <div class="time-grid" id="time-grid"></div>
+                    <p class="time-end-readout hidden" id="time-end-readout"></p>
                     <p class="time-status-note" id="time-status-note"></p>
+                    <div class="time-alt-note">
+                        <i class="ti ti-info-circle" aria-hidden="true"></i>
+                        <span>Need a different start time? Add a note in the Special Requests field on the next page and our team will reach out to confirm.</span>
+                    </div>
                 </div>
-            </div>
 
-            <!-- STEP 2: Contact -->
+            </div><!-- /rs1 -->
+
+            <!-- ═══════════════════════════════════════════════
+                 STEP 8 · Contact Details
+                 ═══════════════════════════════════════════════ -->
             <div class="res-step" id="rs4">
-                <h2>Your Details</h2>
-                <p>Fill in your contact information</p>
+                <h2>Your <em>details</em></h2>
+                <p>Fill in your contact information so we can reach you about your reservation.</p>
                 <input class="res-input" type="text"  id="name"     placeholder="Full Name *">
                 <input class="res-input" type="tel"   id="phone"    placeholder="Phone Number *">
                 <input class="res-input" type="email" id="email"    placeholder="Email Address *">
                 <textarea class="res-input"            id="requests" placeholder="Notes &amp; Special Requests (Optional)"></textarea>
             </div>
 
-            <!-- STEP 6: Summary -->
+            <!-- ═══════════════════════════════════════════════
+                 STEP 9 · Summary
+                 ═══════════════════════════════════════════════ -->
             <div class="res-step" id="rs6">
-                <h2>Reservation Summary</h2>
+                <h2>Reservation <em>Summary</em></h2>
                 <p>Please review all your details before proceeding</p>
                 <div class="summary-box" id="summary-content"></div>
                 <div id="guest-warning" class="guest-warning hidden">
@@ -271,38 +302,56 @@
                 </div>
             </div>
 
-            <!-- STEP 7: Contract -->
+            <!-- ═══════════════════════════════════════════════
+                 STEP 10 · Contract
+                 ═══════════════════════════════════════════════ -->
             <div class="res-step" id="rs7">
-                <h2>Sign the Contract</h2>
-                <p>Download, sign, and upload the contract to complete your booking</p>
+                <h2>Review &amp; <em>Sign</em></h2>
+                <p>Review your contract and sign right here — no printing, no external apps.</p>
                 <div class="contract-box">
-                    <div class="contract-download">
+                    <div class="contract-viewer-head">
                         <div class="contract-icon">&#128196;</div>
                         <div class="contract-info">
                             <h4 id="contract-title">ELI Coffee Events Reservation Contract</h4>
-                            <p id="contract-description">Read the full terms and conditions before signing</p>
+                            <p id="contract-description">Scroll down to review the full agreement before signing.</p>
                         </div>
-                        <a href="#" class="dl-btn" id="contract-download-btn" aria-disabled="true">&#11015; Download Contract</a>
                     </div>
-                    <div class="contract-steps">
-                        <div class="c-step"><span class="c-num">1</span><span>Download the contract above</span></div>
-                        <div class="c-step"><span class="c-num">2</span><span>Print and sign <strong>or</strong> use an e-signature tool</span></div>
-                        <div class="c-step"><span class="c-num">3</span><span>Upload the signed contract below</span></div>
+                    <div class="contract-viewer" id="contract-viewer" aria-live="polite">
+                        <p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>
                     </div>
-                    <div class="contract-upload">
-                        <label for="contract">Upload Signed Contract *</label>
-                        <input type="file" id="contract" accept=".pdf,.jpg,.jpeg,.png">
-                        <p class="contract-note">Accepted formats: PDF, JPG, JPEG, PNG. Maximum 10MB.</p>
-                        <p class="contract-file-status" id="contract-file-status" aria-live="polite">No file chosen yet.</p>
+
+                    <div class="signature-section">
+                        <h4 class="signature-heading">Sign below</h4>
+                        <div class="signature-mode-tabs">
+                            <button type="button" class="signature-mode-btn active" data-mode="draw" id="sig-mode-draw">Draw</button>
+                            <button type="button" class="signature-mode-btn" data-mode="type" id="sig-mode-type">Type instead</button>
+                        </div>
+
+                        <div class="signature-draw-panel" id="signature-draw-panel">
+                            <canvas id="signature-canvas" class="signature-canvas" aria-label="Draw your signature here"></canvas>
+                            <button type="button" class="signature-clear-btn" id="signature-clear-btn">Clear</button>
+                        </div>
+
+                        <div class="signature-type-panel hidden" id="signature-type-panel">
+                            <input type="text" id="signature-type-input" class="signature-type-input" placeholder="Type your full name">
+                            <p class="signature-type-preview" id="signature-type-preview"></p>
+                        </div>
+
+                        <p class="signature-status" id="signature-status" aria-live="polite"></p>
                     </div>
+
                     <div class="contract-agreement-box">
                         <div class="contract-agreement-row">
-                            <input type="checkbox" id="contract-agreement" class="contract-agreement-checkbox">
-                            <label for="contract-agreement" class="contract-agreement-copy">I agree to the</label>
+                            <input type="checkbox" id="contract-agreement-terms" class="contract-agreement-checkbox">
+                            <label for="contract-agreement-terms" class="contract-agreement-copy">I have read and agree to the</label>
                             <button type="button" class="contract-policy-link" data-policy="terms">Terms &amp; Conditions</button>
                             <span class="contract-agreement-copy">and</span>
                             <button type="button" class="contract-policy-link" data-policy="privacy">Data Privacy Policy</button>
                             <span class="contract-agreement-copy">.</span>
+                        </div>
+                        <div class="contract-agreement-row">
+                            <input type="checkbox" id="contract-agreement-esign" class="contract-agreement-checkbox">
+                            <label for="contract-agreement-esign" class="contract-agreement-copy">I confirm my reservation details above are accurate, and I am signing this contract electronically.</label>
                         </div>
                         <p class="contract-inline-message" id="contract-policy-message" aria-live="polite"></p>
                     </div>
@@ -318,6 +367,7 @@
         </div>
     </section>
 
+    <!-- Policy Modal -->
     <div class="policy-modal-backdrop hidden" id="policy-modal-backdrop" aria-hidden="true">
         <div class="policy-modal-card" role="dialog" aria-modal="true" aria-labelledby="policy-modal-title">
             <button type="button" class="policy-modal-close" id="policy-modal-close" aria-label="Close policy modal">&times;</button>
@@ -334,20 +384,14 @@
     <!-- FOOTER -->
     <footer class="footer-new">
         <div class="footer-new-grid">
-
             <div>
                 <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
                 <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
                 <div class="footer-new-social">
-                    <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
-                        <i class="ti ti-brand-facebook"></i>
-                    </a>
-                    <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                        <i class="ti ti-brand-instagram"></i>
-                    </a>
+                    <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>
+                    <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>
                 </div>
             </div>
-
             <div>
                 <p class="footer-new-heading">Explore</p>
                 <ul class="footer-new-links">
@@ -359,7 +403,6 @@
                     <li><a href="/about.html">About</a></li>
                 </ul>
             </div>
-
             <div>
                 <p class="footer-new-heading">Services</p>
                 <ul class="footer-new-links">
@@ -368,23 +411,12 @@
                     <li><a href="/packages.html">Catering</a></li>
                 </ul>
             </div>
-
             <div>
                 <p class="footer-new-heading">Contact</p>
-                <div class="footer-new-contact-row">
-                    <i class="ti ti-phone"></i>
-                    <span>0917 562 0306 | 0917 562 0308</span>
-                </div>
-                <div class="footer-new-contact-row">
-                    <i class="ti ti-mail"></i>
-                    <span>elicoffeetea@gmail.com</span>
-                </div>
-                <div class="footer-new-contact-row">
-                    <i class="ti ti-map-pin"></i>
-                    <span>Binangonan, Rizal &amp; Antipolo City</span>
-                </div>
+                <div class="footer-new-contact-row"><i class="ti ti-phone"></i><span>0917 562 0306 | 0917 562 0308</span></div>
+                <div class="footer-new-contact-row"><i class="ti ti-mail"></i><span>elicoffeetea@gmail.com</span></div>
+                <div class="footer-new-contact-row"><i class="ti ti-map-pin"></i><span>Binangonan, Rizal &amp; Antipolo City</span></div>
             </div>
-
         </div>
         <div class="footer-new-bottom">
             <span>© 2026 ELI Coffee Events Cafe. All rights reserved.</span>
@@ -398,6 +430,7 @@
     <script type="module">
     import { customerSupabase as supabase } from '/js/supabase.js';
     import {
+        fetchAvailableStartTimes,
         fetchBlackoutDates,
         fetchCalendarAvailability,
         fetchDateAvailability,
@@ -413,22 +446,53 @@
         document.getElementById('resGuestNotice').classList.remove('hidden');
     }
 
+    // ── State ──────────────────────────────────────────────────────────────
     const S = {
-        eventType: '', guestCount: '', eventDate: '',
-        locationType: '', venueLocation: '',
-        miniPackage: null, snackAddon: null,
-        offsiteCategory: '', offsitePackage: null,
+        locationType: '',
+        miniPackage: null,
+        snackAddon: null,
+        offsiteCategory: '',
+        offsitePackage: null,
         cateringCart: [],
-        name: '', phone: '', email: '', requests: '',
-        time: ''
+        guestCount: '',
+        eventType: '',
+        eventTypeOther: '',
+        venueLocation: '',
+        eventDate: '',
+        time: '',
+        name: '', phone: '', email: '', requests: ''
     };
 
+    // ── Phase 2 feature flag — flip to true once DB has min_guests/max_guests ──
+    const GUEST_COUNT_VALIDATION_ENABLED = false;
+
+    // ── Event types cache (populated by loadEventTypes) ────────────────────
+    let eventTypesCache = [];
+
+    // ── Package data (populated by loadPackages) ───────────────────────────
+    let MINI        = [];
+    let SNACK       = [];
+    let OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+
+    const OFFSITE_CATS = [
+        { label:'Eli Coffee Bar',   val:'coffee',   icon:'&#9749;',         desc:'Professional coffee bar service for your event' },
+        { label:'Snack Bar Corner', val:'snack',    icon:'&#127850;',       desc:'Mobile snack bar with chocolate fountain' },
+        { label:'Catering',         val:'catering', icon:'&#127869;&#65039;', desc:'Full catering service with buffet setup, styled tables &amp; more' }
+    ];
+
+    // ── Step order ─────────────────────────────────────────────────────────
+    // rs1 = single Event Information page (Location → Package → Guests+Type → Add-ons/Venue → Date → Time)
+    const STEP_IDS = ['rs1', 'rs4', 'rs6', 'rs7'];
+    const STEP_LABELS = ['Event Information', 'Your Details', 'Review', 'Contract'];
+    let cur = 1;
+    function total() { return STEP_IDS.length; }
+    function sid(n)  { return STEP_IDS[n - 1]; }
+
+    // ── Draft ──────────────────────────────────────────────────────────────
     const DRAFT_KEY = 'eli_reservation_draft';
 
     function saveDraft() {
-        try {
-            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ state: S, step: cur }));
-        } catch { /* sessionStorage unavailable */ }
+        try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ state: S, step: cur })); } catch { /* ignore */ }
     }
 
     function clearDraft() {
@@ -443,23 +507,18 @@
             if (!saved || typeof savedStep !== 'number') return false;
 
             Object.assign(S, saved);
-            cur = Math.min(Math.max(savedStep, 1), total());
-
-            const etEl = document.getElementById('event-type');
-            if (etEl && S.eventType) etEl.value = S.eventType;
+            // Clamp to valid range; any step > total() resets to 1
+            cur = (typeof savedStep === 'number' && savedStep >= 1 && savedStep <= total()) ? savedStep : 1;
 
             const gcEl = document.getElementById('guest-count');
             if (gcEl && S.guestCount) gcEl.value = S.guestCount;
 
             const nameEl = document.getElementById('name');
             if (nameEl && S.name) nameEl.value = S.name;
-
             const phoneEl = document.getElementById('phone');
             if (phoneEl && S.phone) phoneEl.value = S.phone;
-
             const emailEl = document.getElementById('email');
             if (emailEl && S.email) emailEl.value = S.email;
-
             const reqEl = document.getElementById('requests');
             if (reqEl && S.requests) reqEl.value = S.requests;
 
@@ -471,36 +530,61 @@
 
             if (S.eventDate) syncSelectedDate(S.eventDate);
 
+            if (S.eventTypeOther) {
+                const otherInput = document.getElementById('event-type-other');
+                if (otherInput) otherInput.value = S.eventTypeOther;
+            }
+
             return true;
         } catch { return false; }
     }
 
-    const eventDateInput = document.getElementById('event-date');
-    const eventDateDisplayInput = document.getElementById('event-date-display');
-    const nameInput = document.getElementById('name');
-    const phoneInput = document.getElementById('phone');
-    const emailInput = document.getElementById('email');
-    const availabilityGrid = document.getElementById('availabilityGrid');
-    const availabilityMonthLabel = document.getElementById('availabilityMonthLabel');
-    const availabilityMessage = document.getElementById('availabilityMessage');
+    // ── DOM refs ───────────────────────────────────────────────────────────
+    const eventDateInput          = document.getElementById('event-date');
+    const eventDateDisplayInput   = document.getElementById('event-date-display');
+    const nameInput               = document.getElementById('name');
+    const phoneInput              = document.getElementById('phone');
+    const emailInput              = document.getElementById('email');
+    const availabilityGrid        = document.getElementById('availabilityGrid');
+    const availabilityMonthLabel  = document.getElementById('availabilityMonthLabel');
+    const availabilityMessage     = document.getElementById('availabilityMessage');
     const availabilityClosureNote = document.getElementById('availabilityClosureNote');
     const availabilityClosureLabel = document.getElementById('availabilityClosureLabel');
     const availabilityClosureCopy = document.getElementById('availabilityClosureCopy');
     const availabilityPrevMonthBtn = document.getElementById('availabilityPrevMonth');
     const availabilityNextMonthBtn = document.getElementById('availabilityNextMonth');
-    const timeStatusNote = document.getElementById('time-status-note');
-    const contractInput = document.getElementById('contract');
-    const contractFileStatus = document.getElementById('contract-file-status');
-    const contractAgreementCheckbox = document.getElementById('contract-agreement');
-    const contractPolicyMessage = document.getElementById('contract-policy-message');
-    const policyModalBackdrop = document.getElementById('policy-modal-backdrop');
-    const policyModalTitle = document.getElementById('policy-modal-title');
-    const policyModalContent = document.getElementById('policy-modal-content');
-    const policyModalClose = document.getElementById('policy-modal-close');
-    const policyModalDismiss = document.getElementById('policy-modal-dismiss');
-    const policyModalAgree = document.getElementById('policy-modal-agree');
-    const policyButtons = document.querySelectorAll('[data-policy]');
+    const timeStatusNote          = document.getElementById('time-status-note');
+    const timeEndReadout          = document.getElementById('time-end-readout');
+    const contractViewer          = document.getElementById('contract-viewer');
+    const contractAgreementTerms  = document.getElementById('contract-agreement-terms');
+    const contractAgreementEsign  = document.getElementById('contract-agreement-esign');
+    const contractPolicyMessage   = document.getElementById('contract-policy-message');
+    const signatureStatus         = document.getElementById('signature-status');
+    const signatureCanvas         = document.getElementById('signature-canvas');
+    const signatureClearBtn       = document.getElementById('signature-clear-btn');
+    const signatureDrawPanel      = document.getElementById('signature-draw-panel');
+    const signatureTypePanel      = document.getElementById('signature-type-panel');
+    const signatureTypeInput      = document.getElementById('signature-type-input');
+    const signatureTypePreview    = document.getElementById('signature-type-preview');
+    const sigModeDrawBtn          = document.getElementById('sig-mode-draw');
+    const sigModeTypeBtn          = document.getElementById('sig-mode-type');
+    const policyModalBackdrop     = document.getElementById('policy-modal-backdrop');
+    const policyModalTitle        = document.getElementById('policy-modal-title');
+    const policyModalContent      = document.getElementById('policy-modal-content');
+    const policyModalClose        = document.getElementById('policy-modal-close');
+    const policyModalDismiss      = document.getElementById('policy-modal-dismiss');
+    const policyModalAgree        = document.getElementById('policy-modal-agree');
+    const policyButtons           = document.querySelectorAll('[data-policy]');
 
+    // ── Signature state ────────────────────────────────────────────────────
+    const signatureState = {
+        mode: 'draw',          // 'draw' | 'type'
+        pad: null,             // SignaturePad instance
+        contractLoaded: false,
+        activeTemplateContractType: 'package_contract'
+    };
+
+    // ── Availability state ─────────────────────────────────────────────────
     const availabilityState = {
         month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         calendarAvailability: new Map(),
@@ -509,841 +593,75 @@
         blackoutReasonColumn: null,
         closedDateReasons: new Map(),
         selectedDateAvailability: null,
-        timeStatusOverride: ''
+        timeStatusOverride: '',
+        availableStartTimes: []
     };
 
-    const CONTRACT_UPLOAD_RULES = {
-        maxFileSize: 10 * 1024 * 1024,
-        allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
-        allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png']
-    };
+    // ── Default contract body (used when a package has no active template) ─
+    // Mirrors the fallback text in supabase/functions/generate-signed-contract —
+    // this is just for the in-page preview; the edge function's copy is
+    // authoritative for the generated PDF.
+    const DEFAULT_CONTRACT_TEMPLATE_BODY =
+`RESERVATION SERVICE AGREEMENT
 
+This Reservation Service Agreement ("Agreement") is entered into between ELI Coffee Events Cafe Binangonan ("the Venue") and {{customer_name}} ("the Client") for the event and package described below.
+
+Reservation Number: {{reservation_number}}
+Package: {{package_name}}
+Event Date: {{event_date}}
+Event Time: {{event_time}}
+Venue: {{venue}}
+Guest Count: {{guest_count}}
+Total Package Price: {{total_price}}
+
+1. Booking Confirmation. This reservation is confirmed upon submission of this signed Agreement and payment of the applicable reservation fee or down payment as described in the Venue's Reservation Rules.
+
+2. Cancellation and Rescheduling. Cancellation fees and rescheduling terms follow the Venue's published Cancellation and Rescheduling policies, which the Client has reviewed and agrees to as part of accepting the Terms and Conditions.
+
+3. Client Responsibilities. The Client agrees to provide accurate event details, guest counts, and contact information, and to notify the Venue promptly of any changes to the reservation.
+
+4. Electronic Signature. The Client acknowledges that this Agreement is being signed electronically, and agrees that such electronic signature is legally binding to the same extent as a handwritten signature, consistent with the Philippine Electronic Commerce Act (Republic Act No. 8792).
+
+By signing below, the Client confirms that the reservation details above are accurate and agrees to the terms of this Agreement and the Venue's Terms and Conditions and Data Privacy Policy.`;
+
+    // ── Policy content ─────────────────────────────────────────────────────
     const POLICY_CONTENT = {
         terms: {
             title: 'Terms & Conditions',
             sections: [
-                {
-                    heading: '1. Reservation Agreement',
-                    paragraphs: [
-                        'By submitting a reservation, the customer confirms that all provided information is accurate and agrees to comply with the policies stated in this system. A reservation is considered pending until reviewed and approved by the administrator.'
-                    ]
-                },
-                {
-                    heading: '2. Package and Services',
-                    paragraphs: [
-                        'The selected package includes the agreed services such as catering setup, food and beverage inclusions, event setup, and assigned staff. Specific inclusions depend on the chosen package and are displayed during the reservation process.',
-                        'Additional costs such as crew meals and transportation fees may apply depending on the event location and requirements.'
-                    ]
-                },
-                {
-                    heading: '3. Payment Terms',
-                    paragraphs: [
-                        'Reservations may be confirmed through any of the following:'
-                    ],
-                    bullets: [
-                        'Full Payment',
-                        '50% Down Payment',
-                        'Reservation Fee'
-                    ],
-                    trailingParagraphs: [
-                        'Any reservation fee paid will be deducted from the total package amount. The remaining balance must be settled before the specified payment deadline.',
-                        'All submitted payments are subject to verification by the administrator. Customers must provide accurate payment details and valid proof of payment.'
-                    ]
-                },
-                {
-                    heading: '4. Non-Refundable Policy',
-                    paragraphs: [
-                        'All payments made are strictly non-refundable. Once a payment is submitted and verified, it cannot be reversed or refunded under any circumstances.'
-                    ]
-                },
-                {
-                    heading: '5. Rescheduling Policy',
-                    paragraphs: [
-                        'Customers may request to reschedule their reservation depending on availability. A rescheduling fee of P3,000 will be required. The requested date must be available and is subject to approval by the administrator.'
-                    ]
-                },
-                {
-                    heading: '6. Cancellation Policy',
-                    paragraphs: [
-                        'In the event of cancellation, all payments made will remain non-refundable. Cancellation requests may still be recorded in the system for documentation and administrative purposes.'
-                    ]
-                },
-                {
-                    heading: '7. Contract Submission',
-                    paragraphs: [
-                        'Customers are required to submit a signed contract as part of the reservation process. The system may allow resubmission of contracts if revisions are requested by the administrator. Submitted contracts are subject to review and approval.'
-                    ]
-                },
-                {
-                    heading: '8. Electronic Transactions and Signatures',
-                    paragraphs: [
-                        'This system complies with Republic Act No. 8792, also known as the Electronic Commerce Act of 2000, which recognizes the legal validity of electronic data messages, electronic documents, and electronic signatures.',
-                        'All electronic records, including reservation details, submitted contracts, and uploaded documents, are considered legally binding and equivalent to their paper-based counterparts.',
-                        'By submitting a reservation and signing the contract electronically, the customer acknowledges and agrees that their electronic signature represents their identity and intent to enter into a binding agreement with ELI Coffee Events.'
-                    ]
-                },
-                {
-                    heading: '9. System Usage',
-                    paragraphs: [
-                        'By using this system, the customer agrees not to provide false information, misuse the platform, or submit invalid or fraudulent payment records. The administrator reserves the right to reject, cancel, or take appropriate action on reservations that violate system policies.'
-                    ]
-                },
-                {
-                    heading: '10. Data Privacy',
-                    paragraphs: [
-                        'Customer information such as name, contact details, and uploaded documents will be securely stored and used solely for reservation processing, communication, and administrative purposes in accordance with applicable data privacy regulations.'
-                    ]
-                },
-                {
-                    heading: '11. Agreement',
-                    paragraphs: [
-                        'By checking the agreement box and submitting the reservation, the customer confirms that they have read, understood, and agreed to all the terms and conditions stated above.'
-                    ]
-                }
+                { heading: '1. Reservation Agreement', paragraphs: ['By submitting a reservation, the customer confirms that all provided information is accurate and agrees to comply with the policies stated in this system. A reservation is considered pending until reviewed and approved by the administrator.'] },
+                { heading: '2. Package and Services', paragraphs: ['The selected package includes the agreed services such as catering setup, food and beverage inclusions, event setup, and assigned staff. Specific inclusions depend on the chosen package and are displayed during the reservation process.', 'Additional costs such as crew meals and transportation fees may apply depending on the event location and requirements.'] },
+                { heading: '3. Payment Terms', paragraphs: ['Reservations may be confirmed through any of the following:'], bullets: ['Full Payment', '50% Down Payment', 'Reservation Fee'], trailingParagraphs: ['Any reservation fee paid will be deducted from the total package amount. The remaining balance must be settled before the specified payment deadline.', 'All submitted payments are subject to verification by the administrator. Customers must provide accurate payment details and valid proof of payment.'] },
+                { heading: '4. Non-Refundable Policy', paragraphs: ['All payments made are strictly non-refundable. Once a payment is submitted and verified, it cannot be reversed or refunded under any circumstances.'] },
+                { heading: '5. Rescheduling Policy', paragraphs: ['Customers may request to reschedule their reservation depending on availability. A rescheduling fee of P3,000 will be required. The requested date must be available and is subject to approval by the administrator.'] },
+                { heading: '6. Cancellation Policy', paragraphs: ['In the event of cancellation, all payments made will remain non-refundable. Cancellation requests may still be recorded in the system for documentation and administrative purposes.'] },
+                { heading: '7. Contract Submission', paragraphs: ['Customers are required to submit a signed contract as part of the reservation process. The system may allow resubmission of contracts if revisions are requested by the administrator. Submitted contracts are subject to review and approval.'] },
+                { heading: '8. Electronic Transactions and Signatures', paragraphs: ['This system complies with Republic Act No. 8792, also known as the Electronic Commerce Act of 2000, which recognizes the legal validity of electronic data messages, electronic documents, and electronic signatures.', 'All electronic records, including reservation details, submitted contracts, and uploaded documents, are considered legally binding and equivalent to their paper-based counterparts.', 'By submitting a reservation and signing the contract electronically, the customer acknowledges and agrees that their electronic signature represents their identity and intent to enter into a binding agreement with ELI Coffee Events.'] },
+                { heading: '9. System Usage', paragraphs: ['By using this system, the customer agrees not to provide false information, misuse the platform, or submit invalid or fraudulent payment records. The administrator reserves the right to reject, cancel, or take appropriate action on reservations that violate system policies.'] },
+                { heading: '10. Data Privacy', paragraphs: ['Customer information such as name, contact details, and uploaded documents will be securely stored and used solely for reservation processing, communication, and administrative purposes in accordance with applicable data privacy regulations.'] },
+                { heading: '11. Agreement', paragraphs: ['By checking the agreement box and submitting the reservation, the customer confirms that they have read, understood, and agreed to all the terms and conditions stated above.'] }
             ]
         },
         privacy: {
             title: 'Data Privacy Policy',
             sections: [
-                {
-                    heading: 'Policy Statement',
-                    paragraphs: [
-                        'ELI Coffee Events is committed to protecting the privacy and personal data of its users in accordance with Republic Act No. 10173, also known as the Data Privacy Act of 2012.'
-                    ]
-                },
-                {
-                    heading: '1. Collection of Personal Data',
-                    paragraphs: [
-                        'The system collects personal information such as name, email address, phone number, and other relevant details provided during account registration, reservation, and payment submission. Uploaded files such as proof of payment and signed contracts are also collected as part of the reservation process.'
-                    ]
-                },
-                {
-                    heading: '2. Purpose of Data Collection',
-                    paragraphs: [
-                        'Personal data is collected and used solely for the following purposes:'
-                    ],
-                    bullets: [
-                        'Processing and managing reservations',
-                        'Verifying payment submissions',
-                        'Reviewing and validating contracts',
-                        'Communicating with customers regarding their reservations',
-                        'Maintaining records for administrative and operational purposes'
-                    ]
-                },
-                {
-                    heading: '3. Data Storage and Security',
-                    paragraphs: [
-                        'All personal data and uploaded documents are securely stored using trusted third-party services. Reasonable organizational, physical, and technical security measures are implemented to protect data against unauthorized access, alteration, disclosure, or destruction.'
-                    ]
-                },
-                {
-                    heading: '4. Data Sharing and Disclosure',
-                    paragraphs: [
-                        'Personal data will not be sold, shared, or disclosed to unauthorized third parties. Data may only be accessed by authorized personnel of ELI Coffee Events for operational and administrative purposes.'
-                    ]
-                },
-                {
-                    heading: '5. Data Retention',
-                    paragraphs: [
-                        'Personal data will be retained only for as long as necessary to fulfill the purposes stated above or as required by applicable laws and regulations. Records related to reservations, payments, and contracts may be retained for documentation and audit purposes.'
-                    ]
-                },
-                {
-                    heading: '6. User Rights',
-                    paragraphs: [
-                        'Users have the right to access, review, and request correction of their personal data stored in the system. Requests may be subject to verification and system limitations.'
-                    ]
-                },
-                {
-                    heading: '7. Use of System',
-                    paragraphs: [
-                        'By using this system and submitting personal information, the user consents to the collection, use, and processing of their data in accordance with this policy.'
-                    ]
-                },
-                {
-                    heading: '8. Contact and Inquiries',
-                    paragraphs: [
-                        'For any questions or concerns regarding data privacy, users may contact ELI Coffee Events through the provided contact channels.'
-                    ]
-                },
-                {
-                    heading: '9. Policy Updates',
-                    paragraphs: [
-                        'This Data Privacy Policy may be updated from time to time. Continued use of the system constitutes acceptance of any changes made.'
-                    ]
-                }
+                { heading: 'Policy Statement', paragraphs: ['ELI Coffee Events is committed to protecting the privacy and personal data of its users in accordance with Republic Act No. 10173, also known as the Data Privacy Act of 2012.'] },
+                { heading: '1. Collection of Personal Data', paragraphs: ['The system collects personal information such as name, email address, phone number, and other relevant details provided during account registration, reservation, and payment submission. Uploaded files such as proof of payment and signed contracts are also collected as part of the reservation process.'] },
+                { heading: '2. Purpose of Data Collection', paragraphs: ['Personal data is collected and used solely for the following purposes:'], bullets: ['Processing and managing reservations', 'Verifying payment submissions', 'Reviewing and validating contracts', 'Communicating with customers regarding their reservations', 'Maintaining records for administrative and operational purposes'] },
+                { heading: '3. Data Storage and Security', paragraphs: ['All personal data and uploaded documents are securely stored using trusted third-party services. Reasonable organizational, physical, and technical security measures are implemented to protect data against unauthorized access, alteration, disclosure, or destruction.'] },
+                { heading: '4. Data Sharing and Disclosure', paragraphs: ['Personal data will not be sold, shared, or disclosed to unauthorized third parties. Data may only be accessed by authorized personnel of ELI Coffee Events for operational and administrative purposes.'] },
+                { heading: '5. Data Retention', paragraphs: ['Personal data will be retained only for as long as necessary to fulfill the purposes stated above or as required by applicable laws and regulations. Records related to reservations, payments, and contracts may be retained for documentation and audit purposes.'] },
+                { heading: '6. User Rights', paragraphs: ['Users have the right to access, review, and request correction of their personal data stored in the system. Requests may be subject to verification and system limitations.'] },
+                { heading: '7. Use of System', paragraphs: ['By using this system and submitting personal information, the user consents to the collection, use, and processing of their data in accordance with this policy.'] },
+                { heading: '8. Contact and Inquiries', paragraphs: ['For any questions or concerns regarding data privacy, users may contact ELI Coffee Events through the provided contact channels.'] },
+                { heading: '9. Policy Updates', paragraphs: ['This Data Privacy Policy may be updated from time to time. Continued use of the system constitutes acceptance of any changes made.'] }
             ]
         }
     };
 
     let activePolicyKey = 'terms';
 
-    const CONTRACT_FILES = {
-        onsite_vip: '../files/contracts/contract-vip-lounge.pdf',
-        onsite_main_hall: '../files/contracts/contract-main-hall.pdf',
-        add_on_snack: '../files/contracts/contract-snack-bar.pdf',
-        offsite_coffee: '../files/contracts/contract-coffee-bar.pdf',
-        offsite_snack: '../files/contracts/contract-snack-bar.pdf',
-        offsite_catering: '../files/contracts/contract-catering.pdf',
-  
-    };
-
-    // These are populated from the Supabase `package` table
-    let MINI        = [];
-    let SNACK       = [];
-    let OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
-
-    const OFFSITE_CATS = [
-        { label:'Eli Coffee Bar',   val:'coffee',   icon:'&#9749;',   desc:'Professional coffee bar service for your event' },
-        { label:'Snack Bar Corner', val:'snack',    icon:'&#127850;', desc:'Mobile snack bar with chocolate fountain' },
-        { label:'Catering',         val:'catering', icon:'&#127869;&#65039;', desc:'Full catering service with buffet setup, styled tables &amp; more' }
-    ];
-    function pad(value) {
-        return String(value).padStart(2, '0');
-    }
-
-    function toDateKey(date) {
-        return [
-            date.getFullYear(),
-            pad(date.getMonth() + 1),
-            pad(date.getDate())
-        ].join('-');
-    }
-
-    function setAvailabilityMessage(message, isError = false) {
-        if (!availabilityMessage) return;
-        availabilityMessage.textContent = message;
-        availabilityMessage.classList.toggle('error', isError);
-    }
-
-    function setContractPolicyMessage(message, tone = '') {
-        if (!contractPolicyMessage) return;
-        contractPolicyMessage.textContent = message;
-        contractPolicyMessage.className = 'contract-inline-message' + (tone ? ` ${tone}` : '');
-    }
-
-    function getFileExtension(fileName) {
-        const parts = String(fileName || '').toLowerCase().split('.');
-        return parts.length > 1 ? `.${parts.pop()}` : '';
-    }
-
-    function getContractUploadValidationMessage(file) {
-        if (!file) {
-            return 'Please upload your signed contract.';
-        }
-
-        if (Number(file.size || 0) <= 0) {
-            return 'The selected contract file is empty. Please choose a valid file.';
-        }
-
-        if (file.size > CONTRACT_UPLOAD_RULES.maxFileSize) {
-            return 'The signed contract must be 10MB or smaller.';
-        }
-
-        const mimeType = String(file.type || '').toLowerCase();
-        const extension = getFileExtension(file.name);
-        const validMimeType = CONTRACT_UPLOAD_RULES.allowedMimeTypes.includes(mimeType);
-        const validExtension = CONTRACT_UPLOAD_RULES.allowedExtensions.includes(extension);
-
-        if (!validMimeType && !validExtension) {
-            return 'Please upload the signed contract as a PDF, JPG, JPEG, or PNG file.';
-        }
-
-        return '';
-    }
-
-    function updateContractFileStatus(file) {
-        if (!contractFileStatus) return;
-
-        const validationMessage = getContractUploadValidationMessage(file);
-        if (!file) {
-            contractFileStatus.textContent = 'No file chosen yet.';
-            contractFileStatus.className = 'contract-file-status';
-            return;
-        }
-
-        if (validationMessage) {
-            contractFileStatus.textContent = validationMessage;
-            contractFileStatus.className = 'contract-file-status error';
-            return;
-        }
-
-        const fileSizeMb = (file.size / (1024 * 1024)).toFixed(2);
-        contractFileStatus.textContent = `${file.name} selected (${fileSizeMb} MB).`;
-        contractFileStatus.className = 'contract-file-status success';
-    }
-
-    function renderPolicyContent(policyKey) {
-        const policy = POLICY_CONTENT[policyKey];
-        if (!policy) return;
-
-        policyModalTitle.textContent = policy.title;
-        policyModalContent.innerHTML = policy.sections.map((section) => `
-            <section class="policy-section">
-                <h4>${section.heading}</h4>
-                ${(section.paragraphs || []).map((paragraph) => `<p>${paragraph}</p>`).join('')}
-                ${section.bullets?.length ? `
-                    <ul>
-                        ${section.bullets.map((item) => `<li>${item}</li>`).join('')}
-                    </ul>
-                ` : ''}
-                ${(section.trailingParagraphs || []).map((paragraph) => `<p>${paragraph}</p>`).join('')}
-            </section>
-        `).join('');
-    }
-
-    function openPolicyModal(policyKey) {
-        activePolicyKey = policyKey;
-        renderPolicyContent(policyKey);
-        policyModalBackdrop.classList.remove('hidden');
-        policyModalBackdrop.setAttribute('aria-hidden', 'false');
-    }
-
-    function closePolicyModal() {
-        policyModalBackdrop.classList.add('hidden');
-        policyModalBackdrop.setAttribute('aria-hidden', 'true');
-    }
-
-    function agreeToPolicies() {
-        if (contractAgreementCheckbox) {
-            contractAgreementCheckbox.checked = true;
-        }
-        setContractPolicyMessage('');
-        closePolicyModal();
-    }
-
-    function setTimeStatusOverride(message = '') {
-        availabilityState.timeStatusOverride = String(message || '').trim();
-    }
-
-    function setClosedDateNotice(dateKey = '', reason = '') {
-        if (!availabilityClosureNote || !availabilityClosureCopy) return;
-
-        const safeReason = String(reason || '').trim();
-        if (!dateKey) {
-            availabilityClosureNote.classList.add('hidden');
-            availabilityClosureCopy.textContent = '';
-            return;
-        }
-
-        if (availabilityClosureLabel) {
-            availabilityClosureLabel.textContent = `Date unavailable${dateKey ? `: ${formatDisplayDate(dateKey)}` : ''}`;
-        }
-
-        availabilityClosureCopy.textContent = safeReason
-            ? `This date is unavailable due to: ${safeReason}.`
-            : 'This date is currently unavailable for booking.';
-
-        availabilityClosureNote.classList.remove('hidden');
-    }
-
-    function formatDisplayDate(dateKey) {
-        if (!dateKey) return '';
-        const [year, month, day] = dateKey.split('-').map(Number);
-        const date = new Date(year, month - 1, day);
-        return date.toLocaleDateString('en-PH', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    }
-
-    function syncSelectedDate(dateKey) {
-        if (!eventDateInput) return;
-        eventDateInput.value = dateKey || '';
-        if (eventDateDisplayInput) {
-            eventDateDisplayInput.value = dateKey ? formatDisplayDate(dateKey) : '';
-        }
-        S.eventDate = dateKey || '';
-        if (dateKey) {
-            setClosedDateNotice('', '');
-        }
-    }
-
-    function updateDateDisplayPlaceholder() {
-        if (!eventDateDisplayInput) return;
-        eventDateDisplayInput.placeholder = getSelectedBookingScope()
-            ? 'Select a date from the availability calendar below *'
-            : 'Choose your location and package first, then select a date *';
-    }
-
-    function getScopeSelectionPrompt() {
-        if (!S.locationType) {
-            return 'Choose your location type and package first to unlock dates for your booking.';
-        }
-
-        if (S.locationType === 'onsite' && !S.miniPackage) {
-            return 'Choose an onsite package first to unlock VIP or Main Hall dates.';
-        }
-
-        if (S.locationType === 'offsite' && !S.offsiteCategory) {
-            return 'Choose your offsite service first to unlock dates.';
-        }
-
-        if (S.locationType === 'offsite' && S.offsiteCategory !== 'catering' && !S.offsitePackage) {
-            return 'Choose an offsite package first to unlock dates.';
-        }
-
-        return 'Choose an available date for your booking.';
-    }
-
-    function getReservationContactName(profile, user) {
-        const parts = [
-            profile?.first_name,
-            profile?.middle_name,
-            profile?.last_name
-        ].filter(Boolean);
-
-        return parts.join(' ').trim() || user?.email || '';
-    }
-
-    function applyReservationContactPrefill(profile, user) {
-        const fullName = getReservationContactName(profile, user);
-        const email = profile?.email || user?.email || '';
-        const phone = profile?.phone_number || user?.user_metadata?.phone_number || '';
-
-        if (nameInput && !nameInput.value.trim()) {
-            nameInput.value = fullName;
-        }
-
-        if (phoneInput && !phoneInput.value.trim()) {
-            phoneInput.value = phone;
-        }
-
-        if (emailInput && !emailInput.value.trim()) {
-            emailInput.value = email;
-        }
-
-        S.name = nameInput?.value.trim() || S.name;
-        S.phone = phoneInput?.value.trim() || S.phone;
-        S.email = emailInput?.value.trim() || S.email;
-    }
-
-    async function prefillReservationContactDetails() {
-        const user = session?.user;
-        if (!user) return;
-
-        const fallbackProfile = {
-            first_name: user.user_metadata?.first_name || '',
-            middle_name: user.user_metadata?.middle_name || '',
-            last_name: user.user_metadata?.last_name || '',
-            email: user.email || '',
-            phone_number: user.user_metadata?.phone_number || ''
-        };
-
-        try {
-            const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('first_name, middle_name, last_name, email, phone_number')
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-            if (error) throw error;
-            applyReservationContactPrefill(profile || fallbackProfile, user);
-        } catch (error) {
-            console.error('Failed to prefill reservation contact details:', error);
-            applyReservationContactPrefill(fallbackProfile, user);
-        }
-    }
-
-    function isUnavailableDate(dateKey) {
-        return isDateUnavailableForScope(dateKey, getSelectedBookingScope());
-    }
-
-    function getDateAvailability(dateKey) {
-        return availabilityState.calendarAvailability.get(dateKey) || {
-            eventDate: dateKey,
-            occupiedScopes: [],
-            isFullyBooked: false,
-            scopeTaken: false,
-            blockedTimes: []
-        };
-    }
-
-    async function refreshAvailabilityForSelectedScope() {
-        const selectedScope = getSelectedBookingScope();
-        updateDateDisplayPlaceholder();
-        setTimeStatusOverride('');
-
-        if (S.eventDate && (!selectedScope || isDateUnavailableForScope(S.eventDate, selectedScope))) {
-            const dateAvailability = getDateAvailability(S.eventDate);
-            const conflictMessage = selectedScope
-                ? 'This date is fully booked. Choose another available date to see time slots.'
-                : getScopeSelectionPrompt();
-            syncSelectedDate('');
-            S.time = '';
-            availabilityState.selectedDateAvailability = null;
-            setAvailabilityMessage(conflictMessage, Boolean(selectedScope));
-            setTimeStatusOverride(conflictMessage);
-        }
-
-        setClosedDateNotice('', '');
-        await loadAvailabilityCalendar();
-        buildTimeGrid();
-    }
-
-    function getSelectedBookingScope() {
-        if (!S.locationType) return null;
-        if (S.locationType === 'offsite') {
-            if (!S.offsiteCategory) return null;
-            if (S.offsiteCategory !== 'catering' && !S.offsitePackage) return null;
-            return 'offsite';
-        }
-        return getSharedBookingScope(S.locationType, S.miniPackage?.label || '');
-    }
-
-    function getSelectedDurationHours() {
-        if (S.locationType === 'onsite') {
-            return Number(S.miniPackage?.durationHours || 0) || null;
-        }
-
-        if (S.offsiteCategory === 'catering') {
-            return Number(OFFSITE_PKGS.catering?.[0]?.durationHours || 0) || 4;
-        }
-
-        return Number(S.offsitePackage?.durationHours || 0) || null;
-    }
-
-    function isDateFullyBooked(dateKey) {
-        return getDateAvailability(dateKey).isFullyBooked;
-    }
-
-    function isDateUnavailableForScope(dateKey, scope) {
-        if (!dateKey) return false;
-        if (availabilityState.closedDates.has(dateKey)) return true;
-        return getDateAvailability(dateKey).isFullyBooked;
-    }
-
-    async function resolveAvailabilityBlackoutColumn() {
-        if (availabilityState.blackoutDateColumn) return availabilityState.blackoutDateColumn;
-
-        for (const column of ['closed_date', 'date']) {
-            const { error } = await supabase
-                .from('calendar_blackouts')
-                .select(column)
-                .limit(1);
-
-            if (!error) {
-                availabilityState.blackoutDateColumn = column;
-                return column;
-            }
-        }
-
-        return null;
-    }
-
-    async function resolveAvailabilityBlackoutReasonColumn() {
-        if (availabilityState.blackoutReasonColumn) return availabilityState.blackoutReasonColumn;
-
-        for (const column of ['note', 'reason']) {
-            const { error } = await supabase
-                .from('calendar_blackouts')
-                .select(column)
-                .limit(1);
-
-            if (!error) {
-                availabilityState.blackoutReasonColumn = column;
-                return column;
-            }
-        }
-
-        return null;
-    }
-
-    function renderAvailabilityCalendar() {
-        if (!availabilityGrid || !availabilityMonthLabel) return;
-
-        const monthStart = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth(), 1);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const gridStart = new Date(monthStart);
-        gridStart.setDate(monthStart.getDate() - monthStart.getDay());
-        const selectedScope = getSelectedBookingScope();
-
-        availabilityMonthLabel.textContent = availabilityState.month.toLocaleDateString('en-US', {
-            month: 'long',
-            year: 'numeric'
-        });
-        if (availabilityPrevMonthBtn) {
-            availabilityPrevMonthBtn.disabled = monthStart <= currentMonthStart;
-        }
-
-        availabilityGrid.innerHTML = '';
-
-        for (let index = 0; index < 42; index += 1) {
-            const date = new Date(gridStart);
-            date.setDate(gridStart.getDate() + index);
-
-            const dateKey = toDateKey(date);
-            const isCurrentMonth = date.getMonth() === availabilityState.month.getMonth();
-            const isPast = date < today;
-            const dayAvailability = getDateAvailability(dateKey);
-            const isBooked = isDateUnavailableForScope(dateKey, selectedScope) && !availabilityState.closedDates.has(dateKey);
-            const isClosed = availabilityState.closedDates.has(dateKey);
-            const isSelected = eventDateInput?.value === dateKey;
-            const isContextLocked = !selectedScope && !isBooked;
-
-            const dayBtn = document.createElement('button');
-            dayBtn.type = 'button';
-            dayBtn.className = 'availability-day';
-            dayBtn.textContent = String(date.getDate());
-
-            if (!isCurrentMonth) {
-                dayBtn.classList.add('outside-month');
-                dayBtn.disabled = true;
-            } else if (isPast) {
-                dayBtn.classList.add('past');
-                dayBtn.disabled = true;
-            } else if (isClosed) {
-                dayBtn.classList.add('closed');
-                dayBtn.title = 'Click to view why this date is unavailable.';
-                dayBtn.addEventListener('click', () => {
-                    syncSelectedDate('');
-                    S.time = '';
-                    availabilityState.selectedDateAvailability = null;
-                    setClosedDateNotice(dateKey, availabilityState.closedDateReasons.get(dateKey) || '');
-                    setAvailabilityMessage(`Selected a closed date: ${formatDisplayDate(dateKey)}.`, false);
-                    setTimeStatusOverride(`This date is closed. Choose another available date to unlock time slots.`);
-                    buildTimeGrid();
-                });
-            } else if (isContextLocked) {
-                dayBtn.classList.add('context-disabled');
-                dayBtn.disabled = true;
-                dayBtn.title = getScopeSelectionPrompt();
-            } else if (isBooked) {
-                dayBtn.classList.add('booked');
-                dayBtn.title = 'This date is fully booked.';
-                dayBtn.setAttribute('aria-disabled', 'true');
-                dayBtn.addEventListener('click', () => {
-                    const reason = 'This date is fully booked.';
-                    syncSelectedDate('');
-                    S.time = '';
-                    availabilityState.selectedDateAvailability = null;
-                    setClosedDateNotice('', '');
-                    setAvailabilityMessage(reason, true);
-                    setTimeStatusOverride(`${reason} Choose another available date to see time slots.`);
-                    buildTimeGrid();
-                });
-            } else {
-                dayBtn.classList.add('available');
-                dayBtn.title = 'Click to select this date.';
-                dayBtn.addEventListener('click', async () => {
-                    if (eventDateInput?.value === dateKey) {
-                        syncSelectedDate('');
-                        S.time = '';
-                        availabilityState.selectedDateAvailability = null;
-                        setTimeStatusOverride('');
-                        renderAvailabilityCalendar();
-                        buildTimeGrid();
-                        setAvailabilityMessage('Date selection cleared.', false);
-                        return;
-                    }
-
-                    syncSelectedDate(dateKey);
-                    S.time = '';
-                    setTimeStatusOverride('');
-                    await loadSelectedDateAvailability();
-                    renderAvailabilityCalendar();
-                    buildTimeGrid();
-                });
-            }
-
-            if (isSelected && isCurrentMonth) {
-                dayBtn.classList.add('selected');
-            }
-
-            availabilityGrid.appendChild(dayBtn);
-        }
-    }
-
-    async function loadAvailabilityCalendar() {
-        updateDateDisplayPlaceholder();
-        setAvailabilityMessage('Loading availability...');
-
-        try {
-            const range = getCalendarRange(availabilityState.month);
-            const [calendarAvailability, blackoutData] = await Promise.all([
-                fetchCalendarAvailability(supabase, {
-                    fromDate: range.fromDate,
-                    toDate: range.toDate
-                }),
-                fetchBlackoutDates(supabase, availabilityState, true)
-            ]);
-
-            availabilityState.calendarAvailability = calendarAvailability;
-            availabilityState.blackoutDateColumn = blackoutData.blackoutDateColumn;
-            availabilityState.blackoutReasonColumn = blackoutData.blackoutReasonColumn;
-            availabilityState.closedDates = blackoutData.closedDates;
-            availabilityState.closedDateReasons = blackoutData.closedDateReasons;
-
-            if (S.eventDate && getSelectedBookingScope()) {
-                await loadSelectedDateAvailability();
-            } else {
-                availabilityState.selectedDateAvailability = null;
-            }
-
-            if (!getSelectedBookingScope()) {
-                setAvailabilityMessage(getScopeSelectionPrompt(), false);
-            } else if (!S.eventDate) {
-                setAvailabilityMessage(`Choose an available date for the ${getScopeLabel(getSelectedBookingScope())} booking slot.`, false);
-            } else if (!availabilityState.selectedDateAvailability?.scopeTaken) {
-                setAvailabilityMessage(`Selected ${formatDisplayDate(S.eventDate)}.`, false);
-            }
-        } catch (error) {
-            console.error('Availability calendar failed:', error);
-            availabilityState.calendarAvailability = new Map();
-            availabilityState.closedDates = new Set();
-            availabilityState.closedDateReasons = new Map();
-            availabilityState.selectedDateAvailability = null;
-            setAvailabilityMessage('Availability preview could not be loaded right now.', true);
-        }
-
-        renderAvailabilityCalendar();
-    }
-
-    async function loadSelectedDateAvailability() {
-        const selectedScope = getSelectedBookingScope();
-        if (!S.eventDate || !selectedScope) {
-            availabilityState.selectedDateAvailability = null;
-            return null;
-        }
-
-        try {
-            const availability = await fetchDateAvailability(supabase, {
-                eventDate: S.eventDate,
-                scope: selectedScope,
-                durationHours: getSelectedDurationHours()
-            });
-            availabilityState.selectedDateAvailability = availability;
-
-            if (availability.scopeTaken) {
-                setAvailabilityMessage('This date is fully booked.', true);
-            } else {
-                setAvailabilityMessage(`Selected ${formatDisplayDate(S.eventDate)}.`, false);
-            }
-
-            return availability;
-        } catch (error) {
-            console.error('Selected date availability failed:', error);
-            availabilityState.selectedDateAvailability = null;
-            setAvailabilityMessage('Could not refresh the selected date availability right now.', true);
-            return null;
-        }
-    }
-
-    const MINI_PACKAGE_DETAIL_FALLBACKS = {
-        'VIP Lite':        { pax: '15-18 pax',    hours: '2 hours', credit: '&#8369;2,000 food credit' },
-        'VIP Plus':        { pax: '15-18 pax',    hours: '3 hours', credit: '&#8369;2,499 food credit' },
-        'VIP Max':         { pax: '15-18 pax',    hours: '4 hours', credit: '&#8369;3,000 food credit' },
-        'Main Hall Basic': { pax: 'Up to 25 pax', hours: '2 hours', credit: '&#8369;8,000 food credit' },
-        'Main Hall Plus':  { pax: 'Up to 25 pax', hours: '3 hours', credit: '&#8369;9,000 food credit' }
-    };
-
-    function parseMiniPackageDetails(pkg) {
-        const fallback = MINI_PACKAGE_DETAIL_FALLBACKS[pkg.package_name] || {};
-        const description = String(pkg.description || '').trim();
-        const match = description.match(/^(.+?)\s*,\s*(\d+\s*hours?)\s*,\s*((?:P|&#8369;|\u20B1)\s*\d[\d,]*\s*food credit)$/i);
-
-        if (match) {
-            const currencyNormalizedCredit = match[3]
-                .replace(/^P\s*/i, '&#8369;')
-                .replace(/^\u20B1\s*/i, '&#8369;');
-
-            return {
-                pax: match[1].trim(),
-                hours: match[2].trim(),
-                credit: currencyNormalizedCredit.trim()
-            };
-        }
-
-        return {
-            pax: fallback.pax || (pkg.guest_capacity ? 'Up to ' + pkg.guest_capacity + ' pax' : ''),
-            hours: fallback.hours || '',
-            credit: fallback.credit || ''
-        };
-    }
-
-    // ── Load event types from Supabase ──
-    async function loadEventTypes() {
-        const sel = document.getElementById('event-type');
-        const { data, error } = await supabase
-            .from('event_types')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (error) { console.error('event_types fetch error:', error); return; }
-        if (!data || data.length === 0) { console.warn('event_types: no rows returned', data); return; }
-
-        console.log('event_types rows:', data);
-
-        data.forEach(et => {
-            // skip archived — works whether column is status:'Active' or is_active:true
-            if (et.status && et.status !== 'Active') return;
-            if (et.is_active === false) return;
-
-            const label = et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1];
-            if (!label) return;
-
-            const opt = document.createElement('option');
-            opt.value = label;
-            opt.textContent = label;
-            sel.appendChild(opt);
-        });
-    }
-
-    // ── Load packages from Supabase ──
-    async function loadPackages() {
-        const { data: pkgs, error } = await supabase
-            .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type, duration_hours, package_category(is_active)')
-            .eq('is_active', true)
-            .order('price', { ascending: true });
-
-        if (error || !pkgs) { console.error('Failed to load packages:', error); return; }
-
-        // Exclude packages whose parent category is archived (null category = no restriction)
-        const visiblePkgs = pkgs.filter(p => p.package_category?.is_active !== false);
-
-        MINI  = [];
-        SNACK = [];
-        OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
-
-        visiblePkgs.forEach(p => {
-            const desc = (p.description || '').trim();
-            if (p.price === 0 && (desc === '' || desc === '.')) return;
-
-            const base   = {
-                id: p.package_id,
-                label: p.package_name,
-                price: p.price,
-                desc: p.description || '',
-                contract: getContractFileForPackage(p),
-                durationHours: Number(p.duration_hours || 0) || null
-            };
-            const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
-
-            if (p.location_type === 'onsite') {
-                if (isAddon) {
-                    SNACK.push(base);
-                } else {
-                    // main onsite package
-                    MINI.push({
-                        ...base,
-                        ...parseMiniPackageDetails(p)
-                    });
-                }
-            } else if (p.location_type === 'offsite') {
-                // Infer offsite category from package name since package_type is only 'main'/'add on'
-                const name = p.package_name.toLowerCase();
-                if (name.includes('coffee'))   OFFSITE_PKGS.coffee.push(base);
-                else if (name.includes('snack') || name.includes('biscuit')) OFFSITE_PKGS.snack.push(base);
-                else if (name.includes('catering')) OFFSITE_PKGS.catering.push(base);
-                else OFFSITE_PKGS.catering.push(base); // fallback
-            }
-        });
-    }
-
+    // ── Catering dish data ─────────────────────────────────────────────────
     const DISHES = [
         { cat:'Chicken',    icon:'&#127831;', tag:'main',    required:true,  items:['Chicken ala King','Chicken Fillet w/ White Sauce','Garlic Butter Chicken'] },
         { cat:'Pork',       icon:'&#129385;', tag:'main',    required:true,  items:['Pork with Mushroom','Crunchy Pork','Pork Caldereta'] },
@@ -1366,182 +684,656 @@
         Rice:       {20:600,  30:900,  40:1200, 50:1500}
     };
 
-    const TIMES = ['1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM',
-                   '6:00 PM','7:00 PM','8:00 PM','9:00 PM','10:00 PM'];
+    // ── Utility ────────────────────────────────────────────────────────────
+    function pad(v) { return String(v).padStart(2, '0'); }
 
-    function fmtPeso(value) {
-        return '\u20B1' + Number(value || 0).toLocaleString();
+    function toDateKey(date) {
+        return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-');
     }
 
-    function hasCateringTag(tag) {
-        return DISHES
-            .filter(group => group.tag === tag)
-            .some(group => S.cateringCart.some(item => item.cat === group.cat && item.pax));
+    function fmtPeso(v) { return '₱' + Number(v || 0).toLocaleString(); }
+
+    function formatDisplayDate(dateKey) {
+        if (!dateKey) return '';
+        const [year, month, day] = dateKey.split('-').map(Number);
+        return new Date(year, month - 1, day).toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
     }
 
-    function isCateringSelectionValid() {
-        return hasCateringTag('main') && hasCateringTag('pasta') && hasCateringTag('dessert');
+    // ── Phase 2 guest-count validation stub ───────────────────────────────
+    function getSelectedPackageMinGuests() {
+        return (S.miniPackage || S.offsitePackage)?.min_guests ?? null;
     }
 
-    function getCateringCartTotal() {
-        return S.cateringCart.reduce((sum, item) => sum + (item && item.pax ? item.price : 0), 0);
+    function getSelectedPackageMaxGuests() {
+        return (S.miniPackage || S.offsitePackage)?.max_guests ?? null;
     }
 
-    function getCateringCartCount() {
-        return S.cateringCart.filter(item => item && item.pax).length;
+    function validateGuestCountRange(count) {
+        if (!GUEST_COUNT_VALIDATION_ENABLED) return true;
+        const min = getSelectedPackageMinGuests();
+        const max = getSelectedPackageMaxGuests();
+        if (min == null || max == null) return true;
+        return count >= min && count <= max;
     }
 
-    // ── Step order: Time Slot (rs5) now comes BEFORE Your Details (rs4) ──
-    const STEP_IDS = ['rs1','rs4','rs6','rs7'];
+    // ── URL param entry handling ───────────────────────────────────────────
+    function applyUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        const pkgId  = params.get('package');
+        if (!pkgId) return false;
 
-    let cur = 1;
-    function total() { return STEP_IDS.length; }
-    function sid(n)  { return STEP_IDS[n - 1]; }
-
-    function showStep(n) {
-        document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
-        document.getElementById(sid(n)).classList.add('active');
-
-        document.getElementById('progress').style.width = (n / total() * 100) + '%';
-        document.getElementById('step-text').textContent =
-            'Step ' + n + ' of ' + total() + ': ' + document.getElementById(sid(n)).querySelector('h2').textContent;
-
-        document.getElementById('prevBtn').classList.toggle('hidden', n === 1);
-        document.getElementById('nextBtn').textContent = n === total() ? 'Submit' : 'Next \u2192';
-
-        populate(sid(n));
-        saveDraft();
-    }
-
-    function populate(id) {
-        if (id === 'rs1') {
-            buildStep3();
-            renderAvailabilityCalendar();
-            buildTimeGrid();
-        }
-        if (id === 'rs6') buildSummary();
-        if (id === 'rs7') buildContractDownload();
-    }
-
-    function getContractFileForPackage(pkg) {
-        const name = (pkg.package_name || '').toLowerCase();
-        const location = (pkg.location_type || '').toLowerCase();
-
-        if (location === 'onsite') {
-            if (name.includes('vip')) return CONTRACT_FILES.onsite_vip;
-            if (name.includes('main hall')) return CONTRACT_FILES.onsite_main_hall;
-            if (name.includes('snack') || name.includes('biscuit')) return CONTRACT_FILES.add_on_snack;
-            return CONTRACT_FILES.onsite_default;
+        // Compare as strings — package_id is a UUID so parseInt would return NaN
+        const onsitePkg = MINI.find(p => String(p.id) === pkgId);
+        if (onsitePkg) {
+            S.locationType = 'onsite';
+            S.miniPackage  = onsitePkg;
+            document.querySelectorAll('.location-card').forEach(c => {
+                c.classList.toggle('active', c.dataset.val === 'onsite');
+            });
+            return true;
         }
 
-        if (location === 'offsite') {
-            if (name.includes('coffee')) return CONTRACT_FILES.offsite_coffee;
-            if (name.includes('snack') || name.includes('biscuit')) return CONTRACT_FILES.offsite_snack;
-            if (name.includes('catering')) return CONTRACT_FILES.offsite_catering;
+        for (const [cat, pkgs] of Object.entries(OFFSITE_PKGS)) {
+            const pkg = pkgs.find(p => String(p.id) === pkgId);
+            if (pkg) {
+                S.locationType    = 'offsite';
+                S.offsiteCategory = cat;
+                S.offsitePackage  = pkg;
+                document.querySelectorAll('.location-card').forEach(c => {
+                    c.classList.toggle('active', c.dataset.val === 'offsite');
+                });
+                return true;
+            }
         }
 
-        return CONTRACT_FILES.default;
+        // Package not found (archived or invalid ID) — fall back to empty form
+        return false;
     }
 
-    function getSelectedContractInfo() {
+    // ── Policy modal ───────────────────────────────────────────────────────
+    function setContractPolicyMessage(msg, tone = '') {
+        if (!contractPolicyMessage) return;
+        contractPolicyMessage.textContent = msg;
+        contractPolicyMessage.className = 'contract-inline-message' + (tone ? ` ${tone}` : '');
+    }
+
+    function renderPolicyContent(key) {
+        const policy = POLICY_CONTENT[key];
+        if (!policy) return;
+        policyModalTitle.textContent = policy.title;
+        policyModalContent.innerHTML = policy.sections.map(s => `
+            <section class="policy-section">
+                <h4>${s.heading}</h4>
+                ${(s.paragraphs || []).map(p => `<p>${p}</p>`).join('')}
+                ${s.bullets?.length ? `<ul>${s.bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
+                ${(s.trailingParagraphs || []).map(p => `<p>${p}</p>`).join('')}
+            </section>`).join('');
+    }
+
+    function openPolicyModal(key) {
+        activePolicyKey = key;
+        renderPolicyContent(key);
+        policyModalBackdrop.classList.remove('hidden');
+        policyModalBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePolicyModal() {
+        policyModalBackdrop.classList.add('hidden');
+        policyModalBackdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    function agreeToPolicies() {
+        if (contractAgreementTerms) contractAgreementTerms.checked = true;
+        setContractPolicyMessage('');
+        closePolicyModal();
+    }
+
+    // ── Signature capture ───────────────────────────────────────────────────
+    function setSignatureStatus(msg, isError = false) {
+        if (!signatureStatus) return;
+        signatureStatus.textContent = msg;
+        signatureStatus.classList.toggle('error', isError);
+    }
+
+    function resizeSignatureCanvas() {
+        if (!signatureCanvas) return;
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        const rect = signatureCanvas.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const data = signatureState.pad && !signatureState.pad.isEmpty() ? signatureState.pad.toData() : null;
+        signatureCanvas.width  = rect.width * ratio;
+        signatureCanvas.height = rect.height * ratio;
+        signatureCanvas.getContext('2d').scale(ratio, ratio);
+        if (signatureState.pad) {
+            signatureState.pad.clear();
+            if (data) signatureState.pad.fromData(data);
+        }
+    }
+
+    function initSignaturePad() {
+        if (!signatureCanvas || signatureState.pad || typeof SignaturePad === 'undefined') return;
+        signatureState.pad = new SignaturePad(signatureCanvas, {
+            backgroundColor: 'rgb(255,255,255)',
+            penColor: 'rgb(42,20,8)'
+        });
+        resizeSignatureCanvas();
+        window.addEventListener('resize', resizeSignatureCanvas);
+    }
+
+    function setSignatureMode(mode) {
+        signatureState.mode = mode;
+        sigModeDrawBtn?.classList.toggle('active', mode === 'draw');
+        sigModeTypeBtn?.classList.toggle('active', mode === 'type');
+        signatureDrawPanel?.classList.toggle('hidden', mode !== 'draw');
+        signatureTypePanel?.classList.toggle('hidden', mode !== 'type');
+        if (mode === 'draw') { initSignaturePad(); resizeSignatureCanvas(); }
+        setSignatureStatus('');
+    }
+
+    function isSignaturePresent() {
+        if (signatureState.mode === 'draw') return !!signatureState.pad && !signatureState.pad.isEmpty();
+        return !!(signatureTypeInput?.value || '').trim();
+    }
+
+    function getSignerName() {
+        if (signatureState.mode === 'type') return (signatureTypeInput?.value || '').trim();
+        return S.name || '';
+    }
+
+    function renderTypedSignatureToDataUrl(text) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600; canvas.height = 160;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#2A1408';
+        ctx.font = '56px "Dancing Script", cursive';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+        return canvas.toDataURL('image/png');
+    }
+
+    async function getSignatureDataUrl() {
+        if (signatureState.mode === 'draw') {
+            if (!signatureState.pad || signatureState.pad.isEmpty()) return null;
+            return signatureState.pad.toDataURL('image/png');
+        }
+        const text = (signatureTypeInput?.value || '').trim();
+        if (!text) return null;
+        try { await document.fonts.load('56px "Dancing Script"'); } catch { /* fall back to default font */ }
+        return renderTypedSignatureToDataUrl(text);
+    }
+
+    // ── Contract template (in-app, dynamically merged) ─────────────────────
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function getSelectedContractPackageId() {
+        if (S.locationType === 'onsite') return S.miniPackage?.id || null;
+        if (S.offsiteCategory === 'catering') return OFFSITE_PKGS.catering?.[0]?.id || null;
+        return S.offsitePackage?.id || null;
+    }
+
+    function getSelectedContractPackageLabel() {
+        if (S.locationType === 'onsite') return S.miniPackage?.label || null;
+        if (S.offsiteCategory === 'catering') return 'Catering Package';
+        return S.offsitePackage?.label || null;
+    }
+
+    function computeContractPreviewTotal() {
         if (S.locationType === 'onsite') {
-            if (!S.miniPackage) return null;
-            return {
-                title: S.miniPackage.label + ' Contract',
-                description: 'Download the contract for your selected package before signing.',
-                downloadUrl: S.miniPackage.contract || CONTRACT_FILES.onsite_default,
-                contractType: 'package_contract'
-            };
+            return (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
         }
-
         if (S.offsiteCategory === 'catering') {
-            const cateringPkg = OFFSITE_PKGS.catering[0];
-            return {
-                title: 'Catering Package Contract',
-                description: 'Download the contract for your selected offsite catering package.',
-                downloadUrl: cateringPkg?.contract || CONTRACT_FILES.offsite_catering,
-                contractType: 'package_contract'
-            };
+            return S.cateringCart.filter(i => i && i.pax).reduce((sum, i) => sum + i.price, 0);
         }
-
-        if (S.offsitePackage) {
-            return {
-                title: S.offsitePackage.label + ' Contract',
-                description: 'Download the contract for your selected package before signing.',
-                downloadUrl: S.offsitePackage.contract || CONTRACT_FILES.default,
-                contractType: 'package_contract'
-            };
-        }
-
-        return null;
+        return S.offsitePackage ? S.offsitePackage.price : 0;
     }
 
-    function buildContractDownload() {
-        const info = getSelectedContractInfo();
-        const btn = document.getElementById('contract-download-btn');
-        const title = document.getElementById('contract-title');
-        const description = document.getElementById('contract-description');
+    function mergeTemplateTokens(template, data) {
+        return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key) => (data[key] ?? ''));
+    }
 
-        if (!btn || !title || !description) return;
+    function renderContractBody(templateBody) {
+        if (!contractViewer) return;
+        const data = {
+            customer_name: S.name || 'Customer',
+            package_name: getSelectedContractPackageLabel() || 'Selected Package',
+            event_type: (S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType) || 'TBD',
+            event_date: formatDisplayDate(S.eventDate) || 'TBD',
+            event_time: S.time || 'TBD',
+            venue: S.locationType === 'offsite' ? (S.venueLocation || 'Customer-provided venue') : 'ELI Coffee Events Cafe Binangonan (Onsite)',
+            reservation_number: 'Assigned upon submission',
+            total_price: fmtPeso(computeContractPreviewTotal()),
+            guest_count: S.guestCount || ''
+        };
+        const merged = mergeTemplateTokens(templateBody, data);
+        contractViewer.innerHTML = merged.split('\n').map(line => {
+            const trimmed = line.trim();
+            return trimmed ? `<p>${escapeHtml(trimmed)}</p>` : '<div class="contract-viewer-gap"></div>';
+        }).join('');
+    }
 
-        if (!info) {
-            btn.href = '#';
-            btn.removeAttribute('download');
-            btn.setAttribute('aria-disabled', 'true');
-            title.textContent = 'ELI Coffee Events Reservation Contract';
-            description.textContent = 'Select a package first so the correct contract file can be downloaded.';
+    async function buildContractStep() {
+        if (!contractViewer) return;
+        const pkgId = getSelectedContractPackageId();
+
+        if (!pkgId) {
+            contractViewer.innerHTML = '<p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>';
             return;
         }
 
-        btn.href = info.downloadUrl;
-        btn.setAttribute('download', '');
-        btn.removeAttribute('aria-disabled');
-        title.textContent = info.title;
-        description.textContent = info.description;
+        contractViewer.innerHTML = '<p class="contract-viewer-loading">Loading your contract...</p>';
+
+        const { data: tmpl } = await supabase
+            .from('contract_templates')
+            .select('template_body, contract_type')
+            .eq('package_id', pkgId)
+            .eq('is_active', true)
+            .order('version_no', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        signatureState.activeTemplateContractType = tmpl?.contract_type || 'package_contract';
+        renderContractBody(tmpl?.template_body || DEFAULT_CONTRACT_TEMPLATE_BODY);
+        signatureState.contractLoaded = true;
     }
 
-    function buildStep3() {
+    // ── Availability helpers ───────────────────────────────────────────────
+    function setAvailabilityMessage(msg, isError = false) {
+        if (!availabilityMessage) return;
+        availabilityMessage.textContent = msg;
+        availabilityMessage.classList.toggle('error', isError);
+    }
+
+    function setTimeStatusOverride(msg = '') {
+        availabilityState.timeStatusOverride = String(msg || '').trim();
+    }
+
+    function setClosedDateNotice(dateKey = '', reason = '') {
+        if (!availabilityClosureNote || !availabilityClosureCopy) return;
+        if (!dateKey) { availabilityClosureNote.classList.add('hidden'); availabilityClosureCopy.textContent = ''; return; }
+        if (availabilityClosureLabel) availabilityClosureLabel.textContent = `Date unavailable${dateKey ? ': ' + formatDisplayDate(dateKey) : ''}`;
+        availabilityClosureCopy.textContent = reason ? `This date is unavailable due to: ${reason}.` : 'This date is currently unavailable for booking.';
+        availabilityClosureNote.classList.remove('hidden');
+    }
+
+    function syncSelectedDate(dateKey) {
+        if (!eventDateInput) return;
+        eventDateInput.value = dateKey || '';
+        if (eventDateDisplayInput) eventDateDisplayInput.value = dateKey ? formatDisplayDate(dateKey) : '';
+        S.eventDate = dateKey || '';
+        if (dateKey) setClosedDateNotice('', '');
+    }
+
+    function updateDateDisplayPlaceholder() {
+        if (!eventDateDisplayInput) return;
+        eventDateDisplayInput.placeholder = getSelectedBookingScope()
+            ? 'Select a date from the availability calendar below *'
+            : 'Choose your location and package first, then select a date *';
+    }
+
+    function getSelectedBookingScope() {
+        if (!S.locationType) return null;
+        if (S.locationType === 'offsite') {
+            if (!S.offsiteCategory) return null;
+            if (S.offsiteCategory !== 'catering' && !S.offsitePackage) return null;
+            return 'offsite';
+        }
+        return getSharedBookingScope(S.locationType, S.miniPackage?.label || '', S.miniPackage?.bookingScope || null);
+    }
+
+    function getSelectedDurationHours() {
+        if (S.locationType === 'onsite') return Number(S.miniPackage?.durationHours || 0) || null;
+        if (S.offsiteCategory === 'catering') return Number(OFFSITE_PKGS.catering?.[0]?.durationHours || 0) || 4;
+        return Number(S.offsitePackage?.durationHours || 0) || null;
+    }
+
+    function getScopeSelectionPrompt() {
+        if (!S.locationType) return 'Choose your location type and package first to unlock dates for your booking.';
+        if (S.locationType === 'onsite' && !S.miniPackage) return 'Choose an onsite package first to unlock VIP or Main Hall dates.';
+        if (S.locationType === 'offsite' && !S.offsiteCategory) return 'Choose your offsite service first to unlock dates.';
+        if (S.locationType === 'offsite' && S.offsiteCategory !== 'catering' && !S.offsitePackage) return 'Choose an offsite package first to unlock dates.';
+        return 'Choose an available date for your booking.';
+    }
+
+    function getDateAvailability(dateKey) {
+        return availabilityState.calendarAvailability.get(dateKey) || {
+            eventDate: dateKey, occupiedScopes: [], isFullyBooked: false, scopeTaken: false, blockedTimes: []
+        };
+    }
+
+    function isDateUnavailableForScope(dateKey, scope) {
+        if (!dateKey) return false;
+        if (availabilityState.closedDates.has(dateKey)) return true;
+        return getDateAvailability(dateKey).isFullyBooked;
+    }
+
+    function isUnavailableDate(dateKey) {
+        return isDateUnavailableForScope(dateKey, getSelectedBookingScope());
+    }
+
+    async function refreshAvailabilityForSelectedScope() {
+        const selectedScope = getSelectedBookingScope();
+        updateDateDisplayPlaceholder();
+        setTimeStatusOverride('');
+
+        if (S.eventDate && (!selectedScope || isDateUnavailableForScope(S.eventDate, selectedScope))) {
+            const conflictMsg = selectedScope
+                ? 'This date is fully booked. Choose another available date to see time slots.'
+                : getScopeSelectionPrompt();
+            syncSelectedDate('');
+            S.time = '';
+            availabilityState.selectedDateAvailability = null;
+            setAvailabilityMessage(conflictMsg, Boolean(selectedScope));
+            setTimeStatusOverride(conflictMsg);
+        }
+
+        setClosedDateNotice('', '');
+        await loadAvailabilityCalendar();
+        buildTimeGrid();
+    }
+
+    function renderAvailabilityCalendar() {
+        if (!availabilityGrid || !availabilityMonthLabel) return;
+
+        const monthStart = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth(), 1);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const gridStart = new Date(monthStart);
+        gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+        const selectedScope = getSelectedBookingScope();
+
+        availabilityMonthLabel.textContent = availabilityState.month.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+        if (availabilityPrevMonthBtn) availabilityPrevMonthBtn.disabled = monthStart <= currentMonthStart;
+
+        availabilityGrid.innerHTML = '';
+
+        for (let i = 0; i < 42; i++) {
+            const date = new Date(gridStart);
+            date.setDate(gridStart.getDate() + i);
+            const dateKey = toDateKey(date);
+            const isCurrentMonth = date.getMonth() === availabilityState.month.getMonth();
+            const isPast = date < today;
+            const isBooked = isDateUnavailableForScope(dateKey, selectedScope) && !availabilityState.closedDates.has(dateKey);
+            const isClosed = availabilityState.closedDates.has(dateKey);
+            const isSelected = eventDateInput?.value === dateKey;
+            const isContextLocked = !selectedScope && !isBooked;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'availability-day';
+            btn.textContent = String(date.getDate());
+
+            if (!isCurrentMonth) {
+                btn.classList.add('outside-month'); btn.disabled = true;
+            } else if (isPast) {
+                btn.classList.add('past'); btn.disabled = true;
+            } else if (isClosed) {
+                btn.classList.add('closed');
+                btn.title = 'Click to view why this date is unavailable.';
+                btn.addEventListener('click', () => {
+                    syncSelectedDate(''); S.time = ''; availabilityState.selectedDateAvailability = null;
+                    setClosedDateNotice(dateKey, availabilityState.closedDateReasons.get(dateKey) || '');
+                    setAvailabilityMessage(`Selected a closed date: ${formatDisplayDate(dateKey)}.`, false);
+                    setTimeStatusOverride('This date is closed. Choose another available date to unlock time slots.');
+                    buildTimeGrid();
+                });
+            } else if (isContextLocked) {
+                btn.classList.add('context-disabled'); btn.disabled = true;
+                btn.title = getScopeSelectionPrompt();
+            } else if (isBooked) {
+                btn.classList.add('booked');
+                btn.title = 'This date is fully booked.';
+                btn.setAttribute('aria-disabled', 'true');
+                btn.addEventListener('click', () => {
+                    const reason = 'This date is fully booked.';
+                    syncSelectedDate(''); S.time = ''; availabilityState.selectedDateAvailability = null;
+                    setClosedDateNotice('', ''); setAvailabilityMessage(reason, true);
+                    setTimeStatusOverride(`${reason} Choose another available date to see time slots.`);
+                    buildTimeGrid();
+                });
+            } else {
+                btn.classList.add('available');
+                btn.title = 'Click to select this date.';
+                btn.addEventListener('click', async () => {
+                    if (eventDateInput?.value === dateKey) {
+                        syncSelectedDate(''); S.time = ''; availabilityState.selectedDateAvailability = null;
+                        setTimeStatusOverride(''); renderAvailabilityCalendar(); buildTimeGrid();
+                        setAvailabilityMessage('Date selection cleared.', false); return;
+                    }
+                    syncSelectedDate(dateKey); S.time = ''; setTimeStatusOverride('');
+                    await loadSelectedDateAvailability();
+                    renderAvailabilityCalendar(); buildTimeGrid();
+                });
+            }
+
+            if (isSelected && isCurrentMonth) btn.classList.add('selected');
+            availabilityGrid.appendChild(btn);
+        }
+    }
+
+    async function loadAvailabilityCalendar() {
+        updateDateDisplayPlaceholder();
+        setAvailabilityMessage('Loading availability...');
+
+        try {
+            const range = getCalendarRange(availabilityState.month);
+            const [calendarAvailability, blackoutData] = await Promise.all([
+                fetchCalendarAvailability(supabase, { fromDate: range.fromDate, toDate: range.toDate }),
+                fetchBlackoutDates(supabase, availabilityState, true)
+            ]);
+
+            availabilityState.calendarAvailability = calendarAvailability;
+            availabilityState.blackoutDateColumn   = blackoutData.blackoutDateColumn;
+            availabilityState.blackoutReasonColumn = blackoutData.blackoutReasonColumn;
+            availabilityState.closedDates          = blackoutData.closedDates;
+            availabilityState.closedDateReasons    = blackoutData.closedDateReasons;
+
+            if (S.eventDate && getSelectedBookingScope()) {
+                await loadSelectedDateAvailability();
+            } else {
+                availabilityState.selectedDateAvailability = null;
+            }
+
+            if (!getSelectedBookingScope()) {
+                setAvailabilityMessage(getScopeSelectionPrompt(), false);
+            } else if (!S.eventDate) {
+                setAvailabilityMessage(`Choose an available date for the ${getScopeLabel(getSelectedBookingScope())} booking slot.`, false);
+            } else if (!availabilityState.selectedDateAvailability?.scopeTaken) {
+                setAvailabilityMessage(`Selected ${formatDisplayDate(S.eventDate)}.`, false);
+            }
+        } catch (err) {
+            console.error('Availability calendar failed:', err);
+            availabilityState.calendarAvailability = new Map();
+            availabilityState.closedDates = new Set();
+            availabilityState.closedDateReasons = new Map();
+            availabilityState.selectedDateAvailability = null;
+            setAvailabilityMessage('Availability preview could not be loaded right now.', true);
+        }
+
+        renderAvailabilityCalendar();
+    }
+
+    async function loadSelectedDateAvailability() {
+        const selectedScope = getSelectedBookingScope();
+        if (!S.eventDate || !selectedScope) { availabilityState.selectedDateAvailability = null; return null; }
+
+        try {
+            const availability = await fetchDateAvailability(supabase, {
+                eventDate: S.eventDate, scope: selectedScope, durationHours: getSelectedDurationHours()
+            });
+            availabilityState.selectedDateAvailability = availability;
+            setAvailabilityMessage(availability.scopeTaken ? 'This date is fully booked.' : `Selected ${formatDisplayDate(S.eventDate)}.`, availability.scopeTaken);
+            return availability;
+        } catch (err) {
+            console.error('Selected date availability failed:', err);
+            availabilityState.selectedDateAvailability = null;
+            setAvailabilityMessage('Could not refresh the selected date availability right now.', true);
+            return null;
+        }
+    }
+
+    // ── Load event types ───────────────────────────────────────────────────
+    async function loadEventTypes() {
+        const { data, error } = await supabase.from('event_types').select('*').order('name', { ascending: true });
+        if (error || !data) { console.error('event_types fetch error:', error); return; }
+
+        eventTypesCache = data
+            .filter(et => !(et.status && et.status !== 'Active') && et.is_active !== false)
+            .map(et => et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1])
+            .filter(Boolean);
+
+        buildEventTypeSelect();
+    }
+
+    function buildEventTypeSelect() {
+        const sel = document.getElementById('event-type-select');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">Select event type…</option>';
+        [...eventTypesCache, 'Other'].forEach(label => {
+            const opt = document.createElement('option');
+            opt.value = label;
+            opt.textContent = label;
+            if (S.eventType === label) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        const otherWrap = document.getElementById('event-type-other-wrap');
+        if (S.eventType === 'Other' && otherWrap) {
+            otherWrap.classList.remove('hidden');
+            const otherInput = document.getElementById('event-type-other');
+            if (otherInput && S.eventTypeOther) otherInput.value = S.eventTypeOther;
+        } else {
+            otherWrap?.classList.add('hidden');
+        }
+    }
+
+    document.getElementById('event-type-select')?.addEventListener('change', function () {
+        const label = this.value;
+        S.eventType = label;
+        const otherWrap = document.getElementById('event-type-other-wrap');
+        if (label === 'Other') {
+            otherWrap?.classList.remove('hidden');
+            document.getElementById('event-type-other')?.focus();
+        } else {
+            otherWrap?.classList.add('hidden');
+            S.eventTypeOther = '';
+            const otherInput = document.getElementById('event-type-other');
+            if (otherInput) otherInput.value = '';
+        }
+    });
+
+    // ── Load packages from Supabase ────────────────────────────────────────
+    async function loadPackages() {
+        const { data: pkgs, error } = await supabase
+            .from('package')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type, duration_hours, booking_scope, package_category(is_active)')
+            .eq('is_active', true)
+            .order('price', { ascending: true });
+
+        if (error || !pkgs) { console.error('Failed to load packages:', error); return; }
+
+        const visible = pkgs.filter(p => p.package_category?.is_active !== false);
+        MINI = []; SNACK = []; OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+
+        visible.forEach(p => {
+            const desc = (p.description || '').trim();
+            if (p.price === 0 && (desc === '' || desc === '.')) return;
+
+            const base = {
+                id: p.package_id,
+                label: p.package_name,
+                price: p.price,
+                desc: p.description || '',
+                durationHours: Number(p.duration_hours || 0) || null,
+                bookingScope: p.booking_scope || null
+                // Phase 2: min_guests and max_guests will be added here once DB columns exist
+            };
+            const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
+
+            if (p.location_type === 'onsite') {
+                if (isAddon) SNACK.push(base);
+                else MINI.push(base);
+            } else if (p.location_type === 'offsite') {
+                const name = p.package_name.toLowerCase();
+                if (name.includes('coffee'))                            OFFSITE_PKGS.coffee.push(base);
+                else if (name.includes('snack') || name.includes('biscuit')) OFFSITE_PKGS.snack.push(base);
+                else if (name.includes('catering'))                     OFFSITE_PKGS.catering.push(base);
+                else                                                    OFFSITE_PKGS.catering.push(base);
+            }
+        });
+    }
+
+
+    // ── Package step builder ───────────────────────────────────────────────
+    function buildPackageStep() {
         const onEl  = document.getElementById('onsite-section');
         const offEl = document.getElementById('offsite-section');
-        const descEl = document.getElementById('rs3-desc');
-
-        if (!S.locationType) {
-            onEl.classList.add('hidden');
-            offEl.classList.add('hidden');
-            descEl.textContent = 'Choose your location type first to unlock package options.';
-            return;
-        }
+        const descEl = document.getElementById('rs-pkg-desc');
 
         if (S.locationType === 'onsite') {
             onEl.classList.remove('hidden');
             offEl.classList.add('hidden');
-            descEl.textContent = 'Select a VIP or Main Hall package to unlock dates for that booking slot.';
+            if (descEl) descEl.textContent = 'Select a package for your event at ELI Coffee.';
             buildMiniGrid();
-        } else {
+        } else if (S.locationType === 'offsite') {
             onEl.classList.add('hidden');
             offEl.classList.remove('hidden');
-            descEl.textContent = 'Choose your offsite service and package to unlock available dates.';
+            if (descEl) descEl.textContent = 'Choose your offsite service and package.';
             buildOffsiteCats();
+        } else {
+            onEl.classList.add('hidden');
+            offEl.classList.add('hidden');
+            if (descEl) descEl.textContent = 'Choose your location type first to unlock package options.';
         }
     }
 
+    function truncDesc(text, threshold) {
+        threshold = threshold || 120;
+        if (!text || text.length <= threshold) return text || '';
+        var cut = text.lastIndexOf(' ', threshold - 10);
+        var pivot = cut > 50 ? cut : threshold;
+        return '<span class="pkg-desc-short">' + text.slice(0, pivot) + '&hellip; ' +
+               '<button type="button" class="pkg-desc-toggle" data-mode="expand">View full details</button></span>' +
+               '<span class="pkg-desc-full hidden">' + text + ' ' +
+               '<button type="button" class="pkg-desc-toggle" data-mode="collapse">Show less</button></span>';
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.pkg-desc-toggle');
+        if (!btn) return;
+        var p = btn.closest('.pkg-desc');
+        if (!p) return;
+        var isExpand = btn.dataset.mode === 'expand';
+        var shortEl = p.querySelector('.pkg-desc-short');
+        var fullEl  = p.querySelector('.pkg-desc-full');
+        if (shortEl) shortEl.classList.toggle('hidden', isExpand);
+        if (fullEl)  fullEl.classList.toggle('hidden', !isExpand);
+    });
+
+    // Phase 1: show name + price + raw description only (no guest range)
     function buildMiniGrid() {
         const g = document.getElementById('mini-grid');
+        if (!g) return;
         g.innerHTML = '';
-        document.getElementById('snack-addon').classList.toggle('hidden', !S.miniPackage);
         MINI.forEach(p => {
             const c = card(
                 '<h4>' + p.label + '</h4>' +
                 '<div class="pkg-price">&#8369;' + p.price.toLocaleString() + '</div>' +
-                '<p class="pkg-desc">' + p.pax + ' &bull; ' + p.hours + '<br>' + p.credit + '</p>',
+                '<p class="pkg-desc">' + truncDesc(p.desc) + '</p>',
                 S.miniPackage && S.miniPackage.label === p.label
             );
             c.onclick = async () => {
                 S.miniPackage = p;
-                S.time = '';
+                S.snackAddon  = null;
+                S.time        = '';
                 activate(g, c);
-                document.getElementById('snack-addon').classList.remove('hidden');
-                buildSnackGrid();
+                updateSectionLocks();
+                buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
@@ -1550,15 +1342,16 @@
 
     function buildSnackGrid() {
         const g = document.getElementById('snack-grid');
+        if (!g) return;
         g.innerHTML = '';
-        const none = card('<h4>No Add-on</h4><p class="pkg-desc">Skip the snack bar</p>', S.snackAddon === null);
+        const none = card('<h4>No Add-on</h4><p class="pkg-desc">Skip the snack bar corner</p>', S.snackAddon === null);
         none.onclick = () => { S.snackAddon = null; activate(g, none); };
         g.appendChild(none);
         SNACK.forEach(p => {
             const c = card(
                 '<h4>' + p.label + '</h4>' +
                 '<div class="pkg-price">&#8369;' + p.price.toLocaleString() + '</div>' +
-                '<p class="pkg-desc">' + p.desc + '</p>',
+                '<p class="pkg-desc">' + truncDesc(p.desc) + '</p>',
                 S.snackAddon && S.snackAddon.label === p.label
             );
             c.onclick = () => { S.snackAddon = p; activate(g, c); };
@@ -1568,12 +1361,9 @@
 
     function buildOffsiteCats() {
         const g = document.getElementById('offsite-cat-grid');
+        if (!g) return;
         g.innerHTML = '';
-        const serviceIcons = {
-            coffee: 'fa-mug-hot',
-            snack: 'fa-cookie-bite',
-            catering: 'fa-utensils'
-        };
+        const serviceIcons = { coffee:'fa-mug-hot', snack:'fa-cookie-bite', catering:'fa-utensils' };
         OFFSITE_CATS.forEach(p => {
             const c = card(
                 '<div class="service-card-icon" aria-hidden="true"><i class="fa-solid ' + (serviceIcons[p.val] || 'fa-briefcase') + '"></i></div>' +
@@ -1582,25 +1372,20 @@
             );
             c.classList.add('service-card');
             c.onclick = async () => {
-                S.offsiteCategory = p.val;
-                S.offsitePackage  = null;
-                S.cateringCart    = [];
-                S.time            = '';
+                S.offsiteCategory = p.val; S.offsitePackage = null; S.cateringCart = []; S.time = '';
                 activate(g, c);
-
                 const subEl      = document.getElementById('offsite-sub');
                 const cateringEl = document.getElementById('catering-section');
-
                 if (p.val === 'catering') {
-                    subEl.classList.add('hidden');
-                    cateringEl.classList.remove('hidden');
+                    subEl.classList.add('hidden'); cateringEl.classList.remove('hidden');
                     buildCateringDishBuilder();
                 } else {
-                    cateringEl.classList.add('hidden');
-                    subEl.classList.remove('hidden');
+                    cateringEl.classList.add('hidden'); subEl.classList.remove('hidden');
                     document.getElementById('offsite-sub-label').textContent = 'Choose a ' + p.label + ' Package';
                     buildOffsiteSub(p.val);
                 }
+                updateSectionLocks();
+                buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
@@ -1619,81 +1404,116 @@
 
     function buildOffsiteSub(val) {
         const g = document.getElementById('offsite-sub-grid');
+        if (!g) return;
         g.innerHTML = '';
         (OFFSITE_PKGS[val] || []).forEach(p => {
             const c = card(
                 '<h4>' + p.label + '</h4>' +
                 '<div class="pkg-price">' + (p.price > 0 ? '&#8369;' + p.price.toLocaleString() : 'Contact for quote') + '</div>' +
-                '<p class="pkg-desc">' + p.desc + '</p>',
+                '<p class="pkg-desc">' + truncDesc(p.desc) + '</p>',
                 S.offsitePackage && S.offsitePackage.label === p.label
             );
             c.onclick = async () => {
-                S.offsitePackage = p;
-                S.time = '';
+                S.offsitePackage = p; S.time = '';
                 activate(g, c);
+                updateSectionLocks();
+                buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
     }
 
-    function getCateringSelection(cat) {
-        return S.cateringCart.find(item => item.cat === cat);
-    }
+    // ── Add-on / Venue conditional step ───────────────────────────────────
+    function buildAddonOrVenueStep() {
+        const title      = document.getElementById('rs-addon-or-venue-title');
+        const desc       = document.getElementById('rs-addon-or-venue-desc');
+        const addonSect  = document.getElementById('addon-section');
+        const venueSect  = document.getElementById('venue-section');
 
-    function setCateringSelection(cat, dish, pax) {
-        S.cateringCart = S.cateringCart.filter(item => item.cat !== cat);
-        if (dish && pax && PRICES[cat] && PRICES[cat][pax]) {
-            S.cateringCart.push({ cat, dish, pax, price: PRICES[cat][pax] });
-        } else if (dish) {
-            S.cateringCart.push({ cat, dish, pax: null, price: 0 });
+        // When no package is chosen yet, keep content collapsed (lock overlay handles messaging)
+        if (!isGuestsTypeUnlocked()) {
+            if (title) title.textContent = 'Add-ons / Venue';
+            if (desc)  desc.textContent = '';
+            if (addonSect) addonSect.classList.add('hidden');
+            if (venueSect) venueSect.classList.add('hidden');
+            return;
+        }
+
+        if (S.locationType === 'onsite') {
+            if (title) title.innerHTML = 'Want to add a <em>Snack Bar</em>?';
+            if (desc)  desc.textContent = 'This optional add-on pairs perfectly with your gathering. You can skip it and proceed.';
+            if (addonSect) addonSect.classList.remove('hidden');
+            if (venueSect) venueSect.classList.add('hidden');
+            buildSnackGrid();
+        } else {
+            if (title) title.innerHTML = 'Where is your <em>venue</em>?';
+            if (desc)  desc.textContent = 'Search your address or click the map to pin your venue. Rizal province only.';
+            if (addonSect) addonSect.classList.add('hidden');
+            if (venueSect) venueSect.classList.remove('hidden');
+            setTimeout(() => {
+                if (window.initVenueMap) window.initVenueMap();
+                if (window.venueMap) window.venueMap.invalidateSize();
+            }, 150);
         }
     }
 
-    function clearCateringSelection(cat) {
-        S.cateringCart = S.cateringCart.filter(item => item.cat !== cat);
+    // ── Catering dish builder ──────────────────────────────────────────────
+    function hasCateringTag(tag) {
+        return DISHES.filter(g => g.tag === tag).some(g => S.cateringCart.some(i => i.cat === g.cat && i.pax));
     }
+
+    function isCateringSelectionValid() {
+        return hasCateringTag('main') && hasCateringTag('pasta') && hasCateringTag('dessert');
+    }
+
+    function getCateringCartTotal()  { return S.cateringCart.reduce((s, i) => s + (i && i.pax ? i.price : 0), 0); }
+    function getCateringCartCount()  { return S.cateringCart.filter(i => i && i.pax).length; }
+    function getCateringSelection(cat) { return S.cateringCart.find(i => i.cat === cat); }
+
+    function setCateringSelection(cat, dish, pax) {
+        S.cateringCart = S.cateringCart.filter(i => i.cat !== cat);
+        if (dish && pax && PRICES[cat] && PRICES[cat][pax]) S.cateringCart.push({ cat, dish, pax, price: PRICES[cat][pax] });
+        else if (dish) S.cateringCart.push({ cat, dish, pax: null, price: 0 });
+    }
+
+    function clearCateringSelection(cat) { S.cateringCart = S.cateringCart.filter(i => i.cat !== cat); }
 
     function renderCateringProgress() {
         const tracker = document.getElementById('catering-progress-tracker');
+        if (!tracker) return;
         const steps = [
-            { label: 'Main Dish', check: () => hasCateringTag('main') },
-            { label: 'Pasta', check: () => hasCateringTag('pasta') },
-            { label: 'Dessert', check: () => hasCateringTag('dessert') },
-            { label: 'Rice', check: () => hasCateringTag('rice'), optional: true }
+            { label:'Main Dish', check: () => hasCateringTag('main') },
+            { label:'Pasta',     check: () => hasCateringTag('pasta') },
+            { label:'Dessert',   check: () => hasCateringTag('dessert') },
+            { label:'Rice',      check: () => hasCateringTag('rice'), optional: true }
         ];
-
         tracker.innerHTML = '';
-        steps.forEach((step, index) => {
+        steps.forEach((step, idx) => {
             const done = step.check();
             const item = document.createElement('div');
             item.className = 'pt-item' + (done ? ' done' : ' pending');
             item.innerHTML =
-                '<div class="pt-dot">' + (done ? '&#10003;' : index + 1) + '</div>' +
+                '<div class="pt-dot">' + (done ? '&#10003;' : idx + 1) + '</div>' +
                 '<span>' + step.label + (step.optional ? ' <em style="font-weight:400;font-style:normal;opacity:0.6">(optional)</em>' : '') + '</span>';
             tracker.appendChild(item);
-
-            if (index < steps.length - 1) {
-                const divider = document.createElement('div');
-                divider.className = 'pt-divider';
-                tracker.appendChild(divider);
+            if (idx < steps.length - 1) {
+                const div = document.createElement('div'); div.className = 'pt-divider'; tracker.appendChild(div);
             }
         });
     }
 
     function buildCateringDishBuilder() {
         const builder = document.getElementById('catering-tray-builder');
+        if (!builder) return;
         builder.innerHTML = '';
 
         DISHES.forEach(group => {
             const selected = getCateringSelection(group.cat);
-            const isDone = selected && selected.pax;
+            const isDone   = selected && selected.pax;
+            const section  = document.createElement('div'); section.className = 'cat-section';
 
-            const section = document.createElement('div');
-            section.className = 'cat-section';
-
-            const header = document.createElement('div');
-            header.className = 'cat-header';
+            const header = document.createElement('div'); header.className = 'cat-header';
             header.innerHTML =
                 '<div class="cat-icon-wrap">' + group.icon + '</div>' +
                 '<span class="cat-title">' + group.cat + '</span>' +
@@ -1701,71 +1521,49 @@
                 '<span class="cat-done-badge' + (isDone ? ' visible' : '') + '">&#10003; Added</span>';
             section.appendChild(header);
 
-            const grid = document.createElement('div');
-            grid.className = 'dish-grid';
-
+            const grid = document.createElement('div'); grid.className = 'dish-grid';
             group.items.forEach(item => {
                 const isSelected = selected && selected.dish === item;
-                const card = document.createElement('div');
-                card.className = 'dish-card' + (isSelected ? ' selected' : '');
-                card.innerHTML =
+                const dc = document.createElement('div');
+                dc.className = 'dish-card' + (isSelected ? ' selected' : '');
+                dc.innerHTML =
                     '<div class="dish-name">' + item + '</div>' +
                     '<div class="dish-status checked">&#10003; Selected</div>' +
                     '<div class="dish-status remove">&#10005; Click to remove</div>';
-
-                card.onclick = () => {
-                    if (isSelected) clearCateringSelection(group.cat);
-                    else setCateringSelection(group.cat, item, null);
-                    rebuildCateringUI();
-                };
-
-                grid.appendChild(card);
+                dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat); else setCateringSelection(group.cat, item, null); rebuildCateringUI(); };
+                grid.appendChild(dc);
             });
-
             section.appendChild(grid);
 
             if (selected && selected.dish) {
-                const paxWrap = document.createElement('div');
-                paxWrap.className = 'pax-wrapper visible';
-
-                const paxTop = document.createElement('div');
-                paxTop.className = 'pax-top';
+                const paxWrap = document.createElement('div'); paxWrap.className = 'pax-wrapper visible';
+                const paxTop  = document.createElement('div'); paxTop.className = 'pax-top';
                 paxTop.innerHTML =
                     '<span class="pax-top-label">Pax per tray</span>' +
                     (selected.pax ? '<span class="pax-selected-price">' + fmtPeso(PRICES[group.cat][selected.pax]) + '</span>' : '');
                 paxWrap.appendChild(paxTop);
 
-                const paxButtons = document.createElement('div');
-                paxButtons.className = 'pax-buttons';
-
+                const paxBtns = document.createElement('div'); paxBtns.className = 'pax-buttons';
                 [20, 30, 40, 50].forEach(n => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'pax-btn' + (selected.pax === n ? ' selected' : '');
                     btn.textContent = n + ' pax';
-                    btn.onclick = () => {
-                        setCateringSelection(group.cat, selected.dish, n);
-                        rebuildCateringUI();
-                    };
-                    paxButtons.appendChild(btn);
+                    btn.onclick = () => { setCateringSelection(group.cat, selected.dish, n); rebuildCateringUI(); };
+                    paxBtns.appendChild(btn);
                 });
-
-                paxWrap.appendChild(paxButtons);
+                paxWrap.appendChild(paxBtns);
 
                 if (!selected.pax) {
-                    const hint = document.createElement('p');
-                    hint.className = 'pax-hint';
+                    const hint = document.createElement('p'); hint.className = 'pax-hint';
                     hint.textContent = 'Choose the number of pax to add this dish to your cart.';
                     paxWrap.appendChild(hint);
                 }
-
                 section.appendChild(paxWrap);
             }
 
-            const divider = document.createElement('hr');
-            divider.className = 'cat-divider';
+            const divider = document.createElement('hr'); divider.className = 'cat-divider';
             section.appendChild(divider);
-
             builder.appendChild(section);
         });
 
@@ -1774,135 +1572,194 @@
     }
 
     function renderCateringCart() {
-        const rows = document.getElementById('catering-tray-rows');
-        const emptyEl = document.getElementById('catering-cart-empty');
-        const footerEl = document.getElementById('catering-cart-footer');
-        const badgeEl = document.getElementById('catering-cart-badge');
+        const rows      = document.getElementById('catering-tray-rows');
+        const emptyEl   = document.getElementById('catering-cart-empty');
+        const footerEl  = document.getElementById('catering-cart-footer');
+        const badgeEl   = document.getElementById('catering-cart-badge');
         const runningEl = document.getElementById('catering-cart-running-total');
-        const countEl = document.getElementById('catering-cart-footer-count');
-        const totalEl = document.getElementById('catering-tray-total');
-        const noticeEl = document.getElementById('catering-validation-notice');
+        const countEl   = document.getElementById('catering-cart-footer-count');
+        const totalEl   = document.getElementById('catering-tray-total');
+        const noticeEl  = document.getElementById('catering-validation-notice');
         const noticeText = document.getElementById('catering-validation-text');
+
         const count = getCateringCartCount();
         const total = getCateringCartTotal();
-
         rows.innerHTML = '';
-        badgeEl.textContent = count;
-        runningEl.textContent = fmtPeso(total);
+        if (badgeEl) badgeEl.textContent = count;
+        if (runningEl) runningEl.textContent = fmtPeso(total);
 
         if (!count) {
-            emptyEl.style.display = 'block';
-            footerEl.style.display = 'none';
+            if (emptyEl)  emptyEl.style.display = 'block';
+            if (footerEl) footerEl.style.display = 'none';
         } else {
-            emptyEl.style.display = 'none';
-            footerEl.style.display = 'flex';
-            countEl.textContent = count + ' dish' + (count !== 1 ? 'es' : '') + ' selected';
-            totalEl.textContent = fmtPeso(total);
+            if (emptyEl)  emptyEl.style.display = 'none';
+            if (footerEl) footerEl.style.display = 'flex';
+            if (countEl)  countEl.textContent = count + ' dish' + (count !== 1 ? 'es' : '') + ' selected';
+            if (totalEl)  totalEl.textContent = fmtPeso(total);
 
-            S.cateringCart
-                .filter(item => item && item.pax)
-                .forEach(item => {
-                    const row = document.createElement('div');
-                    row.className = 'cart-item';
-                    row.innerHTML =
-                        '<div class="ci-indicator"></div>' +
-                        '<div>' +
-                            '<div class="ci-cat">' + item.cat + '</div>' +
-                            '<div class="ci-dish">' + item.dish + '</div>' +
-                            '<div class="ci-pax">' + item.pax + ' pax</div>' +
-                        '</div>' +
-                        '<div class="ci-right">' +
-                            '<span class="ci-price">' + fmtPeso(item.price) + '</span>' +
-                            '<button type="button" class="ci-remove-btn" data-cat="' + item.cat + '">Remove</button>' +
-                        '</div>';
-                    rows.appendChild(row);
-                });
+            S.cateringCart.filter(i => i && i.pax).forEach(item => {
+                const row = document.createElement('div'); row.className = 'cart-item';
+                row.innerHTML =
+                    '<div class="ci-indicator"></div>' +
+                    '<div><div class="ci-cat">' + item.cat + '</div>' +
+                    '<div class="ci-dish">' + item.dish + '</div>' +
+                    '<div class="ci-pax">' + item.pax + ' pax</div></div>' +
+                    '<div class="ci-right"><span class="ci-price">' + fmtPeso(item.price) + '</span>' +
+                    '<button type="button" class="ci-remove-btn" data-cat="' + item.cat + '">Remove</button></div>';
+                rows.appendChild(row);
+            });
 
             rows.querySelectorAll('.ci-remove-btn').forEach(btn => {
-                btn.onclick = () => {
-                    clearCateringSelection(btn.dataset.cat);
-                    rebuildCateringUI();
-                };
+                btn.onclick = () => { clearCateringSelection(btn.dataset.cat); rebuildCateringUI(); };
             });
         }
 
-        noticeEl.className = 'validation-notice' + (isCateringSelectionValid() ? ' success' : '');
-        if (isCateringSelectionValid()) {
-            noticeEl.querySelector('.vn-icon').textContent = 'âœ…';
-            noticeText.textContent = 'Great! Your menu meets the minimum requirements. You can add more dishes if you like.';
-        } else {
-            const missing = [];
-            if (!hasCateringTag('main')) missing.push('1 main dish');
-            if (!hasCateringTag('pasta')) missing.push('1 pasta');
-            if (!hasCateringTag('dessert')) missing.push('1 dessert');
-            noticeEl.querySelector('.vn-icon').textContent = 'âš ï¸';
-            noticeText.textContent = 'Still needed: ' + missing.join(', ') + '.';
+        if (noticeEl) {
+            noticeEl.className = 'validation-notice' + (isCateringSelectionValid() ? ' success' : '');
+            if (noticeEl.querySelector('.vn-icon')) {
+                noticeEl.querySelector('.vn-icon').textContent = isCateringSelectionValid() ? '✅' : '⚠️';
+            }
+            if (noticeText) {
+                if (isCateringSelectionValid()) {
+                    noticeText.textContent = 'Great! Your menu meets the minimum requirements. You can add more dishes if you like.';
+                } else {
+                    const missing = [];
+                    if (!hasCateringTag('main'))   missing.push('1 main dish');
+                    if (!hasCateringTag('pasta'))  missing.push('1 pasta');
+                    if (!hasCateringTag('dessert')) missing.push('1 dessert');
+                    noticeText.textContent = 'Still needed: ' + missing.join(', ') + '.';
+                }
+            }
         }
     }
 
-    function rebuildCateringUI() {
-        buildCateringDishBuilder();
+    function rebuildCateringUI() { buildCateringDishBuilder(); }
+
+    // ── Time grid ──────────────────────────────────────────────────────────
+    let timeGridRequestToken = 0;
+
+    function findAvailableStartTimeRow(timeLabel) {
+        return (availabilityState.availableStartTimes || []).find(r => r.timeLabel === timeLabel) || null;
     }
 
-    function buildTimeGrid() {
+    function formatTimeOfDay(value) {
+        if (!value) return '';
+        const [hStr, mStr] = String(value).split(':');
+        let h = parseInt(hStr, 10);
+        if (Number.isNaN(h)) return '';
+        const m = (mStr || '00').padStart(2, '0');
+        const suffix = h >= 12 ? 'PM' : 'AM';
+        h = h % 12; if (h === 0) h = 12;
+        return `${h}:${m} ${suffix}`;
+    }
+
+    function renderEndTimeReadout() {
+        if (!timeEndReadout) return;
+        const row = S.time ? findAvailableStartTimeRow(S.time) : null;
+        if (row && row.endTime) {
+            timeEndReadout.textContent = `Ends at: ${formatTimeOfDay(row.endTime)}`;
+            timeEndReadout.classList.remove('hidden');
+        } else {
+            timeEndReadout.textContent = '';
+            timeEndReadout.classList.add('hidden');
+        }
+    }
+
+    async function buildTimeGrid() {
         const g = document.getElementById('time-grid');
-        g.innerHTML = '';
+        if (!g) return;
+
         const selectedScope = getSelectedBookingScope();
-        const selectedAvailability = availabilityState.selectedDateAvailability || {
-            occupiedScopes: [],
-            scopeTaken: false,
-            blockedTimes: []
-        };
-        const blockedTimes = new Set(selectedAvailability.blockedTimes || []);
-        const timeStatusOverride = availabilityState.timeStatusOverride || '';
+        const selectedAvail = availabilityState.selectedDateAvailability || { scopeTaken: false };
+        const override      = availabilityState.timeStatusOverride || '';
+
+        g.innerHTML = '';
+        availabilityState.availableStartTimes = [];
 
         if (!S.eventDate) {
-            if (timeStatusNote) {
-                timeStatusNote.textContent = timeStatusOverride || (selectedScope
-                    ? `Choose an available date for the ${getScopeLabel(selectedScope)} booking slot first.`
-                    : 'Choose your location and package first, then pick an available date to unlock time slots.');
-            }
-        } else if (!selectedScope) {
-            if (timeStatusNote) {
-                timeStatusNote.textContent = 'Choose your location and package first so the correct booking slot can be checked.';
-            }
-        } else if (selectedAvailability.scopeTaken) {
+            if (timeStatusNote) timeStatusNote.textContent = override || (selectedScope
+                ? `Choose an available date for the ${getScopeLabel(selectedScope)} booking slot first.`
+                : 'Choose your location and package first, then pick an available date to unlock time slots.');
+            renderEndTimeReadout();
+            return;
+        }
+
+        if (!selectedScope) {
+            if (timeStatusNote) timeStatusNote.textContent = 'Choose your location and package first so the correct booking slot can be checked.';
+            renderEndTimeReadout();
+            return;
+        }
+
+        if (selectedAvail.scopeTaken) {
             S.time = '';
-            if (timeStatusNote) {
-                timeStatusNote.textContent = 'This date is fully booked.';
-            }
+            if (timeStatusNote) timeStatusNote.textContent = 'This date is fully booked.';
+            renderEndTimeReadout();
+            return;
+        }
+
+        const requestToken = ++timeGridRequestToken;
+        g.innerHTML = '<p class="time-grid-loading">Loading available times...</p>';
+
+        let rows = [];
+        try {
+            rows = await fetchAvailableStartTimes(supabase, {
+                eventDate: S.eventDate,
+                scope: selectedScope,
+                durationHours: getSelectedDurationHours()
+            });
+        } catch (err) {
+            if (requestToken !== timeGridRequestToken) return;
+            g.innerHTML = '';
+            if (timeStatusNote) timeStatusNote.textContent = 'Could not load available times. Please try again.';
+            renderEndTimeReadout();
+            return;
+        }
+
+        if (requestToken !== timeGridRequestToken) return; // superseded by a newer request
+
+        availabilityState.availableStartTimes = rows;
+        g.innerHTML = '';
+
+        if (S.time && !rows.some(r => r.timeLabel === S.time && r.isAvailable)) {
+            S.time = ''; // previously chosen time is no longer valid (duration/scope/date changed)
+        }
+
+        if (!rows.length) {
+            if (timeStatusNote) timeStatusNote.textContent = `${getScopeLabel(selectedScope)} has no valid start times for this package's duration within operating hours.`;
         } else if (timeStatusNote) {
-            timeStatusNote.textContent = blockedTimes.size
+            const anyBlocked = rows.some(r => !r.isAvailable);
+            timeStatusNote.textContent = anyBlocked
                 ? `${getScopeLabel(selectedScope)} is open on this date. Disabled times overlap with an existing reservation.`
                 : `${getScopeLabel(selectedScope)} is open on this date. Choose your event start time below.`;
         }
 
-        TIMES.forEach(t => {
+        rows.forEach(row => {
+            const isDisabled = !row.isAvailable;
             const c = document.createElement('div');
-            const isDisabled = !S.eventDate || !selectedScope || blockedTimes.has(t);
-            c.className = 'time-card' + (S.time === t ? ' active' : '') + (isDisabled ? ' disabled' : '');
-            c.textContent = t;
-            if (blockedTimes.has(t) && selectedScope) {
-                c.title = `${getScopeLabel(selectedScope)} is unavailable at ${t} due to an overlapping reservation.`;
-            } else if (!selectedScope) {
-                c.title = 'Choose your location and package first to unlock time slots.';
-            } else if (!S.eventDate) {
-                c.title = 'Choose an available date first to unlock time slots.';
-            } else {
-                c.title = `Choose ${t} as your start time.`;
-            }
+            c.className = 'time-card' + (S.time === row.timeLabel ? ' active' : '') + (isDisabled ? ' disabled' : '');
+            c.textContent = row.timeLabel;
+            c.title = isDisabled
+                ? (row.reason || `${getScopeLabel(selectedScope)} is unavailable at ${row.timeLabel} due to an overlapping reservation.`)
+                : `Choose ${row.timeLabel} as your start time.`;
+
             c.onclick = () => {
                 if (isDisabled) return;
-                S.time = t;
+                S.time = row.timeLabel;
                 g.querySelectorAll('.time-card').forEach(x => x.classList.remove('active'));
                 c.classList.add('active');
+                renderEndTimeReadout();
             };
             g.appendChild(c);
         });
+
+        renderEndTimeReadout();
     }
 
+    // ── Summary ────────────────────────────────────────────────────────────
     function buildSummary() {
         const box = document.getElementById('summary-content');
+        if (!box) return;
+
         let pkgRows = '';
         let total   = 0;
 
@@ -1910,16 +1767,15 @@
             if (S.miniPackage) {
                 total += S.miniPackage.price;
                 pkgRows += sr('Package', S.miniPackage.label + ' &mdash; &#8369;' + S.miniPackage.price.toLocaleString());
-                pkgRows += sr('Inclusions', S.miniPackage.pax + ' &bull; ' + S.miniPackage.hours + ' &bull; ' + S.miniPackage.credit);
             }
             if (S.snackAddon) {
                 total += S.snackAddon.price;
-                pkgRows += sr('Snack Bar Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
+                pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
             }
         } else if (S.offsiteCategory === 'catering') {
             pkgRows += sr('Service', '&#127869;&#65039; Catering');
-            pkgRows += sr('Inclusions', 'Buffet setup, utensils, waiters, styled tables, backdrop, centerpiece, 3-4 hrs');
-            pkgRows += sr('Special Offer', 'FREE Overflowing Coffee & 1 Appetizer/Dessert');
+            pkgRows += sr('Inclusions', 'Buffet setup, utensils, waiters, styled tables, backdrop, centerpiece, 3–4 hrs');
+            pkgRows += sr('Special Offer', 'FREE Overflowing Coffee &amp; 1 Appetizer/Dessert');
             S.cateringCart.filter(i => i && i.pax).forEach(i => {
                 total += i.price;
                 pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; &#8369;' + i.price.toLocaleString());
@@ -1927,9 +1783,8 @@
             if (total === 0) pkgRows += sr('Price', 'Contact for quote');
         } else if (S.offsitePackage) {
             const catObj = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
-            const catLabel = catObj ? catObj.label : '';
             total = S.offsitePackage.price;
-            pkgRows += sr('Service', catLabel);
+            pkgRows += sr('Service', catObj ? catObj.label : '');
             pkgRows += sr('Package', S.offsitePackage.label);
             if (S.offsitePackage.price > 0) pkgRows += sr('Price', '&#8369;' + S.offsitePackage.price.toLocaleString());
         }
@@ -1937,21 +1792,20 @@
         const totalStr = total > 0 ? '&#8369;' + total.toLocaleString() : 'Contact for quote';
         const locStr   = S.locationType === 'onsite'
             ? '&#127968; Onsite &mdash; ELI Coffee'
-            : '&#128663; Offsite &mdash; ' + S.venueLocation;
+            : '&#128663; Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
+        const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
         box.innerHTML =
             '<div class="summary-section-title">Event</div>' +
-            sr('Event Type', S.eventType) +
-            sr('Date', S.eventDate) +
-            sr('Time', S.time) +
-            sr('Guests', S.guestCount) +
-            sr('Location', locStr) +
-            '<hr class="summary-divider">' +
-            '<div class="summary-section-title">Package</div>' +
+            sr('Location',   locStr) +
             pkgRows +
+            sr('Guests',     S.guestCount) +
+            sr('Event Type', displayEventType) +
+            sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate) +
+            sr('Time',       S.time) +
             '<hr class="summary-divider">' +
             '<div class="summary-section-title">Contact</div>' +
-            sr('Name', S.name) +
+            sr('Name',  S.name) +
             sr('Email', S.email) +
             sr('Phone', S.phone) +
             (S.requests ? sr('Requests', S.requests) : '') +
@@ -1965,84 +1819,264 @@
         return '<div class="summary-row"><span class="s-label">' + label + '</span><span class="s-value">' + value + '</span></div>';
     }
 
+    // ── Contract download ──────────────────────────────────────────────────
+
+    // ── Contact prefill ────────────────────────────────────────────────────
+    function getReservationContactName(profile, user) {
+        return [profile?.first_name, profile?.middle_name, profile?.last_name].filter(Boolean).join(' ').trim() || user?.email || '';
+    }
+
+    function applyReservationContactPrefill(profile, user) {
+        const fullName = getReservationContactName(profile, user);
+        const email    = profile?.email || user?.email || '';
+        const phone    = profile?.phone_number || user?.user_metadata?.phone_number || '';
+        if (nameInput  && !nameInput.value.trim())  nameInput.value  = fullName;
+        if (phoneInput && !phoneInput.value.trim()) phoneInput.value = phone;
+        if (emailInput && !emailInput.value.trim()) emailInput.value = email;
+        S.name  = nameInput?.value.trim()  || S.name;
+        S.phone = phoneInput?.value.trim() || S.phone;
+        S.email = emailInput?.value.trim() || S.email;
+    }
+
+    async function prefillReservationContactDetails() {
+        const user = session?.user;
+        if (!user) return;
+        const fallback = { first_name: user.user_metadata?.first_name || '', middle_name: user.user_metadata?.middle_name || '', last_name: user.user_metadata?.last_name || '', email: user.email || '', phone_number: user.user_metadata?.phone_number || '' };
+        try {
+            const { data: profile, error } = await supabase.from('profiles').select('first_name, middle_name, last_name, email, phone_number').eq('user_id', user.id).maybeSingle();
+            if (error) throw error;
+            applyReservationContactPrefill(profile || fallback, user);
+        } catch {
+            applyReservationContactPrefill(fallback, user);
+        }
+    }
+
+    // ── Step display ───────────────────────────────────────────────────────
+    function showStep(n) {
+        document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
+        const stepEl = document.getElementById(sid(n));
+        if (stepEl) stepEl.classList.add('active');
+
+        document.getElementById('progress').style.width = (n / total() * 100) + '%';
+        document.getElementById('step-text').textContent = 'Step ' + n + ' of ' + total() + ': ' + (STEP_LABELS[n - 1] || '');
+
+        document.getElementById('prevBtn').classList.toggle('hidden', n === 1);
+        document.getElementById('nextBtn').textContent = n === total() ? 'Submit' : 'Next →';
+
+        populate(sid(n));
+        saveDraft();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function populate(id) {
+        if (id === 'rs1') {
+            // Restore location card active state
+            document.querySelectorAll('.location-card').forEach(c => {
+                c.classList.toggle('active', c.dataset.val === S.locationType);
+            });
+            // Build package options based on saved location
+            buildPackageStep();
+            // Build event type select (always ready so it renders when unlocked)
+            buildEventTypeSelect();
+            // Restore guest count field
+            const gcEl = document.getElementById('guest-count');
+            if (gcEl && S.guestCount) gcEl.value = S.guestCount;
+            // Apply locked/unlocked state to sections 1C and 1D
+            updateSectionLocks();
+            // Build add-ons / venue section
+            buildAddonOrVenueStep();
+            // Calendar and time
+            updateDateDisplayPlaceholder();
+            loadAvailabilityCalendar();
+            buildTimeGrid();
+        }
+        if (id === 'rs6')  buildSummary();
+        if (id === 'rs7')  buildContractStep();
+        if (id === 'rs4' && isLoggedIn) prefillReservationContactDetails();
+    }
+
+    // ── Validation ─────────────────────────────────────────────────────────
     function validate(n) {
         const id = sid(n);
 
         if (id === 'rs1') {
-            const et = document.getElementById('event-type').value.trim();
-            const gc = document.getElementById('guest-count').value.trim();
-            const venueValue = document.getElementById('venue-location').value.trim();
-            const ed = document.getElementById('event-date').value;
-            if (!et || !gc) { alert('Please fill in your event type and guest count first.'); return false; }
-            if (!S.locationType) { alert('Please choose whether your reservation is onsite or offsite.'); return false; }
-            if (S.locationType === 'offsite' && !venueValue) {
-                alert('Please enter your venue location for the offsite booking.');
-                return false;
+            // 1A — Location
+            if (!S.locationType) {
+                alert('Please choose whether your event is onsite or offsite.');
+                scrollToSection('sub-loc'); return false;
             }
+
+            // 1B — Package
             if (S.locationType === 'onsite') {
-                if (!S.miniPackage) { alert('Please select an onsite package before choosing a date.'); return false; }
+                if (!S.miniPackage) {
+                    alert('Please select a package before continuing.');
+                    scrollToSection('sub-pkg'); return false;
+                }
             } else {
-                if (!S.offsiteCategory) { alert('Please select an offsite service first.'); return false; }
+                if (!S.offsiteCategory) {
+                    alert('Please select an offsite service category.');
+                    scrollToSection('sub-pkg'); return false;
+                }
                 if (S.offsiteCategory === 'catering') {
                     if (!isCateringSelectionValid()) {
                         alert('Please select at least 1 main dish, 1 pasta, and 1 dessert for your catering package.');
-                        return false;
+                        scrollToSection('sub-pkg'); return false;
                     }
-                } else {
-                    if (!S.offsitePackage) { alert('Please select a specific offsite package before choosing a date.'); return false; }
+                } else if (!S.offsitePackage) {
+                    alert('Please select a specific package before continuing.');
+                    scrollToSection('sub-pkg'); return false;
                 }
             }
 
-            if (!ed) { alert('Please choose an available date from the calendar.'); return false; }
-            const d = new Date(ed), today = new Date(); today.setHours(0,0,0,0);
-            if (d < today) { alert('Please select a future date.'); return false; }
+            // 1C — Guest count
+            const raw = document.getElementById('guest-count')?.value.trim();
+            const gc  = parseInt(raw, 10);
+            if (!raw || isNaN(gc) || gc < 1) {
+                alert('Please enter a valid number of guests (at least 1).');
+                scrollToSection('sub-guests-type'); return false;
+            }
+            if (!validateGuestCountRange(gc)) {
+                const min = getSelectedPackageMinGuests();
+                const max = getSelectedPackageMaxGuests();
+                alert(`Guest count must be between ${min} and ${max} for this package.`);
+                scrollToSection('sub-guests-type'); return false;
+            }
+            S.guestCount = String(gc);
+
+            // 1C — Event type
+            if (!S.eventType) {
+                alert('Please select your event type.');
+                scrollToSection('sub-guests-type'); return false;
+            }
+            if (S.eventType === 'Other') {
+                const otherText = document.getElementById('event-type-other')?.value.trim();
+                if (!otherText) {
+                    alert('Please describe your event type in the text field below.');
+                    scrollToSection('sub-guests-type'); return false;
+                }
+                S.eventTypeOther = otherText;
+            }
+
+            // 1D — Venue pin (offsite only; onsite add-ons are optional)
+            if (S.locationType === 'offsite') {
+                const venueVal = document.getElementById('venue-location')?.value.trim();
+                if (!venueVal) {
+                    alert('Please search for your venue address or click the map to drop a pin.');
+                    scrollToSection('sub-addon-venue'); return false;
+                }
+                S.venueLocation = venueVal;
+            }
+
+            // 1E — Date
+            const ed = document.getElementById('event-date')?.value;
+            if (!ed) {
+                alert('Please choose an available date from the calendar.');
+                scrollToSection('sub-date'); return false;
+            }
+            const d = new Date(ed), today = new Date(); today.setHours(0, 0, 0, 0);
+            if (d < today) {
+                alert('Please select a future date.');
+                scrollToSection('sub-date'); return false;
+            }
             if (isUnavailableDate(ed)) {
                 alert('The selected date is not available for this booking type. Please choose another date.');
-                return false;
+                scrollToSection('sub-date'); return false;
             }
-            if (!S.time) { alert('Please select a time slot.'); return false; }
-
-            S.eventType = et;
-            S.guestCount = gc;
             S.eventDate = ed;
-            S.venueLocation = S.locationType === 'offsite' ? venueValue : '';
+
+            // 1F — Time
+            if (!S.time) {
+                alert('Please select a start time.');
+                scrollToSection('sub-time'); return false;
+            }
+
+            return true;
         }
 
         if (id === 'rs4') {
-            const name  = document.getElementById('name').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            const email = document.getElementById('email').value.trim();
+            const name  = document.getElementById('name')?.value.trim();
+            const phone = document.getElementById('phone')?.value.trim();
+            const email = document.getElementById('email')?.value.trim();
             if (!name || !phone || !email) { alert('Please fill in all contact details.'); return false; }
-            if (!/^\S+@\S+\.\S+$/.test(email)) { alert('Please enter a valid email.'); return false; }
+            if (!/^\S+@\S+\.\S+$/.test(email)) { alert('Please enter a valid email address.'); return false; }
             S.name = name; S.phone = phone; S.email = email;
-            S.requests = document.getElementById('requests').value.trim();
+            S.requests = document.getElementById('requests')?.value.trim() || '';
+            return true;
         }
 
         if (id === 'rs6') {
-            if (!isLoggedIn) {
-                document.getElementById('guest-warning').classList.remove('hidden');
-                return false;
-            }
+            if (!isLoggedIn) { document.getElementById('guest-warning').classList.remove('hidden'); return false; }
+            return true;
         }
 
         if (id === 'rs7') {
-            const contractFile = contractInput?.files?.[0] || null;
-            const contractValidationMessage = getContractUploadValidationMessage(contractFile);
-            if (contractValidationMessage) {
-                setContractPolicyMessage(contractValidationMessage, 'error');
-                updateContractFileStatus(contractFile);
+            if (!isSignaturePresent()) {
+                setSignatureStatus(signatureState.mode === 'draw' ? 'Please sign to continue.' : 'Please type your name to continue.', true);
                 return false;
             }
-            if (!contractAgreementCheckbox?.checked) {
-                setContractPolicyMessage('Please agree to the Terms & Conditions and Data Privacy Policy before submitting.', 'error');
-                return false;
+            if (!contractAgreementTerms?.checked) {
+                setContractPolicyMessage('Please agree to the Terms & Conditions and Data Privacy Policy before submitting.', 'error'); return false;
             }
+            if (!contractAgreementEsign?.checked) {
+                setContractPolicyMessage('Please confirm your details are accurate and that you are signing electronically.', 'error'); return false;
+            }
+            setSignatureStatus('');
             setContractPolicyMessage('');
+            return true;
         }
 
         return true;
     }
 
+    // ── Section lock helpers ────────────────────────────────────────────────
+    function isGuestsTypeUnlocked() {
+        if (!S.locationType) return false;
+        if (S.locationType === 'onsite') return !!S.miniPackage;
+        // Offsite: unlock once a category is chosen (catering dish validation happens at submit)
+        return !!S.offsiteCategory;
+    }
+
+    function updateSectionLocks() {
+        const unlocked = isGuestsTypeUnlocked();
+
+        // ── Guests + Event Type (1C) ──
+        const lockMsg  = document.getElementById('guests-type-status');
+        const content  = document.getElementById('guests-type-content');
+        const gcInput  = document.getElementById('guest-count');
+        const etSelect = document.getElementById('event-type-select');
+        if (lockMsg)  lockMsg.classList.toggle('hidden', unlocked);
+        if (content)  content.classList.toggle('res-locked-content', !unlocked);
+        if (gcInput)  gcInput.disabled = !unlocked;
+        if (etSelect) etSelect.disabled = !unlocked;
+
+        // ── Add-ons / Venue (1D) ──
+        const addonMsg     = document.getElementById('addon-venue-status');
+        const addonContent = document.getElementById('addon-venue-content');
+        if (addonMsg)     addonMsg.classList.toggle('hidden', unlocked);
+        if (addonContent) addonContent.classList.toggle('res-locked-content', !unlocked);
+    }
+
+    function scrollToSection(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const top = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top, behavior: 'smooth' });
+    }
+
+    // ── Card / pill helpers ────────────────────────────────────────────────
+    function card(html, isActive) {
+        const d = document.createElement('div');
+        d.className = 'pkg-card' + (isActive ? ' active' : '');
+        d.innerHTML = html;
+        return d;
+    }
+
+    function activate(container, el) {
+        container.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // ── Event listeners ────────────────────────────────────────────────────
     document.getElementById('nextBtn').onclick = () => {
         if (!isLoggedIn) {
             const notice = document.getElementById('resGuestNotice');
@@ -2061,85 +2095,90 @@
     };
 
     document.querySelectorAll('.location-card').forEach(c => {
-        c.onclick = async () => {
+        c.onclick = () => {
             document.querySelectorAll('.location-card').forEach(x => x.classList.remove('active'));
             c.classList.add('active');
-            S.locationType    = c.dataset.val;
-            S.miniPackage     = null;
-            S.snackAddon      = null;
-            S.offsiteCategory = '';
-            S.offsitePackage  = null;
-            S.cateringCart    = [];
-            S.time            = '';
-            document.getElementById('venue-wrapper').classList.toggle('hidden', S.locationType !== 'offsite');
-            if (S.locationType === 'offsite') {
-                setTimeout(function () {
-                    if (window.venueMap) { window.venueMap.invalidateSize(); }
-                }, 150);
+            const prev = S.locationType;
+            S.locationType = c.dataset.val;
+            // Reset downstream selections when location type changes
+            if (prev !== S.locationType) {
+                S.miniPackage     = null;
+                S.snackAddon      = null;
+                S.offsiteCategory = '';
+                S.offsitePackage  = null;
+                S.cateringCart    = [];
+                S.time            = '';
+                syncSelectedDate('');
             }
-            buildStep3();
-            await refreshAvailabilityForSelectedScope();
+            buildPackageStep();
+            updateSectionLocks();
+            buildAddonOrVenueStep();
+            refreshAvailabilityForSelectedScope();
         };
     });
 
     availabilityPrevMonthBtn?.addEventListener('click', async () => {
-        availabilityState.month = new Date(
-            availabilityState.month.getFullYear(),
-            availabilityState.month.getMonth() - 1,
-            1
-        );
+        availabilityState.month = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth() - 1, 1);
         await loadAvailabilityCalendar();
     });
 
     availabilityNextMonthBtn?.addEventListener('click', async () => {
-        availabilityState.month = new Date(
-            availabilityState.month.getFullYear(),
-            availabilityState.month.getMonth() + 1,
-            1
-        );
+        availabilityState.month = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth() + 1, 1);
         await loadAvailabilityCalendar();
     });
 
+    contractAgreementTerms?.addEventListener('change', () => { if (contractAgreementTerms.checked) setContractPolicyMessage(''); });
+    contractAgreementEsign?.addEventListener('change', () => { if (contractAgreementEsign.checked) setContractPolicyMessage(''); });
+    sigModeDrawBtn?.addEventListener('click', () => setSignatureMode('draw'));
+    sigModeTypeBtn?.addEventListener('click', () => setSignatureMode('type'));
+    signatureClearBtn?.addEventListener('click', () => { signatureState.pad?.clear(); setSignatureStatus(''); });
+    signatureTypeInput?.addEventListener('input', () => {
+        if (signatureTypePreview) signatureTypePreview.textContent = signatureTypeInput.value.trim();
+        setSignatureStatus('');
+    });
+    policyButtons.forEach(btn => btn.addEventListener('click', () => openPolicyModal(btn.dataset.policy)));
+    policyModalClose?.addEventListener('click', closePolicyModal);
+    policyModalDismiss?.addEventListener('click', closePolicyModal);
+    policyModalAgree?.addEventListener('click', agreeToPolicies);
+    policyModalBackdrop?.addEventListener('click', e => { if (e.target === policyModalBackdrop) closePolicyModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !policyModalBackdrop?.classList.contains('hidden')) closePolicyModal(); });
+
+    // ── Submit ─────────────────────────────────────────────────────────────
     async function submitDone() {
         const nextBtn = document.getElementById('nextBtn');
-        nextBtn.disabled = true;
-        nextBtn.textContent = 'Submitting...';
+        nextBtn.disabled = true; nextBtn.textContent = 'Submitting...';
 
         try {
-            const latestAvailability = await fetchDateAvailability(supabase, {
-                eventDate: S.eventDate,
-                scope: getSelectedBookingScope(),
-                durationHours: getSelectedDurationHours()
+            const latestAvail = await fetchDateAvailability(supabase, {
+                eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours()
             });
-
-            if (getSelectedBookingScope() && latestAvailability.scopeTaken) {
-                availabilityState.selectedDateAvailability = latestAvailability;
+            if (getSelectedBookingScope() && latestAvail.scopeTaken) {
+                availabilityState.selectedDateAvailability = latestAvail;
                 buildTimeGrid();
                 throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
             }
 
-            const { data: { session } } = await supabase.auth.getSession();
-            const userId = session.user.id;
-
-            const contractFile = contractInput?.files?.[0] || null;
-            const contractValidationMessage = getContractUploadValidationMessage(contractFile);
-            if (contractValidationMessage) {
-                throw new Error(contractValidationMessage);
+            const latestStartTimes = await fetchAvailableStartTimes(supabase, {
+                eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours()
+            });
+            const chosenRow = latestStartTimes.find(r => r.timeLabel === S.time);
+            if (!chosenRow || !chosenRow.isAvailable) {
+                availabilityState.availableStartTimes = latestStartTimes;
+                buildTimeGrid();
+                throw new Error('Your selected start time is no longer available. Please choose another time.');
             }
 
-            const formData = new FormData();
-            formData.append('file',          contractFile);
-            formData.append('upload_preset', 'eli_contracts');
-            formData.append('folder',        'contracts');
+            const { data: { session: freshSession } } = await supabase.auth.getSession();
+            const userId = freshSession.user.id;
 
-            const cloudName = 'dtt707f1w';
-            const cloudRes  = await fetch(
-                'https://api.cloudinary.com/v1_1/' + cloudName + '/auto/upload',
-                { method: 'POST', body: formData }
-            );
-            if (!cloudRes.ok) throw new Error('Contract upload failed. Please try again.');
-            const cloudData   = await cloudRes.json();
-            const contractUrl = cloudData.secure_url;
+            if (!isSignaturePresent()) throw new Error('Please sign the contract before submitting.');
+            if (!contractAgreementTerms?.checked || !contractAgreementEsign?.checked) {
+                throw new Error('Please check both agreement boxes before submitting.');
+            }
+            const signatureDataUrl = await getSignatureDataUrl();
+            if (!signatureDataUrl) throw new Error('Please sign the contract before submitting.');
+            const signerName = getSignerName();
+            const signatureType = signatureState.mode === 'draw' ? 'drawn' : 'typed';
 
             let packageId  = null;
             let addOnId    = null;
@@ -2148,10 +2187,8 @@
             if (S.locationType === 'onsite') {
                 packageId  = S.miniPackage ? S.miniPackage.id : null;
                 addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
-                totalPrice = (S.miniPackage ? S.miniPackage.price : 0)
-                           + (S.snackAddon  ? S.snackAddon.price  : 0);
+                totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
             } else if (S.offsiteCategory === 'catering') {
-                // Catering package row in the package table
                 const cateringPkg = OFFSITE_PKGS.catering[0];
                 packageId  = cateringPkg ? cateringPkg.id : null;
                 totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
@@ -2160,11 +2197,13 @@
                 totalPrice = S.offsitePackage ? S.offsitePackage.price : 0;
             }
 
+            const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
+
             const { data: reservation, error: insertError } = await supabase
                 .from('reservations')
                 .insert({
                     user_id:          userId,
-                    event_type:       S.eventType,
+                    event_type:       displayEventType,
                     event_date:       S.eventDate,
                     event_time:       S.time,
                     guest_count:      parseInt(S.guestCount),
@@ -2184,89 +2223,18 @@
 
             if (insertError) throw new Error('Reservation save failed: ' + insertError.message);
 
-            async function getActiveTemplateId(pkgId) {
-                if (!pkgId) return null;
-                const { data: tmpl, error: tmplErr } = await supabase
-                    .from('contract_templates')
-                    .select('template_id')
-                    .eq('package_id', pkgId)
-                    .eq('is_active', true)
-                    .order('version_no', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                if (tmplErr) {
-                    console.warn('Template lookup failed:', tmplErr.message);
-                    return null;
+            const { data: contractResult, error: contractError } = await supabase.functions.invoke('generate-signed-contract', {
+                body: {
+                    reservation_id: reservation.reservation_id,
+                    signature_data_url: signatureDataUrl,
+                    signer_name: signerName,
+                    signature_type: signatureType
                 }
-                return tmpl?.template_id || null;
+            });
+
+            if (contractError || !contractResult?.success) {
+                throw new Error(contractResult?.error || 'We could not finalize your signed contract. Please try again.');
             }
-
-            const selectedContract = getSelectedContractInfo();
-            const templateId = await getActiveTemplateId(packageId);
-
-            const contractPayload = {
-                reservation_id: reservation.reservation_id,
-                template_id: templateId,
-                contract_type: selectedContract?.contractType || 'package_contract',
-                contract_url: contractUrl,
-                review_status: 'pending_review',
-                review_notes: null,
-                reviewed_at: null,
-                verified_date: null
-            };
-
-            let contractInsertError = null;
-            {
-                const insertResult = await supabase
-                    .from('reservation_contracts')
-                    .insert(contractPayload);
-                contractInsertError = insertResult.error;
-            }
-
-            const contractInsertMessage = contractInsertError?.message || '';
-            const missingReviewColumns = contractInsertMessage.includes("Could not find the 'review_status' column")
-                || contractInsertMessage.includes('column reservation_contracts.review_status does not exist')
-                || contractInsertMessage.includes("Could not find the 'review_notes' column")
-                || contractInsertMessage.includes('column reservation_contracts.review_notes does not exist')
-                || contractInsertMessage.includes("Could not find the 'reviewed_at' column")
-                || contractInsertMessage.includes('column reservation_contracts.reviewed_at does not exist');
-
-            if (missingReviewColumns) {
-                const fallbackResult = await supabase
-                    .from('reservation_contracts')
-                    .insert({
-                        reservation_id: reservation.reservation_id,
-                        template_id: templateId,
-                        contract_type: selectedContract?.contractType || 'package_contract',
-                        contract_url: contractUrl,
-                        verified_date: null
-                    });
-                contractInsertError = fallbackResult.error;
-            }
-
-            if (contractInsertError) {
-                throw new Error('Contract save failed: ' + contractInsertError.message);
-            }
-
-            // ── Auto-verify contract signature via Edge Function ──────────────
-            let autoVerified = false;
-            try {
-                console.log('[verify-contract] invoking →', { reservation_id: reservation.reservation_id, contract_url: contractUrl });
-                const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-contract', {
-                    body: { reservation_id: reservation.reservation_id, contract_url: contractUrl }
-                });
-                console.log('[verify-contract] response →', JSON.stringify({ verifyData, verifyError: verifyError?.message ?? null }));
-                if (verifyError) {
-                    console.warn('[verify-contract] function error:', verifyError.message);
-                } else if (verifyData?.verified === true) {
-                    autoVerified = true;
-                } else {
-                    console.log('[verify-contract] not auto-verified:', verifyData?.reason ?? verifyData?.error ?? 'unknown reason');
-                }
-            } catch (verifyErr) {
-                console.warn('[verify-contract] invocation threw:', verifyErr?.message || verifyErr);
-            }
-            // ─────────────────────────────────────────────────────────────────
 
             clearDraft();
 
@@ -2277,115 +2245,62 @@
             const msg = document.createElement('div');
             msg.className = 'summary-box';
             msg.style.cssText = 'text-align:center;padding:48px 20px;';
-            if (autoVerified) {
-                msg.innerHTML =
-                    '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
-                    '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
-                    '<p style="color:#777;line-height:1.8;font-size:15px;">' +
-                    'Thank you, <strong>' + S.name + '</strong>!<br>' +
-                    'Your signed contract was <strong style="color:#6B3A1F;">automatically verified</strong>.<br>' +
-                    'Your reservation has been advanced to the finalization stage.<br>' +
-                    'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
-                    '</p>';
-            } else {
-                msg.innerHTML =
-                    '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
-                    '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
-                    '<p style="color:#777;line-height:1.8;font-size:15px;">' +
-                    'Thank you, <strong>' + S.name + '</strong>!<br>' +
-                    'Your reservation is <strong style="color:#6B3A1F;">under verification</strong>.<br>' +
-                    'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.' +
-                    '</p>';
-            }
+            msg.innerHTML =
+                '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
+                '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
+                '<p style="color:#777;line-height:1.8;font-size:15px;">Thank you, <strong>' + S.name + '</strong>!<br>' +
+                'Reservation Number: <strong style="color:#6B3A1F;">' + (contractResult.reservation_number || '') + '</strong><br>' +
+                'Your reservation is <strong style="color:#6B3A1F;">under review</strong>.<br>' +
+                'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.</p>' +
+                '<p style="margin-top:14px;"><a href="' + contractResult.contract_url + '" target="_blank" rel="noopener noreferrer" class="dl-btn" style="text-decoration:none;">Download your signed contract</a></p>';
             document.querySelector('.reservation-container').appendChild(msg);
 
         } catch (err) {
             alert(err.message);
-            nextBtn.disabled = false;
-            nextBtn.textContent = 'Submit';
+            nextBtn.disabled = false; nextBtn.textContent = 'Submit';
         }
     }
 
-    contractInput?.addEventListener('change', () => {
-        updateContractFileStatus(contractInput.files?.[0] || null);
-        setContractPolicyMessage('');
-    });
-
-    contractAgreementCheckbox?.addEventListener('change', () => {
-        if (contractAgreementCheckbox.checked) {
-            setContractPolicyMessage('');
-        }
-    });
-
-    policyButtons.forEach((button) => {
-        button.addEventListener('click', () => openPolicyModal(button.dataset.policy));
-    });
-
-    policyModalClose?.addEventListener('click', closePolicyModal);
-    policyModalDismiss?.addEventListener('click', closePolicyModal);
-    policyModalAgree?.addEventListener('click', agreeToPolicies);
-    policyModalBackdrop?.addEventListener('click', (event) => {
-        if (event.target === policyModalBackdrop) {
-            closePolicyModal();
-        }
-    });
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && policyModalBackdrop && !policyModalBackdrop.classList.contains('hidden')) {
-            closePolicyModal();
-        }
-    });
-
-    function card(html, isActive) {
-        const d = document.createElement('div');
-        d.className = 'pkg-card' + (isActive ? ' active' : '');
-        d.innerHTML = html;
-        return d;
-    }
-
-    function pill(text, isActive) {
-        const d = document.createElement('div');
-        d.className = 'pill' + (isActive ? ' active' : '');
-        d.textContent = text;
-        return d;
-    }
-
-    function activate(container, el) {
-        container.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
-        el.classList.add('active');
-    }
-
-    function activatePill(container, el) {
-        container.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-        el.classList.add('active');
-    }
-
-    // Load map scope config from system_settings, expose for non-module Leaflet script
-    try {
-        const { data: mapSetting } = await supabase
-            .from('system_settings')
-            .select('setting_value')
-            .eq('setting_key', 'venue_map_scope')
-            .maybeSingle();
-        if (mapSetting?.setting_value) window.venueMapConfig = JSON.parse(mapSetting.setting_value);
-    } catch { /* non-critical — Leaflet IIFE falls back to hardcoded Rizal defaults */ }
-
-    // Load packages from DB first, then start the form
+    // ── Initialize ─────────────────────────────────────────────────────────
     syncSelectedDate('');
-    await prefillReservationContactDetails();
     await loadEventTypes();
     await loadPackages();
-    await loadAvailabilityCalendar();
-    const _draftRestored = restoreDraft();
-    showStep(_draftRestored ? cur : 1);
+
+    // URL params (from "Book" on the Packages page) always take priority over
+    // any saved draft — the user made an explicit package selection, so discard
+    // any stale sessionStorage state that would otherwise silently suppress it.
+    const hasUrlPackage = new URLSearchParams(window.location.search).has('package');
+    if (hasUrlPackage) {
+        clearDraft();
+        const paramApplied = applyUrlParams();
+        cur = 1;
+        showStep(cur);
+        if (paramApplied) setTimeout(() => scrollToSection('sub-guests-type'), 120);
+    } else {
+        const draftRestored = restoreDraft();
+        if (!draftRestored) cur = 1;
+        showStep(cur);
+    }
+
+    // Prefill contact details for logged-in users (non-blocking)
+    prefillReservationContactDetails();
+    // Calendar loads after the page renders so the hero is fast
+    loadAvailabilityCalendar();
+
+    // Load map scope config from system_settings
+    try {
+        const { data: mapSetting } = await supabase.from('system_settings').select('setting_value').eq('setting_key', 'venue_map_scope').maybeSingle();
+        if (mapSetting?.setting_value) window.venueMapConfig = JSON.parse(mapSetting.setting_value);
+    } catch { /* non-critical */ }
+
     </script>
 
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function () {
         'use strict';
 
-        // Geographic bounds — loaded from system_settings, falling back to Rizal province defaults
         var cfg          = window.venueMapConfig || {};
         var RIZAL_CENTER = [cfg.center_lat || 14.5794, cfg.center_lng || 121.1878];
         var RIZAL_BOUNDS = [
@@ -2402,28 +2317,25 @@
             mapInitialized = true;
 
             window.venueMap = map = L.map('venue-map', {
-                center:             RIZAL_CENTER,
-                zoom:               11,
-                maxBounds:          RIZAL_BOUNDS,
-                maxBoundsViscosity: 1.0,
-                minZoom:            10,
-                maxZoom:            18
+                center: RIZAL_CENTER, zoom: 11,
+                maxBounds: RIZAL_BOUNDS, maxBoundsViscosity: 1.0,
+                minZoom: 10, maxZoom: 18
             });
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            map.on('click', function (e) {
-                placeMarker(e.latlng.lat, e.latlng.lng, true);
-            });
+            map.on('click', function (e) { placeMarker(e.latlng.lat, e.latlng.lng, true); });
         }
+
+        // Expose globally so buildAddonOrVenueStep() can call it
+        window.initVenueMap = initVenueMap;
 
         function placeMarker(lat, lng, doReverseGeocode) {
             if (!map) return;
-            if (marker) {
-                marker.setLatLng([lat, lng]);
-            } else {
+            if (marker) marker.setLatLng([lat, lng]);
+            else {
                 marker = L.marker([lat, lng], { draggable: true }).addTo(map);
                 marker.on('dragend', function () {
                     var pos = marker.getLatLng();
@@ -2443,86 +2355,39 @@
 
         function reverseGeocode(lat, lng) {
             setVenueAddress('Looking up address…');
-            fetch(
-                'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json',
-                { headers: { 'Accept-Language': 'en' } }
-            )
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                setVenueAddress(d.display_name || (lat.toFixed(5) + ', ' + lng.toFixed(5)));
-            })
-            .catch(function () {
-                setVenueAddress(lat.toFixed(5) + ', ' + lng.toFixed(5));
-            });
+            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json', { headers: { 'Accept-Language': 'en' } })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { setVenueAddress(d.display_name || (lat.toFixed(5) + ', ' + lng.toFixed(5))); })
+                .catch(function () { setVenueAddress(lat.toFixed(5) + ', ' + lng.toFixed(5)); });
         }
 
         function searchAddress(query) {
             if (!query.trim()) return;
             setVenueAddress('Searching…');
-
             var viewbox = (cfg.sw_lng||120.95)+','+(cfg.sw_lat||14.26)+','+(cfg.ne_lng||121.62)+','+(cfg.ne_lat||14.82);
             var url = 'https://nominatim.openstreetmap.org/search'
-                + '?q='        + encodeURIComponent(query + ', Rizal, Philippines')
-                + '&format=json&limit=1'
-                + '&viewbox='  + viewbox
-                + '&bounded=1&countrycodes=ph';
+                + '?q=' + encodeURIComponent(query + ', Rizal, Philippines')
+                + '&format=json&limit=1&viewbox=' + viewbox + '&bounded=1&countrycodes=ph';
 
             fetch(url, { headers: { 'Accept-Language': 'en' } })
-            .then(function (r) { return r.json(); })
-            .then(function (results) {
-                if (!results.length) {
-                    setVenueAddress('No results found in Rizal. Try a more specific address.');
-                    return;
-                }
-                var r = results[0];
-                placeMarker(parseFloat(r.lat), parseFloat(r.lon), false);
-                setVenueAddress(r.display_name);
-            })
-            .catch(function () {
-                setVenueAddress('Search failed. Please try again.');
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (results) {
+                    if (!results.length) { setVenueAddress('No results found in Rizal. Try a more specific address.'); return; }
+                    var r = results[0];
+                    placeMarker(parseFloat(r.lat), parseFloat(r.lon), false);
+                    setVenueAddress(r.display_name);
+                })
+                .catch(function () { setVenueAddress('Search failed. Please try again.'); });
         }
 
-        // Show map when venue-wrapper becomes visible (offsite selected)
-        // Uses MutationObserver on the hidden class toggle.
-        var observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (m) {
-                if (m.attributeName === 'class') {
-                    var wrapper = document.getElementById('venue-wrapper');
-                    if (wrapper && !wrapper.classList.contains('hidden')) {
-                        setTimeout(function () {
-                            initVenueMap();
-                            if (map) map.invalidateSize();
-                        }, 120);
-                    }
-                }
-            });
-        });
-
-        // Script is at bottom of <body> — DOM is already ready, run immediately.
-        var wrapper     = document.getElementById('venue-wrapper');
+        // Wire up search controls once DOM is ready (script is at bottom of body)
         var searchBtn   = document.getElementById('venue-search-btn');
         var searchInput = document.getElementById('venue-search-input');
 
-        if (wrapper) observer.observe(wrapper, { attributes: true });
-
-        if (searchBtn) {
-            searchBtn.addEventListener('click', function () {
-                if (searchInput) searchAddress(searchInput.value);
-            });
-        }
-
-        if (searchInput) {
-            searchInput.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    searchAddress(searchInput.value);
-                }
-            });
-        }
+        if (searchBtn) searchBtn.addEventListener('click', function () { if (searchInput) searchAddress(searchInput.value); });
+        if (searchInput) searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); searchAddress(searchInput.value); } });
     })();
     </script>
 
 </body>
 </html>
-
