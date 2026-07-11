@@ -16,8 +16,7 @@ export function setBadgeCount(element, count) {
   if (!element) return;
   const normalizedCount = Math.max(Number(count) || 0, 0);
   element.textContent = String(normalizedCount);
-  element.hidden = false;
-  element.removeAttribute('aria-hidden');
+  element.hidden = normalizedCount === 0;
 }
 
 async function fetchPendingReservationCount(supabase) {

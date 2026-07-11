@@ -518,6 +518,19 @@
             border-color: #e9ded3;
             box-shadow: none;
         }
+        /* Available, but a location/package hasn't been chosen yet — shown so
+           anyone (including signed-out visitors) can preview open dates.
+           Dashed border signals "informational" rather than "ready to
+           select", since clicking still just prompts them to choose a
+           booking type first. */
+        .availability-day.available.preview {
+            border-style: dashed;
+            cursor: pointer;
+        }
+        .availability-day.available.preview:hover {
+            transform: none;
+            box-shadow: none;
+        }
         .availability-day.past {
             background: #f8f5f1;
             color: #c3b5a7;

@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -313,7 +314,7 @@ async function loadCustomers() {
     renderCustomers([]);
     initAdminSidebarBadges(supabase)
     setCustomersMessage(
-      `Failed to load registered customers: ${error?.message || 'unknown error'}. If the admin account should see all profiles, check the RLS policies for the profiles table.`,
+      `Failed to load registered customers: ${error?.message || 'unknown error'}.`,
       true
     );
   }
@@ -327,6 +328,10 @@ validateAdminSession({
 
     // Setup inactivity
     setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
     // Attach UI listeners (IMPORTANT)
     refreshCustomersBtn?.addEventListener('click', loadCustomers);

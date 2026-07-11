@@ -3,6 +3,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -902,6 +903,10 @@ validateAdminSession({
 
     //  Set inactivity (super admin)
     setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
     wireFilters();
     wireTableActions();

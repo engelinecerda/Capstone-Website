@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { markAdminReviewsSeen, refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -332,7 +333,7 @@ async function loadReviews() {
       reviewBadgeEl: navReviewCount
     }).catch(() => {});
     setReviewsMessage(
-      `Failed to load submitted reviews: ${error?.message || 'unknown error'}. Check the reviews table, grants, and RLS policies for the admin account.`,
+      `Failed to load submitted reviews: ${error?.message || 'unknown error'}.`,
       true
     );
   }
@@ -349,6 +350,10 @@ validateAdminSession({
 
     // Setup inactivity
     setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
     // Wire UI
     searchInput?.addEventListener('input', applyFilters);

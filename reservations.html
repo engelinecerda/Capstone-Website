@@ -229,7 +229,7 @@
                 <!-- ── 1E. Date ───────────────────────────────── -->
                 <div class="res-section" id="sub-date">
                     <h2>Choose your <em>date</em></h2>
-                    <p>Available dates are shown based on your selected package and location.</p>
+                    <p>Browse open dates below. Choose a location and package to select one for your booking.</p>
 
                     <input type="hidden" id="event-date">
                     <input class="res-input res-input-readonly" type="text" id="event-date-display" placeholder="Select a date from the availability calendar below *" readonly>
@@ -237,7 +237,7 @@
                         <div class="availability-head">
                             <div>
                                 <h3 id="availabilityTitle">Availability Calendar</h3>
-                                <p>Only dates that fit your selected booking type will unlock here.</p>
+                                <p>Colors show general availability. Choose your location type and package to select a date.</p>
                             </div>
                             <div class="availability-nav">
                                 <button type="button" class="availability-nav-btn" id="availabilityPrevMonth" aria-label="Previous month">&lsaquo;</button>
@@ -1084,8 +1084,18 @@ By signing below, the Client confirms that the reservation details above are acc
                     buildTimeGrid();
                 });
             } else if (isContextLocked) {
-                btn.classList.add('context-disabled'); btn.disabled = true;
+                // General availability preview — visible to everyone, including
+                // guests who haven't chosen a location/package yet, so they can
+                // browse open dates before deciding to book. Actually selecting
+                // a date still requires a location + package so we know which
+                // scope to check when they get there.
+                btn.classList.add('available', 'preview');
                 btn.title = getScopeSelectionPrompt();
+                btn.addEventListener('click', () => {
+                    const prompt = getScopeSelectionPrompt();
+                    setAvailabilityMessage(prompt, false);
+                    setTimeStatusOverride(prompt);
+                });
             } else if (isBooked) {
                 btn.classList.add('booked');
                 btn.title = 'This date is fully booked.';

@@ -534,7 +534,7 @@ function showContractsView() {
 
   toggleTemplatesBtn.classList.remove('showing-templates');
   if (toggleTemplatesLabel) {
-    toggleTemplatesLabel.textContent = 'View Templates';
+    toggleTemplatesLabel.textContent = 'View templates';
   }
 
   templatesVisible = false;
@@ -551,7 +551,7 @@ async function showTemplatesView() {
 
   toggleTemplatesBtn.classList.add('showing-templates');
   if (toggleTemplatesLabel) {
-    toggleTemplatesLabel.textContent = 'Show Submitted Contracts';
+    toggleTemplatesLabel.textContent = 'Show submitted contracts';
   }
 
   templatesVisible = true;

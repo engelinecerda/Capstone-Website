@@ -473,7 +473,7 @@ function showPaymentsView() {
 
   togglePaymentMethodsBtn?.classList.remove('showing-methods');
   if (togglePaymentMethodsLabel) {
-    togglePaymentMethodsLabel.textContent = 'View Payment Methods';
+    togglePaymentMethodsLabel.textContent = 'View payment methods';
   }
 
   methodsVisible = false;
@@ -489,7 +489,7 @@ async function showMethodsView() {
 
   togglePaymentMethodsBtn?.classList.add('showing-methods');
   if (togglePaymentMethodsLabel) {
-    togglePaymentMethodsLabel.textContent = 'Show Payment Submissions';
+    togglePaymentMethodsLabel.textContent = 'Show payment submissions';
   }
 
   methodsVisible = true;

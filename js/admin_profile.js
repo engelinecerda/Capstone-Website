@@ -96,8 +96,11 @@ function renderProfileShell() {
     nameEl: sidebarName,
     emailEl: sidebarEmail,
     roleEl: sidebarRolePill,
+    avatarEl: document.getElementById('sidebarAvatar'),
     fallbackLabel: profile.role === 'admin' ? 'Admin' : 'Manager'
   });
+  const roleBottomEl = document.getElementById('sidebarRoleBottom');
+  if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
   if (heroAvatar) heroAvatar.textContent = getPortalInitials(profile, 'A');
   if (heroName) heroName.textContent = identity.displayName;

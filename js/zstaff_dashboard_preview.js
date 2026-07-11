@@ -1,5 +1,5 @@
-import { portalSupabase as supabase } from './supabase.js';
-import { verifyPortalSession } from './admin_auth.js';
+import { portalSupabase as supabase } from './zmock_supabase.js';
+import { verifyPortalSession } from './zmock_admin_auth.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarName = document.getElementById('sidebarName');

@@ -201,6 +201,22 @@ form.addEventListener('submit', async function (e) {
         return;
     }
 
+    // This is a customer-facing login — accounts registered as staff,
+    // manager, or admin belong to the separate admin portal and must not
+    // be able to sign in here even though Supabase Auth shares one user
+    // table across both portals.
+    const { data: profileRow, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+    if (profileError || !profileRow || String(profileRow.role || '').trim().toLowerCase() !== 'customer') {
+        await supabase.auth.signOut();
+        setMsg('This account is registered for staff access. Please use the staff/admin login instead.', 'error');
+        return;
+    }
+
     // Success — clear attempt history and redirect
     clearRecord(email);
     window.location.href = '/';

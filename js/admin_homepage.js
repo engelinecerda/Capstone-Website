@@ -4,18 +4,29 @@ import { getEffectiveReservationStatus, syncCompletedReservations } from './rese
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 const sidebarName = document.getElementById('sidebarName');
-const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
-const badge = document.getElementById('adminBadge');
-const sidebarTitle = document.getElementById('sidebarTitle');
+const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
+const sidebarAvatar = document.getElementById('sidebarAvatar');
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const demandYearSelect = document.getElementById('demandYear');
+const pageDate = document.getElementById('pageDate');
+const replacementAlert = document.getElementById('replacementAlert');
 const API = "https://capstone-website-papg.onrender.com";
+
+if (pageDate) {
+    pageDate.textContent = new Date().toLocaleDateString('en-PH', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
 
 let fullData = [];
 let barChart;
@@ -36,9 +47,18 @@ const chipTargets = {
     approved: document.getElementById('chipApproved'),
     declined: document.getElementById('chipDeclined'),
     completed: document.getElementById('chipCompleted'),
-    cancelled: document.getElementById('chipCancelled'),
-    rescheduled: document.getElementById('chipRescheduled')
+    cancelled: document.getElementById('chipCancelled')
 };
+
+const segTargets = {
+    pending: document.getElementById('segPending'),
+    approved: document.getElementById('segApproved'),
+    declined: document.getElementById('segDeclined'),
+    completed: document.getElementById('segCompleted'),
+    cancelled: document.getElementById('segCancelled')
+};
+
+const statusTotalEl = document.getElementById('statusTotal');
 
 async function loadForecast() {
     const res = await fetch(`${API}/forecast`);
@@ -266,12 +286,23 @@ function updateStats(reservations, contractsByReservationId = {}) {
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
     if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
+    if (replacementAlert) replacementAlert.hidden = totals.replacementContracts === 0;
+
+    const cancelledCombined = totals.cancelled + totals.rescheduled;
     if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
     if (chipTargets.approved) chipTargets.approved.textContent = String(totals.approved);
     if (chipTargets.declined) chipTargets.declined.textContent = String(totals.declined);
     if (chipTargets.completed) chipTargets.completed.textContent = String(totals.completed);
-    if (chipTargets.cancelled) chipTargets.cancelled.textContent = String(totals.cancelled);
-    if (chipTargets.rescheduled) chipTargets.rescheduled.textContent = String(totals.rescheduled);
+    if (chipTargets.cancelled) chipTargets.cancelled.textContent = String(cancelledCombined);
+
+    const total = reservations.length;
+    if (statusTotalEl) statusTotalEl.textContent = String(total);
+    const pct = (n) => (total > 0 ? (n / total) * 100 : 0);
+    if (segTargets.pending) segTargets.pending.style.width = pct(totals.pending) + '%';
+    if (segTargets.approved) segTargets.approved.style.width = pct(totals.approved) + '%';
+    if (segTargets.declined) segTargets.declined.style.width = pct(totals.declined) + '%';
+    if (segTargets.completed) segTargets.completed.style.width = pct(totals.completed) + '%';
+    if (segTargets.cancelled) segTargets.cancelled.style.width = pct(cancelledCombined) + '%';
 }
 
 function renderReservationsTable(reservations, contractsByReservationId = {}) {
@@ -289,14 +320,17 @@ function renderReservationsTable(reservations, contractsByReservationId = {}) {
             : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
         const status = formatStatus(reservation.status);
         const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
+        const contractCell = contractStatus.key === 'cancelled'
+            ? `<span class="no-contract">No contract</span>`
+            : `<span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span><span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span>`;
         return `
             <tr>
                 <td><span class="table-main">${escapeHtml(customerName)}</span><span class="table-sub">${escapeHtml(customerEmail)}</span></td>
                 <td><span class="table-main">${escapeHtml(reservation.event_type || 'Event')}</span><span class="table-sub">Submitted ${escapeHtml(formatDate(reservation.created_at))}</span></td>
-                <td><span class="table-main">${escapeHtml(formatDate(reservation.event_date))}</span><span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span></td>
+                <td><span class="table-main date-cell">${escapeHtml(formatDate(reservation.event_date))}</span><span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span></td>
                 <td><span class="table-main">${escapeHtml(packageName)}</span><span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span></td>
-                <td>${escapeHtml(location)}</td>
-                <td><span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span><span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span></td>
+                <td class="location-cell" title="${escapeHtml(location)}">${escapeHtml(location)}</td>
+                <td>${contractCell}</td>
                 <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
             </tr>`;
     }).join('');
@@ -414,6 +448,8 @@ watchAuthState();
 validateAdminSession({
     onSuccess: ({ profile }) => {
         setupInactivityLogout(profile.role);
+        if (sidebarAvatar) sidebarAvatar.textContent = getPortalInitials(profile);
+        if (sidebarRoleBottom) sidebarRoleBottom.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
         refreshSidebarBadges = initAdminSidebarBadges(supabase);
         loadDashboard();
     }

@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 import {
   fetchDateAvailability,
   getBookingScope as getSharedBookingScope,
@@ -2527,8 +2528,12 @@ watchAuthState();
 
 validateAdminSession({
   onSuccess: ({ session, profile }) => {
-    adminSession = session; 
+    adminSession = session;
     setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     loadData();
   }
 });

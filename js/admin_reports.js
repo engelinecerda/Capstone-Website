@@ -327,6 +327,8 @@ async function validateAdminSession() {
         avatarEl: sidebarAvatar,
         fallbackLabel: 'Admin'
     });
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
     applyRoleVisibility(profile.role);
 

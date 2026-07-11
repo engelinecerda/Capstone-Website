@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -584,7 +585,7 @@ function buildOcrPanel(payment) {
           <span class="ocr-panel-title">OCR Extraction</span>
           <span class="ocr-badge ocr-badge-failed">Failed</span>
         </div>
-        <p class="ocr-panel-note">Cloud Vision could not read this image: ${escapeHtml(ocr.error)}</p>
+        <p class="ocr-panel-note">We couldn't read this image automatically: ${escapeHtml(ocr.error)}</p>
       </div>
     `;
   }
@@ -946,8 +947,12 @@ validateAdminSession({
 
     // Setup inactivity (same as homepage)
     setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
-    
+
     if (profile.role === 'admin') {
       document.body.classList.add('is-super-admin');
     } else {

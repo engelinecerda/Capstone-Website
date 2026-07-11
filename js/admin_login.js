@@ -4,9 +4,9 @@ import { verifyPortalSession } from './admin_auth.js';
 
 const adminLoginForm = document.getElementById('adminLoginForm');
 const loginCard = document.getElementById('loginCard');
+const welcomeHeader = document.getElementById('welcomeHeader');
 const formMsg = document.getElementById('formMsg');
 const emailInput = document.getElementById('email');
-const roleSelect = document.getElementById('role');
 
 const mfaCard = document.getElementById('mfaCard');
 const mfaForm = document.getElementById('mfaForm');
@@ -49,6 +49,7 @@ function setMfaMessage(message, type = '') {
 
 function showMfaCard() {
     if (loginCard) loginCard.style.display = 'none';
+    if (welcomeHeader) welcomeHeader.style.display = 'none';
     if (mfaCard) mfaCard.style.display = '';
     if (mfaCodeInput) { mfaCodeInput.value = ''; mfaCodeInput.focus(); }
     setMfaMessage('');
@@ -57,6 +58,7 @@ function showMfaCard() {
 function hideMfaCard() {
     if (mfaCard) mfaCard.style.display = 'none';
     if (loginCard) loginCard.style.display = '';
+    if (welcomeHeader) welcomeHeader.style.display = '';
     if (mfaCodeInput) mfaCodeInput.value = '';
     setMfaMessage('');
 }
@@ -65,46 +67,24 @@ async function redirectIfPortalSessionExists() {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) return;
 
-    const { session, profile } = await verifyPortalSession(supabase, {
-        requiredRole: normalizeRole(data.session.user?.user_metadata?.role || '')
-    });
+    const { session, profile } = await verifyPortalSession(supabase);
 
     if (session) {
         const route = getPortalRoute(profile?.role);
         if (route) {
             window.location.replace(route);
-            return;
         }
-    }
-
-    const profileLookup = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('user_id', data.session.user.id)
-        .maybeSingle();
-
-    const route = getPortalRoute(profileLookup.data?.role);
-    if (route) {
-        window.location.replace(route);
     }
 }
 
 adminLoginForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    const selectedRole = normalizeRole(roleSelect?.value);
     const email = emailInput?.value.trim().toLowerCase() || '';
     const password = document.getElementById('password')?.value || '';
-    const targetRoute = getPortalRoute(selectedRole);
 
-    if (!targetRoute) {
-        setMessage('This portal currently supports Manager, Admin, and Staff roles only.', 'error');
-        roleSelect?.focus();
-        return;
-    }
-
-    if (!email) {
-        setMessage('Enter your email before continuing.', 'error');
+    if (!email || !password) {
+        setMessage('Enter your email and password to continue.', 'error');
         return;
     }
 
@@ -116,12 +96,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
     });
 
     if (error) {
-        if (error.message.toLowerCase().includes('email not confirmed')) {
-            setMessage('Confirm this email first, or manually mark it confirmed in Supabase.', 'error');
-            return;
-        }
-
-        setMessage('Login failed: ' + error.message, 'error');
+        setMessage('Invalid email or password.', 'error');
         return;
     }
 
@@ -143,10 +118,18 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         setMessage('Your account has been locked by the administrator.', 'error');
         return;
     }
-    const { session, profile, message } = await verifyPortalSession(supabase, { requiredRole: selectedRole });
+
+    const { session, profile, message } = await verifyPortalSession(supabase);
     if (!session) {
         await supabase.auth.signOut();
-        setMessage(message || 'This account is not allowed to use this portal role.', 'error');
+        setMessage(message || 'This account is not allowed to sign in here.', 'error');
+        return;
+    }
+
+    const targetRoute = getPortalRoute(profile?.role);
+    if (!targetRoute) {
+        await supabase.auth.signOut();
+        setMessage('This account is not allowed to sign in here.', 'error');
         return;
     }
 
@@ -163,7 +146,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
             }
             mfaState.factorId = totpFactor.id;
             mfaState.challengeId = challengeData.id;
-            mfaState.redirectTo = getPortalRoute(profile?.role) || targetRoute;
+            mfaState.redirectTo = targetRoute;
             showMfaCard();
             return;
         }
@@ -171,7 +154,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
 
     localStorage.removeItem('profile');
     setMessage('Login successful. Redirecting...');
-    window.location.replace(getPortalRoute(profile?.role) || targetRoute);
+    window.location.replace(targetRoute);
 });
 
 mfaForm?.addEventListener('submit', async (event) => {

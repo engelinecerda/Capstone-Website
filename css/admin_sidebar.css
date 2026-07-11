@@ -14,6 +14,7 @@
 .sidebar-bottom-nav .sidebar-section-label { margin-top: 0; }
 
 .nav-badge { display: grid; place-items: center; }
+.nav-badge[hidden] { display: none !important; }
 
 /* ── HAMBURGER BUTTON (hidden on desktop, shown on mobile) ─── */
 .sidebar-hamburger {

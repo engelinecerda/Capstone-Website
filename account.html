@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/account.css">
 </head>
@@ -50,19 +50,8 @@
     <div class="account-hero-inner">
       <div class="account-hero-left">
         <!-- Main heading -->
-        <h1 class="hero-heading">My Profile</h1>
-        <p class="hero-subtitle">Manage your account, reservations, payment, and preferences.</p>
-      </div>
-      <div class="account-hero-right">
-        <!-- Breadcrumb -->
-        <nav class="hero-breadcrumb" aria-label="Breadcrumb">
-          <span class="hero-breadcrumb-item">My Profile</span>
-          <span class="hero-breadcrumb-sep">/</span>
-          <span class="hero-breadcrumb-item active" id="hero-breadcrumb-current">Profile Overview</span>
-        </nav>
-        <button class="hero-logout-btn" id="logout-btn">
-          <i class="ti ti-logout"></i> Logout
-        </button>
+        <h1 class="hero-heading" id="hero-heading">My account</h1>
+        <p class="hero-subtitle" id="hero-subtitle">Manage your profile and bookings.</p>
       </div>
     </div>
   </section>
@@ -70,8 +59,17 @@
   <!-- ── Horizontal tab row ────────────────────────────────────────────── -->
   <div class="account-tabs-bar">
     <div class="account-tabs-inner">
-      <button class="account-tab active" data-section="profile">Profile</button>
-      <button class="account-tab" data-section="reservations">Reservations</button>
+      <div class="account-tabs-group">
+        <button class="account-tab active" data-section="profile">
+          <i class="fa-solid fa-user" aria-hidden="true"></i> Profile
+        </button>
+        <button class="account-tab" data-section="reservations">
+          <i class="fa-solid fa-calendar-check" aria-hidden="true"></i> Reservations
+        </button>
+      </div>
+      <button type="button" class="account-tabs-logout" id="tab-logout-btn">
+        <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Logout
+      </button>
     </div>
   </div>
 
@@ -90,7 +88,7 @@
               <p class="info-card-subtitle">Your account and contact details on file.</p>
             </div>
             <button type="button" class="btn-edit-profile" id="edit-profile-btn">
-              <i class="ti ti-edit"></i> Edit Profile
+              <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit Profile
             </button>
           </div>
 
@@ -124,7 +122,7 @@
             </div>
             <div class="info-actions">
               <button type="button" class="pill-btn" id="change-password-btn">
-                <i class="ti ti-lock"></i> Change Password
+                <i class="fa-solid fa-lock" aria-hidden="true"></i> Change Password
               </button>
             </div>
           </div>
@@ -214,7 +212,7 @@
       <section class="account-section" id="section-reservations">
         <div id="reservations-list">
           <div class="empty-state">
-            <div class="empty-icon">&#128172;</div>
+            <div class="empty-icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></div>
             <h3>No reservations yet</h3>
             <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
           </div>
@@ -232,19 +230,6 @@
       <div class="receipt-view" id="receipt-view"></div>
       <div class="account-modal-actions">
         <button type="button" class="account-modal-btn secondary" id="receipt-modal-dismiss">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="account-modal-backdrop hidden" id="reservation-details-backdrop" aria-hidden="true">
-    <div class="account-modal-card reservation-details-modal-card" role="dialog" aria-modal="true" aria-labelledby="reservation-details-title">
-      <button type="button" class="account-modal-close" id="reservation-details-close" aria-label="Close reservation details">x</button>
-      <p class="account-modal-eyebrow">Reservation Details</p>
-      <h2 class="account-modal-title" id="reservation-details-title">Booking Overview</h2>
-      <p class="account-modal-copy">Review your booking information, payment progress, and uploaded contract in one place.</p>
-      <div class="reservation-details-view" id="reservation-details-view"></div>
-      <div class="account-modal-actions">
-        <button type="button" class="account-modal-btn secondary" id="reservation-details-dismiss">Close</button>
       </div>
     </div>
   </div>
