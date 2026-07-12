@@ -3,8 +3,7 @@ import { verifyPortalSession } from './admin_auth.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarName = document.getElementById('sidebarName');
-const sidebarEmail = document.getElementById('sidebarEmail');
-const sidebarRolePill = document.getElementById('sidebarRolePill');
+const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
 const logoutBtn = document.getElementById('logoutBtn');
 const summaryTodayValue = document.getElementById('summaryTodayValue');
 const summaryTodayCopy = document.getElementById('summaryTodayCopy');
@@ -173,6 +172,13 @@ const FILTER_LABELS = {
   past: 'past'
 };
 
+const CHIP_LABELS = {
+  today: 'Today',
+  week: 'This Week',
+  upcoming: 'Upcoming',
+  past: 'Past'
+};
+
 function getReservationStatusMeta(status) {
   const normalized = normalizeRole(status);
   if (normalized === 'completed') {
@@ -190,6 +196,12 @@ function getReservationStatusMeta(status) {
 function getCustomerSurname(reservation) {
   const parts = String(reservation?.contact_name || '').trim().split(/\s+/).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : 'Customer';
+}
+
+function getReservationInitials(reservation) {
+  const parts = String(reservation?.contact_name || '').trim().split(/\s+/).filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+  return initials || 'R';
 }
 
 function getReservationDurationHours(reservation) {
@@ -294,8 +306,22 @@ function getAssignmentsForCurrentFilter() {
 }
 
 function syncFilterButtons() {
-  filterRow?.querySelectorAll('.filter-chip').forEach((button) => {
-    button.classList.toggle('active', button.dataset.filter === state.activeFilter);
+  filterRow?.querySelectorAll('.chip').forEach((button) => {
+    button.classList.toggle('active', !state.selectedDate && button.dataset.filter === state.activeFilter);
+  });
+}
+
+function updateFilterChipCounts() {
+  const counts = {
+    today: state.reservations.filter((reservation) => isToday(getReservationDateKey(reservation))).length,
+    week: state.reservations.filter((reservation) => isInThisWeek(getReservationDateKey(reservation))).length,
+    upcoming: state.reservations.filter((reservation) => isUpcoming(getReservationDateKey(reservation))).length,
+    past: state.reservations.filter((reservation) => isPast(getReservationDateKey(reservation))).length
+  };
+
+  filterRow?.querySelectorAll('.chip').forEach((button) => {
+    const filterKey = button.dataset.filter;
+    button.textContent = `${CHIP_LABELS[filterKey] || filterKey} (${counts[filterKey] ?? 0})`;
   });
 }
 
@@ -310,7 +336,6 @@ function updateActiveDateBanner() {
 function renderSummary() {
   const todayCount = state.reservations.filter((reservation) => isToday(getReservationDateKey(reservation))).length;
   const weekCount = state.reservations.filter((reservation) => isInThisWeek(getReservationDateKey(reservation))).length;
-  const roleLabel = formatStaffRole(state.profile?.staff_role);
   const today = parseDateKey(getTodayKey());
   const weekEnd = new Date(today);
   weekEnd.setDate(today.getDate() + 6);
@@ -333,22 +358,20 @@ function renderSummary() {
 
   if (summaryNextValue) {
     summaryNextValue.textContent = nextAssignment
-      ? `Next up · ${getEventTitle(nextAssignment)}`
-      : 'Next up · None scheduled';
+      ? getEventTitle(nextAssignment)
+      : 'None scheduled';
   }
   if (summaryNextCopy) {
     summaryNextCopy.textContent = nextAssignment
       ? `${formatShortDate(nextAssignment.event_date)} · ${nextAssignment.event_time || 'No time selected'}`
       : '';
   }
-
-  if (sidebarRolePill) sidebarRolePill.textContent = roleLabel;
 }
 
 function renderProfileShell() {
   if (sidebarAvatar) sidebarAvatar.textContent = getInitials(state.profile);
   if (sidebarName) sidebarName.textContent = getDisplayName(state.profile);
-  if (sidebarEmail) sidebarEmail.textContent = state.profile?.email || 'No email on file';
+  if (sidebarRoleBottom) sidebarRoleBottom.textContent = 'Staff';
 }
 
 function renderCalendar() {
@@ -409,6 +432,7 @@ function renderReservations() {
   if (!reservationList) return;
 
   syncFilterButtons();
+  updateFilterChipCounts();
   updateActiveDateBanner();
   const filtered = getAssignmentsForCurrentFilter();
   const total = state.reservations.length;
@@ -434,13 +458,15 @@ function renderReservations() {
     const showHistoryLink = !state.selectedDate && state.activeFilter !== 'past' && pastCount > 0;
 
     reservationList.innerHTML = `
-      <div class="empty-state">
-        <h3 class="empty-state-title">No assigned reservations</h3>
-        <p class="empty-state-copy">
-          ${escapeHtml(emptyLead)}
-          ${showHistoryLink ? ` You have ${pastCount} past assignment${pastCount === 1 ? '' : 's'} — <button type="button" class="text-btn" id="viewHistoryBtn">view history</button>` : ''}
-        </p>
-      </div>
+      <tr class="empty-row">
+        <td colspan="5">
+          <h3 class="empty-state-title">No assigned reservations</h3>
+          <p class="empty-state-copy">
+            ${escapeHtml(emptyLead)}
+            ${showHistoryLink ? ` You have ${pastCount} past assignment${pastCount === 1 ? '' : 's'} — <button type="button" class="text-btn" id="viewHistoryBtn">view history</button>` : ''}
+          </p>
+        </td>
+      </tr>
     `;
     return;
   }
@@ -450,17 +476,32 @@ function renderReservations() {
     const note = getAssignmentNote(reservation);
 
     return `
-      <article class="reservation-card">
-        <div class="reservation-card-head">
-          <h3 class="reservation-title">${escapeHtml(getEventTitle(reservation))} — ${escapeHtml(getCustomerSurname(reservation))}</h3>
-          <span class="status-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
-        </div>
-        <p class="reservation-line2">${escapeHtml(formatShortDate(reservation.event_date))} · ${escapeHtml(getReservationTimeRangeLabel(reservation))} · ${escapeHtml(getLocationLabel(reservation))}</p>
-        <p class="reservation-line3">${escapeHtml(String(reservation.guest_count || 0))} guests${note ? ` · ${escapeHtml(note)}` : ''}</p>
-        <div class="reservation-actions">
-          <button type="button" class="primary-btn" data-action="view-details" data-reservation-id="${reservation.reservation_id}">View Details</button>
-        </div>
-      </article>
+      <tr class="reservation-row">
+        <td data-label="Event / Package">
+          <div class="reservation-customer">
+            <span class="reservation-avatar">${escapeHtml(getReservationInitials(reservation))}</span>
+            <div class="reservation-customer-copy">
+              <span class="table-main">${escapeHtml(getEventTitle(reservation))} — ${escapeHtml(getCustomerSurname(reservation))}</span>
+              <span class="table-sub">${escapeHtml(reservation.package?.package_name || 'Package pending')}</span>
+              <span class="table-sub">${escapeHtml(getLocationLabel(reservation))}</span>
+            </div>
+          </div>
+        </td>
+        <td data-label="Date & Time">
+          <div class="table-date">
+            <span class="table-date-main">${escapeHtml(formatShortDate(reservation.event_date))}</span>
+            <span class="table-date-time">${escapeHtml(getReservationTimeRangeLabel(reservation))}</span>
+          </div>
+        </td>
+        <td data-label="Status"><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+        <td data-label="Notes">
+          <span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span>
+          <span class="table-sub">${note ? escapeHtml(note) : 'No notes'}</span>
+        </td>
+        <td class="actions" data-label="Action">
+          <button type="button" class="secondary-btn" data-action="view-details" data-reservation-id="${reservation.reservation_id}">View Details</button>
+        </td>
+      </tr>
     `;
   }).join('');
 }
@@ -486,12 +527,12 @@ function renderReservationModal(reservationId) {
   state.activeReservationId = reservationId;
 
   reservationModalHero.innerHTML = `
-    <div class="reservation-card-head">
+    <div class="modal-hero-head">
       <div>
         <h3 class="modal-hero-title">${escapeHtml(getEventTitle(reservation))}</h3>
         <p class="modal-hero-copy">${escapeHtml(reservation.contact_name || 'Assigned customer')} | ${escapeHtml(formatStaffRole(state.profile?.staff_role))}</p>
       </div>
-      <span class="status-badge ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
+      <span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
     </div>
   `;
 
@@ -632,7 +673,47 @@ async function loadDashboard() {
   }
 }
 
+function injectSidebarHamburger() {
+  if (document.getElementById('sidebarHamburger')) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'sidebarHamburger';
+  btn.className = 'sidebar-hamburger';
+  btn.setAttribute('aria-label', 'Open menu');
+  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/>
+    <line x1="3" y1="12" x2="21" y2="12"/>
+    <line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'sidebarOverlay';
+  overlay.className = 'sidebar-overlay';
+
+  document.body.prepend(overlay);
+  document.body.prepend(btn);
+
+  btn.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-open');
+  });
+
+  overlay.addEventListener('click', () => {
+    document.body.classList.remove('sidebar-open');
+  });
+
+  document.querySelectorAll('.sidebar .nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        document.body.classList.remove('sidebar-open');
+      }
+    });
+  });
+}
+
 function bindEvents() {
+  injectSidebarHamburger();
+
   logoutBtn?.addEventListener('click', async () => {
     await supabase.auth.signOut();
     redirectLogin();

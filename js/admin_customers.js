@@ -3,6 +3,7 @@ import { validateAdminSession, wireLogoutButton, watchAuthState } from './sessio
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -332,6 +333,7 @@ validateAdminSession({
     if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
     const roleBottomEl = document.getElementById('sidebarRoleBottom');
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
+    initManagerNotificationBell(supabase, session.user.id);
 
     // Attach UI listeners (IMPORTANT)
     refreshCustomersBtn?.addEventListener('click', loadCustomers);

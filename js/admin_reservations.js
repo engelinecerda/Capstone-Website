@@ -3,6 +3,7 @@ import { validateAdminSession, wireLogoutButton, watchAuthState } from './sessio
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
   fetchDateAvailability,
   getBookingScope as getSharedBookingScope,
@@ -2512,9 +2513,20 @@ refreshBtn?.addEventListener('click', loadData);
 });*/
 
 
+function applyStatusFilterFromUrl() {
+  const requestedStatus = new URLSearchParams(window.location.search).get('status');
+  if (!requestedStatus || !chipsRow) return;
+  const chip = chipsRow.querySelector(`[data-status="${requestedStatus}"]`);
+  if (!chip) return;
+  chipsRow.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+  chip.classList.add('active');
+  if (statusDropdown) statusDropdown.value = 'all';
+}
+
 //  run immediately (UI setup)
 setCalendarExpanded(false);
 wireFilters();
+applyStatusFilterFromUrl();
 wireTableActions();
 wireReservationDetailsModal();
 wireCalendarToggle();
@@ -2526,14 +2538,24 @@ wireDayTimelineModal();
 wireLogoutButton();
 watchAuthState();
 
+function openReservationFromUrlIfPresent() {
+  const requestedId = new URLSearchParams(window.location.search).get('reservation');
+  if (!requestedId) return;
+  if (getReservationById(requestedId)) {
+    openReservationDetailsModal(requestedId);
+  }
+}
+
 validateAdminSession({
-  onSuccess: ({ session, profile }) => {
+  onSuccess: async ({ session, profile }) => {
     adminSession = session;
     setupInactivityLogout(profile.role);
     const avatarEl = document.getElementById('sidebarAvatar');
     if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
     const roleBottomEl = document.getElementById('sidebarRoleBottom');
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
-    loadData();
+    initManagerNotificationBell(supabase, session.user.id);
+    await loadData();
+    openReservationFromUrlIfPresent();
   }
 });

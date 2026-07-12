@@ -1,315 +1,29 @@
-:root {
-  --bg: #f5efe7;
-  --panel: #ffffff;
-  --sidebar: #fffaf5;
-  --border: #eadfd2;
-  --text: #20150b;
-  --muted: #73685f;
-  --accent: #6b4f3a;
-  --accent-strong: #4e3624;
-  --accent-soft: #f6ece1;
-  --accent-line: #d9c2aa;
-  --success-soft: #dff2e2;
-  --success-text: #25643d;
-  --neutral-soft: #eceff3;
-  --neutral-text: #566170;
-  --shadow: 0 12px 28px rgba(70, 43, 19, 0.08);
-  --font: 'Kumbh Sans', sans-serif;
-  --sidebar-w: 250px;
+/* staff_dashboard.css — page-specific additions on top of manager-theme.css */
+
+/* ============================================================
+   STAT ROW (3 cards instead of the manager's default 4)
+   ============================================================ */
+.stat-row {
+  grid-template-columns: repeat(3, 1fr);
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  min-height: 100%;
-}
-
-body {
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  display: flex;
-}
-
-.sidebar {
-  width: var(--sidebar-w);
-  background: var(--sidebar);
-  border-right: 1px solid var(--border);
-  position: fixed;
-  inset: 0 auto 0 0;
-  display: flex;
-  flex-direction: column;
-  padding: 24px 18px 20px;
-  overflow-y: auto;
-}
-
-.sidebar-brand {
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.sidebar-title {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.sidebar-subtitle {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
-.sidebar-profile {
-  display: block;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-}
-
-.sidebar-avatar {
-  display: none;
-}
-
-.sidebar-profile-copy {
-  min-width: 0;
-}
-
-.sidebar-name {
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.sidebar-email {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
-.sidebar-role-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 24px;
-  margin-top: 8px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 12px;
-  color: var(--text);
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  border: 1px solid transparent;
-  background: transparent;
-}
-
-.nav-item-button {
-  font: inherit;
-  cursor: pointer;
-}
-
-.nav-item:hover {
-  background: #fff;
-  border-color: var(--border);
-}
-
-.nav-item.active {
-  background: var(--accent-strong);
-  color: #fff;
-}
-
-.nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding-top: 14px;
-  color: var(--muted);
-  font-size: 11px;
-  text-align: center;
-}
-
-.main {
-  margin-left: var(--sidebar-w);
-  flex: 1;
-  min-height: 100vh;
-  padding: 34px 36px 44px;
-}
-
-.page-shell {
-  max-width: 1360px;
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 24px;
-}
-
-.page-eyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #9a6a41;
-}
-
-.page-title {
-  margin-top: 8px;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.page-subtitle {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 13.5px;
-}
-
-.page-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.icon-btn,
-.secondary-btn,
-.text-btn {
-  font: inherit;
-}
-
-.icon-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow);
-}
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-}
-
-.summary-bar {
-  display: flex;
-  align-items: center;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-  padding: 18px 24px;
-  margin-bottom: 18px;
-  gap: 22px;
-}
-
-.summary-seg {
-  flex: 1;
-  min-width: 0;
-}
-
-.summary-seg-next {
-  flex: 1.6;
-}
-
-.summary-divider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--border);
-}
-
-.summary-seg-label {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.summary-seg-value {
-  margin-top: 8px;
-  font-size: 26px;
-  line-height: 1.1;
-  font-weight: 700;
-}
-
-.summary-seg-next-value {
-  font-size: 17px;
+.stat-value-text {
+  font-size: 16px;
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.summary-seg-copy {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-.dashboard-message {
-  min-height: 18px;
-  margin-bottom: 16px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.dashboard-message.error {
-  color: #b42318;
-}
-
+/* ============================================================
+   WORKSPACE LAYOUT — reservations primary (~60%), calendar compact (~40%)
+   ============================================================ */
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
   gap: 20px;
   align-items: start;
-}
-
-.card {
-  padding: 20px;
+  margin-bottom: 18px;
 }
 
 .card-head {
@@ -317,47 +31,201 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
-}
-
-.card-head-stack {
   margin-bottom: 14px;
 }
 
-.card-title {
-  font-size: 17px;
-  font-weight: 700;
+/* ============================================================
+   FILTER CHIPS — count-pill pattern
+   ============================================================ */
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
-.card-copy {
-  margin-top: 4px;
+.chip {
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--btn-secondary-border);
+  color: var(--text);
+}
+
+.chip.active {
+  background: var(--active-bg);
+  border-color: var(--active-bg);
+  color: var(--active-text);
+  font-weight: 500;
+}
+
+.active-date-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  border-left: 3px solid var(--active-bg);
+  background: var(--input-bg);
+}
+
+.active-date-filter.hidden {
+  display: none;
+}
+
+.active-date-copy {
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.text-btn {
+  border: none;
+  background: transparent;
+  color: var(--btn-primary-bg);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ============================================================
+   RESERVATION TABLE
+   ============================================================ */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.reservation-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.reservation-table th,
+.reservation-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 12px 10px 0;
+}
+
+.reservation-table th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 0.5px solid var(--border);
+}
+
+.reservation-table th:last-child,
+.reservation-table td.actions {
+  width: 140px;
+  min-width: 140px;
+  text-align: center;
+}
+
+.reservation-table tbody td {
+  border-bottom: 0.5px solid #EFE8DD;
+}
+
+.reservation-row:hover td {
+  background: #FBF8F3;
+}
+
+.reservation-customer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.reservation-customer-copy {
+  min-width: 0;
+}
+
+.reservation-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sidebar-cream);
+  color: var(--avatar-bg);
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.table-main {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.table-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.table-date {
+  display: grid;
+  gap: 3px;
+}
+
+.table-date-main {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.table-date-time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.status-pill.cancelled {
+  background: var(--declined);
+  color: var(--declined-txt);
+}
+
+.reservation-table tbody tr.empty-row td {
+  padding: 24px 20px;
+  text-align: center;
+  border-bottom: none;
+}
+
+.empty-state-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-state-copy {
+  margin-top: 6px;
   color: var(--muted);
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-.secondary-btn {
-  min-height: 38px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.secondary-btn:hover,
-.icon-btn:hover,
-.text-btn:hover {
-  filter: brightness(0.98);
-}
-
-.secondary-btn-full {
-  width: 100%;
-}
-
+/* ============================================================
+   SCHEDULE CALENDAR
+   ============================================================ */
 .calendar-header {
   display: flex;
   align-items: center;
@@ -367,48 +235,53 @@ body {
 }
 
 .calendar-month {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 500;
   text-align: center;
   flex: 1;
+  color: var(--text);
 }
 
 .calendar-nav {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--accent);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 0.5px solid var(--btn-secondary-border);
+  background: var(--card-bg);
+  color: var(--text);
   font: inherit;
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
+}
+
+.calendar-nav:hover {
+  background: var(--btn-secondary-hover);
 }
 
 .calendar-weekdays,
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .calendar-weekdays {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .calendar-weekdays span {
   text-align: center;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
 .calendar-cell {
-  min-height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: #fff;
+  min-height: 38px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--card-bg);
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -417,7 +290,7 @@ body {
   gap: 3px;
   padding: 4px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .calendar-cell.outside {
@@ -426,38 +299,38 @@ body {
 
 .calendar-cell.assigned {
   cursor: pointer;
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
+  border-color: #D8CCBD;
+  background: var(--input-bg);
 }
 
 .calendar-cell.assigned:hover {
-  background: #f0dfc9;
+  background: var(--btn-secondary-hover);
 }
 
 .calendar-cell.selected {
-  box-shadow: 0 0 0 3px rgba(107, 79, 58, 0.18);
+  box-shadow: 0 0 0 3px rgba(61, 26, 10, 0.14);
 }
 
 .calendar-cell.today {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--active-bg);
+  border-color: var(--active-bg);
+  color: var(--active-text);
 }
 
 .calendar-cell.today:hover {
-  background: var(--accent-strong);
+  background: var(--nav-hover-bg);
 }
 
 .cell-dot {
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: #c98a2c;
+  background: #C08A3E;
   display: inline-block;
 }
 
 .calendar-cell.today .cell-dot {
-  background: #fff;
+  background: var(--sidebar-cream);
 }
 
 .calendar-legend {
@@ -484,7 +357,7 @@ body {
 }
 
 .legend-dot.assigned {
-  background: #c98a2c;
+  background: #C08A3E;
 }
 
 .legend-swatch {
@@ -495,182 +368,16 @@ body {
 }
 
 .legend-swatch.today {
-  background: var(--accent);
+  background: var(--active-bg);
 }
 
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.filter-chip {
-  min-height: 36px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.filter-chip.active {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
-  color: #fff;
-}
-
-.active-date-filter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-}
-
-.active-date-filter.hidden {
-  display: none;
-}
-
-.active-date-copy {
-  color: var(--accent);
-  font-size: 12.5px;
-  font-weight: 700;
-}
-
-.text-btn {
-  border: none;
-  background: transparent;
-  color: var(--accent);
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.reservation-list {
-  display: grid;
-  gap: 12px;
-}
-
-.reservation-card {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: #fff;
-  padding: 16px 18px;
-}
-
-.reservation-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.reservation-title {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.reservation-line2 {
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.reservation-line3 {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-
-.status-badge.pending {
-  background: var(--neutral-soft);
-  border-color: #d7dde4;
-  color: var(--neutral-text);
-}
-
-.status-badge.approved {
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-  color: var(--accent);
-}
-
-.status-badge.completed {
-  background: var(--success-soft);
-  border-color: #b8dcc1;
-  color: var(--success-text);
-}
-
-.status-badge.cancelled {
-  background: #fbe4e1;
-  border-color: #f0b7b0;
-  color: #b3261e;
-}
-
-.reservation-actions {
-  margin-top: 12px;
-}
-
-.primary-btn {
-  min-height: 36px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.empty-state {
-  border: 1px dashed var(--border);
-  border-radius: 16px;
-  background: #fff;
-  padding: 24px 20px;
-  text-align: center;
-}
-
-.empty-state-title {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.empty-state-copy {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
+/* ============================================================
+   MODAL
+   ============================================================ */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(39, 24, 12, 0.42);
+  background: rgba(26, 26, 26, 0.42);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -686,10 +393,10 @@ body {
   width: min(100%, 760px);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
-  background: #fffdf9;
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  box-shadow: 0 28px 60px rgba(39, 24, 12, 0.24);
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 28px 60px rgba(26, 26, 26, 0.2);
   padding: 24px;
   position: relative;
 }
@@ -698,70 +405,79 @@ body {
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fff;
+  border: 0.5px solid var(--border);
+  background: var(--card-bg);
   color: var(--muted);
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .modal-eyebrow {
-  color: #9a6a41;
+  color: var(--section-label);
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .modal-title {
-  margin-top: 10px;
-  font-size: 25px;
-  font-weight: 700;
-  line-height: 1.15;
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text);
 }
 
 .modal-copy {
   margin-top: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
 .modal-hero {
-  margin-top: 20px;
-  padding: 18px 20px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #fff8ef 0%, #f7ebdd 100%);
-  border: 1px solid var(--accent-line);
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--input-bg);
+  border: 0.5px solid var(--border);
+}
+
+.modal-hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .modal-hero-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
 }
 
 .modal-hero-copy {
   margin-top: 6px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .modal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .modal-detail-card {
-  border-radius: 16px;
-  background: #fff;
-  border: 1px solid var(--border);
-  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  padding: 12px 14px;
 }
 
 .modal-detail-card.full {
@@ -772,16 +488,16 @@ body {
   display: block;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
 .modal-detail-value {
-  margin-top: 6px;
+  margin-top: 5px;
   color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 600;
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -790,65 +506,93 @@ body {
   margin-top: 18px;
 }
 
-@media (max-width: 1180px) {
+.secondary-btn-full {
+  width: 100%;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1100px) {
   .workspace-grid {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 920px) {
-  .summary-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 14px;
-  }
-
-  .summary-divider {
-    width: auto;
-    height: 1px;
-  }
-
-  .page-header {
-    flex-direction: column;
+@media (max-width: 720px) {
+  .stat-row {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 760px) {
-  :root {
-    --sidebar-w: 0px;
-  }
-
-  .sidebar {
-    display: none;
-  }
-
+@media (max-width: 768px) {
+  /* admin_sidebar.css zeroes .main's margin-left on mobile but not its
+     width, which is still calc(100% - var(--sidebar-w)) from
+     manager-theme.css — pin it back to full width here. */
   .main {
-    margin-left: 0;
-    padding: 18px 14px 28px;
+    width: 100% !important;
   }
+}
 
-  .page-title {
-    font-size: 26px;
-  }
-
-  .card {
-    padding: 16px;
-  }
-
-  .calendar-grid {
-    gap: 6px;
-  }
-
-  .calendar-cell {
-    min-height: 38px;
-    font-size: 11px;
-  }
-
+@media (max-width: 480px) {
   .modal-grid {
     grid-template-columns: 1fr;
   }
 
   .modal-backdrop {
     padding: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .reservation-table {
+    display: block;
+    width: 100%;
+  }
+
+  .reservation-table thead {
+    display: none;
+  }
+
+  .reservation-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .reservation-table tbody tr.reservation-row {
+    display: block;
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .reservation-table tbody tr.reservation-row td {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+    border-bottom: 0.5px solid #EFE8DD;
+  }
+
+  .reservation-table tbody tr.reservation-row td:last-child {
+    border-bottom: none;
+  }
+
+  .reservation-table tbody tr.reservation-row td .status-pill {
+    justify-self: start;
+  }
+
+  .reservation-table tbody tr.reservation-row td::before {
+    content: attr(data-label);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted-2);
+  }
+
+  .reservation-table td.actions {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
   }
 }

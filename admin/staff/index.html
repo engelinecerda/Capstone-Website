@@ -1,83 +1,83 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Schedule - Staff</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/staff_dashboard.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
 </head>
 <body>
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <p class="sidebar-title">Staff Portal</p>
-      <p class="sidebar-subtitle">ELI Coffee Events</p>
-    </div>
-
-    <div class="sidebar-profile">
-      <span class="sidebar-avatar" id="sidebarAvatar">S</span>
-      <div class="sidebar-profile-copy">
-        <p class="sidebar-name" id="sidebarName">Loading...</p>
-        <p class="sidebar-email" id="sidebarEmail">Checking session...</p>
-        <span class="sidebar-role-pill" id="sidebarRolePill">Employee</span>
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role">Staff</p>
       </div>
     </div>
 
-    <nav class="sidebar-nav">
-      <a href="/admin/staff/index.html" class="nav-item active">
-        <span class="nav-icon">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        </span>
-        <span class="nav-label">My Schedule</span>
-      </a>
-      <a href="/admin/staff/profile.html" class="nav-item">
-        <span class="nav-icon">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-        </span>
-        <span class="nav-label">Profile</span>
-      </a>
-      <button type="button" class="nav-item nav-item-button" id="logoutBtn">
-        <span class="nav-icon">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </span>
-        <span class="nav-label">Logout</span>
-      </button>
-    </nav>
+    <div class="sidebar-content">
+      <nav class="sidebar-nav">
+        <p class="sidebar-section-label">Main</p>
+        <a href="/admin/staff/index.html" class="nav-item active">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </span>
+          <span class="nav-label">My Schedule</span>
+        </a>
+        <a href="/admin/staff/profile.html" class="nav-item">
+          <span class="nav-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+          <span class="nav-label">Profile</span>
+        </a>
+      </nav>
 
-    <p class="sidebar-footer">ELI Coffee Events Staff System</p>
+      <div class="sidebar-user">
+        <a href="/admin/staff/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Staff</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
   </aside>
 
   <main class="main">
     <section class="page-shell">
       <header class="page-header">
         <div>
-          <p class="page-eyebrow">Employee View</p>
-          <h1 class="page-title">My Schedule</h1>
-          <p class="page-subtitle">View your assigned reservations and work schedule.</p>
+          <h1 class="page-title">My schedule</h1>
+          <p class="page-sub">View your assigned reservations and work schedule.</p>
         </div>
       </header>
 
-      <section class="summary-bar" id="summaryBar">
-        <div class="summary-seg">
-          <p class="summary-seg-label">Today</p>
-          <p class="summary-seg-value" id="summaryTodayValue">0</p>
-          <p class="summary-seg-copy" id="summaryTodayCopy">No assignments today</p>
+      <section class="stat-row">
+        <div class="stat-card">
+          <p class="stat-label">Today</p>
+          <div class="stat-value" id="summaryTodayValue">0</div>
+          <p class="stat-sub" id="summaryTodayCopy">No assignments today</p>
         </div>
 
-        <div class="summary-divider" aria-hidden="true"></div>
-
-        <div class="summary-seg">
-          <p class="summary-seg-label">This Week</p>
-          <p class="summary-seg-value" id="summaryWeekValue">0</p>
-          <p class="summary-seg-copy" id="summaryWeekCopy">Loading...</p>
+        <div class="stat-card">
+          <p class="stat-label">This Week</p>
+          <div class="stat-value" id="summaryWeekValue">0</div>
+          <p class="stat-sub" id="summaryWeekCopy">Loading...</p>
         </div>
 
-        <div class="summary-divider" aria-hidden="true"></div>
-
-        <div class="summary-seg summary-seg-next">
-          <p class="summary-seg-label">Next Assignment</p>
-          <p class="summary-seg-value summary-seg-next-value" id="summaryNextValue">Next up &middot; None scheduled</p>
-          <p class="summary-seg-copy" id="summaryNextCopy"></p>
+        <div class="stat-card">
+          <p class="stat-label">Next Assignment</p>
+          <div class="stat-value stat-value-text" id="summaryNextValue">None scheduled</div>
+          <p class="stat-sub" id="summaryNextCopy"></p>
         </div>
       </section>
 
@@ -85,18 +85,18 @@
 
       <section class="workspace-grid">
         <section class="card list-card">
-          <div class="card-head card-head-stack">
+          <div class="card-head">
             <div>
               <h2 class="card-title">Assigned Reservations</h2>
-              <p class="card-copy" id="listCountCopy">Only reservations assigned to you are shown here.</p>
+              <p class="card-sub" id="listCountCopy">Only reservations assigned to you are shown here.</p>
             </div>
+          </div>
 
-            <div class="filter-row" id="filterRow">
-              <button type="button" class="filter-chip active" data-filter="today">Today</button>
-              <button type="button" class="filter-chip" data-filter="week">This Week</button>
-              <button type="button" class="filter-chip" data-filter="upcoming">Upcoming</button>
-              <button type="button" class="filter-chip" data-filter="past">Past</button>
-            </div>
+          <div class="chips-row" id="filterRow">
+            <button type="button" class="chip active" data-filter="today">Today (0)</button>
+            <button type="button" class="chip" data-filter="week">This Week (0)</button>
+            <button type="button" class="chip" data-filter="upcoming">Upcoming (0)</button>
+            <button type="button" class="chip" data-filter="past">Past (0)</button>
           </div>
 
           <div class="active-date-filter hidden" id="activeDateFilter">
@@ -104,14 +104,27 @@
             <button type="button" class="text-btn" id="clearDateFilterBtn">Clear</button>
           </div>
 
-          <div class="reservation-list" id="reservationList"></div>
+          <div class="table-wrap">
+            <table class="reservation-table">
+              <thead>
+                <tr>
+                  <th>Event / Package</th>
+                  <th>Date &amp; Time</th>
+                  <th>Status</th>
+                  <th>Notes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="reservationList"></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="card calendar-card">
           <div class="card-head">
             <div>
               <h2 class="card-title">Schedule Calendar</h2>
-              <p class="card-copy">Click a highlighted date to filter the list.</p>
+              <p class="card-sub">Click a highlighted date to filter the list.</p>
             </div>
           </div>
 
@@ -161,4 +174,3 @@
   <script type="module" src="/js/staff_dashboard.js"></script>
 </body>
 </html>
-

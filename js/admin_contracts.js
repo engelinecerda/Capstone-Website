@@ -4,6 +4,7 @@ import { validateAdminSession, wireLogoutButton, watchAuthState } from './sessio
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -908,11 +909,17 @@ validateAdminSession({
     const roleBottomEl = document.getElementById('sidebarRoleBottom');
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
+    initManagerNotificationBell(supabase, session.user.id);
     wireFilters();
     wireTableActions();
     wireModals();
     
     // Load your data (ONLY ONCE)
     await loadData();
+
+    const requestedReservationId = new URLSearchParams(window.location.search).get('reservation');
+    if (requestedReservationId && getReservationById(requestedReservationId)) {
+      openContractDetailsModal(requestedReservationId);
+    }
   }
 });

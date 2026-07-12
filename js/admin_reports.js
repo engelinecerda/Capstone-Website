@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { applyRoleVisibility } from './session_validation.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
     getEffectiveReservationStatus,
     syncCompletedReservations
@@ -381,5 +382,6 @@ supabase.auth.onAuthStateChange((event) => {
 
 const session = await validateAdminSession();
 if (session) {
+    initManagerNotificationBell(supabase, session.user.id);
     await loadReports();
 }
