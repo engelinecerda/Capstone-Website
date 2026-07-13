@@ -3,6 +3,7 @@
     import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
     import { setupInactivityLogout } from './super_admin_inactivity.js';
     import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+    import { getPortalInitials } from './admin_auth.js';
 
    
     // ── STATE ────────────────────────────────────────────────────────
@@ -252,40 +253,34 @@
       const phone      = v('fieldPhone');
       const role       = document.getElementById('addFieldRole').value;
       const staffRole  = v('addFieldStaffRole');
-      const password   = document.getElementById('fieldPassword').value;
-      const confirm    = document.getElementById('fieldPasswordConfirm').value;
 
       if (!firstName || !lastName) { showMsg('First and last name are required.', 'error'); return; }
       if (!email)    { showMsg('Email address is required.', 'error'); return; }
-      if (!password) { showMsg('Password is required.', 'error'); return; }
-      if (password.length < 8) { showMsg('Password must be at least 8 characters.', 'error'); return; }
-      if (password !== confirm) { showMsg('Passwords do not match.', 'error'); return; }
 
       showMsg('Creating account…', 'info');
       disableSave(true);
 
       try {
-        const { data: authData, error: authErr } = await supabase.auth.signUp({ email, password });
-        if (authErr) throw authErr;
-
-        const userId = authData.user?.id;
-        if (!userId) throw new Error('Account was created but no user ID was returned.');
-
-        const { error: profileErr } = await supabase.from('profiles').upsert({
-          user_id: userId,
-          first_name: firstName,
-          middle_name: middleName || null,
-          last_name: lastName,
-          email,
-          phone_number: phone || '',
-          role,
-          staff_role: staffRole || null,
-          date_registered: new Date().toISOString()
+        const { data, error: fnErr } = await supabase.functions.invoke('create-staff-account', {
+          body: {
+            email,
+            role,
+            staff_role: staffRole || null,
+            first_name: firstName,
+            last_name: lastName
+          }
         });
+
+        if (fnErr) throw new Error(data?.detail || fnErr.message);
+
+        const { error: profileErr } = await supabase.from('profiles').update({
+          middle_name: middleName || null,
+          phone_number: phone || ''
+        }).eq('user_id', data.user_id);
 
         if (profileErr) throw profileErr;
 
-        showMsg('Account created successfully!', 'success');
+        showMsg('Account created. A password setup email has been sent.', 'success');
         await loadAccounts();
         setTimeout(closeAccountModal, 1400);
 
@@ -308,6 +303,34 @@
 
       if (!firstName || !lastName) { showMsg('First and last name are required.', 'error'); return; }
 
+      const fields = { firstName, lastName, middleName, phone, role, staffRole, status };
+
+      if (role !== a.role) {
+        openRoleChangeConfirm(a, fields);
+        return;
+      }
+
+      await saveAccountUpdate(a, fields);
+    }
+
+    // ── ROLE CHANGE CONFIRMATION ────────────────────────────────────────
+    function openRoleChangeConfirm(a, fields) {
+      document.getElementById('confirmTitle').textContent = 'Change Portal Role';
+      document.getElementById('confirmSub').textContent   = displayName(a);
+      document.getElementById('confirmBody').textContent  =
+        `This changes ${displayName(a)}'s portal role from ${formatRoleLabel(a.role)} to ${formatRoleLabel(fields.role)}.`;
+      document.getElementById('confirmOk').onclick = async () => {
+        closeConfirmModal();
+        await saveAccountUpdate(a, fields);
+      };
+      document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    function formatRoleLabel(role) {
+      return role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : role === 'staff' ? 'Staff' : role;
+    }
+
+    async function saveAccountUpdate(a, { firstName, lastName, middleName, phone, role, staffRole, status }) {
       showMsg('Saving changes…', 'info');
       disableSave(true);
 
@@ -449,6 +472,16 @@
     async function init() {
     const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
     if (!result) return;
+
+    if (result.profile.role !== 'admin') {
+      window.location.replace('/admin/dashboard.html');
+      return;
+    }
+
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
 
     watchAuthState();
     wireLogoutButton();

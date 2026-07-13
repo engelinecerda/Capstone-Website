@@ -698,28 +698,13 @@ async function submitReplacementContract() {
         if (error) throw error;
         if (!data) throw new Error('Your reservation contract could not be updated.');
 
-        // ── Auto-verify: ask the edge function to detect the signature ──
-        setContractMessage('Verifying contract signature...');
-        let autoVerified = false;
-        try {
-            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-contract', {
-                body: { reservation_id: reservationId, contract_url: contractUrl }
-            });
-            if (!verifyError && verifyData?.verified === true) {
-                autoVerified = true;
-            }
-        } catch (verifyErr) {
-            console.warn('[verify-contract] invocation threw:', verifyErr?.message || verifyErr);
-        }
-        // ──────────────────────────────────────────────────────────────
-
+        // A DB trigger (trg_auto_verify_contract) picks up this update and
+        // calls the verify-contract edge function server-side, so the client
+        // does not invoke it directly here — doing both would double the
+        // GCP Vision usage for a single submission.
         await loadPageData();
         render();
-        setContractMessage(
-            autoVerified
-                ? 'Your signed contract was automatically verified.'
-                : 'Your corrected signed contract was sent to the admin for review.'
-        );
+        setContractMessage('Your corrected signed contract was submitted and is being verified.');
     } catch (error) {
         submitBtn?.removeAttribute('disabled');
         setContractMessage(`Failed to submit replacement contract: ${error.message}`, true);

@@ -43,6 +43,8 @@
   --completed-txt:#4A2C17;
   --neutral:      #F1EFE8;
   --neutral-txt:  #5F5E5A;
+  --info:         #E3EEFB;
+  --info-txt:     #2C5A99;
 
   /* Buttons */
   --btn-primary-bg:      #3D1A0A;
@@ -411,7 +413,11 @@ body {
 .page-header .refresh-btn,
 .page-header .btn-primary,
 .page-header .header-btn,
-.page-header .header-btn-primary {
+.page-header .header-btn-primary,
+.page-header-row .refresh-btn,
+.page-header-row .btn-primary,
+.page-header-row .header-btn,
+.page-header-row .header-btn-primary {
   height: 30px;
   flex-shrink: 0;
 }
@@ -651,7 +657,7 @@ table td {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -863,6 +869,100 @@ table td {
 @media (max-width: 480px) {
   .notif-dropdown-panel {
     width: 300px;
+  }
+}
+
+/* ============================================================
+   Shared record avatar (customer initials circle)
+   Source of truth: Customers page treatment.
+   ============================================================ */
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--avatar-bg);
+  color: #F5EBDD;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Shared pagination bar (record-list pages)
+   ============================================================ */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.pagination-summary {
+  margin: 0;
+  font-size: 12px;
+  color: #8A7A6C;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 12px;
+  background: #FFFFFF;
+  border: 0.5px solid #D8CCBD;
+  color: #4A2C17;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+  background: #F5EEE4;
+}
+
+.page-btn.active {
+  background: #3D1A0A;
+  color: #FDF6EE;
+  border-color: transparent;
+  cursor: default;
+}
+
+.page-btn.page-chevron:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.page-ellipsis {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #8A7A6C;
+}
+
+@media (max-width: 480px) {
+  .pagination-bar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

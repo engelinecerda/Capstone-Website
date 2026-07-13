@@ -7,6 +7,7 @@ import {
     getEffectiveReservationStatus,
     syncCompletedReservations
 } from './reservation_status.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -21,10 +22,14 @@ const reportSearch = document.getElementById('reportSearch');
 const reportsMessage = document.getElementById('reportsMessage');
 const reportsSummary = document.getElementById('reportsSummary');
 const reportsTableBody = document.getElementById('reportsTableBody');
+const reportsPagination = document.getElementById('reportsPagination');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
 const navReviewCount = document.getElementById('navReviewCount');
+
+let reportsFiltered = [];
+let reportsCurrentPage = 1;
 
 const state = {
     reservations: []
@@ -201,8 +206,23 @@ function renderTable(reservations) {
 function renderReports() {
     const filteredReservations = getFilteredReservations();
     renderSummary(filteredReservations);
-    renderTable(filteredReservations);
+    reportsFiltered = filteredReservations;
+    reportsCurrentPage = 1;
+    renderReportsTablePage();
     setReportsMessage(`${filteredReservations.length} reservation(s) currently included in this report.`);
+}
+
+function renderReportsTablePage() {
+    renderTable(paginate(reportsFiltered, reportsCurrentPage, PAGE_SIZE));
+    renderPagination(reportsPagination, {
+        totalItems: reportsFiltered.length,
+        currentPage: reportsCurrentPage,
+        pageSize: PAGE_SIZE,
+        onPageChange: (page) => {
+            reportsCurrentPage = page;
+            renderReportsTablePage();
+        }
+    });
 }
 
 function exportReportsPdf() {

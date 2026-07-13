@@ -251,6 +251,30 @@ function getAssignmentNote(reservation) {
   return String(reservation?.assignment_note || '').trim();
 }
 
+function isMissingColumn(error, columnName) {
+  const message = error?.message || '';
+  return message.includes(`Could not find the '${columnName}' column`)
+    || message.includes(`column reservation_staff_assignments.${columnName} does not exist`);
+}
+
+function getAcknowledgmentState(reservation) {
+  if (reservation?.updated_after_ack) return 'needs_reack';
+  if (!reservation?.acknowledged_at) return 'needs_ack';
+  return 'acknowledged';
+}
+
+function formatAckTimestamp(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
 function parseTimeValue(value) {
   const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return null;
@@ -438,10 +462,13 @@ function renderReservations() {
   const total = state.reservations.length;
   const pastCount = state.reservations.filter((reservation) => isPast(getReservationDateKey(reservation))).length;
 
+  const needsAckCount = state.reservations.filter((reservation) => getAcknowledgmentState(reservation) !== 'acknowledged').length;
+  const ackSuffix = needsAckCount ? ` · ${needsAckCount} need${needsAckCount === 1 ? 's' : ''} your acknowledgment` : '';
+
   if (listCountCopy) {
-    listCountCopy.textContent = state.selectedDate
+    listCountCopy.textContent = (state.selectedDate
       ? `Showing ${filtered.length} for ${formatShortDate(state.selectedDate)} of ${total} total`
-      : `Showing ${filtered.length} ${FILTER_LABELS[state.activeFilter] || 'upcoming'} of ${total} total`;
+      : `Showing ${filtered.length} ${FILTER_LABELS[state.activeFilter] || 'upcoming'} of ${total} total`) + ackSuffix;
   }
 
   if (!filtered.length) {

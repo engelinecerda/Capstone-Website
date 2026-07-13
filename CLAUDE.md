@@ -66,22 +66,21 @@ The `profiles.role` column drives all access control:
 
 ## Admin Page Auth Pattern
 
-Every admin page calls one of these at initialization:
+Every admin page calls this at initialization:
 ```js
-// Pages shared between manager and admin:
 import { validateAdminSession } from './js/session_validation.js';
-const { session, profile } = await validateAdminSession();
-
-// Manager-only pages:
-import { verifyAdminSession } from './js/admin_auth.js';
-const { session, profile } = await verifyAdminSession(supabase);
-
-// Admin-only pages:
-import { verifySuperAdminSession } from './js/admin_auth.js';
-const { session, profile } = await verifySuperAdminSession(supabase);
+const result = await validateAdminSession();
 ```
+`validateAdminSession` allows both `manager` and `admin` roles and auto-populates the sidebar identity. `js/admin_auth.js` also exports `verifyAdminSession`/`verifySuperAdminSession` helpers for single-role checks, but no page currently calls them — they have a different return contract than `validateAdminSession` and are not wired into the identity-population flow.
 
-`validateAdminSession` allows both `manager` and `admin` roles and auto-populates the sidebar identity.
+Admin-only pages (the 5 System pages under `admin/super admin/`) add a guard clause right after `validateAdminSession`, redirecting non-admin roles to the dashboard:
+```js
+if (result.profile.role !== 'admin') {
+  window.location.replace('/admin/dashboard.html');
+  return;
+}
+```
+This is a UI-layer convenience only — the real enforcement for those pages' mutations is the admin-only RLS policies on `system_settings`, `package`/`package_category`/`package_tier`, and `profiles` (see `supabase/migrations/20260714_admin_manager_separation_of_duties.sql`).
 
 ## RLS Policy Pattern
 

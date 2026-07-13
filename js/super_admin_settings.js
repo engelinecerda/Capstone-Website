@@ -3,6 +3,7 @@ import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 const RIZAL_DEFAULTS = {
   center_lat: 14.5794,
@@ -78,16 +79,46 @@ async function saveMapScope() {
   const validationError = validateMapConfig(config);
   if (validationError) { setMapMsg(validationError, true); return; }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase
+  const { data: current } = await supabase
     .from('system_settings')
-    .upsert(
-      { setting_key: 'venue_map_scope', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-      { onConflict: 'setting_key' }
-    );
+    .select('setting_value')
+    .eq('setting_key', 'venue_map_scope')
+    .maybeSingle();
+  const oldConfig = current ? { ...RIZAL_DEFAULTS, ...JSON.parse(current.setting_value) } : RIZAL_DEFAULTS;
 
-  if (error) { setMapMsg('Failed to save: ' + error.message, true); return; }
-  setMapMsg('Map scope saved successfully.');
+  showSettingsConfirm(
+    'Change Venue Map Scope',
+    `Center ${oldConfig.center_lat}, ${oldConfig.center_lng}`,
+    `Center ${config.center_lat}, ${config.center_lng}`,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'venue_map_scope', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+
+      if (error) { setMapMsg('Failed to save: ' + error.message, true); return; }
+      setMapMsg('Map scope saved successfully.');
+    }
+  );
+}
+
+// ── Confirm modal (Map Scope / Operating Hours) ──────────────────────────────
+function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
+  const modal = document.getElementById('settingsConfirmModal');
+  if (!modal) { onConfirm(); return; }
+
+  document.getElementById('settingsConfirmTitle').textContent = title;
+  document.getElementById('settingsConfirmCopy').textContent = `${oldValueLabel} → ${newValueLabel}`;
+
+  document.getElementById('settingsConfirmOk').onclick = () => {
+    modal.classList.add('hidden');
+    onConfirm();
+  };
+  document.getElementById('settingsConfirmCancel').onclick = () => modal.classList.add('hidden');
+  modal.classList.remove('hidden');
 }
 
 // ── Vision API usage widget ─────────────────────────────────────────────────
@@ -165,22 +196,47 @@ async function saveOperatingHours() {
   if (openTime >= closeTime) { setHoursMsg('Closing time must be after opening time.', true); return; }
 
   const config = { open_time: openTime, close_time: closeTime };
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from('system_settings')
-    .upsert(
-      { setting_key: 'booking_operating_hours', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-      { onConflict: 'setting_key' }
-    );
 
-  if (error) { setHoursMsg('Failed to save: ' + error.message, true); return; }
-  setHoursMsg('Operating hours saved successfully.');
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'booking_operating_hours')
+    .maybeSingle();
+  const oldConfig = current ? { ...DEFAULT_OPERATING_HOURS, ...JSON.parse(current.setting_value) } : DEFAULT_OPERATING_HOURS;
+
+  showSettingsConfirm(
+    'Change Booking Operating Hours',
+    `${oldConfig.open_time} – ${oldConfig.close_time}`,
+    `${openTime} – ${closeTime}`,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'booking_operating_hours', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+
+      if (error) { setHoursMsg('Failed to save: ' + error.message, true); return; }
+      setHoursMsg('Operating hours saved successfully.');
+    }
+  );
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
   const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
   if (!result) return;
+
+  if (result.profile.role !== 'admin') {
+    window.location.replace('/admin/dashboard.html');
+    return;
+  }
+
+  const avatarEl = document.getElementById('sidebarAvatar');
+  if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
+  const roleBottomEl = document.getElementById('sidebarRoleBottom');
+  if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
 
   watchAuthState();
   wireLogoutButton();

@@ -10,9 +10,11 @@ import {
   getOccupiedScopesFromReservations,
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
+const reservationsPagination = document.getElementById('reservationsPagination');
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
 const chipsRow = document.getElementById('chipsRow');
@@ -41,14 +43,20 @@ const blackoutModal = document.getElementById('blackoutModal');
 const blackoutModalClose = document.getElementById('blackoutModalClose');
 const blackoutCancelBtn = document.getElementById('blackoutCancelBtn');
 const blackoutConfirmBtn = document.getElementById('blackoutConfirmBtn');
-const blackoutModalEyebrow = document.getElementById('blackoutModalEyebrow');
 const blackoutModalTitle = document.getElementById('blackoutModalTitle');
 const blackoutModalCopy = document.getElementById('blackoutModalCopy');
-const blackoutSelectedDate = document.getElementById('blackoutSelectedDate');
+const blackoutModalWarning = document.getElementById('blackoutModalWarning');
 const blackoutReasonField = document.getElementById('blackoutReasonField');
 const blackoutReasonLabel = document.getElementById('blackoutReasonLabel');
 const blackoutReasonInput = document.getElementById('blackoutReason');
 const blackoutModalMessage = document.getElementById('blackoutModalMessage');
+const calendarDayPanel = document.getElementById('calendarDayPanel');
+const dayPanelDate = document.getElementById('dayPanelDate');
+const dayPanelStatusPill = document.getElementById('dayPanelStatusPill');
+const dayPanelCount = document.getElementById('dayPanelCount');
+const dayPanelBookings = document.getElementById('dayPanelBookings');
+const dayPanelFooter = document.getElementById('dayPanelFooter');
+const dayPanelActionBtn = document.getElementById('dayPanelActionBtn');
 const reservationDetailsModal = document.getElementById('reservationDetailsModal');
 const reservationDetailsClose = document.getElementById('reservationDetailsClose');
 const reservationDetailsDismiss = document.getElementById('reservationDetailsDismiss');
@@ -71,13 +79,6 @@ const assignmentReservationSummary = document.getElementById('assignmentReservat
 const assignmentReservationMeta = document.getElementById('assignmentReservationMeta');
 const assignmentSelectionCount = document.getElementById('assignmentSelectionCount');
 const assignmentNoteInput = document.getElementById('assignmentNoteInput');
-const dayTimelineModal = document.getElementById('dayTimelineModal');
-const dayTimelineClose = document.getElementById('dayTimelineClose');
-const dayTimelineDismiss = document.getElementById('dayTimelineDismiss');
-const dayTimelineTitle = document.getElementById('dayTimelineTitle');
-const dayTimelineRuler = document.getElementById('dayTimelineRuler');
-const dayTimelineTrack = document.getElementById('dayTimelineTrack');
-const dayTimelineList = document.getElementById('dayTimelineList');
 const PAYMENT_METHOD_LABELS = {
   card: 'Card',
   bancnet: 'BancNet',
@@ -99,16 +100,19 @@ const CAPACITY_BLOCKING_STATUSES = new Set([
 ]);
 
 let reservationsCache = [];
+let reservationsFiltered = [];
+let reservationsCurrentPage = 1;
 let blackouts = new Set();
 let currentMonth = new Date();
 let adminSession = null;
+let currentRole = null;
 const BLACKOUT_DATE_COLUMNS = ['closed_date', 'date'];
 const BLACKOUT_REASON_COLUMNS = ['note', 'reason'];
 let blackoutDateColumn = null;
 let blackoutReasonColumn = null;
 let pendingBlackoutDate = null;
-let pendingBlackoutAction = 'close';
 let isCalendarExpanded = false;
+let selectedCalendarDate = null;
 let staffDirectory = [];
 let assignmentMapByReservationId = {};
 let assignmentFeatureReady = true;
@@ -467,145 +471,20 @@ function setCalendarExpanded(nextExpanded) {
   calendarToggleBtn?.setAttribute('aria-expanded', String(isCalendarExpanded));
   const toggleLabel = calendarToggleBtn?.querySelector('span');
   if (toggleLabel) {
-    toggleLabel.textContent = isCalendarExpanded ? 'Hide Availability Calendar' : 'Availability Calendar';
+    toggleLabel.textContent = isCalendarExpanded ? 'Hide calendar' : 'Show calendar';
   }
 }
 
-// ── Day timeline (time-block schedule view) ──────────────────────────────────
-let cachedOperatingHours = null;
-
-function parseTimeStringToMinutes(value) {
-  if (!value) return null;
-  const match = String(value).match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  return Number(match[1]) * 60 + Number(match[2]);
+function formatShortMonthDay(dateIso) {
+  return new Date(`${dateIso}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 }
 
-function parseTimeLabelToMinutes(label) {
-  if (!label) return null;
-  const match = String(label).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return null;
-  let hours = Number(match[1]) % 12;
-  if (/pm/i.test(match[3])) hours += 12;
-  return hours * 60 + Number(match[2]);
-}
-
-function formatMinutesAsLabel(minutes) {
-  if (minutes == null) return '';
-  let h = Math.floor(minutes / 60);
-  const m = String(minutes % 60).padStart(2, '0');
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  h = h % 12; if (h === 0) h = 12;
-  return `${h}:${m} ${suffix}`;
-}
-
-async function getOperatingHoursCached() {
-  if (cachedOperatingHours) return cachedOperatingHours;
-
-  const defaults = { openMinutes: 13 * 60, closeMinutes: 22 * 60 };
-  try {
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('setting_value')
-      .eq('setting_key', 'booking_operating_hours')
-      .maybeSingle();
-
-    if (error || !data) { cachedOperatingHours = defaults; return defaults; }
-
-    const parsed = JSON.parse(data.setting_value);
-    cachedOperatingHours = {
-      openMinutes: parseTimeStringToMinutes(parsed.open_time) ?? defaults.openMinutes,
-      closeMinutes: parseTimeStringToMinutes(parsed.close_time) ?? defaults.closeMinutes
-    };
-  } catch {
-    cachedOperatingHours = defaults;
-  }
-  return cachedOperatingHours;
-}
-
-function getReservationStartEndMinutes(reservation) {
-  const start = parseTimeStringToMinutes(reservation?.start_time) ?? parseTimeLabelToMinutes(reservation?.event_time);
-  if (start == null) return { start: null, end: null };
-  const end = parseTimeStringToMinutes(reservation?.event_end_time)
-    ?? (start + getReservationDurationHours(reservation) * 60);
-  return { start, end };
-}
-
-function closeDayTimeline() {
-  dayTimelineModal?.classList.add('hidden');
-  dayTimelineModal?.setAttribute('aria-hidden', 'true');
-}
-
-async function openDayTimeline(dateIso) {
-  if (dayTimelineTitle) dayTimelineTitle.textContent = `Schedule for ${formatBlackoutDate(dateIso)}`;
-  if (dayTimelineTrack) dayTimelineTrack.innerHTML = '<p class="day-timeline-empty">Loading...</p>';
-  if (dayTimelineRuler) dayTimelineRuler.innerHTML = '';
-  if (dayTimelineList) dayTimelineList.innerHTML = '';
-  dayTimelineModal?.classList.remove('hidden');
-  dayTimelineModal?.setAttribute('aria-hidden', 'false');
-
-  const { openMinutes, closeMinutes } = await getOperatingHoursCached();
-  const windowMinutes = Math.max(closeMinutes - openMinutes, 1);
-
-  const dayReservations = (reservationsCache || []).filter((r) =>
-    String(r.event_date || '').split('T')[0] === dateIso &&
-    CAPACITY_BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
-  );
-
-  if (dayTimelineRuler) {
-    const steps = 5;
-    for (let i = 0; i <= steps; i += 1) {
-      const label = document.createElement('span');
-      label.textContent = formatMinutesAsLabel(Math.round(openMinutes + (windowMinutes * i) / steps));
-      dayTimelineRuler.appendChild(label);
-    }
-  }
-
-  if (dayTimelineTrack) dayTimelineTrack.innerHTML = '';
-
-  if (!dayReservations.length) {
-    if (dayTimelineTrack) dayTimelineTrack.innerHTML = '<p class="day-timeline-empty">No active reservations on this date.</p>';
-    return;
-  }
-
-  dayReservations.forEach((reservation) => {
-    const { start, end } = getReservationStartEndMinutes(reservation);
-    const packageName = reservation?.package?.package_name || 'Package';
-    const isOffsite = String(reservation?.location_type || '').toLowerCase() === 'offsite';
-
-    if (start != null && end != null && dayTimelineTrack) {
-      const clampedStart = Math.max(start, openMinutes);
-      const clampedEnd = Math.min(end, closeMinutes);
-      const leftPct = ((clampedStart - openMinutes) / windowMinutes) * 100;
-      const widthPct = Math.max(((clampedEnd - clampedStart) / windowMinutes) * 100, 2);
-
-      const block = document.createElement('div');
-      block.className = 'day-timeline-block' + (isOffsite ? ' offsite' : '');
-      block.style.left = `${leftPct}%`;
-      block.style.width = `${widthPct}%`;
-      block.title = `${reservation.contact_name || 'Customer'} — ${packageName} (${formatMinutesAsLabel(start)}–${formatMinutesAsLabel(end)})`;
-      block.innerHTML = `<strong>${reservation.contact_name || 'Customer'}</strong>${packageName}`;
-      dayTimelineTrack.appendChild(block);
-    }
-
-    if (dayTimelineList) {
-      const item = document.createElement('div');
-      item.className = 'day-timeline-item';
-      item.innerHTML = `
-        <div>
-          <div class="day-timeline-item-main">${reservation.contact_name || 'Customer'} — ${packageName}</div>
-          <div class="day-timeline-item-sub">${isOffsite ? 'Offsite' : 'Onsite'} · ${getReservationDurationHours(reservation)}h · ${String(reservation.status || '').replace(/_/g, ' ')}</div>
-        </div>
-        <div class="day-timeline-item-time">${start != null ? `${formatMinutesAsLabel(start)} – ${formatMinutesAsLabel(end)}` : (reservation.event_time || 'No time selected')}</div>
-      `;
-      dayTimelineList.appendChild(item);
-    }
-  });
+function getReservationsForDate(dateIso) {
+  return (reservationsCache || []).filter((r) => String(r.event_date || '').split('T')[0] === dateIso);
 }
 
 function closeBlackoutModal() {
   pendingBlackoutDate = null;
-  pendingBlackoutAction = 'close';
   blackoutModal?.classList.add('hidden');
   blackoutModal?.setAttribute('aria-hidden', 'true');
   blackoutConfirmBtn?.removeAttribute('disabled');
@@ -613,100 +492,90 @@ function closeBlackoutModal() {
   setModalMessage('');
 }
 
-function configureBlackoutModal(action) {
-  const isReopen = action === 'reopen';
-  if (blackoutModalEyebrow) {
-    blackoutModalEyebrow.textContent = isReopen ? 'Reopen calendar date' : 'Close calendar date';
-  }
+function openBlackoutModal(dateIso) {
+  pendingBlackoutDate = dateIso;
   if (blackoutModalTitle) {
-    blackoutModalTitle.textContent = isReopen ? 'Confirm date reopening' : 'Confirm date closure';
+    blackoutModalTitle.textContent = `Close ${formatShortMonthDay(dateIso)}?`;
   }
   if (blackoutModalCopy) {
-    blackoutModalCopy.textContent = isReopen
-      ? 'You are about to reopen this date on the admin calendar.'
-      : 'You are about to close this date on the admin calendar.';
+    blackoutModalCopy.textContent = 'Customers will not be able to book this date.';
   }
-  if (blackoutReasonField) {
-    blackoutReasonField.hidden = isReopen;
-    blackoutReasonField.setAttribute('aria-hidden', String(isReopen));
+  const bookingCount = getReservationsForDate(dateIso).length;
+  if (blackoutModalWarning) {
+    if (bookingCount > 0) {
+      blackoutModalWarning.hidden = false;
+      blackoutModalWarning.textContent = `This date has ${bookingCount} reservation${bookingCount !== 1 ? 's' : ''}. Closing prevents new bookings only — existing reservations are not affected.`;
+    } else {
+      blackoutModalWarning.hidden = true;
+      blackoutModalWarning.textContent = '';
+    }
   }
-  if (blackoutReasonLabel) {
-    blackoutReasonLabel.textContent = 'Reason for closing this date';
-  }
-  if (blackoutReasonInput) {
-    blackoutReasonInput.placeholder = 'Enter the reason for closing this date...';
-  }
-  if (blackoutConfirmBtn) {
-    blackoutConfirmBtn.textContent = isReopen ? 'Confirm reopening' : 'Confirm closure';
-  }
-}
-
-function openBlackoutModal(dateIso, action = 'close') {
-  pendingBlackoutDate = dateIso;
-  pendingBlackoutAction = action;
-  configureBlackoutModal(action);
-  if (blackoutSelectedDate) blackoutSelectedDate.textContent = formatBlackoutDate(dateIso);
   if (blackoutReasonInput) blackoutReasonInput.value = '';
   setModalMessage('');
   blackoutModal?.classList.remove('hidden');
   blackoutModal?.setAttribute('aria-hidden', 'false');
-  if (action === 'reopen') {
-    blackoutConfirmBtn?.focus();
-  } else {
-    blackoutReasonInput?.focus();
-  }
+  blackoutReasonInput?.focus();
 }
 
 async function confirmBlackout() {
   if (!pendingBlackoutDate) return;
 
   blackoutConfirmBtn?.setAttribute('disabled', 'true');
-  setModalMessage(pendingBlackoutAction === 'reopen' ? 'Reopening date...' : 'Saving closed date...');
+  setModalMessage('Saving closed date...');
 
   try {
     const dateColumn = await resolveBlackoutDateColumn();
-    let error = null;
-
-    if (pendingBlackoutAction === 'reopen') {
-      ({ error } = await supabase
-        .from('calendar_blackouts')
-        .delete()
-        .eq(dateColumn, pendingBlackoutDate));
-    } else {
-      const reason = blackoutReasonInput?.value.trim() || '';
-      if (!reason) {
-        setModalMessage('Please enter the reason for closing this date.', true);
-        blackoutConfirmBtn?.removeAttribute('disabled');
-        blackoutReasonInput?.focus();
-        return;
-      }
-
-      const reasonColumn = await resolveBlackoutReasonColumn();
-      const payload = {
-        [dateColumn]: pendingBlackoutDate,
-        [reasonColumn]: reason,
-        created_by: adminSession?.user?.id || null
-      };
-
-      ({ error } = await supabase
-        .from('calendar_blackouts')
-        .upsert(payload, { onConflict: dateColumn }));
+    const reason = blackoutReasonInput?.value.trim() || '';
+    if (!reason) {
+      setModalMessage('Please enter the reason for closing this date.', true);
+      blackoutConfirmBtn?.removeAttribute('disabled');
+      blackoutReasonInput?.focus();
+      return;
     }
+
+    const reasonColumn = await resolveBlackoutReasonColumn();
+    const payload = {
+      [dateColumn]: pendingBlackoutDate,
+      [reasonColumn]: reason,
+      created_by: adminSession?.user?.id || null
+    };
+
+    const { error } = await supabase
+      .from('calendar_blackouts')
+      .upsert(payload, { onConflict: dateColumn });
 
     if (error) throw error;
 
-    if (pendingBlackoutAction === 'reopen') {
-      blackouts.delete(pendingBlackoutDate);
-      setMessage(calendarMessage, `Reopened ${formatBlackoutDate(pendingBlackoutDate)}.`, false);
-    } else {
-      blackouts.add(pendingBlackoutDate);
-      setMessage(calendarMessage, `Closed ${formatBlackoutDate(pendingBlackoutDate)}.`, false);
-    }
+    blackouts.add(pendingBlackoutDate);
+    setMessage(calendarMessage, `Closed ${formatBlackoutDate(pendingBlackoutDate)}.`, false);
     renderCalendar(approvedDatesFromCache());
+    renderDayDetailPanel();
     closeBlackoutModal();
   } catch (error) {
     blackoutConfirmBtn?.removeAttribute('disabled');
     setModalMessage(getBlackoutSchemaHint(error), true);
+  }
+}
+
+async function reopenDate(dateIso) {
+  dayPanelActionBtn?.setAttribute('disabled', 'true');
+  try {
+    const dateColumn = await resolveBlackoutDateColumn();
+    const { error } = await supabase
+      .from('calendar_blackouts')
+      .delete()
+      .eq(dateColumn, dateIso);
+
+    if (error) throw error;
+
+    blackouts.delete(dateIso);
+    setMessage(calendarMessage, `Reopened ${formatBlackoutDate(dateIso)}.`, false);
+    renderCalendar(approvedDatesFromCache());
+    renderDayDetailPanel();
+  } catch (error) {
+    setMessage(calendarMessage, `Failed to reopen date: ${getBlackoutSchemaHint(error)}`, true);
+  } finally {
+    dayPanelActionBtn?.removeAttribute('disabled');
   }
 }
 
@@ -1118,7 +987,7 @@ function renderTable(list) {
       <tr class="reservation-row">
         <td data-label="Customer / Package">
           <div class="reservation-customer">
-            <span class="reservation-avatar">${escapeHtml(getCustomerInitials(res.contact_name, res.contact_email))}</span>
+            <span class="avatar">${escapeHtml(getCustomerInitials(res.contact_name, res.contact_email))}</span>
             <div class="reservation-customer-copy">
               ${res.reservation_number ? `<span class="table-reservation-number">${escapeHtml(res.reservation_number)}</span>` : ''}
               <span class="table-main">${escapeHtml(res.contact_name || 'Unknown')}</span>
@@ -1247,7 +1116,7 @@ function renderReservationDetailsModal() {
         : buildDetailCard('Balance Status', balance.statusLabel)
     ].join('');
 
-    const paymentActions = pendingPayment ? `
+    const paymentActions = (pendingPayment && currentRole !== 'admin') ? `
       <div class="details-action-row">
         <button class="action-btn approve" data-action="approve-payment" data-reservation-id="${reservation.reservation_id}" data-payment-id="${pendingPayment.payment_id}">
           ${escapeHtml(pendingPayment.payment_method === 'cash' ? 'Verify Cash Payment' : 'Approve Payment')}
@@ -1294,11 +1163,11 @@ function renderReservationDetailsModal() {
     const contractActionMarkup = contract.hasFile ? `
       <div class="details-action-row">
         <a class="action-btn view" href="${contractRecord.contract_url}" target="_blank" rel="noopener noreferrer">View Contract</a>
-        ${['pending', 'resubmitted'].includes(contract.key)
+        ${(currentRole !== 'admin' && ['pending', 'resubmitted'].includes(contract.key))
           ? `<button class="action-btn approve" data-action="verify-contract" data-reservation-id="${reservation.reservation_id}">Verify Contract</button>`
           : ''}
       </div>
-      ${contract.key !== 'approved' ? `
+      ${(currentRole !== 'admin' && contract.key !== 'approved') ? `
         <label class="modal-field">
           <span class="modal-label">Correction note for the customer</span>
           <textarea
@@ -1333,14 +1202,7 @@ function renderReservationDetailsModal() {
   }
 
   if (reservationStaffSection) {
-    reservationStaffSection.innerHTML = `
-        <div class="assigned-staff-list">
-          ${assignedStaff.length
-            ? assignedStaff.map((staff) => `
-            <span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))} · ${escapeHtml(formatStaffRole(staff.staff_role))}</span>
-          `).join('')
-          : '<span class="staff-pill unassigned">Not assigned yet</span>'}
-        </div>
+    const assignActionMarkup = currentRole === 'admin' ? '' : `
       <div class="details-action-row">
         <button
           class="action-btn assign"
@@ -1355,10 +1217,20 @@ function renderReservationDetailsModal() {
         ${(assignmentState.canAssign && assignmentState.disabled) ? `<span class="details-empty-inline">${escapeHtml(assignmentState.disabledReason)}</span>` : ''}
       </div>
     `;
+    reservationStaffSection.innerHTML = `
+        <div class="assigned-staff-list">
+          ${assignedStaff.length
+            ? assignedStaff.map((staff) => `
+            <span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))} · ${escapeHtml(formatStaffRole(staff.staff_role))}</span>
+          `).join('')
+          : '<span class="staff-pill unassigned">Not assigned yet</span>'}
+        </div>
+      ${assignActionMarkup}
+    `;
   }
 
   if (reservationActionsSection) {
-    const reservationActionMarkup = ['pending', 'resubmission_requested'].includes(reservationStatus.key) ? `
+    const reservationActionMarkup = currentRole === 'admin' ? '' : ['pending', 'resubmission_requested'].includes(reservationStatus.key) ? `
       <div class="details-action-row">
         <button
           class="action-btn approve"
@@ -1387,6 +1259,7 @@ function renderReservationDetailsModal() {
         ${buildDetailCard('Requested Date', formatReservationDate(activeRescheduleRequest.requested_date))}
         ${buildDetailCard('Requested Time', formatReservationTime(activeRescheduleRequest.requested_time))}
       </div>
+      ${currentRole === 'admin' ? '' : `
       <div class="details-action-row">
         <button class="action-btn approve" data-action="approve-reschedule" data-request-id="${activeRescheduleRequest.reschedule_request_id}" data-reservation-id="${reservation.reservation_id}">
           Approve Reschedule
@@ -1395,6 +1268,7 @@ function renderReservationDetailsModal() {
           Reject Request
         </button>
       </div>
+      `}
     ` : '';
 
     reservationActionsSection.innerHTML = `
@@ -1439,8 +1313,23 @@ function filterAndRender() {
     status
   );
   renderStats(reservationsCache);
-  renderTable(filtered);
+  reservationsFiltered = filtered;
+  reservationsCurrentPage = 1;
+  renderReservationsPage();
   setMessage(tableMessage, filtered.length ? '' : getEmptyFilterMessage(status), false);
+}
+
+function renderReservationsPage() {
+  renderTable(paginate(reservationsFiltered, reservationsCurrentPage, PAGE_SIZE));
+  renderPagination(reservationsPagination, {
+    totalItems: reservationsFiltered.length,
+    currentPage: reservationsCurrentPage,
+    pageSize: PAGE_SIZE,
+    onPageChange: (page) => {
+      reservationsCurrentPage = page;
+      renderReservationsPage();
+    }
+  });
 }
 
 function wireFilters() {
@@ -2076,6 +1965,10 @@ async function saveAssignmentSelection() {
 }
 
 async function performReservationAction(action, button) {
+  if (currentRole === 'admin') {
+    throw new Error('This action requires the Manager role.');
+  }
+
   const reservationId = button.dataset.reservationId || button.dataset.id;
   const reservation = getReservationById(reservationId);
   const previousStatus = reservation?.status || null;
@@ -2237,8 +2130,6 @@ function renderCalendar(bookedDates = []) {
     const isCurrentMonth = dateObj.getMonth() === currentMonth.getMonth();
     const isPast = dateObj < today;
     const isToday = iso === todayIso;
-    const cell = document.createElement('div');
-    cell.className = 'calendar-cell';
     const booked = bookedSet.has(iso);
     const closed = closedSet.has(iso);
     const formattedDate = formatBlackoutDate(iso);
@@ -2246,67 +2137,119 @@ function renderCalendar(bookedDates = []) {
       String(r.event_date || '').split('T')[0] === iso &&
       CAPACITY_BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
     ).length;
-    let statusKey = 'open';
-    let statusLabel = 'Open';
-    let titleText = `${formattedDate} is open. Click to close this date.`;
+
+    const cell = document.createElement('div');
+    cell.className = 'calendar-cell';
+
+    let titleText = `${formattedDate} is open.`;
 
     if (!isCurrentMonth) {
       cell.classList.add('outside-month');
       titleText = `${formattedDate} is outside the current month.`;
-    } else if (isPast) {
-      cell.classList.add('past');
-      titleText = `${formattedDate} is in the past.`;
-    } else if (closed) {
-      cell.classList.add('closed');
-      statusKey = 'closed';
-      statusLabel = 'Closed';
-      titleText = `${formattedDate} is closed. Click to reopen it.`;
-    } else if (booked) {
-      cell.classList.add('booked');
-      statusKey = 'booked';
-      statusLabel = 'Booked';
-      titleText = dayCount >= 2
-        ? `${formattedDate} is fully booked (${dayCount}/2 reservations).`
-        : `${formattedDate} has ${dayCount} active reservation${dayCount !== 1 ? 's' : ''}.`;
     } else {
-      cell.classList.add('available');
+      if (closed) {
+        cell.classList.add('closed');
+        titleText = `${formattedDate} is closed.`;
+      }
+      if (isPast) {
+        titleText = `${formattedDate} is in the past.`;
+      }
+      if (booked) {
+        titleText = dayCount
+          ? `${formattedDate} has ${dayCount} reservation${dayCount !== 1 ? 's' : ''}.`
+          : `${formattedDate} has bookings.`;
+      }
+      if (isToday) {
+        cell.classList.add('today');
+      }
+      if (iso === selectedCalendarDate) {
+        cell.classList.add('selected');
+      }
     }
 
-    if (isToday && isCurrentMonth) {
-      cell.classList.add('today');
-    }
-
-    cell.dataset.status = statusKey;
+    cell.dataset.date = iso;
     cell.title = titleText;
     cell.setAttribute('aria-label', titleText);
     cell.innerHTML = `
-      <div class="calendar-cell-body">
-        <div class="calendar-day-row">
-          <span class="calendar-day-number">${dateObj.getDate()}</span>
-          ${isToday && isCurrentMonth ? '<span class="calendar-day-marker">Today</span>' : ''}
-        </div>
-        <div class="calendar-cell-footer">
-          ${statusKey !== 'open' && isCurrentMonth ? `<span class="calendar-status-pill ${statusKey}">${statusLabel}</span>` : ''}
-        </div>
-      </div>
+      <span class="calendar-day-number">${dateObj.getDate()}</span>
+      ${isCurrentMonth && booked ? '<span class="calendar-day-dot"></span>' : ''}
     `;
 
-    if (isCurrentMonth && !isPast && !booked && !closed) {
+    if (isCurrentMonth) {
       cell.classList.add('is-actionable');
-      bindCalendarAction(cell, () => openBlackoutModal(iso));
-    } else if (isCurrentMonth && !isPast && closed) {
-      cell.classList.add('is-actionable');
-      bindCalendarAction(cell, () => openBlackoutModal(iso, 'reopen'));
-    } else if (isCurrentMonth && booked) {
-      cell.classList.add('is-actionable');
-      cell.title = `${titleText} Click to view the day's schedule.`;
-      bindCalendarAction(cell, () => openDayTimeline(iso));
+      bindCalendarAction(cell, () => selectCalendarDate(iso));
     } else {
       cell.setAttribute('aria-disabled', 'true');
     }
     calendarGrid.appendChild(cell);
   }
   calendarMonthLabel.textContent = currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function selectCalendarDate(dateIso) {
+  selectedCalendarDate = dateIso;
+  renderCalendar(approvedDatesFromCache());
+  renderDayDetailPanel();
+}
+
+function renderDayDetailPanel() {
+  if (!calendarDayPanel || !selectedCalendarDate) return;
+  const iso = selectedCalendarDate;
+  const dateObj = new Date(`${iso}T00:00:00`);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const isPast = dateObj < today;
+  const closed = blackouts.has(iso);
+
+  if (dayPanelDate) {
+    dayPanelDate.textContent = dateObj.toLocaleDateString('en-PH', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  if (dayPanelStatusPill) {
+    dayPanelStatusPill.textContent = closed ? 'Closed' : 'Open';
+    dayPanelStatusPill.className = `status-pill ${closed ? 'cancelled' : 'completed'}`;
+  }
+
+  const bookings = getReservationsForDate(iso);
+
+  if (dayPanelCount) {
+    dayPanelCount.textContent = bookings.length
+      ? `${bookings.length} booking${bookings.length !== 1 ? 's' : ''} on this date`
+      : 'No bookings on this date';
+  }
+
+  if (dayPanelBookings) {
+    dayPanelBookings.innerHTML = bookings.map((reservation) => {
+      const status = formatStatusPill(getEffectiveReservationStatus(reservation));
+      return `
+        <div class="day-booking-card">
+          <div class="day-booking-head">
+            <span class="day-booking-name">${escapeHtml(reservation.contact_name || 'Unknown customer')}</span>
+            <span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
+          </div>
+          <p class="day-booking-meta">${escapeHtml(reservation.event_type || 'Event')} &middot; ${escapeHtml(reservation.event_time || 'No time selected')} &middot; ${escapeHtml(String(reservation.guest_count || 0))} guests</p>
+          <a href="#" class="day-booking-link" data-reservation-id="${escapeHtml(reservation.reservation_id)}">View reservation &rarr;</a>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (dayPanelFooter && dayPanelActionBtn) {
+    if (isPast) {
+      dayPanelFooter.hidden = true;
+    } else {
+      dayPanelFooter.hidden = false;
+      dayPanelActionBtn.textContent = closed ? 'Reopen this date' : 'Close this date';
+      dayPanelActionBtn.className = `day-panel-action ${closed ? 'action-reopen' : 'action-close'}`;
+      dayPanelActionBtn.onclick = closed
+        ? () => reopenDate(iso)
+        : () => openBlackoutModal(iso);
+    }
+  }
 }
 
 async function fetchBlackouts() {
@@ -2322,35 +2265,6 @@ async function fetchBlackouts() {
   }
 }
 
-async function toggleBlackout(dateIso) {
-  const dateColumn = await resolveBlackoutDateColumn();
-
-  if (blackouts.has(dateIso)) {
-    const { error } = await supabase
-      .from('calendar_blackouts')
-      .delete()
-      .eq(dateColumn, dateIso);
-    if (error) {
-      setMessage(calendarMessage, `Failed to open date: ${getBlackoutSchemaHint(error)}`, true);
-      return;
-    }
-    blackouts.delete(dateIso);
-  } else {
-    const { error } = await supabase
-      .from('calendar_blackouts')
-      .upsert({
-        [dateColumn]: dateIso,
-        created_by: adminSession?.user?.id || null
-      }, { onConflict: dateColumn });
-    if (error) {
-      setMessage(calendarMessage, `Failed to close date: ${getBlackoutSchemaHint(error)}`, true);
-      return;
-    }
-    blackouts.add(dateIso);
-  }
-  renderCalendar(approvedDatesFromCache());
-}
-
 function approvedDatesFromCache() {
   const dates = new Set(
     reservationsCache
@@ -2364,6 +2278,15 @@ function approvedDatesFromCache() {
 async function loadCalendar() {
   await fetchBlackouts();
   renderCalendar(approvedDatesFromCache());
+  if (!selectedCalendarDate) {
+    const now = new Date();
+    selectedCalendarDate = formatDateKey([
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')
+    ].join('-'));
+  }
+  renderDayDetailPanel();
 }
 
 async function loadData() {
@@ -2452,14 +2375,13 @@ function wireBlackoutModal() {
   });
 }
 
-function wireDayTimelineModal() {
-  dayTimelineClose?.addEventListener('click', closeDayTimeline);
-  dayTimelineDismiss?.addEventListener('click', closeDayTimeline);
-  dayTimelineModal?.addEventListener('click', (event) => {
-    if (event.target === dayTimelineModal) closeDayTimeline();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !dayTimelineModal?.classList.contains('hidden')) closeDayTimeline();
+function wireDayPanelBookingLinks() {
+  dayPanelBookings?.addEventListener('click', (event) => {
+    const link = event.target.closest('.day-booking-link');
+    if (!link) return;
+    event.preventDefault();
+    const reservationId = link.dataset.reservationId;
+    if (reservationId) openReservationDetailsModal(reservationId);
   });
 }
 
@@ -2533,7 +2455,7 @@ wireCalendarToggle();
 wireCalendarNav();
 wireBlackoutModal();
 wireAssignmentModal();
-wireDayTimelineModal();
+wireDayPanelBookingLinks();
 
 wireLogoutButton();
 watchAuthState();
@@ -2549,6 +2471,7 @@ function openReservationFromUrlIfPresent() {
 validateAdminSession({
   onSuccess: async ({ session, profile }) => {
     adminSession = session;
+    currentRole = profile.role;
     setupInactivityLogout(profile.role);
     const avatarEl = document.getElementById('sidebarAvatar');
     if (avatarEl) avatarEl.textContent = getPortalInitials(profile);

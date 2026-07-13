@@ -580,6 +580,71 @@ async function loadDashboard() {
     }
 }
 
+function formatHourMinute(hhmm) {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = ((h + 11) % 12) + 1;
+    return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+async function loadSystemOverview() {
+    const ovPackageCount = document.getElementById('ovPackageCount');
+    const ovAccountCount = document.getElementById('ovAccountCount');
+    const ovLastBackup = document.getElementById('ovLastBackup');
+    const ovBookingHours = document.getElementById('ovBookingHours');
+    if (!ovPackageCount && !ovAccountCount && !ovLastBackup && !ovBookingHours) return;
+
+    const [pkgRes, profilesRes, settingsRes] = await Promise.all([
+        supabase.from('package').select('package_id', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('profiles').select('role').eq('is_locked', false).in('role', ['manager', 'staff', 'admin']),
+        supabase.from('system_settings').select('setting_key, setting_value').in('setting_key', ['last_backup_at', 'booking_operating_hours'])
+    ]);
+
+    if (ovPackageCount) {
+        ovPackageCount.textContent = pkgRes.count ?? 0;
+    }
+
+    if (ovAccountCount) {
+        const counts = { manager: 0, staff: 0, admin: 0 };
+        (profilesRes.data || []).forEach((row) => { if (counts[row.role] !== undefined) counts[row.role] += 1; });
+        ovAccountCount.textContent = `${counts.manager} mgr · ${counts.staff} staff · ${counts.admin} admin`;
+    }
+
+    const settingsByKey = {};
+    (settingsRes.data || []).forEach((row) => { settingsByKey[row.setting_key] = row.setting_value; });
+
+    if (ovLastBackup) {
+        const raw = settingsByKey.last_backup_at;
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                ovLastBackup.textContent = new Date(parsed.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+            } catch {
+                ovLastBackup.textContent = 'Unavailable';
+            }
+        } else {
+            ovLastBackup.textContent = 'No backup yet';
+        }
+    }
+
+    if (ovBookingHours) {
+        const raw = settingsByKey.booking_operating_hours;
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                const open = formatHourMinute(parsed.open_time);
+                const close = formatHourMinute(parsed.close_time);
+                ovBookingHours.textContent = (open && close) ? `${open} – ${close}` : 'Not set';
+            } catch {
+                ovBookingHours.textContent = 'Unavailable';
+            }
+        } else {
+            ovBookingHours.textContent = 'Not set';
+        }
+    }
+}
+
 refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 
@@ -594,5 +659,6 @@ validateAdminSession({
         refreshSidebarBadges = initAdminSidebarBadges(supabase);
         initManagerNotificationBell(supabase, session.user.id);
         loadDashboard();
+        if (profile.role === 'admin') loadSystemOverview();
     }
 });

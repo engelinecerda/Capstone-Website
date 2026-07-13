@@ -5,6 +5,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -15,6 +16,7 @@ const statusDropdown = document.getElementById('statusDropdown');
 const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const contractsBody = document.getElementById('contractsBody');
+const contractsPagination = document.getElementById('contractsPagination');
 const chipsRow = document.getElementById('chipsRow');
 
 
@@ -35,10 +37,13 @@ const contractActionsSection = document.getElementById('contractActionsSection')
 const contractDetailsMessage = document.getElementById('contractDetailsMessage');
 
 let contractsCache = [];
+let contractsFiltered = [];
+let contractsCurrentPage = 1;
 let allReservationsCount = 0;
 let activeContractReservationId = null;
 let contractDetailsFlash = null;
 let refreshSidebarBadges = () => {};
+let currentRole = null;
 
 function countPendingReservations(reservations) {
   return reservations.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
@@ -404,7 +409,7 @@ function renderTable(list) {
       <tr class="reservation-row">
         <td data-label="Customer / Package">
           <div class="reservation-customer">
-            <span class="reservation-avatar">${escapeHtml(getCustomerInitials(reservation.contact_name, reservation.contact_email))}</span>
+            <span class="avatar">${escapeHtml(getCustomerInitials(reservation.contact_name, reservation.contact_email))}</span>
             <div class="reservation-customer-copy">
               ${reservation.reservation_number ? `<span class="table-reservation-number">${escapeHtml(reservation.reservation_number)}</span>` : ''}
               <span class="table-main">${escapeHtml(reservation.contact_name || 'Unknown customer')}</span>
@@ -464,7 +469,9 @@ function filterAndRender() {
 
   syncActiveChip();
   renderStats(contractsCache);
-  renderTable(filtered);
+  contractsFiltered = filtered;
+  contractsCurrentPage = 1;
+  renderContractsPage();
 
   if (!contractsCache.length) {
     setMessage(tableMessage, 'No submitted contracts are available yet.');
@@ -476,6 +483,19 @@ function filterAndRender() {
       `Showing ${filtered.length} of ${contractsCache.length} submitted contract(s).`
     );
   }
+}
+
+function renderContractsPage() {
+  renderTable(paginate(contractsFiltered, contractsCurrentPage, PAGE_SIZE));
+  renderPagination(contractsPagination, {
+    totalItems: contractsFiltered.length,
+    currentPage: contractsCurrentPage,
+    pageSize: PAGE_SIZE,
+    onPageChange: (page) => {
+      contractsCurrentPage = page;
+      renderContractsPage();
+    }
+  });
 }
 
 async function fetchReservationContracts(reservationIds) {
@@ -721,9 +741,9 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
     </div>
   `;
 
-  const showReservationActions = ['pending', 'resubmission_requested'].includes(reservationStatus.key);
+  const showReservationActions = currentRole !== 'admin' && ['pending', 'resubmission_requested'].includes(reservationStatus.key);
 
-  contractActionsSection.innerHTML = `
+  contractActionsSection.innerHTML = currentRole === 'admin' ? '' : `
     <div class="action-stack">
       <div class="details-action-row">
         ${['pending', 'resubmitted'].includes(contract.key)
@@ -774,6 +794,10 @@ function openContractDetailsModal(reservationId) {
 }
 
 async function performContractAction(action, button) {
+  if (currentRole === 'admin') {
+    throw new Error('This action requires the Manager role.');
+  }
+
   const reservationId = button.dataset.reservationId;
   const reservation = getReservationById(reservationId);
   const previousStatus = reservation?.status || null;
@@ -901,6 +925,8 @@ watchAuthState();
 
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {
+
+    currentRole = profile.role;
 
     //  Set inactivity (super admin)
     setupInactivityLogout(profile.role);
