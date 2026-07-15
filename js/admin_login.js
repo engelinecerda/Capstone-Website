@@ -24,7 +24,7 @@ const mfaState = {
 const PORTAL_ROUTES = {
     manager: '/admin/dashboard.html',
     admin: '/admin/dashboard.html',
-    staff: '/admin/staff/index.html'
+    staff: '/board'
 };
 
 function normalizeRole(value) {

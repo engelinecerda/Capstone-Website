@@ -175,10 +175,16 @@ function getAssignmentSchemaHint(error) {
 
 function getStaffDirectoryHint(error) {
   const message = error?.message || '';
-  if (message.includes('row-level security policy')) {
-    return 'Staff accounts could not be loaded because the profiles RLS policy is blocking admin access. Add an admin read-all policy for profiles.';
+  if (
+    message.includes('relation "public.staff_roster" does not exist')
+    || message.includes("Could not find the table 'staff_roster' in the schema cache")
+  ) {
+    return 'Create the staff_roster table in Supabase before using employee assignment.';
   }
-  return message || 'Staff accounts could not be loaded right now.';
+  if (message.includes('row-level security policy')) {
+    return 'Staff roster could not be loaded because its RLS policy is blocking admin access. Add a manager/admin read policy for staff_roster.';
+  }
+  return message || 'Staff roster could not be loaded right now.';
 }
 
 async function resolveBlackoutDateColumn() {
@@ -1463,33 +1469,30 @@ async function fetchReservations() {
   }));
 }
 
-async function fetchStaffProfiles() {
+async function fetchStaffRoster() {
   const { data, error } = await supabase
-    .from('profiles')
+    .from('staff_roster')
     .select(`
-      user_id,
+      staff_id,
       first_name,
-      middle_name,
       last_name,
-      email,
-      role,
       staff_role
     `)
-    .eq('role', 'staff')
+    .eq('is_active', true)
     .order('first_name', { ascending: true });
 
   if (error) throw error;
   return data || [];
 }
 
-async function fetchReservationAssignments(reservationIds, knownStaffProfiles) {
+async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
   if (!reservationIds.length) return {};
 
   let response = await supabase
     .from('reservation_staff_assignments')
     .select(`
       reservation_id,
-      staff_user_id,
+      roster_staff_id,
       assigned_at,
       assignment_note
     `)
@@ -1500,7 +1503,7 @@ async function fetchReservationAssignments(reservationIds, knownStaffProfiles) {
       .from('reservation_staff_assignments')
       .select(`
         reservation_id,
-        staff_user_id,
+        roster_staff_id,
         assigned_at
       `)
       .in('reservation_id', reservationIds);
@@ -1509,14 +1512,14 @@ async function fetchReservationAssignments(reservationIds, knownStaffProfiles) {
   const { data, error } = response;
   if (error) throw error;
 
-  const staffById = (knownStaffProfiles || []).reduce((map, staff) => {
-    map[staff.user_id] = staff;
+  const staffById = (knownStaffRoster || []).reduce((map, staff) => {
+    map[staff.staff_id] = staff;
     return map;
   }, {});
 
   return (data || []).reduce((map, assignment) => {
     if (!map[assignment.reservation_id]) map[assignment.reservation_id] = [];
-    const staffProfile = staffById[assignment.staff_user_id];
+    const staffProfile = staffById[assignment.roster_staff_id];
     if (staffProfile) {
       map[assignment.reservation_id].push({
         ...staffProfile,
@@ -1822,7 +1825,6 @@ function renderAssignmentStaffList() {
     if (!assignmentSearchTerm) return true;
     const haystacks = [
       getStaffDisplayName(staff),
-      staff.email,
       formatStaffRole(staff.staff_role)
     ]
       .filter(Boolean)
@@ -1846,13 +1848,12 @@ function renderAssignmentStaffList() {
     <label class="assignment-staff-option">
       <input
         type="checkbox"
-        value="${escapeHtml(staff.user_id)}"
-        ${assignmentSelection.has(staff.user_id) ? 'checked' : ''}
+        value="${escapeHtml(String(staff.staff_id))}"
+        ${assignmentSelection.has(String(staff.staff_id)) ? 'checked' : ''}
       />
       <span class="assignment-staff-copy">
         <span class="assignment-staff-name">${escapeHtml(getStaffDisplayName(staff))}</span>
         <span class="assignment-staff-role">${escapeHtml(formatStaffRole(staff.staff_role))}</span>
-        <span class="assignment-staff-email">${escapeHtml(staff.email || 'No email on file')}</span>
       </span>
     </label>
   `).join('');
@@ -1882,7 +1883,7 @@ function openAssignmentModal(reservationId) {
   if (!reservation) return;
 
   activeAssignmentReservationId = reservationId;
-  assignmentSelection = new Set(getAssignedStaff(reservationId).map((staff) => staff.user_id));
+  assignmentSelection = new Set(getAssignedStaff(reservationId).map((staff) => String(staff.staff_id)));
   assignmentSearchTerm = '';
 
   if (assignmentReservationSummary) {
@@ -1911,11 +1912,11 @@ async function saveAssignmentSelection() {
   const assignmentNote = String(assignmentNoteInput?.value || '').trim();
   const selectedStaffIds = Array.from(assignmentSelection);
   const existingStaffIds = new Set(
-    getAssignedStaff(activeAssignmentReservationId).map((staff) => staff.user_id)
+    getAssignedStaff(activeAssignmentReservationId).map((staff) => String(staff.staff_id))
   );
   const selectedStaffIdSet = new Set(selectedStaffIds);
-  const staffIdsToDelete = Array.from(existingStaffIds).filter((staffUserId) => !selectedStaffIdSet.has(staffUserId));
-  const staffIdsToInsert = selectedStaffIds.filter((staffUserId) => !existingStaffIds.has(staffUserId));
+  const staffIdsToDelete = Array.from(existingStaffIds).filter((staffId) => !selectedStaffIdSet.has(staffId));
+  const staffIdsToInsert = selectedStaffIds.filter((staffId) => !existingStaffIds.has(staffId));
 
   try {
     if (staffIdsToDelete.length) {
@@ -1923,15 +1924,15 @@ async function saveAssignmentSelection() {
         .from('reservation_staff_assignments')
         .delete()
         .eq('reservation_id', activeAssignmentReservationId)
-        .in('staff_user_id', staffIdsToDelete);
+        .in('roster_staff_id', staffIdsToDelete.map(Number));
 
       if (deleteError) throw deleteError;
     }
 
     if (staffIdsToInsert.length) {
-      const payload = staffIdsToInsert.map((staffUserId) => ({
+      const payload = staffIdsToInsert.map((staffId) => ({
         reservation_id: activeAssignmentReservationId,
-        staff_user_id: staffUserId,
+        roster_staff_id: Number(staffId),
         assigned_by: adminSession?.user?.id || null,
         assignment_note: assignmentNote || null
       }));
@@ -1948,7 +1949,7 @@ async function saveAssignmentSelection() {
         .from('reservation_staff_assignments')
         .update({ assignment_note: assignmentNote || null })
         .eq('reservation_id', activeAssignmentReservationId)
-        .in('staff_user_id', selectedStaffIds);
+        .in('roster_staff_id', selectedStaffIds.map(Number));
 
       if (updateError) throw updateError;
     }
@@ -2300,7 +2301,7 @@ async function loadData() {
     assignmentMapByReservationId = {};
 
     try {
-      staffDirectory = await fetchStaffProfiles();
+      staffDirectory = await fetchStaffRoster();
     } catch (staffError) {
       assignmentFeatureReady = false;
       assignmentFeatureMessage = getStaffDirectoryHint(staffError);

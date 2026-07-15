@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/reservations.css" />
@@ -310,14 +310,26 @@
                 <p>Review your contract and sign right here — no printing, no external apps.</p>
                 <div class="contract-box">
                     <div class="contract-viewer-head">
-                        <div class="contract-icon">&#128196;</div>
+                        <div class="contract-icon"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></div>
                         <div class="contract-info">
                             <h4 id="contract-title">ELI Coffee Events Reservation Contract</h4>
-                            <p id="contract-description">Scroll down to review the full agreement before signing.</p>
+                            <p id="contract-description">This is a short preview. Open the full agreement to read every section.</p>
                         </div>
                     </div>
-                    <div class="contract-viewer" id="contract-viewer" aria-live="polite">
+                    <div
+                        class="contract-viewer"
+                        id="contract-viewer"
+                        aria-live="polite"
+                        role="region"
+                        aria-label="Service agreement preview"
+                        tabindex="0"
+                    >
                         <p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>
+                    </div>
+                    <div class="contract-viewer-actions">
+                        <button type="button" class="contract-view-full-btn" id="contract-view-full-btn">
+                            <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i> View full agreement
+                        </button>
                     </div>
 
                     <div class="signature-section">
@@ -350,9 +362,10 @@
                             <span class="contract-agreement-copy">.</span>
                         </div>
                         <div class="contract-agreement-row">
-                            <input type="checkbox" id="contract-agreement-esign" class="contract-agreement-checkbox">
+                            <input type="checkbox" id="contract-agreement-esign" class="contract-agreement-checkbox" disabled>
                             <label for="contract-agreement-esign" class="contract-agreement-copy">I confirm my reservation details above are accurate, and I am signing this contract electronically.</label>
                         </div>
+                        <p class="contract-agreement-helper" id="contract-agreement-esign-helper">Read the agreement to enable this checkbox.</p>
                         <p class="contract-inline-message" id="contract-policy-message" aria-live="polite"></p>
                     </div>
                 </div>
@@ -378,6 +391,23 @@
                 <button type="button" class="policy-btn policy-btn-secondary" id="policy-modal-dismiss">Close</button>
                 <button type="button" class="policy-btn policy-btn-primary" id="policy-modal-agree">Agree</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Full-Screen Agreement Reader -->
+    <div class="agreement-modal-backdrop hidden" id="agreement-modal-backdrop" aria-hidden="true">
+        <div class="agreement-modal-surface" role="dialog" aria-modal="true" aria-labelledby="agreement-modal-title">
+            <header class="agreement-modal-header">
+                <h2 class="agreement-modal-title" id="agreement-modal-title">Service Agreement</h2>
+                <button type="button" class="agreement-modal-close-btn" id="agreement-modal-close-btn" aria-label="Close agreement">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </header>
+            <div class="agreement-modal-body" id="agreement-modal-body"></div>
+            <footer class="agreement-modal-footer">
+                <button type="button" class="agreement-modal-btn-outline" id="agreement-modal-footer-close-btn">Close</button>
+                <button type="button" class="agreement-modal-btn-solid" id="agreement-modal-finish-btn">I've finished reading</button>
+            </footer>
         </div>
     </div>
 
@@ -575,13 +605,25 @@
     const policyModalDismiss      = document.getElementById('policy-modal-dismiss');
     const policyModalAgree        = document.getElementById('policy-modal-agree');
     const policyButtons           = document.querySelectorAll('[data-policy]');
+    const contractViewFullBtn     = document.getElementById('contract-view-full-btn');
+    const contractAgreementHelper = document.getElementById('contract-agreement-esign-helper');
+    const agreementModalBackdrop  = document.getElementById('agreement-modal-backdrop');
+    const agreementModalTitle     = document.getElementById('agreement-modal-title');
+    const agreementModalBody      = document.getElementById('agreement-modal-body');
+    const agreementModalCloseBtn        = document.getElementById('agreement-modal-close-btn');
+    const agreementModalFooterCloseBtn  = document.getElementById('agreement-modal-footer-close-btn');
+    const agreementModalFinishBtn       = document.getElementById('agreement-modal-finish-btn');
 
     // ── Signature state ────────────────────────────────────────────────────
     const signatureState = {
         mode: 'draw',          // 'draw' | 'type'
         pad: null,             // SignaturePad instance
         contractLoaded: false,
-        activeTemplateContractType: 'package_contract'
+        activeTemplateContractType: 'package_contract',
+        agreementText: '',           // merged agreement text currently shown (also feeds the modal + PDF)
+        agreementViewMethod: '',     // '' | 'scrolled_inline' | 'opened_full_view'
+        agreementViewedAt: '',       // ISO timestamp once the gate is satisfied
+        agreementModalLastFocus: null
     };
 
     // ── Availability state ─────────────────────────────────────────────────
@@ -899,7 +941,7 @@ By signing below, the Client confirms that the reservation details above are acc
     }
 
     function renderContractBody(templateBody) {
-        if (!contractViewer) return;
+        if (!contractViewer) return '';
         const data = {
             customer_name: S.name || 'Customer',
             package_name: getSelectedContractPackageLabel() || 'Selected Package',
@@ -916,11 +958,59 @@ By signing below, the Client confirms that the reservation details above are acc
             const trimmed = line.trim();
             return trimmed ? `<p>${escapeHtml(trimmed)}</p>` : '<div class="contract-viewer-gap"></div>';
         }).join('');
+        return merged;
+    }
+
+    // ── Agreement read-gating ────────────────────────────────────────────────
+    // The e-sign checkbox stays disabled until we have real evidence the
+    // customer actually saw the agreement text — either they scrolled the
+    // inline preview to its end, or they opened the full-screen reader.
+    function resetAgreementGating() {
+        signatureState.agreementViewMethod = '';
+        signatureState.agreementViewedAt = '';
+        if (contractAgreementEsign) {
+            contractAgreementEsign.checked = false;
+            contractAgreementEsign.disabled = true;
+        }
+        if (contractAgreementHelper) contractAgreementHelper.hidden = false;
+    }
+
+    function markAgreementViewed(method) {
+        if (signatureState.agreementViewMethod) return; // already satisfied
+        signatureState.agreementViewMethod = method;
+        signatureState.agreementViewedAt = new Date().toISOString();
+        if (contractAgreementEsign) contractAgreementEsign.disabled = false;
+        if (contractAgreementHelper) contractAgreementHelper.hidden = true;
+    }
+
+    // Some agreements are short enough to fit the capped preview box with
+    // nothing to scroll — without this, those customers could never satisfy
+    // the "scrolled to the bottom" condition at all.
+    function checkInlinePreviewFits() {
+        if (!contractViewer || signatureState.agreementViewMethod) return;
+        if (contractViewer.scrollHeight <= contractViewer.clientHeight + 2) {
+            markAgreementViewed('scrolled_inline');
+        }
+    }
+
+    function showContractLoadError() {
+        if (!contractViewer) return;
+        contractViewer.innerHTML = `
+            <p class="contract-viewer-loading contract-viewer-error">
+                We couldn't load your agreement text right now.
+                <button type="button" class="contract-retry-btn" id="contract-retry-btn">Retry</button>
+            </p>
+        `;
+        document.getElementById('contract-retry-btn')?.addEventListener('click', buildContractStep);
     }
 
     async function buildContractStep() {
         if (!contractViewer) return;
         const pkgId = getSelectedContractPackageId();
+
+        signatureState.agreementText = '';
+        signatureState.contractLoaded = false;
+        resetAgreementGating();
 
         if (!pkgId) {
             contractViewer.innerHTML = '<p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>';
@@ -929,18 +1019,149 @@ By signing below, the Client confirms that the reservation details above are acc
 
         contractViewer.innerHTML = '<p class="contract-viewer-loading">Loading your contract...</p>';
 
-        const { data: tmpl } = await supabase
-            .from('contract_templates')
-            .select('template_body, contract_type')
-            .eq('package_id', pkgId)
-            .eq('is_active', true)
-            .order('version_no', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        let tmpl = null;
+        try {
+            const { data, error } = await supabase
+                .from('contract_templates')
+                .select('template_body, contract_type')
+                .eq('package_id', pkgId)
+                .eq('is_active', true)
+                .order('version_no', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (error) throw error;
+            tmpl = data;
+        } catch (err) {
+            showContractLoadError();
+            return;
+        }
 
         signatureState.activeTemplateContractType = tmpl?.contract_type || 'package_contract';
-        renderContractBody(tmpl?.template_body || DEFAULT_CONTRACT_TEMPLATE_BODY);
+        signatureState.agreementText = renderContractBody(tmpl?.template_body || DEFAULT_CONTRACT_TEMPLATE_BODY);
         signatureState.contractLoaded = true;
+        checkInlinePreviewFits();
+    }
+
+    // ── Full-screen agreement reader ───────────────────────────────────────
+    // Turns the flat, `\n`-separated agreement text into a heading hierarchy:
+    // the first line becomes the document title (h2), lines that open with
+    // "N. Title." (the convention every contract template + the fallback
+    // body follow) become sub-headings (h3), everything else stays a
+    // paragraph. Used by both the modal renderer and the PDF export so they
+    // never drift out of sync with each other.
+    function parseAgreementSections(text) {
+        const lines = String(text || '').split('\n').map(l => l.trim());
+        const blocks = [];
+        let sawTitle = false;
+
+        for (const line of lines) {
+            if (!line) continue;
+
+            if (!sawTitle) {
+                sawTitle = true;
+                blocks.push({ tag: 'h2', text: line });
+                continue;
+            }
+
+            const sectionMatch = line.match(/^(\d+)\.\s+([^.]{1,80})\.\s*(.*)$/);
+            if (sectionMatch) {
+                blocks.push({ tag: 'h3', text: `${sectionMatch[1]}. ${sectionMatch[2]}.` });
+                if (sectionMatch[3]) blocks.push({ tag: 'p', text: sectionMatch[3] });
+                continue;
+            }
+
+            blocks.push({ tag: 'p', text: line });
+        }
+
+        return blocks;
+    }
+
+    function renderAgreementModalBody() {
+        if (!agreementModalBody) return;
+        const blocks = parseAgreementSections(signatureState.agreementText);
+        agreementModalBody.innerHTML = blocks.map(b => `<${b.tag}>${escapeHtml(b.text)}</${b.tag}>`).join('');
+    }
+
+    function showAgreementModalError() {
+        if (!agreementModalBody) return;
+        agreementModalBody.innerHTML = `
+            <p class="agreement-modal-error">
+                We couldn't load the agreement text right now.
+                <button type="button" class="contract-retry-btn" id="agreement-modal-retry-btn">Retry</button>
+            </p>
+        `;
+        document.getElementById('agreement-modal-retry-btn')?.addEventListener('click', async () => {
+            await buildContractStep();
+            if (signatureState.agreementText) {
+                renderAgreementModalBody();
+                markAgreementViewed('opened_full_view');
+            } else {
+                showAgreementModalError();
+            }
+        });
+    }
+
+    function getAgreementModalFocusable() {
+        if (!agreementModalBackdrop) return [];
+        return Array.from(agreementModalBackdrop.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+            .filter(el => !el.disabled && el.offsetParent !== null);
+    }
+
+    function handleAgreementModalKeydown(event) {
+        if (!agreementModalBackdrop || agreementModalBackdrop.classList.contains('hidden')) return;
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeAgreementModal();
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+        const focusable = getAgreementModalFocusable();
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    function openAgreementModal() {
+        if (!agreementModalBackdrop) return;
+
+        if (agreementModalTitle) {
+            agreementModalTitle.textContent = document.getElementById('contract-title')?.textContent || 'Service Agreement';
+        }
+
+        if (signatureState.agreementText) {
+            renderAgreementModalBody();
+            markAgreementViewed('opened_full_view');
+        } else {
+            showAgreementModalError();
+        }
+
+        signatureState.agreementModalLastFocus = document.activeElement;
+        agreementModalBackdrop.classList.remove('hidden');
+        agreementModalBackdrop.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        document.addEventListener('keydown', handleAgreementModalKeydown);
+
+        const focusable = getAgreementModalFocusable();
+        (focusable[0] || agreementModalBackdrop).focus();
+    }
+
+    function closeAgreementModal() {
+        if (!agreementModalBackdrop) return;
+        agreementModalBackdrop.classList.add('hidden');
+        agreementModalBackdrop.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', handleAgreementModalKeydown);
+        (signatureState.agreementModalLastFocus || contractViewFullBtn)?.focus();
     }
 
     // ── Availability helpers ───────────────────────────────────────────────
@@ -2027,6 +2248,9 @@ By signing below, the Client confirms that the reservation details above are acc
             if (!contractAgreementTerms?.checked) {
                 setContractPolicyMessage('Please agree to the Terms & Conditions and Data Privacy Policy before submitting.', 'error'); return false;
             }
+            if (!signatureState.agreementViewMethod) {
+                setContractPolicyMessage('Please read the agreement first — scroll the preview to the bottom or open the full view.', 'error'); return false;
+            }
             if (!contractAgreementEsign?.checked) {
                 setContractPolicyMessage('Please confirm your details are accurate and that you are signing electronically.', 'error'); return false;
             }
@@ -2153,6 +2377,19 @@ By signing below, the Client confirms that the reservation details above are acc
     policyModalBackdrop?.addEventListener('click', e => { if (e.target === policyModalBackdrop) closePolicyModal(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !policyModalBackdrop?.classList.contains('hidden')) closePolicyModal(); });
 
+    contractViewer?.addEventListener('scroll', () => {
+        if (signatureState.agreementViewMethod) return;
+        const el = contractViewer;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
+            markAgreementViewed('scrolled_inline');
+        }
+    });
+    contractViewFullBtn?.addEventListener('click', openAgreementModal);
+    agreementModalCloseBtn?.addEventListener('click', closeAgreementModal);
+    agreementModalFooterCloseBtn?.addEventListener('click', closeAgreementModal);
+    agreementModalFinishBtn?.addEventListener('click', closeAgreementModal);
+    agreementModalBackdrop?.addEventListener('click', e => { if (e.target === agreementModalBackdrop) closeAgreementModal(); });
+
     // ── Submit ─────────────────────────────────────────────────────────────
     async function submitDone() {
         const nextBtn = document.getElementById('nextBtn');
@@ -2184,6 +2421,9 @@ By signing below, the Client confirms that the reservation details above are acc
             if (!isSignaturePresent()) throw new Error('Please sign the contract before submitting.');
             if (!contractAgreementTerms?.checked || !contractAgreementEsign?.checked) {
                 throw new Error('Please check both agreement boxes before submitting.');
+            }
+            if (!signatureState.agreementViewMethod || !signatureState.agreementViewedAt) {
+                throw new Error('Please read the agreement (scroll the preview or open the full view) before submitting.');
             }
             const signatureDataUrl = await getSignatureDataUrl();
             if (!signatureDataUrl) throw new Error('Please sign the contract before submitting.');
@@ -2238,7 +2478,9 @@ By signing below, the Client confirms that the reservation details above are acc
                     reservation_id: reservation.reservation_id,
                     signature_data_url: signatureDataUrl,
                     signer_name: signerName,
-                    signature_type: signatureType
+                    signature_type: signatureType,
+                    agreement_view_method: signatureState.agreementViewMethod,
+                    agreement_viewed_at: signatureState.agreementViewedAt
                 }
             });
 

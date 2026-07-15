@@ -626,6 +626,8 @@ Deno.serve(async (req: Request) => {
   let signature_data_url: string | undefined;
   let signer_name: string | undefined;
   let signature_type: string | undefined;
+  let agreement_view_method: string | undefined;
+  let agreement_viewed_at: string | undefined;
 
   try {
     const body = await req.json();
@@ -633,19 +635,35 @@ Deno.serve(async (req: Request) => {
     signature_data_url = body.signature_data_url;
     signer_name = String(body.signer_name || '').trim();
     signature_type = body.signature_type;
+    agreement_view_method = body.agreement_view_method;
+    agreement_viewed_at = body.agreement_viewed_at;
   } catch {
     return jsonResponse({ success: false, error: 'Invalid JSON body.' }, 400);
   }
 
-  if (!reservation_id || !signature_data_url || !signer_name || !signature_type) {
+  if (
+    !reservation_id || !signature_data_url || !signer_name || !signature_type ||
+    !agreement_view_method || !agreement_viewed_at
+  ) {
     return jsonResponse(
-      { success: false, error: 'reservation_id, signature_data_url, signer_name, and signature_type are required.' },
+      {
+        success: false,
+        error: 'reservation_id, signature_data_url, signer_name, signature_type, agreement_view_method, ' +
+          'and agreement_viewed_at are required.',
+      },
       400,
     );
   }
 
   if (!['drawn', 'typed'].includes(signature_type)) {
     return jsonResponse({ success: false, error: 'signature_type must be "drawn" or "typed".' }, 400);
+  }
+
+  if (!['scrolled_inline', 'opened_full_view'].includes(agreement_view_method)) {
+    return jsonResponse(
+      { success: false, error: 'agreement_view_method must be "scrolled_inline" or "opened_full_view".' },
+      400,
+    );
   }
 
   if (!signature_data_url.startsWith('data:image/png;base64,')) {
@@ -763,6 +781,8 @@ Deno.serve(async (req: Request) => {
         signer_name,
         signature_type,
         signature_image_url: signatureUrl,
+        agreement_view_method,
+        agreement_viewed_at,
       });
 
     if (signatureInsertError) throw signatureInsertError;

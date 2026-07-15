@@ -100,7 +100,7 @@
         tbody.innerHTML = page.map(a => {
           const avClass    = a.role === 'manager' ? 'avatar-admin' : 'avatar-staff';
           const roleBadge  = a.role === 'manager' ? 'badge-admin'  : 'badge-staff';
-          const roleLabel  = a.role === 'manager' ? 'Manager'      : 'Staff';
+          const roleLabel  = a.is_board_account ? 'Board Account' : (a.role === 'manager' ? 'Manager' : 'Staff');
           const stBadge    = { active:'badge-active', inactive:'badge-inactive', locked:'badge-locked' }[a._status] || 'badge-inactive';
           const stLabel    = a._status.charAt(0).toUpperCase() + a._status.slice(1);
           const lockTitle  = a._status === 'locked' ? 'Unlock Account' : 'Lock Account';
@@ -118,7 +118,7 @@
               <div class="contact-primary">${a.phone_number||'—'}</div>
               <div class="contact-secondary">${a.email||''}</div>
             </td>
-            <td><span class="badge ${roleBadge}">${roleLabel}${a.staff_role ? ` · ${a.staff_role}` : ''}</span></td>
+            <td><span class="badge ${roleBadge}">${roleLabel}${(!a.is_board_account && a.staff_role) ? ` · ${a.staff_role}` : ''}</span></td>
             <td><span class="badge ${stBadge}">${stLabel}</span></td>
             <td style="font-size:12.5px;color:var(--muted);">${a.last_sign_in_at ? fmtDate(a.last_sign_in_at) : '—'}</td>
             <td style="font-size:12.5px;color:var(--muted);">${a._activity||'No recent activity'}</td>
@@ -132,6 +132,10 @@
                 <button type="button" class="btn-icon"       data-action="lock"   data-uid="${a.user_id}" title="${lockTitle}">
                   <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </button>
+                ${a.is_board_account ? `
+                <button type="button" class="btn-icon" data-action="reset-board-password" data-uid="${a.user_id}" title="Reset board password">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                </button>` : ''}
                 <!-- <button type="button" class="btn-icon danger" data-action="delete" data-uid="${a.user_id}" title="Delete Account">
                   <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button> -->
@@ -165,6 +169,7 @@
       if (!a) return;
       if (btn.dataset.action === 'view')   openEditModal(a);
       if (btn.dataset.action === 'lock')   openLockConfirm(a);
+      if (btn.dataset.action === 'reset-board-password') openBoardResetConfirm(a);
       //if (btn.dataset.action === 'delete') openDeleteConfirm(a);
     });
 
@@ -215,13 +220,34 @@
       document.getElementById('fieldEmail').readOnly   = true;
       document.getElementById('fieldEmailHint').style.display = 'block';
 
-      document.getElementById('fieldRole').value      = a.role || 'manager';
       document.getElementById('fieldStaffRole').value = a.staff_role || '';
       document.getElementById('fieldStatus').value    = a._status || 'active';
 
+      const roleSelect = document.getElementById('fieldRole');
+      const staffRoleInput = document.getElementById('fieldStaffRole');
+      const boardHint = document.getElementById('fieldRoleBoardHint');
+      const priorBoardOption = roleSelect.querySelector('option[value="staff"]');
+      if (priorBoardOption) priorBoardOption.remove();
+
+      if (a.is_board_account) {
+        const opt = document.createElement('option');
+        opt.value = 'staff';
+        opt.textContent = 'Staff (Board Account)';
+        roleSelect.appendChild(opt);
+        roleSelect.value = 'staff';
+        roleSelect.disabled = true;
+        staffRoleInput.disabled = true;
+        boardHint.style.display = 'block';
+      } else {
+        roleSelect.value = a.role || 'manager';
+        roleSelect.disabled = false;
+        staffRoleInput.disabled = false;
+        boardHint.style.display = 'none';
+      }
+
       document.getElementById('viewDateRegistered').textContent = fmtDate(a.date_registered);
       document.getElementById('viewLastSignIn').textContent     = a.last_sign_in_at ? fmtDate(a.last_sign_in_at) : '—';
-      document.getElementById('viewRole').textContent           = a.role === 'manager' ? 'Manager' : 'Staff';
+      document.getElementById('viewRole').textContent           = a.is_board_account ? 'Staff (Board Account)' : (a.role === 'manager' ? 'Manager' : 'Staff');
       document.getElementById('viewStaffRole').textContent      = a.staff_role || '—';
 
       hideMsg();
@@ -405,6 +431,37 @@
       applyFilters();
       closeConfirmModal();
     };
+      document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    // ── RESET BOARD PASSWORD ─────────────────────────────────────────
+    function openBoardResetConfirm(a) {
+      document.getElementById('confirmTitle').textContent = 'Reset Board Password';
+      document.getElementById('confirmSub').textContent   = displayName(a);
+      document.getElementById('confirmBody').textContent  =
+        'This will sign out the counter display. The board must be logged in again with the new password. ' +
+        'It may take up to an hour for an already-open display to actually be signed out.';
+      const msg = document.getElementById('confirmMsg');
+      msg.className = 'modal-message hidden';
+      msg.textContent = '';
+
+      document.getElementById('confirmOk').onclick = async () => {
+        msg.className = 'modal-message info';
+        msg.textContent = 'Resetting password…';
+
+        const { data, error: fnErr } = await supabase.functions.invoke('reset-board-password', {
+          body: { user_id: a.user_id }
+        });
+
+        if (fnErr || !data?.password) {
+          msg.className = 'modal-message error';
+          msg.textContent = data?.detail || fnErr?.message || 'Failed to reset the board password.';
+          return;
+        }
+
+        msg.className = 'modal-message success';
+        msg.textContent = `New password: ${data.password} — copy this now, it will not be shown again.`;
+      };
       document.getElementById('confirmModal').classList.remove('hidden');
     }
 

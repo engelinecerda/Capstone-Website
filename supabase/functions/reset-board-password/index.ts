@@ -10,10 +10,12 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 };
 
-const ALLOWED_ROLES = ['manager'];
-
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
+}
+
+function generatePassword() {
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 }
 
 Deno.serve(async (req) => {
@@ -55,51 +57,36 @@ Deno.serve(async (req) => {
     return jsonResponse({ detail: 'Invalid request body' }, 400);
   }
 
-  const email = String(body.email || '').trim().toLowerCase();
-  const role = String(body.role || '').trim().toLowerCase();
-  const staffRole = body.staff_role ? String(body.staff_role).trim() : null;
-  const firstName = body.first_name ? String(body.first_name).trim() : null;
-  const lastName = body.last_name ? String(body.last_name).trim() : null;
-
-  if (!email) {
-    return jsonResponse({ detail: 'Email is required' }, 400);
-  }
-  if (!ALLOWED_ROLES.includes(role)) {
-    return jsonResponse({ detail: 'Role must be manager' }, 400);
+  const boardUserId = String(body.user_id || '').trim();
+  if (!boardUserId) {
+    return jsonResponse({ detail: 'user_id is required' }, 400);
   }
 
-  const tempPassword = crypto.randomUUID();
+  const { data: boardProfile, error: boardProfileError } = await supabaseAdmin
+    .from('profiles')
+    .select('user_id, is_board_account')
+    .eq('user_id', boardUserId)
+    .maybeSingle();
 
-  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
+  if (boardProfileError || !boardProfile?.is_board_account) {
+    return jsonResponse({ detail: 'This endpoint only resets the shared board account password' }, 404);
+  }
+
+  const newPassword = generatePassword();
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(boardUserId, {
+    password: newPassword,
   });
 
-  if (createError || !created?.user) {
-    return jsonResponse({ detail: createError?.message || 'Failed to create account' }, 400);
+  if (updateError) {
+    return jsonResponse({ detail: updateError.message || 'Failed to reset password' }, 400);
   }
 
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .update({
-      role,
-      staff_role: staffRole,
-      first_name: firstName,
-      last_name: lastName,
-    })
-    .eq('user_id', created.user.id);
+  // Best-effort only: Supabase access tokens are short-lived JWTs that remain
+  // valid until they expire (typically ~1hr), so an already-open kiosk
+  // session won't drop instantly. A follow-up SECURITY DEFINER function that
+  // deletes auth.sessions rows for this user would make this immediate; not
+  // done in this pass.
 
-  if (profileError) {
-    return jsonResponse({ detail: `Account created but profile update failed: ${profileError.message}` }, 500);
-  }
-
-  const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email);
-
-  return jsonResponse({
-    user_id: created.user.id,
-    email,
-    role,
-    password_reset_sent: !resetError,
-  }, 201);
+  return jsonResponse({ user_id: boardUserId, password: newPassword }, 200);
 });

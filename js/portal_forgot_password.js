@@ -22,18 +22,24 @@ form?.addEventListener('submit', async (event) => {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Sending...';
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo
-  });
+  const { data: isBoardAccount } = await supabase.rpc('is_board_account_email', { p_email: email });
+
+  if (!isBoardAccount) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo
+    });
+
+    if (error) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Reset Link';
+      message.className = 'form-msg error';
+      message.innerText = 'Failed to send reset email: ' + error.message;
+      return;
+    }
+  }
 
   submitBtn.disabled = false;
   submitBtn.textContent = 'Send Reset Link';
-
-  if (error) {
-    message.className = 'form-msg error';
-    message.innerText = 'Failed to send reset email: ' + error.message;
-    return;
-  }
 
   message.className = 'form-msg success';
   message.innerText = 'If an account exists for that email, a reset link has been sent.';
