@@ -1,30 +1,30 @@
 :root {
-  --bg: #f5efe7;
-  --panel-bg: #ffffff;
-  --sidebar-bg: #fffaf5;
-  --sidebar-w: 250px;
-  --active-bg: #4e3624;
-  --active-text: #ffffff;
-  --nav-text: #20150b;
-  --nav-hover: #ffffff;
-  --badge-bg: #2d1f14;
-  --badge-text: #ffffff;
-  --border: #eadfd2;
-  --text: #20150b;
-  --muted: #73685f;
-  --font: 'Kumbh Sans', sans-serif;
-  --accent-soft: #fbf6f0;
-  --accent-line: #ddccbc;
-  --accent-green: #d9f3df;
-  --accent-green-text: #166534;
-  --accent-blue: #eff6ff;
-  --accent-blue-text: #1d4ed8;
-  --primary: #4e3624;
-  --danger: #b91c1c;
-  --active-pill-bg: #d9f3df;
-  --active-pill-txt: #166534;
-  --archived-pill-bg: #eceff3;
-  --archived-pill-txt: #475569;
+  --bg: #FAF6F0;
+  --panel-bg: #FFFFFF;
+  --sidebar-bg: #2A1208;
+  --sidebar-w: 240px;
+  --active-bg: #4A2C17;
+  --active-text: #F5EBDD;
+  --nav-text: #1A1A1A;
+  --nav-hover: #F5EEE4;
+  --badge-bg: #F5EBDD;
+  --badge-text: #2A1208;
+  --border: #E8DFD3;
+  --text: #1A1A1A;
+  --muted: #7A6A5C;
+  --font: 'Inter', sans-serif;
+  --accent-soft: #FBF8F3;
+  --accent-line: #E2D8CB;
+  --accent-green: #EAF3DE;
+  --accent-green-text: #3B6D11;
+  --accent-blue: #F1EFE8;
+  --accent-blue-text: #5F5E5A;
+  --primary: #3D1A0A;
+  --danger: #A32D2D;
+  --active-pill-bg: #EAF3DE;
+  --active-pill-txt: #3B6D11;
+  --archived-pill-bg: #F1EFE8;
+  --archived-pill-txt: #5F5E5A;
 }
 
 .page-header-row {
@@ -40,7 +40,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4e3624;
+  background: #3D1A0A;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -53,7 +53,7 @@
   white-space: nowrap;
 }
 
-.btn-add-template:hover { background: #3a2718; }
+.btn-add-template:hover { background: #5A2E16; }
 
 /* ── Modal overlay ─────────────────────────────────────────── */
 .tmpl-overlay {
@@ -399,7 +399,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4e3624;
+  background: #3D1A0A;
   color: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -411,7 +411,7 @@
   transition: background 0.15s;
 }
 .tmpl-btn-save:hover    { 
-  background: #3a2718; 
+  background: #5A2E16; 
 }
 .tmpl-btn-save:disabled { 
   opacity: 0.5; cursor: not-allowed; 

@@ -2,6 +2,9 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -12,6 +15,7 @@ const statusDropdown = document.getElementById('statusDropdown');
 const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
+const paymentsPagination = document.getElementById('paymentsPagination');
 
 const paymentDetailsModal = document.getElementById('paymentDetailsModal');
 const paymentDetailsClose = document.getElementById('paymentDetailsClose');
@@ -50,7 +54,10 @@ const PAYMENT_BALANCE_DUE_DAYS = 7;
 
 let adminSession = null;
 let refreshSidebarBadges = () => {};
+let currentRole = null;
 let paymentsCache = [];
+let paymentsFiltered = [];
+let paymentsCurrentPage = 1;
 let reservationMap = {};
 let receiptMap = {};
 let rescheduleRequestMap = {};
@@ -412,7 +419,9 @@ function filterAndRender() {
     && matchesSearch(payment, term)
   ));
   renderStats(paymentsCache);
-  renderTable(filtered);
+  paymentsFiltered = filtered;
+  paymentsCurrentPage = 1;
+  renderPaymentsPage();
   if (!filtered.length) {
     setMessage(tableMessage, 'No payment submissions match the current filter.');
   } else if (reservationFilterParam) {
@@ -420,6 +429,19 @@ function filterAndRender() {
   } else {
     setMessage(tableMessage, '');
   }
+}
+
+function renderPaymentsPage() {
+  renderTable(paginate(paymentsFiltered, paymentsCurrentPage, PAGE_SIZE));
+  renderPagination(paymentsPagination, {
+    totalItems: paymentsFiltered.length,
+    currentPage: paymentsCurrentPage,
+    pageSize: PAGE_SIZE,
+    onPageChange: (page) => {
+      paymentsCurrentPage = page;
+      renderPaymentsPage();
+    }
+  });
 }
 
 async function fetchReservationsForPayments(reservationIds) {
@@ -584,7 +606,7 @@ function buildOcrPanel(payment) {
           <span class="ocr-panel-title">OCR Extraction</span>
           <span class="ocr-badge ocr-badge-failed">Failed</span>
         </div>
-        <p class="ocr-panel-note">Cloud Vision could not read this image: ${escapeHtml(ocr.error)}</p>
+        <p class="ocr-panel-note">We couldn't read this image automatically: ${escapeHtml(ocr.error)}</p>
       </div>
     `;
   }
@@ -627,6 +649,10 @@ function buildOcrPanel(payment) {
 // ────────────────────────────────────────────────────────────────────────────
 
 async function handlePaymentReview(paymentId, nextStatus) {
+  if (currentRole === 'admin') {
+    throw new Error('This action requires the Manager role.');
+  }
+
   const payment = getPaymentById(paymentId);
   if (!payment) throw new Error('Payment record could not be found.');
 
@@ -767,7 +793,7 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
 
   reviewActions.push('<button type="button" class="modal-btn modal-btn-secondary" id="paymentDetailsDismiss">Close</button>');
 
-  if (String(payment.payment_status || '').toLowerCase() === 'pending_review') {
+  if (currentRole !== 'admin' && String(payment.payment_status || '').toLowerCase() === 'pending_review') {
     reviewActions.push(`<button type="button" class="modal-btn modal-btn-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject Payment</button>`);
     reviewActions.push(`<button type="button" class="modal-btn modal-btn-success" data-action="approve-payment" data-payment-id="${payment.payment_id}">${escapeHtml(payment.payment_method === 'cash' ? 'Approve Cash Payment' : 'Approve Payment')}</button>`);
   } else if (receipt) {
@@ -944,10 +970,17 @@ watchAuthState();
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {
 
+    currentRole = profile.role;
+
     // Setup inactivity (same as homepage)
     setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
-    
+    initManagerNotificationBell(supabase, session.user.id);
+
     if (profile.role === 'admin') {
       document.body.classList.add('is-super-admin');
     } else {

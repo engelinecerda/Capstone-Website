@@ -14,6 +14,27 @@
 .sidebar-bottom-nav .sidebar-section-label { margin-top: 0; }
 
 .nav-badge { display: grid; place-items: center; }
+.nav-badge[hidden] { display: none !important; }
+
+/* ── ADMIN (SYSTEM-CONFIG ROLE) READ-ONLY OPERATIONS ─────────── */
+/* Admin sees Operations nav items but never their pending-count badges —
+   those counts are Manager-actionable, not Admin-actionable. */
+body.is-super-admin .sidebar-nav .nav-badge { display: none !important; }
+
+.view-only-pill {
+  display: none;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #F1EFE8;
+  color: #5F5E5A;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+body.is-super-admin .view-only-pill { display: inline-flex; }
 
 /* ── HAMBURGER BUTTON (hidden on desktop, shown on mobile) ─── */
 .sidebar-hamburger {

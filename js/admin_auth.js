@@ -4,6 +4,8 @@ function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+const PORTAL_ROLES = ['manager', 'admin', 'staff'];
+
 export function formatPortalRoleLabel(role, fallback = 'Portal User') {
   const normalized = normalizeRole(role);
   return normalized
@@ -40,6 +42,7 @@ export function populatePortalIdentity({
   nameEl,
   emailEl,
   roleEl,
+  avatarEl,
   fallbackLabel = 'Portal User'
 }) {
   const displayName = getPortalDisplayName(profile, fallbackLabel);
@@ -49,6 +52,7 @@ export function populatePortalIdentity({
   if (nameEl) nameEl.textContent = displayName;
   if (emailEl) emailEl.textContent = email;
   if (roleEl) roleEl.textContent = roleLabel;
+  if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
 
   return { displayName, email, roleLabel };
 }
@@ -81,11 +85,15 @@ export async function verifyPortalSession(supabase, options = {}) {
     return { session: null, message: 'This account signed in successfully, but no portal role was found in Supabase yet.' };
   }
 
-  if (actualRole !== requiredRole) {
+  if (requiredRole && actualRole !== requiredRole) {
     return {
       session: null,
       message: `This account signed in successfully, but its profile role is \`${actualRole}\`, not \`${requiredRole}\`.`
     };
+  }
+
+  if (!requiredRole && !PORTAL_ROLES.includes(actualRole)) {
+    return { session: null, message: 'This account is not allowed to use the portal right now.' };
   }
 
   return { session, profile };

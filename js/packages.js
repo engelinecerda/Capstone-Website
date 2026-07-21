@@ -457,7 +457,7 @@ function buildPackageCard(pkg, categoryName, isBest = false) {
         ${pillsHtml}
         <div class="pkg-card-actions">
           <button class="pkg-card-btn-details" data-action="view" aria-label="View details for ${esc(name)}">Details</button>
-          <a href="/reservations.html" class="pkg-card-btn-book" aria-label="Book ${esc(name)}">
+          <a href="/reservations.html${pkg.package_id ? '?package=' + esc(pkg.package_id) : ''}" class="pkg-card-btn-book" aria-label="Book ${esc(name)}">
             Book
           </a>
         </div>
@@ -513,6 +513,13 @@ function selectPackage(pkg, catName) {
        <p class="pkg-detail-price-note">Starting price · inclusive of setup</p>`
     : `<p class="pkg-detail-price pkg-detail-price--contact">Contact for Quote</p>
        <p class="pkg-detail-price-note">Customized pricing available</p>`;
+
+  // Detail "Book This Package" button — pass package id as URL param
+  if (pkgDetailBookBtn) {
+    pkgDetailBookBtn.href = pkg.package_id
+      ? `/reservations.html?package=${encodeURIComponent(pkg.package_id)}`
+      : '/reservations.html';
+  }
 
   // Area coverage tab
   if (loc === 'offsite') show(tabAreaCoverage);

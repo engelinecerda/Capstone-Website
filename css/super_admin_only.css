@@ -9,9 +9,11 @@
   pointer-events: none !important;
 }
 
-/* Show when body has is-super-admin */
+/* Show when body has is-super-admin. Block is the safe generic default for
+   cards/paragraphs; more specific rules below override per element type
+   (nav items need flex, sections need flex-column). */
 body.is-super-admin .super-admin-only {
-  display: flex !important;
+  display: block !important;
   visibility: visible !important;
   pointer-events: auto !important;
 }
@@ -32,4 +34,13 @@ body.is-super-admin .super-admin-only.hidden {
 /* Sidebar nav items should use flex */
 body.is-super-admin a.super-admin-only.nav-item {
   display: flex !important;
+}
+
+/* Header button groups / icon buttons should use (inline-)flex, not block */
+body.is-super-admin .header-btn-group.super-admin-only {
+  display: flex !important;
+}
+
+body.is-super-admin .btn-add-template.super-admin-only {
+  display: inline-flex !important;
 }

@@ -518,6 +518,19 @@
             border-color: #e9ded3;
             box-shadow: none;
         }
+        /* Available, but a location/package hasn't been chosen yet — shown so
+           anyone (including signed-out visitors) can preview open dates.
+           Dashed border signals "informational" rather than "ready to
+           select", since clicking still just prompts them to choose a
+           booking type first. */
+        .availability-day.available.preview {
+            border-style: dashed;
+            cursor: pointer;
+        }
+        .availability-day.available.preview:hover {
+            transform: none;
+            box-shadow: none;
+        }
         .availability-day.past {
             background: #f8f5f1;
             color: #c3b5a7;
@@ -1068,6 +1081,19 @@
             color: #6B3A1F;
             line-height: 1.6;
         }
+        .time-end-readout {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2A1408;
+        }
+        .time-grid-loading {
+            grid-column: 1 / -1;
+            font-size: 13px;
+            color: #9c8f84;
+            text-align: center;
+            padding: 12px 0;
+        }
 
         /* Summary */
         .summary-box { background: var(--cream, #FAF8F4); border: 1px solid var(--border, rgba(61,26,10,0.10)); border-radius: 4px; padding: 22px 24px; width: 100%; box-sizing: border-box; }
@@ -1086,31 +1112,151 @@
 
         /* Contract */
         .contract-box { width: 100%; }
-        .contract-download { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
-        .contract-icon { font-size: 32px; flex-shrink: 0; }
+        .contract-viewer-head { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
+        .contract-icon { font-size: 22px; color: #6B3A1F; flex-shrink: 0; width: 32px; text-align: center; }
         .contract-info { flex: 1; }
         .contract-info h4 { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 3px; }
         .contract-info p  { font-size: 13px; color: #777; margin: 0; }
-        .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; }
+        .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; display: inline-block; }
         .dl-btn:hover { background: var(--brown-dark, #1E0C03); }
-        .contract-steps { margin-bottom: 16px; }
-        .c-step { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #444; margin-bottom: 10px; }
-        .c-num { background: #6B3A1F; color: #fff; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-        .contract-upload label { display: block; font-size: 14px; font-weight: 600; color: #2A1408; margin-bottom: 8px; }
-        .contract-upload input[type="file"] { width: 100%; border: 2px dashed #e0d0c0; border-radius: 10px; padding: 16px; background: #FFF8F0; cursor: pointer; box-sizing: border-box; font-family: inherit; }
-        .contract-note { font-size: 12px; color: #aaa; margin-top: 6px; }
-        .contract-file-status {
+
+        /* Capped to roughly 5-6 lines — this is a preview now; the full text
+           lives in the full-screen reader opened via "View full agreement". */
+        .contract-viewer {
+            max-height: 190px;
+            overflow-y: auto;
+            border: 1px solid #e0d0c0;
+            border-radius: 12px;
+            padding: 20px 22px;
+            background: #fff;
+            margin-bottom: 12px;
+        }
+        .contract-viewer:focus-visible {
+            outline: 2px solid #6B3A1F;
+            outline-offset: 2px;
+        }
+        .contract-viewer p { font-size: 13.5px; line-height: 1.7; color: #3a2a1c; margin-bottom: 12px; }
+        .contract-viewer-gap { height: 6px; }
+        .contract-viewer-loading { font-size: 13px; color: #9c8f84; text-align: center; padding: 24px 0; }
+        .contract-viewer-error { color: #b42318; }
+
+        .contract-retry-btn {
+            display: inline-flex;
+            align-items: center;
+            min-height: 32px;
+            margin-left: 8px;
+            padding: 0 12px;
+            border: 1px solid #e0d0c0;
+            border-radius: 999px;
+            background: #fff;
+            color: #6B3A1F;
+            font: inherit;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .contract-retry-btn:hover,
+        .contract-retry-btn:focus-visible {
+            background: #FFF8F0;
+            outline: none;
+        }
+
+        .contract-viewer-actions {
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
+        .contract-view-full-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 40px;
+            padding: 9px 18px;
+            border: 1px solid #6B3A1F;
+            border-radius: 8px;
+            background: #fff;
+            color: #6B3A1F;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .contract-view-full-btn:hover,
+        .contract-view-full-btn:focus-visible {
+            background: #6B3A1F;
+            color: #fff;
+            outline: none;
+        }
+
+        .signature-section { margin-bottom: 20px; }
+        .signature-heading { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 10px; }
+        .signature-mode-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+        .signature-mode-btn {
+            border: 1px solid #e0d0c0;
+            background: #fff;
+            color: #6B3A1F;
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 7px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .signature-mode-btn.active { background: #6B3A1F; color: #fff; border-color: #6B3A1F; }
+        .signature-mode-btn:not(.active):hover { background: #FFF8F0; }
+
+        .signature-draw-panel.hidden, .signature-type-panel.hidden { display: none; }
+        .signature-canvas {
+            width: 100%;
+            height: 180px;
+            border: 2px dashed #e0d0c0;
+            border-radius: 12px;
+            background: #fff;
+            touch-action: none;
+            cursor: crosshair;
+        }
+        .signature-clear-btn {
+            margin-top: 8px;
+            border: 1px solid #e0d0c0;
+            background: #fff;
+            color: #6B3A1F;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .signature-clear-btn:hover { background: #FFF8F0; }
+
+        .signature-type-input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 2px dashed #e0d0c0;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            background: #fff;
+        }
+        .signature-type-preview {
+            margin-top: 10px;
+            min-height: 56px;
+            font-family: 'Dancing Script', cursive;
+            font-size: 40px;
+            font-weight: 700;
+            color: #2A1408;
+            padding: 6px 4px;
+            border-bottom: 1px solid #e0d0c0;
+        }
+        .signature-status {
+            min-height: 18px;
             margin-top: 8px;
             font-size: 12px;
             color: #7b6a5d;
-            line-height: 1.5;
         }
-        .contract-file-status.error {
-            color: #b42318;
-        }
-        .contract-file-status.success {
-            color: #166534;
-        }
+        .signature-status.error { color: #b42318; }
+
         .contract-agreement-box {
             margin-top: 18px;
             padding: 16px 18px;
@@ -1129,6 +1275,17 @@
             height: 18px;
             accent-color: #6B3A1F;
             flex-shrink: 0;
+        }
+        .contract-agreement-checkbox:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+        .contract-agreement-helper {
+            margin: 6px 0 0;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #9c8f84;
+            font-style: italic;
         }
         .contract-agreement-copy {
             font-size: 14px;
@@ -1264,6 +1421,225 @@
             color: #fff;
         }
 
+        /* Full-screen agreement reader */
+        .agreement-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1300;
+            background: #FAF6F0;
+        }
+        .agreement-modal-backdrop.hidden {
+            display: none !important;
+        }
+        .agreement-modal-surface {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            background: #FFFDFA;
+        }
+        .agreement-modal-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 18px 24px;
+            background: #FFFDFA;
+            border-bottom: 1px solid #E5DBCC;
+        }
+        .agreement-modal-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #3E2418;
+        }
+        .agreement-modal-close-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border: 1px solid #E5DBCC;
+            border-radius: 999px;
+            background: #fff;
+            color: #3E2418;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+        .agreement-modal-close-btn:hover,
+        .agreement-modal-close-btn:focus-visible {
+            background: #FAF6F0;
+            border-color: #A34F2E;
+            outline: none;
+        }
+        .agreement-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px 24px 48px;
+        }
+
+        /* Centered reading column — 66ch, split whitespace evenly on both
+           sides at the modal's current width. Body text and clause headings
+           stay left-aligned inside it; only the document title is centered. */
+        .agreement-reading-column {
+            max-width: 66ch;
+            margin: 0 auto;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        .agreement-reading-column h2 {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            color: #3E2418;
+            margin: 0 0 24px;
+            line-height: 1.3;
+        }
+        .agreement-reading-column h3 {
+            text-align: left;
+            font-size: 15px;
+            font-weight: 600;
+            color: #2A1208;
+            margin: 24px 0 8px;
+            line-height: 1.4;
+        }
+        .agreement-reading-column h3:first-of-type {
+            margin-top: 8px;
+        }
+        .agreement-reading-column p {
+            text-align: left;
+            font-size: 15px;
+            font-weight: 400;
+            line-height: 1.65;
+            color: #3E2418;
+            margin: 0 0 14px;
+        }
+
+        /* Reservation details — flat definition-list rows, matching the
+           account page's definition-list pattern (muted label left,
+           weight-500 value right, hairline row dividers, top/bottom border
+           framing the whole block). */
+        .agreement-detail-list {
+            margin: 20px 0 28px;
+            border-top: 1px solid #E5DBCC;
+            border-bottom: 1px solid #E5DBCC;
+        }
+        .agreement-detail-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 10px 0;
+            border-bottom: 1px solid #F2EADD;
+        }
+        .agreement-detail-row:last-child {
+            border-bottom: none;
+        }
+        .agreement-detail-row dt {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 400;
+            color: #8A7965;
+        }
+        .agreement-detail-row dd {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 500;
+            color: #3E2418;
+            text-align: right;
+        }
+
+        .agreement-modal-error {
+            max-width: 66ch;
+            margin: 0 auto;
+            font-size: 15px;
+            color: #b42318;
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        @media (max-width: 420px) {
+            .agreement-detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 2px;
+            }
+            .agreement-detail-row dd {
+                text-align: left;
+            }
+        }
+        .agreement-modal-footer {
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 24px;
+            background: #FFFDFA;
+            border-top: 1px solid #E5DBCC;
+        }
+        .agreement-modal-btn-outline,
+        .agreement-modal-btn-solid {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+            padding: 10px 22px;
+            border-radius: 8px;
+            font: inherit;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+        .agreement-modal-btn-outline {
+            border: 1px solid #E5DBCC;
+            background: #fff;
+            color: #3E2418;
+        }
+        .agreement-modal-btn-outline:hover,
+        .agreement-modal-btn-outline:focus-visible {
+            background: #FAF6F0;
+            border-color: #A34F2E;
+            outline: none;
+        }
+        .agreement-modal-btn-solid {
+            border: none;
+            background: #4A2C17;
+            color: #FAF6F0;
+        }
+        .agreement-modal-btn-solid:hover,
+        .agreement-modal-btn-solid:focus-visible {
+            background: #3A2110;
+            outline: none;
+        }
+
+        @media (max-width: 600px) {
+            .agreement-modal-header {
+                padding: 14px 16px;
+            }
+            .agreement-modal-title {
+                font-size: 16px;
+            }
+            .agreement-modal-body {
+                padding: 24px 16px 40px;
+            }
+            .agreement-modal-footer {
+                padding: 12px 16px;
+            }
+            .agreement-modal-btn-outline,
+            .agreement-modal-btn-solid {
+                flex: 1;
+                padding: 10px 12px;
+            }
+        }
+
         /* Buttons */
         .reservation-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border, rgba(61,26,10,0.10)); }
         .btn-back { background: transparent; color: var(--brown-primary, #3D1A0A); border: 1px solid var(--border, rgba(61,26,10,0.20)); padding: 12px 28px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; transition: all 0.2s; }
@@ -1338,4 +1714,330 @@
 
 .res-guest-notice--pulse {
     animation: res-notice-pulse .8s ease-out;
+}
+
+/* ── Event-type chips ───────────────────────────────────────────────────────── */
+.event-type-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.event-chip {
+    padding: 10px 20px;
+    border-radius: 50px;
+    border: 1.5px solid var(--brown-light, #B07D5A);
+    background: #fff;
+    color: var(--brown-primary, #3D1A0A);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+    user-select: none;
+    line-height: 1.4;
+}
+
+.event-chip:hover {
+    border-color: var(--brown-primary, #3D1A0A);
+    background: var(--cream-dark, #F2EBE0);
+}
+
+.event-chip.active {
+    background: var(--brown-primary, #3D1A0A);
+    border-color: var(--brown-primary, #3D1A0A);
+    color: #fff;
+}
+
+.event-type-other-wrap {
+    margin-top: 22px;
+}
+
+.event-type-other-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brown-mid, #6B3820);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* ── Guest count input ──────────────────────────────────────────────────────── */
+/* .guest-count-wrap no longer exists in the DOM — removed when switching to two-column grid */
+
+.guest-count-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #999;
+    font-style: italic;
+    line-height: 1.55;
+    padding-top: 2px;
+    border-top: 1px solid #f0ece8;
+}
+
+/* ── Time-slot info note ────────────────────────────────────────────────────── */
+.time-alt-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 22px;
+    padding: 14px 18px;
+    background: var(--cream, #FAF8F4);
+    border: 1.5px solid var(--brown-pale, #DFC3A8);
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--brown-mid, #6B3820);
+}
+
+.time-alt-note i {
+    font-size: 18px;
+    color: var(--brown-light, #B07D5A);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ── Service card icon (offsite category grid) ──────────────────────────────── */
+.service-card { text-align: center; }
+
+.service-card-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+    color: var(--brown-mid, #6B3820);
+}
+
+/* ── Venue map ──────────────────────────────────────────────────────────────── */
+.venue-search-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.venue-search-row .res-input { flex: 1; min-width: 200px; }
+
+.venue-search-btn {
+    padding: 10px 20px;
+    background: var(--brown-primary, #3D1A0A);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+    transition: opacity 0.18s;
+}
+
+.venue-search-btn:hover { opacity: 0.82; }
+
+.venue-pinned-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--brown-mid, #6B3820);
+    line-height: 1.55;
+    word-break: break-word;
+}
+
+.venue-pin-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.venue-map-hint {
+    font-size: 13px;
+    color: #777;
+    margin-bottom: 14px;
+    line-height: 1.55;
+}
+
+/* ── Pkg card Phase 1 display ───────────────────────────────────────────────── */
+.pkg-price {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--brown-primary, #3D1A0A);
+    margin: 6px 0 4px;
+    font-family: 'Inter', sans-serif;
+}
+
+.pkg-desc {
+    font-size: 13px;
+    color: #777;
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* ── Summary divider + section title ───────────────────────────────────────── */
+.summary-divider {
+    border: none;
+    border-top: 1px solid var(--brown-pale, #DFC3A8);
+    margin: 14px 0;
+}
+
+.summary-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brown-light, #B07D5A);
+    margin-bottom: 10px;
+}
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--brown-primary, #3D1A0A);
+    margin-top: 4px;
+}
+
+/* ── Single-page event-info sub-sections ────────────────────────────────────── */
+/* Each sub-section (Location, Package, Guests+Type, Add-ons/Venue, Date, Time)
+   is separated by a divider, matching the visual pattern used for Calendar/Time. */
+.res-section {
+    margin-top: 40px;
+    padding-top: 36px;
+    border-top: 1px solid var(--brown-pale, #DFC3A8);
+}
+
+.res-section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.res-section h2 {
+    /* Inherit existing h2 styling from the step; just ensure consistent spacing */
+    margin-bottom: 8px;
+}
+
+/* ── Section status note (lock message) ─────────────────────────────────────── */
+/* Same visual pattern as .availability-message and .time-status-note:
+   a short explanatory paragraph shown when a section is waiting on a prior answer. */
+.section-status-note {
+    display: block;
+    font-size: 14px;
+    color: #999;
+    font-style: italic;
+    margin: 6px 0 0;
+    line-height: 1.6;
+}
+
+/* When the section IS answerable, the status note is replaced by normal content
+   so we hide it via JS (toggle .hidden). No extra CSS needed there. */
+
+/* ── Locked content overlay ─────────────────────────────────────────────────── */
+/* Applied to #guests-type-content and #addon-venue-content while their
+   prerequisite section hasn't been answered yet.
+   Matches the intent of .context-disabled on calendar days and
+   .time-card.disabled on time slots: visible but clearly non-interactive. */
+.res-locked-content {
+    opacity: 0.38;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Disabled guest-count input inside locked content (also controlled by .disabled attr) */
+.guest-count-input:disabled {
+    background: var(--cream, #FAF8F4);
+    color: #bbb;
+    cursor: not-allowed;
+}
+
+/* ── Section status note responsive tweak ───────────────────────────────────── */
+@media (max-width: 600px) {
+    .res-section {
+        margin-top: 32px;
+        padding-top: 28px;
+    }
+}
+
+/* ── Guests & Event Type — two-column grid ──────────────────────────────────── */
+.guests-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 32px;
+    align-items: start;
+    margin-top: 4px;
+}
+
+/* Each column: label → input → optional note — identical structure both sides */
+.guests-col,
+.event-type-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+/* Zero the global res-input margin-bottom inside the grid so hint/nothing below
+   the input is not pushed further than intended */
+.guests-type-grid .res-input {
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 400;
+    padding: 12px 16px;
+    text-align: left;
+    height: 46px;
+    box-sizing: border-box;
+}
+
+.event-type-select {
+    cursor: pointer;
+    appearance: auto;
+}
+
+/* "Other" reveal sits flush below the select with consistent spacing */
+.event-type-other-wrap {
+    margin-top: 16px;
+}
+
+.event-type-other-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+@media (max-width: 600px) {
+    .guests-type-grid {
+        grid-template-columns: 1fr;
+        gap: 24px 0;
+    }
+}
+
+/* ── Package description truncation — expand/collapse ───────────────────────── */
+.pkg-desc-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--brown, #8B5E3C);
+    font-size: inherit;
+    font-family: inherit;
+    font-style: italic;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    display: inline;
+    line-height: inherit;
+}
+
+.pkg-desc-toggle:hover {
+    color: var(--dark-brown, #5c3d1e);
 }

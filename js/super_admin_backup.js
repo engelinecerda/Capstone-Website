@@ -6,6 +6,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID  = '840885111053-9o5sunpcth34kfv4c1fc74fp0h9nn2ub.apps.googleusercontent.com';
@@ -440,6 +441,13 @@ confirmBackupOk?.addEventListener('click', async () => {
     const uploaded = await uploadToDrive(filename, jsonContent, description, onProgress);
     onProgress(100, 'Done!');
 
+    await supabase
+      .from('system_settings')
+      .upsert(
+        { setting_key: 'last_backup_at', setting_value: JSON.stringify({ created_at: now.toISOString(), file_name: uploaded.name }), updated_at: now.toISOString(), updated_by: currentAdminId ?? null },
+        { onConflict: 'setting_key' }
+      );
+
     await loadBackupHistory();
     closeModal(confirmBackupModal);
     setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}`, 'success');
@@ -786,9 +794,19 @@ function init() {
 
   validateAdminSession({
     onSuccess: async ({ session, profile }) => {
+      if (profile.role !== 'admin') {
+        window.location.replace('/admin/dashboard.html');
+        return;
+      }
+
       currentAdminId = session.user.id;
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+
+      const avatarEl = document.getElementById('sidebarAvatar');
+      if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+      const roleBottomEl = document.getElementById('sidebarRoleBottom');
+      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
 
       createBackupBtn.disabled  = true;
       restoreSystemBtn.disabled = true;

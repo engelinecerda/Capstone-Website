@@ -7,6 +7,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 import { logAudit } from './audit_logger.js';
 
 // ─── Cloudinary config ────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ const pkgCapacity        = document.getElementById('pkgCapacity');
 const pkgDuration        = document.getElementById('pkgDuration');
 const pkgExtensionPrice  = document.getElementById('pkgExtensionPrice');
 const pkgLocationType    = document.getElementById('pkgLocationType');
+const pkgBookingScope    = document.getElementById('pkgBookingScope');
 
 // ─── DOM: Confirm Modal ───────────────────────────────────────────────────────
 const confirmModal   = document.getElementById('confirmModal');
@@ -780,6 +782,7 @@ function openEditPackageModal(packageId) {
   pkgDuration.value       = pkg.duration_hours ?? '';
   pkgExtensionPrice.value = pkg.extension_price ?? '';
   pkgLocationType.value   = pkg.location_type || '';
+  pkgBookingScope.value   = pkg.booking_scope || '';
 
   if (pkg.package_image) {
     pkgImagePreview.src = pkg.package_image;
@@ -800,6 +803,7 @@ function clearPackageForm() {
   [pkgName, pkgDescription, pkgPrice, pkgCapacity, pkgDuration, pkgExtensionPrice].forEach(el => el.value = '');
   pkgType.value         = '';
   pkgLocationType.value = '';
+  pkgBookingScope.value = '';
   pkgImageInput.value   = '';
   clearImageUI(pkgImagePreview, pkgImagePlaceholder, pkgFileName, pkgImageInput);
   pkgRemoveImageBtn.classList.add('hidden');
@@ -834,6 +838,8 @@ function validatePackageForm() {
     return 'A valid guest capacity is required.';
   if (!pkgDuration.value || isNaN(parseInt(pkgDuration.value)) || parseInt(pkgDuration.value) < 1)
     return 'A valid duration in hours is required.';
+  if (pkgType.value === 'main' && !pkgBookingScope.value)
+    return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
   return null;
 }
 
@@ -865,6 +871,7 @@ pkgModalSave.addEventListener('click', async () => {
       duration_hours:     parseInt(pkgDuration.value, 10),
       extension_price:    pkgExtensionPrice.value !== '' ? Number(pkgExtensionPrice.value) : null,
       location_type:      pkgLocationType.value || null,
+      booking_scope:      pkgBookingScope.value || null,
       package_category_id: activeCategoryId,
     };
 
@@ -1320,8 +1327,18 @@ function init() {
   watchAuthState();
   validateAdminSession({
     onSuccess: ({ profile }) => {
+      if (profile.role !== 'admin') {
+        window.location.replace('/admin/dashboard.html');
+        return;
+      }
+
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+
+      const avatarEl = document.getElementById('sidebarAvatar');
+      if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+      const roleBottomEl = document.getElementById('sidebarRoleBottom');
+      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
 
       // Set admin badge
       const adminBadge = document.getElementById('adminBadge');

@@ -3,6 +3,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
 import { logAudit } from './audit_logger.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -358,8 +359,19 @@ function init() {
   watchAuthState(); 
   validateAdminSession({
     onSuccess: ({ profile }) => {
+      if (profile.role !== 'admin') {
+        window.location.replace('/admin/dashboard.html');
+        return;
+      }
+
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+
+      const avatarEl = document.getElementById('sidebarAvatar');
+      if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+      const roleBottomEl = document.getElementById('sidebarRoleBottom');
+      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+
       const adminBadge = document.getElementById('adminBadge');
       if (adminBadge) adminBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
       loadStats();

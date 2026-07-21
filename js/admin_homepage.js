@@ -1,26 +1,40 @@
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 import { portalSupabase as supabase } from './supabase.js';
-import { getEffectiveReservationStatus, syncCompletedReservations } from './reservation_status.js';
+import { syncCompletedReservations } from './reservation_status.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 
 const sidebarName = document.getElementById('sidebarName');
-const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
-const badge = document.getElementById('adminBadge');
-const sidebarTitle = document.getElementById('sidebarTitle');
+const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
+const sidebarAvatar = document.getElementById('sidebarAvatar');
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const demandYearSelect = document.getElementById('demandYear');
+const pageDate = document.getElementById('pageDate');
+const replacementAlert = document.getElementById('replacementAlert');
+const qaPendingCount = document.getElementById('qaPendingCount');
 const API = "https://capstone-website-papg.onrender.com";
+
+if (pageDate) {
+    pageDate.textContent = new Date().toLocaleDateString('en-PH', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
 
 let fullData = [];
 let barChart;
 let pieChart;
 let demandChart;
+let statusDonutChart;
 let refreshSidebarBadges = () => {};
 
 const statTargets = {
@@ -31,22 +45,22 @@ const statTargets = {
     replacementContracts: document.getElementById('replacementContractsValue')
 };
 
-const chipTargets = {
-    pending: document.getElementById('chipPending'),
-    approved: document.getElementById('chipApproved'),
-    declined: document.getElementById('chipDeclined'),
-    completed: document.getElementById('chipCompleted'),
-    cancelled: document.getElementById('chipCancelled'),
-    rescheduled: document.getElementById('chipRescheduled')
+const statusTotalEl = document.getElementById('statusTotal');
+const statusLegendEl = document.getElementById('statusLegend');
+const packageLegendEl = document.getElementById('packageLegend');
+
+const STATUS_SEGMENT_COLORS = {
+    pending: '#BA7517',
+    approved: '#3B6D11',
+    declined: '#A32D2D',
+    completed: '#6B3F23',
+    cancelled: '#B4B2A9'
 };
+
+const PACKAGE_COLOR_RAMP = ['#4A2C17', '#6B3F23', '#A9805F', '#C9AE9B', '#E2D0BF', '#F0E6D9'];
 
 async function loadForecast() {
     const res = await fetch(`${API}/forecast`);
-    return res.ok ? res.json() : [];
-}
-
-async function loadMonthly() {
-    const res = await fetch(`${API}/analytics/monthly-reservations`);
     return res.ok ? res.json() : [];
 }
 
@@ -126,74 +140,181 @@ function getContractStatusMeta(contract) {
     return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
 }
 
-async function renderBarChart(data) {
-    const labels = data.map(d => d.month);
-    const values = data.map(d => d.count);
+function isSameLocalDay(a, b) {
+    return a.getFullYear() === b.getFullYear()
+        && a.getMonth() === b.getMonth()
+        && a.getDate() === b.getDate();
+}
+
+function isSameLocalMonth(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function setTrend(elId, delta, wordSuffix) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!delta) {
+        el.hidden = true;
+        el.innerHTML = '';
+        return;
+    }
+    el.hidden = false;
+    el.innerHTML = `<span class="trend-delta">+${delta}</span><span class="trend-word">${escapeHtml(wordSuffix)}</span>`;
+}
+
+function updateTrends(reservations) {
+    const now = new Date();
+    let pendingToday = 0;
+    let approvedThisMonth = 0;
+    let completedThisMonth = 0;
+    const firstSeenByCustomer = new Map();
+
+    reservations.forEach((reservation) => {
+        const status = (reservation.status || 'pending').toLowerCase();
+        const createdAt = reservation.created_at ? new Date(reservation.created_at) : null;
+        const eventDate = reservation.event_date ? new Date(reservation.event_date) : null;
+
+        if (status === 'pending' && createdAt && isSameLocalDay(createdAt, now)) pendingToday += 1;
+        if ((status === 'confirmed' || status === 'approved') && createdAt && isSameLocalMonth(createdAt, now)) approvedThisMonth += 1;
+        if (status === 'completed' && eventDate && isSameLocalMonth(eventDate, now)) completedThisMonth += 1;
+
+        if (reservation.user_id && createdAt) {
+            const existing = firstSeenByCustomer.get(reservation.user_id);
+            if (!existing || createdAt < existing) firstSeenByCustomer.set(reservation.user_id, createdAt);
+        }
+    });
+
+    let newCustomersThisMonth = 0;
+    firstSeenByCustomer.forEach((firstDate) => {
+        if (isSameLocalMonth(firstDate, now)) newCustomersThisMonth += 1;
+    });
+
+    setTrend('pendingTrend', pendingToday, 'today');
+    setTrend('approvedTrend', approvedThisMonth, 'this month');
+    setTrend('completedTrend', completedThisMonth, 'this month');
+    setTrend('customersTrend', newCustomersThisMonth, 'this month');
+}
+
+function computeMonthlyBreakdown(reservations) {
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i -= 1) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({
+            key: `${d.getFullYear()}-${d.getMonth()}`,
+            label: d.toLocaleDateString('en-US', { month: 'short' }),
+            submitted: 0,
+            completed: 0
+        });
+    }
+    const monthByKey = new Map(months.map((m) => [m.key, m]));
+
+    reservations.forEach((reservation) => {
+        if (reservation.created_at) {
+            const created = new Date(reservation.created_at);
+            const bucket = monthByKey.get(`${created.getFullYear()}-${created.getMonth()}`);
+            if (bucket) bucket.submitted += 1;
+        }
+        if ((reservation.status || '').toLowerCase() === 'completed' && reservation.event_date) {
+            const eventDate = new Date(reservation.event_date);
+            const bucket = monthByKey.get(`${eventDate.getFullYear()}-${eventDate.getMonth()}`);
+            if (bucket) bucket.completed += 1;
+        }
+    });
+
+    return months;
+}
+
+function renderMonthlyChart(reservations) {
+    const months = computeMonthlyBreakdown(reservations);
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
     if (barChart) barChart.destroy();
     barChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels,
-            datasets: [{
-                label: 'Reservations',
-                data: values,
-                backgroundColor: '#6b3a2a',
-                borderRadius: 6,
-                borderSkipped: false
-            }]
+            labels: months.map((m) => m.label),
+            datasets: [
+                {
+                    label: 'Reservations',
+                    data: months.map((m) => m.submitted),
+                    backgroundColor: '#4A2C17',
+                    borderRadius: 3,
+                    borderSkipped: false
+                },
+                {
+                    label: 'Completed',
+                    data: months.map((m) => m.completed),
+                    backgroundColor: '#A9805F',
+                    borderRadius: 3,
+                    borderSkipped: false
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
-                y: { beginAtZero: true, ticks: { precision: 0, color: '#9ca3af' } }
-            }
-        }
-    });
-}
-
-async function renderPieChart(data) {
-    const labels = data.map(d => d.package);
-    const values = data.map(d => d.count);
-    const ctx = document.getElementById('pieChart');
-    if (!ctx) return;
-    if (pieChart) pieChart.destroy();
-    pieChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels,
-            datasets: [{
-                data: values,
-                backgroundColor: ['#6b3a2a', '#a0522d', '#c9833a', '#d4a574', '#e8d5c0', '#b08b66'],
-                borderWidth: 0,
-                hoverOffset: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '55%',
             plugins: {
                 legend: {
-                    position: 'right',
-                    labels: { color: '#374151', padding: 14, usePointStyle: true }
+                    display: true,
+                    position: 'top',
+                    align: 'start',
+                    labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'rect', font: { size: 11 }, color: '#7A6A5C' }
                 }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#7A6A5C', font: { size: 11 } } },
+                y: { beginAtZero: true, grid: { color: '#F1EFE8' }, ticks: { precision: 0, color: '#7A6A5C', font: { size: 11 } } }
             }
         }
     });
 }
 
-async function renderDemandChart(year) {
-    const filtered = fullData.filter(d => d.year === year);
+function renderPackageChart(data) {
+    const sorted = [...(data || [])].sort((a, b) => (b.count || 0) - (a.count || 0));
+    const colors = sorted.map((_, i) => PACKAGE_COLOR_RAMP[i % PACKAGE_COLOR_RAMP.length]);
+
+    const ctx = document.getElementById('pieChart');
+    if (ctx) {
+        if (pieChart) pieChart.destroy();
+        pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: sorted.map((d) => d.package),
+                datasets: [{
+                    data: sorted.map((d) => d.count),
+                    backgroundColor: colors,
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '55%',
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    if (packageLegendEl) {
+        packageLegendEl.innerHTML = sorted.length
+            ? sorted.map((d, i) => `
+                <li>
+                    <span class="legend-swatch" style="background:${colors[i]}"></span>
+                    <span class="legend-label">${escapeHtml(d.package)}</span>
+                </li>`).join('')
+            : `<li class="legend-empty">No package data yet.</li>`;
+    }
+}
+
+function renderDemandChart(year) {
+    const filtered = fullData.filter((d) => d.year === year);
     const allMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dataMap = {};
-    filtered.forEach(d => { dataMap[d.month_name] = d; });
-    const actual = allMonths.map(month => { const d = dataMap[month]; return d ? d.y : 0; });
-    const forecast = allMonths.map(month => {
+    filtered.forEach((d) => { dataMap[d.month_name] = d; });
+    const actual = allMonths.map((month) => { const d = dataMap[month]; return d ? d.y : 0; });
+    const forecast = allMonths.map((month) => {
         const d = dataMap[month];
         return d && d.yhat !== null && d.yhat !== undefined ? Math.round(d.yhat) : null;
     });
@@ -208,11 +329,11 @@ async function renderDemandChart(year) {
                 {
                     label: 'Actual',
                     data: actual,
-                    borderColor: '#6b4a32',
-                    backgroundColor: '#6b4a32',
+                    borderColor: '#4A2C17',
+                    backgroundColor: '#4A2C17',
                     borderWidth: 2,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#6b4a32',
+                    pointRadius: 3,
+                    pointBackgroundColor: '#4A2C17',
                     pointBorderColor: '#fff',
                     tension: 0.25,
                     spanGaps: true
@@ -220,12 +341,12 @@ async function renderDemandChart(year) {
                 {
                     label: 'Forecast',
                     data: forecast,
-                    borderColor: '#c79c73',
-                    backgroundColor: '#c79c73',
+                    borderColor: '#BA7517',
+                    backgroundColor: '#BA7517',
                     borderWidth: 2,
-                    borderDash: [6, 6],
-                    pointRadius: 4,
-                    pointBackgroundColor: '#c79c73',
+                    borderDash: [5, 4],
+                    pointRadius: 3,
+                    pointBackgroundColor: '#BA7517',
                     pointBorderColor: '#fff',
                     tension: 0.25,
                     spanGaps: true
@@ -235,13 +356,65 @@ async function renderDemandChart(year) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'top', labels: { color: '#374151' } } },
+            plugins: {
+                legend: { position: 'top', align: 'end', labels: { font: { size: 11 }, color: '#7A6A5C', boxWidth: 8, boxHeight: 8 } }
+            },
             scales: {
-                x: { grid: { color: '#f3f0eb' }, ticks: { color: '#9ca3af' } },
-                y: { beginAtZero: true, grid: { color: '#f3f0eb' }, ticks: { color: '#9ca3af', precision: 0 } }
+                x: { grid: { color: '#F1EFE8' }, ticks: { color: '#7A6A5C', font: { size: 11 } } },
+                y: { beginAtZero: true, grid: { color: '#F1EFE8' }, ticks: { color: '#7A6A5C', font: { size: 11 }, precision: 0 } }
             }
         }
     });
+}
+
+function renderStatusDonut(totals, total) {
+    const segments = [
+        { key: 'pending', label: 'Pending', value: totals.pending },
+        { key: 'approved', label: 'Approved', value: totals.approved },
+        { key: 'declined', label: 'Declined', value: totals.declined },
+        { key: 'completed', label: 'Completed', value: totals.completed },
+        { key: 'cancelled', label: 'Cancelled/rescheduled', value: totals.cancelled + totals.rescheduled }
+    ]
+        .map((s) => ({ ...s, color: STATUS_SEGMENT_COLORS[s.key] }))
+        .sort((a, b) => b.value - a.value);
+
+    const ctx = document.getElementById('statusDonut');
+    if (ctx) {
+        if (statusDonutChart) statusDonutChart.destroy();
+        statusDonutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: segments.map((s) => s.label),
+                datasets: [{
+                    data: segments.map((s) => s.value),
+                    backgroundColor: segments.map((s) => s.color),
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    if (statusTotalEl) statusTotalEl.textContent = String(total);
+
+    if (statusLegendEl) {
+        statusLegendEl.innerHTML = segments.map((s) => {
+            const pct = total > 0 ? (s.value / total) * 100 : 0;
+            return `
+                <li>
+                    <span class="legend-swatch" style="background:${s.color}"></span>
+                    <span class="legend-label">${escapeHtml(s.label)}</span>
+                    <span class="legend-count">${s.value}</span>
+                    <span class="legend-pct">${pct.toFixed(1)}%</span>
+                </li>`;
+        }).join('');
+    }
 }
 
 function updateStats(reservations, contractsByReservationId = {}) {
@@ -266,12 +439,13 @@ function updateStats(reservations, contractsByReservationId = {}) {
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
     if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
-    if (chipTargets.pending) chipTargets.pending.textContent = String(totals.pending);
-    if (chipTargets.approved) chipTargets.approved.textContent = String(totals.approved);
-    if (chipTargets.declined) chipTargets.declined.textContent = String(totals.declined);
-    if (chipTargets.completed) chipTargets.completed.textContent = String(totals.completed);
-    if (chipTargets.cancelled) chipTargets.cancelled.textContent = String(totals.cancelled);
-    if (chipTargets.rescheduled) chipTargets.rescheduled.textContent = String(totals.rescheduled);
+    if (replacementAlert) replacementAlert.hidden = totals.replacementContracts === 0;
+    if (qaPendingCount) qaPendingCount.textContent = `${totals.pending} pending approval`;
+
+    updateTrends(reservations);
+
+    const total = reservations.length;
+    renderStatusDonut(totals, total);
 }
 
 function renderReservationsTable(reservations, contractsByReservationId = {}) {
@@ -289,14 +463,17 @@ function renderReservationsTable(reservations, contractsByReservationId = {}) {
             : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
         const status = formatStatus(reservation.status);
         const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
+        const contractCell = contractStatus.key === 'cancelled'
+            ? `<span class="no-contract">No contract</span>`
+            : `<span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span><span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span>`;
         return `
             <tr>
                 <td><span class="table-main">${escapeHtml(customerName)}</span><span class="table-sub">${escapeHtml(customerEmail)}</span></td>
                 <td><span class="table-main">${escapeHtml(reservation.event_type || 'Event')}</span><span class="table-sub">Submitted ${escapeHtml(formatDate(reservation.created_at))}</span></td>
-                <td><span class="table-main">${escapeHtml(formatDate(reservation.event_date))}</span><span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span></td>
+                <td><span class="table-main date-cell">${escapeHtml(formatDate(reservation.event_date))}</span><span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span></td>
                 <td><span class="table-main">${escapeHtml(packageName)}</span><span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span></td>
-                <td>${escapeHtml(location)}</td>
-                <td><span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span><span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span></td>
+                <td class="location-cell" title="${escapeHtml(location)}">${escapeHtml(location)}</td>
+                <td>${contractCell}</td>
                 <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
             </tr>`;
     }).join('');
@@ -340,6 +517,7 @@ async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
     updateStats([], {});
     renderReservationsTable([], {});
+    renderMonthlyChart([]);
 
     let reservationsCount = 0;
     let replacementContracts = 0;
@@ -351,6 +529,7 @@ async function loadDashboard() {
             reservationsCount = reservations.length;
             updateStats(reservations, {});
             renderReservationsTable(reservations, {});
+            renderMonthlyChart(reservations);
             refreshSidebarBadges();
             const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
             const contractsByReservationId = await fetchContracts(reservationIds);
@@ -366,13 +545,9 @@ async function loadDashboard() {
         }
     })();
 
-    const monthlyPromise = loadMonthly()
-        .then((data) => renderBarChart(data))
-        .catch((error) => { console.error('Failed to load monthly chart:', error); return renderBarChart([]); });
-
     const packagePromise = loadPackages()
-        .then((data) => renderPieChart(data))
-        .catch((error) => { console.error('Failed to load package chart:', error); return renderPieChart([]); });
+        .then((data) => renderPackageChart(data))
+        .catch((error) => { console.error('Failed to load package chart:', error); return renderPackageChart([]); });
 
     const forecastPromise = loadForecast()
         .then(async (data) => {
@@ -390,11 +565,11 @@ async function loadDashboard() {
                 demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
             }
             const selectedYear = demandYearSelect?.value;
-            if (selectedYear) await renderDemandChart(selectedYear);
+            if (selectedYear) renderDemandChart(selectedYear);
         })
         .catch((error) => { console.error('Failed to load forecast:', error); });
 
-    await Promise.allSettled([fastPath, monthlyPromise, packagePromise, forecastPromise]);
+    await Promise.allSettled([fastPath, packagePromise, forecastPromise]);
 
     if (!hasError) {
         setDashboardMessage(
@@ -405,6 +580,71 @@ async function loadDashboard() {
     }
 }
 
+function formatHourMinute(hhmm) {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = ((h + 11) % 12) + 1;
+    return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+async function loadSystemOverview() {
+    const ovPackageCount = document.getElementById('ovPackageCount');
+    const ovAccountCount = document.getElementById('ovAccountCount');
+    const ovLastBackup = document.getElementById('ovLastBackup');
+    const ovBookingHours = document.getElementById('ovBookingHours');
+    if (!ovPackageCount && !ovAccountCount && !ovLastBackup && !ovBookingHours) return;
+
+    const [pkgRes, profilesRes, settingsRes] = await Promise.all([
+        supabase.from('package').select('package_id', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('profiles').select('role').eq('is_locked', false).in('role', ['manager', 'staff', 'admin']),
+        supabase.from('system_settings').select('setting_key, setting_value').in('setting_key', ['last_backup_at', 'booking_operating_hours'])
+    ]);
+
+    if (ovPackageCount) {
+        ovPackageCount.textContent = pkgRes.count ?? 0;
+    }
+
+    if (ovAccountCount) {
+        const counts = { manager: 0, staff: 0, admin: 0 };
+        (profilesRes.data || []).forEach((row) => { if (counts[row.role] !== undefined) counts[row.role] += 1; });
+        ovAccountCount.textContent = `${counts.manager} mgr · ${counts.staff} staff · ${counts.admin} admin`;
+    }
+
+    const settingsByKey = {};
+    (settingsRes.data || []).forEach((row) => { settingsByKey[row.setting_key] = row.setting_value; });
+
+    if (ovLastBackup) {
+        const raw = settingsByKey.last_backup_at;
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                ovLastBackup.textContent = new Date(parsed.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+            } catch {
+                ovLastBackup.textContent = 'Unavailable';
+            }
+        } else {
+            ovLastBackup.textContent = 'No backup yet';
+        }
+    }
+
+    if (ovBookingHours) {
+        const raw = settingsByKey.booking_operating_hours;
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                const open = formatHourMinute(parsed.open_time);
+                const close = formatHourMinute(parsed.close_time);
+                ovBookingHours.textContent = (open && close) ? `${open} – ${close}` : 'Not set';
+            } catch {
+                ovBookingHours.textContent = 'Unavailable';
+            }
+        } else {
+            ovBookingHours.textContent = 'Not set';
+        }
+    }
+}
+
 refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 
@@ -412,9 +652,13 @@ wireLogoutButton();
 watchAuthState();
 
 validateAdminSession({
-    onSuccess: ({ profile }) => {
+    onSuccess: ({ session, profile }) => {
         setupInactivityLogout(profile.role);
+        if (sidebarAvatar) sidebarAvatar.textContent = getPortalInitials(profile);
+        if (sidebarRoleBottom) sidebarRoleBottom.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
         refreshSidebarBadges = initAdminSidebarBadges(supabase);
+        initManagerNotificationBell(supabase, session.user.id);
         loadDashboard();
+        if (profile.role === 'admin') loadSystemOverview();
     }
 });

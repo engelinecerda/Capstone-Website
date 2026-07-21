@@ -132,13 +132,127 @@ html {
     text-decoration: none;
     padding: 10px 18px;
     border-radius: 4px;
-    background-color: #6B3A1F;
+    background-color: #3D1A0A;
     color: #fff;
     white-space: nowrap;
 }
 .button:hover{
-    background-color: #5A2E17;
+    background-color: #1E0C03;
     transition: all 0.3s ease;
+}
+
+/* ========================
+   Navbar account dropdown
+======================== */
+.navbar__account-dropdown {
+    position: relative;
+}
+
+.navbar__account-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 136px;
+    padding: 10px 16px;
+    min-height: 40px;
+    border: none;
+    border-radius: 4px;
+    background-color: #3D1A0A;
+    color: #fff;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.navbar__account-trigger:hover,
+.navbar__account-trigger:focus-visible {
+    background-color: #1E0C03;
+    outline: none;
+}
+
+.navbar__account-trigger i {
+    font-size: 11px;
+    transition: transform 0.18s ease;
+}
+
+.navbar__account-dropdown.open .navbar__account-trigger i {
+    transform: rotate(180deg);
+}
+
+.navbar__account-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 190px;
+    background: #fff;
+    border: 1px solid #E5DBCC;
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(42, 20, 8, 0.14);
+    padding: 6px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 1000;
+}
+
+.navbar__account-dropdown.open .navbar__account-menu {
+    display: flex;
+}
+
+.navbar__account-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #3E2418;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    text-decoration: none;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.15s ease;
+}
+
+.navbar__account-menu-item:hover,
+.navbar__account-menu-item:focus-visible {
+    background-color: #FAF6F0;
+    outline: none;
+}
+
+.navbar__account-menu-item i {
+    width: 14px;
+    text-align: center;
+    color: #8A7965;
+}
+
+.navbar__account-menu-item--logout {
+    color: #A34F2E;
+}
+
+.navbar__account-menu-item--logout i {
+    color: #A34F2E;
+}
+
+.navbar__account-menu-item--logout:hover {
+    background-color: #FCEEE7;
+}
+
+.navbar__account-menu-divider {
+    height: 1px;
+    margin: 6px 8px;
+    background-color: #F2EADD;
 }
 .navbar__links:hover{
     color: #241208;
@@ -187,7 +301,7 @@ html {
         width: 100%;
         max-width: 1300px;
         margin: 0 auto;
-        padding: 0 20px;
+        padding: 0 24px;
     }
     /* Logo pinned to center of topbar */
     .navbar__container > a:first-child {
@@ -438,11 +552,11 @@ html {
         letter-spacing: 0.06em;
         text-transform: uppercase;
         border-radius: 12px;
-        background: #6B3A1F;
+        background: #3D1A0A;
         padding: 0;
         transition: background 0.2s;
     }
-    .navbar__btn .button:hover { background: #5A2E17; }
+    .navbar__btn .button:hover { background: #1E0C03; }
 
     /* Bell in topbar */
     .navbar__topbar-right .notif-bell-btn {

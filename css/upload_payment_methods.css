@@ -60,7 +60,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4e3624;
+  background: #3D1A0A;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -74,7 +74,7 @@
 }
 
 .btn-add-pm:hover {
-  background: #3a2718;
+  background: #5A2E16;
 }
 
 /* ── Section toggle ─────────────────────────────────────────── */
@@ -137,7 +137,7 @@
 }
 
 .pm-table tbody tr:hover td {
-  background: #fffdf9;
+  background: #FBF8F3;
 }
 
 /* ── QR thumbnail ───────────────────────────────────────────── */
@@ -534,7 +534,7 @@
 }
 
 .pm-file-chosen svg {
-  color: #4e3624;
+  color: #3D1A0A;
   flex-shrink: 0;
 }
 
@@ -625,7 +625,7 @@
 .pm-progress-pct {
   font-size: 12px;
   font-weight: 600;
-  color: #4e3624;
+  color: #3D1A0A;
 }
 
 .pm-progress-track {
@@ -638,7 +638,7 @@
 
 .pm-progress-bar {
   height: 100%;
-  background: #4e3624;
+  background: #3D1A0A;
   border-radius: 8px;
   transition: width 0.25s ease;
   min-width: 0;
@@ -695,7 +695,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4e3624;
+  background: #3D1A0A;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -708,7 +708,7 @@
 }
 
 .pm-btn-save:hover {
-  background: #3a2718;
+  background: #5A2E16;
 }
 
 .pm-btn-save:disabled {

@@ -24,19 +24,22 @@ export function applyRoleVisibility(role) {
   }
 
 
+  // Empty string reverts to the element's own CSS-defined display (block for
+  // cards, flex for .nav-item via its class rule) instead of forcing one
+  // display value onto every element the class is used on.
   document.querySelectorAll('.super-admin-only').forEach(el => {
-    el.style.display = isSuperAdmin ? 'flex' : 'none';
+    el.style.display = isSuperAdmin ? '' : 'none';
   });
 
   document.querySelectorAll('.manager-only').forEach(el => {
-    el.style.display = isSuperAdmin ? 'none' : 'flex';
+    el.style.display = isSuperAdmin ? 'none' : '';
   });
 
   const pill = document.getElementById('sidebarRolePill');
   const badge = document.getElementById('adminBadge');
   const title = document.getElementById('sidebarTitle');
 
-  if (pill) pill.textContent = isSuperAdmin ? 'Admin' : 'Manager';
+  if (pill) pill.textContent = isSuperAdmin ? 'Administrator' : 'Manager';
   if (badge) badge.textContent = isSuperAdmin ? 'Admin' : 'Manager';
   if (title) title.textContent = isSuperAdmin ? 'Admin Panel' : 'Manager Panel';
 

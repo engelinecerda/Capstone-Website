@@ -8,6 +8,7 @@ import {
   populatePortalIdentity
 } from './admin_auth.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -96,8 +97,11 @@ function renderProfileShell() {
     nameEl: sidebarName,
     emailEl: sidebarEmail,
     roleEl: sidebarRolePill,
+    avatarEl: document.getElementById('sidebarAvatar'),
     fallbackLabel: profile.role === 'admin' ? 'Admin' : 'Manager'
   });
+  const roleBottomEl = document.getElementById('sidebarRoleBottom');
+  if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
   if (heroAvatar) heroAvatar.textContent = getPortalInitials(profile, 'A');
   if (heroName) heroName.textContent = identity.displayName;
@@ -349,6 +353,7 @@ validateAdminSession({
     state.profile = profile;
     setupInactivityLogout(profile.role);
     initAdminSidebarBadges(supabase);
+    initManagerNotificationBell(supabase, session.user.id);
     renderProfileShell();
     setPageMessage('Your profile is ready.');
     loadMfaStatus();
