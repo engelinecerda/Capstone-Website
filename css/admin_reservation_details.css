@@ -1,0 +1,672 @@
+@import url('./admin_reservations.css');
+
+/* ============================================================
+   Hidden-state overrides.
+   This codebase has no generic `.hidden { display: none }` rule —
+   every component scopes its own `.thing.hidden` combo (see
+   .modal-backdrop.hidden, .calendar-card.hidden, etc. in
+   admin_reservations.css). Without a matching combo here, a plain
+   `.hidden` class does nothing and the element stays visible at
+   whatever `display` this file gives its base class.
+   ============================================================ */
+.details-loading.hidden,
+.details-error.hidden,
+.details-content.hidden,
+.reschedule-review-panel.hidden,
+.signature-check-panel.hidden,
+.action-btn.hidden {
+  display: none;
+}
+
+/* ============================================================
+   Breadcrumb
+   The breadcrumb bar is a normal, non-sticky element — it scrolls
+   away naturally. Only .reservation-sticky-header below is sticky.
+   Two overlapping sticky regions was the source of the earlier
+   scroll-gap bug; one sticky bar is simpler and can't misalign.
+   ============================================================ */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #8A7A6C;
+}
+
+.breadcrumb a {
+  color: #8A7A6C;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: #3D1A0A;
+  text-decoration: underline;
+}
+
+.breadcrumb-sep {
+  color: #C9B8A8;
+}
+
+.breadcrumb-current {
+  color: #4A2C17;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Loading / error states
+   ============================================================ */
+.details-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeleton-card {
+  height: 140px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #F1EAE0 25%, #F7F1EA 37%, #F1EAE0 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeleton-card.small {
+  height: 80px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.details-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 64px 24px;
+  text-align: center;
+  color: #7A6A5C;
+  font-size: 13px;
+}
+
+/* ============================================================
+   Sticky reservation header
+   ============================================================ */
+.reservation-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #FAF6F0;
+  padding: 14px 0;
+  margin-bottom: 16px;
+  border-bottom: 0.5px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.reservation-sticky-header.is-stuck {
+  border-bottom-color: var(--border);
+}
+
+.reservation-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar.avatar-lg {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+.avatar.avatar-sm {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+
+.reservation-header-copy {
+  min-width: 0;
+}
+
+.reservation-header-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reservation-header-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.reservation-header-meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #8A7A6C;
+}
+
+.reservation-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reservation-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 0.5px solid var(--btn-secondary-border);
+  background: #FFFFFF;
+  color: #4A2C17;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.header-action-btn:hover:not(:disabled) {
+  background: #F5EEE4;
+}
+
+.header-action-btn.primary {
+  background: #3D1A0A;
+  border-color: #3D1A0A;
+  color: #FDF6EE;
+}
+
+.header-action-btn.primary:hover:not(:disabled) {
+  background: #2A1208;
+}
+
+.header-action-btn.decline {
+  color: #A32D2D;
+  border-color: #E9C9C9;
+}
+
+.header-action-btn.decline:hover:not(:disabled) {
+  background: #FCEBEB;
+}
+
+.header-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.details-flash-message {
+  min-height: 16px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #3B6D11;
+}
+
+.details-flash-message.error {
+  color: #A32D2D;
+}
+
+.details-flash-message:empty {
+  display: none;
+}
+
+/* ============================================================
+   Reschedule review panel
+   ============================================================ */
+.reschedule-review-panel {
+  background: #FAEEDA;
+  border: 0.5px solid #F0D8A8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.reschedule-review-panel .dl-row {
+  border-bottom-color: rgba(133, 79, 11, 0.15);
+}
+
+/* ============================================================
+   Two-column layout
+   ============================================================ */
+.details-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.details-col-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.details-col-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Last card in each column absorbs leftover height so both columns
+   bottom out together (Payment on the left, Staff assignment on the
+   right). Only meaningful while .details-columns is stretched side by
+   side — neutralized below the stacking breakpoint. */
+.details-card-flex {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .details-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .details-card-flex {
+    flex: none;
+  }
+}
+
+/* ============================================================
+   Card header row (title + inline pill + link-out)
+   ============================================================ */
+.card-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.card-head-row .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.card-head-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: #3D1A0A;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.card-head-link:hover {
+  text-decoration: underline;
+}
+
+.card-head-link.hidden {
+  display: none;
+}
+
+/* ============================================================
+   Definition-list rows
+   ============================================================ */
+.dl-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Two-per-row grid for short paired fields (Booking details, Payment).
+   Assumes exactly 4 items (2 rows) — the last row loses its divider. */
+.dl-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
+}
+
+.dl-grid-2col .dl-row:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+
+.dl-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.dl-row:last-child {
+  border-bottom: none;
+}
+
+.dl-row.full {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dl-label {
+  font-size: 11px;
+  color: #7A6A5C;
+  flex-shrink: 0;
+}
+
+.dl-value {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+}
+
+.dl-row.full .dl-value {
+  text-align: left;
+}
+
+.dl-value.muted {
+  color: #8A7A6C;
+  font-weight: 400;
+}
+
+/* ============================================================
+   Staff assignment card (right column)
+   ============================================================ */
+.staff-assign-footer {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.action-btn.full-width {
+  width: 100%;
+}
+
+.staff-assign-helper {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #8A7A6C;
+  text-align: center;
+}
+
+.staff-assign-helper.hidden {
+  display: none;
+}
+
+/* ============================================================
+   Assign staff modal
+   .modal-backdrop / .modal-card / .modal-message are shared with
+   other modals (see admin_reservations.css) and are not touched —
+   everything else here is scoped to this modal only.
+   ============================================================ */
+.assignment-modal-card {
+  width: min(100%, 420px);
+  background: #FFFFFF;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(58, 34, 17, 0.16);
+  padding: 0;
+}
+
+.assignment-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid #E8DFD3;
+}
+
+.assignment-modal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.assignment-modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #8A7A6C;
+}
+
+.assignment-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0.5px solid var(--btn-secondary-border);
+  background: #FFFFFF;
+  color: #4A2C17;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.assignment-modal-close:hover {
+  background: #F5EEE4;
+}
+
+.assignment-modal-body {
+  padding: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.assignment-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 0.5px solid #E8DFD3;
+}
+
+.assignment-context-block {
+  background: #FAF6F0;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin-bottom: 12px;
+}
+
+.assignment-context-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8A7A6C;
+}
+
+.assignment-context-main {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.assignment-context-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #8A7A6C;
+}
+
+.assignment-search-field {
+  position: relative;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.assignment-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8A7A6C;
+  pointer-events: none;
+}
+
+.assignment-search-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  border-radius: 8px;
+  border: 0.5px solid #E8DFD3;
+  background: #FBF8F3;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.assignment-search-input:focus {
+  border-color: #B98F6A;
+}
+
+.assignment-selection-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-height: 20px;
+}
+
+.assignment-selection-label {
+  font-size: 11px;
+  color: #8A7A6C;
+  flex-shrink: 0;
+}
+
+.assignment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px 0 8px;
+  border-radius: 999px;
+  background: #EFE8DD;
+  color: #4A2C17;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.assignment-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: transparent;
+  color: #4A2C17;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+}
+
+.assignment-chip-remove:hover {
+  opacity: 1;
+}
+
+.assignment-staff-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 8px;
+}
+
+.assignment-staff-empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: #8A7A6C;
+  font-size: 11px;
+}
+
+.assignment-staff-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 0.5px solid #E8DFD3;
+}
+
+.assignment-staff-option:last-child {
+  border-bottom: none;
+}
+
+.assignment-staff-option:hover {
+  background: #FBF8F3;
+}
+
+.assignment-staff-option.selected {
+  background: #FAF6F0;
+}
+
+.assignment-staff-option input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 0.5px solid #D8CCBD;
+  background: #FFFFFF;
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.assignment-staff-option input[type="checkbox"]:checked {
+  background: #3D1A0A;
+  border-color: #3D1A0A;
+}
+
+.assignment-staff-option input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 3px;
+  height: 7px;
+  border: solid #FDF6EE;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.assignment-staff-copy {
+  min-width: 0;
+}
+
+.assignment-staff-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.assignment-staff-role {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: #8A7A6C;
+}

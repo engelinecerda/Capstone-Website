@@ -32,7 +32,9 @@ export const PAYMENT_METHODS = {
         label: 'BPI',
         shortLabel: 'Bank (BPI)',
         type: 'online',
-        qrImage: '/images/qr-bpi.png',
+        // No baked-in QR fallback for bank transfer — only shown if an
+        // admin actually uploads one via the payment_method table.
+        qrImage: '',
         details: [
             { label: 'Account Name', value: 'Engeline Cerda', copyable: true },
             { label: 'Account Number', value: '4039941106', copyable: true }
@@ -120,6 +122,75 @@ export const PAYMENT_STATUS_META = {
     approved: { label: 'Approved', key: 'approved' },
     rejected: { label: 'Rejected', key: 'rejected' }
 };
+
+// Reference-number format per remote method. These regexes MUST stay in
+// sync with validate_payment_submission() in
+// supabase/migrations/20260716_payment_overhaul.sql — that's the "one
+// client+server validation map" split across the two languages a browser
+// and Postgres actually share.
+export const REFERENCE_NUMBER_PATTERNS = {
+    gcash: { regex: /^\d{13}$/, hint: '13 digits', placeholder: 'e.g. 1234567890123' },
+    maya: { regex: /^\d{12,13}$/, hint: '12–13 digits', placeholder: 'e.g. 123456789012' },
+    bpi: { regex: /^[A-Za-z0-9]{10,13}$/, hint: '10–13 letters/numbers', placeholder: 'e.g. AB1234567890' }
+};
+
+export function validateReferenceNumber(method, value) {
+    const pattern = REFERENCE_NUMBER_PATTERNS[method];
+    if (!pattern) return true;
+    return pattern.regex.test(String(value || '').trim());
+}
+
+export const RESERVATION_RULES_DEFAULTS = {
+    min_advance_days: 14,
+    max_advance_days: 365,
+    min_pax: 20,
+    max_pax: 150,
+    deposit_pct: 30,
+    full_payment_days: 7,
+    auto_cancel_days: 5,
+    contract_resubmission_days: 3
+};
+
+export const PAY_AT_CAFE_DEFAULTS = {
+    card: 'Card payments are processed on our POS terminal at the counter.',
+    cash: 'Pay in cash at the counter.'
+};
+
+/**
+ * Reads the shared "reservation_rules" system_settings row. Falls back to
+ * RESERVATION_RULES_DEFAULTS (kept identical to the trigger function's own
+ * fallback) if the row is missing or the fetch fails, so the page still
+ * works before an admin has ever saved this settings panel.
+ */
+export async function loadReservationRules(supabase) {
+    try {
+        const { data, error } = await supabase
+            .from('system_settings')
+            .select('setting_value')
+            .eq('setting_key', 'reservation_rules')
+            .maybeSingle();
+
+        if (error || !data) return { ...RESERVATION_RULES_DEFAULTS };
+        return { ...RESERVATION_RULES_DEFAULTS, ...JSON.parse(data.setting_value) };
+    } catch {
+        return { ...RESERVATION_RULES_DEFAULTS };
+    }
+}
+
+export async function loadPayAtCafeInstructions(supabase) {
+    try {
+        const { data, error } = await supabase
+            .from('system_settings')
+            .select('setting_value')
+            .eq('setting_key', 'pay_at_cafe_instructions')
+            .maybeSingle();
+
+        if (error || !data) return { ...PAY_AT_CAFE_DEFAULTS };
+        return { ...PAY_AT_CAFE_DEFAULTS, ...JSON.parse(data.setting_value) };
+    } catch {
+        return { ...PAY_AT_CAFE_DEFAULTS };
+    }
+}
 
 const ONSITE_RESERVATION_FEE = 999;
 const PAYMENT_BALANCE_DUE_DAYS = 7;
@@ -237,6 +308,14 @@ export function getReservationBalanceDetails(reservation, paymentsByReservationI
     const isPastDue = Boolean(remainingBalance > 0 && dueDateKey && getTodayDateKey() > dueDateKey);
     const hasPartialPayment = approvedBaseTotal > 0 && remainingBalance > 0;
 
+    // Grace deadline = due date + auto_cancel_days (System Settings). Only
+    // meaningful once a due date exists; used by the overdue status strip
+    // and the pay-at-café arrival-date max bound.
+    const autoCancelDays = Number(options.reservationRules?.auto_cancel_days ?? RESERVATION_RULES_DEFAULTS.auto_cancel_days);
+    const graceDeadline = dueDate ? new Date(dueDate.getTime() + autoCancelDays * 24 * 60 * 60 * 1000) : null;
+    const graceDeadlineKey = graceDeadline ? buildLocalDateKey(graceDeadline) : '';
+    const graceDeadlineLabel = graceDeadlineKey ? safeFormatDate(options.formatDate, graceDeadlineKey) : '';
+
     let phaseLabel = 'Initial Payment';
     let stateLabel = 'Initial payment needed';
     let toneKey = 'pending';
@@ -274,7 +353,10 @@ export function getReservationBalanceDetails(reservation, paymentsByReservationI
         phaseLabel,
         stateLabel,
         toneKey,
-        helperText
+        helperText,
+        graceDeadline,
+        graceDeadlineKey,
+        graceDeadlineLabel
     };
 }
 
@@ -311,7 +393,9 @@ function buildPaymentOption(reservation, paymentType, amount, paymentsByReservat
         displayLabel,
         description: baseDescription,
         displayDescription: options.displayDescription || baseDescription,
-        rescheduleRequestId: options.rescheduleRequestId || ''
+        rescheduleRequestId: options.rescheduleRequestId || '',
+        minAmount: options.minAmount,
+        maxAmount: options.maxAmount
     };
 }
 
@@ -345,43 +429,55 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
     const pendingBasePayment = getPendingBasePayment(paymentsByReservationId, reservationId);
     const optionsList = [];
 
+    // Every base-payment option is now computed fresh from the CURRENT
+    // remaining balance (not gated behind "is this the first payment?"), so
+    // Reservation Fee / Down Payment / Full Payment / Custom Amount can all
+    // appear together on a second or third payment too — whichever of them
+    // haven't already been used or aren't already pending review.
     if (!pendingBasePayment && remainingBalance > 0) {
-        if (approvedBasePayments > 0) {
-            if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'full_payment')) {
-                optionsList.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, paymentsByReservationId, {
-                    ...options,
-                    displayLabel: 'Remaining Balance',
-                    displayDescription: balance.dueDateKey
-                        ? `Settle the unpaid balance by ${balance.dueDateLabel}.`
-                        : 'Settle the unpaid balance for this reservation.'
-                }));
-            }
-        } else {
-            if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'reservation_fee')) {
-                optionsList.push(buildPaymentOption(reservation, 'reservation_fee', getReservationFeeAmount(reservation, remainingBalance), paymentsByReservationId, {
-                    ...options,
-                    displayDescription: 'Confirm your reservation with the reservation fee.'
-                }));
-            }
+        const reservationFeeAmount = getReservationFeeAmount(reservation, remainingBalance);
+        if (
+            reservationFeeAmount > 0
+            && reservationFeeAmount < remainingBalance
+            && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'reservation_fee')
+        ) {
+            optionsList.push(buildPaymentOption(reservation, 'reservation_fee', reservationFeeAmount, paymentsByReservationId, {
+                ...options,
+                displayDescription: 'Confirm your reservation with the reservation fee.'
+            }));
+        }
 
-            const downPaymentAmount = roundCurrency(Math.min(totalPrice * 0.5, remainingBalance));
-            if (
-                downPaymentAmount > 0
-                && downPaymentAmount < remainingBalance
-                && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'down_payment')
-            ) {
-                optionsList.push(buildPaymentOption(reservation, 'down_payment', downPaymentAmount, paymentsByReservationId, {
-                    ...options,
-                    displayDescription: 'Pay 50% now to confirm the reservation and settle the rest later.'
-                }));
-            }
+        const downPaymentAmount = roundCurrency(Math.min(remainingBalance * 0.5, remainingBalance));
+        if (
+            downPaymentAmount > 0
+            && downPaymentAmount < remainingBalance
+            && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'down_payment')
+        ) {
+            optionsList.push(buildPaymentOption(reservation, 'down_payment', downPaymentAmount, paymentsByReservationId, {
+                ...options,
+                displayDescription: 'Pay half of your remaining balance now and settle the rest later.'
+            }));
+        }
 
-            if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'full_payment')) {
-                optionsList.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, paymentsByReservationId, {
-                    ...options,
-                    displayDescription: 'Settle the reservation in one payment.'
-                }));
-            }
+        if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'full_payment')) {
+            optionsList.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, paymentsByReservationId, {
+                ...options,
+                displayDescription: approvedBasePayments > 0
+                    ? (balance.dueDateKey ? `Settle the unpaid balance by ${balance.dueDateLabel}.` : 'Settle the unpaid balance for this reservation.')
+                    : 'Settle the reservation in one payment.'
+            }));
+        }
+
+        if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'partial_payment')) {
+            const depositPct = Number(options.reservationRules?.deposit_pct ?? RESERVATION_RULES_DEFAULTS.deposit_pct);
+            const minAmount = roundCurrency(Math.min(totalPrice * depositPct / 100, remainingBalance));
+            optionsList.push(buildPaymentOption(reservation, 'partial_payment', 0, paymentsByReservationId, {
+                ...options,
+                displayLabel: 'Custom Amount',
+                displayDescription: `Enter any amount between ${safeFormatCurrency(minAmount)} and ${safeFormatCurrency(remainingBalance)}.`,
+                minAmount,
+                maxAmount: remainingBalance
+            }));
         }
     }
 
@@ -417,7 +513,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
         }
     }
 
-    return optionsList.filter((option) => option.amount > 0);
+    return optionsList.filter((option) => option.amount > 0 || option.paymentType === 'partial_payment');
 }
 
 export function getPaymentSummary(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
@@ -682,23 +778,26 @@ export async function submitCustomerPayment({
     paymentMethod,
     paymentType,
     rescheduleRequestId = null,
+    customAmount = null,
     referenceNumber = '',
     paymentDate = null,
     cashPaymentDate = null,
     notes = '',
     proofFile = null,
-    formatDate
+    formatDate,
+    reservationRules = null
 }) {
     const reservation = (reservations || []).find((entry) => String(entry.reservation_id) === String(reservationId));
     if (!reservation) {
         throw new Error('This reservation could not be found.');
     }
 
+    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const availableOptions = getAvailablePaymentOptions(
         reservation,
         paymentsByReservationId,
         reschedulesByReservationId,
-        { formatDate }
+        { formatDate, reservationRules }
     );
     const selectedOption = availableOptions.find((option) => (
         option.paymentType === paymentType
@@ -711,21 +810,51 @@ export async function submitCustomerPayment({
 
     const activeMethod = String(paymentMethod || 'gcash');
     const isOnsite = PAYMENT_METHODS[activeMethod]?.type === 'onsite';
-    const amount = Number(selectedOption.amount || 0);
+    const isCustomAmount = selectedOption.paymentType === 'partial_payment';
+
+    let amount = Number(selectedOption.amount || 0);
+    if (isCustomAmount) {
+        amount = roundCurrency(Number(customAmount));
+        if (!Number.isFinite(amount) || amount <= 0) {
+            throw new Error('Please enter a valid custom payment amount.');
+        }
+        if (amount < selectedOption.minAmount) {
+            throw new Error(`Custom payment amount must be at least ${safeFormatCurrency(selectedOption.minAmount)}.`);
+        }
+        if (amount > selectedOption.maxAmount) {
+            throw new Error(`Custom payment amount cannot exceed the remaining balance of ${safeFormatCurrency(selectedOption.maxAmount)}.`);
+        }
+    }
     if (!amount || amount <= 0) {
         throw new Error('This payment option does not have a valid amount.');
     }
 
     if (isOnsite) {
         if (!cashPaymentDate) {
-            throw new Error('Please choose the date you will visit the cafe to pay.');
+            throw new Error('Please choose your planned date of arrival for payment.');
+        }
+        const todayKey = getTodayDateKey();
+        if (cashPaymentDate < todayKey) {
+            throw new Error('The planned arrival date cannot be in the past.');
+        }
+        const eventDateKey = String(reservation.event_date || '').split('T')[0];
+        const latestAllowedKey = [balance.graceDeadlineKey, eventDateKey].filter(Boolean).sort()[0] || '';
+        if (latestAllowedKey && cashPaymentDate > latestAllowedKey) {
+            throw new Error('The planned arrival date must be on or before the payment grace deadline or event date, whichever is earlier.');
         }
     } else {
         if (!referenceNumber) {
             throw new Error('Please enter your reference or transaction number.');
         }
+        if (!validateReferenceNumber(activeMethod, referenceNumber)) {
+            const hint = REFERENCE_NUMBER_PATTERNS[activeMethod]?.hint || 'the correct format';
+            throw new Error(`Please enter a valid ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} reference number (${hint}).`);
+        }
         if (!paymentDate) {
             throw new Error('Please choose the payment date.');
+        }
+        if (paymentDate > getTodayDateKey()) {
+            throw new Error('The payment date cannot be in the future.');
         }
         if (!proofFile) {
             throw new Error('Please upload a proof of payment.');

@@ -260,7 +260,7 @@ function methodMatchesSearch(method, term) {
   if (!term) return true;
   const haystack = [
     method.account_name,
-    method['phone / account_number'],
+    method['phone/account_number'],
     method.mode_of_payment,
   ]
     .filter(Boolean)
@@ -564,3 +564,59 @@ export function refreshMethodsIfVisible() {
     loadPaymentMethods();
   }
 }
+
+// ── Pay-at-café instructions (Card / Cash — no account row, just shared
+//    copy) ─────────────────────────────────────────────────────────────
+const CAFE_INSTRUCTIONS_DEFAULTS = {
+  card: 'Card payments are processed on our POS terminal at the counter.',
+  cash: 'Pay in cash at the counter.'
+};
+
+const cafeCardInput = document.getElementById('pmCafeInstructionsCard');
+const cafeCashInput = document.getElementById('pmCafeInstructionsCash');
+const cafeSaveBtn   = document.getElementById('pmCafeInstructionsSave');
+const cafeMsg       = document.getElementById('pmCafeInstructionsMessage');
+
+function setCafeInstructionsMessage(msg, isError = false) {
+  if (!cafeMsg) return;
+  cafeMsg.textContent = msg;
+  cafeMsg.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+async function loadCafeInstructions() {
+  if (!cafeCardInput || !cafeCashInput) return;
+
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'pay_at_cafe_instructions')
+    .maybeSingle();
+
+  const config = (!error && data) ? { ...CAFE_INSTRUCTIONS_DEFAULTS, ...JSON.parse(data.setting_value) } : CAFE_INSTRUCTIONS_DEFAULTS;
+  cafeCardInput.value = config.card;
+  cafeCashInput.value = config.cash;
+}
+
+async function saveCafeInstructions() {
+  if (!cafeCardInput || !cafeCashInput) return;
+
+  const config = {
+    card: cafeCardInput.value.trim() || CAFE_INSTRUCTIONS_DEFAULTS.card,
+    cash: cafeCashInput.value.trim() || CAFE_INSTRUCTIONS_DEFAULTS.cash
+  };
+
+  setCafeInstructionsMessage('Saving...');
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      { setting_key: 'pay_at_cafe_instructions', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
+    );
+
+  if (error) { setCafeInstructionsMessage('Failed to save: ' + error.message, true); return; }
+  setCafeInstructionsMessage('Instructions saved.');
+}
+
+cafeSaveBtn?.addEventListener('click', saveCafeInstructions);
+loadCafeInstructions();

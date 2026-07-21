@@ -1482,42 +1482,96 @@
             overflow-y: auto;
             padding: 32px 24px 48px;
         }
-        .agreement-modal-body h2,
-        .agreement-modal-body h3,
-        .agreement-modal-body p,
-        .agreement-modal-error {
-            max-width: 70ch;
-            margin-left: auto;
-            margin-right: auto;
+
+        /* Centered reading column — 66ch, split whitespace evenly on both
+           sides at the modal's current width. Body text and clause headings
+           stay left-aligned inside it; only the document title is centered. */
+        .agreement-reading-column {
+            max-width: 66ch;
+            margin: 0 auto;
+            font-family: 'Inter', system-ui, sans-serif;
         }
-        .agreement-modal-body h2 {
+        .agreement-reading-column h2 {
+            text-align: center;
             font-size: 24px;
-            font-weight: 700;
+            font-weight: 600;
+            letter-spacing: 0.01em;
             color: #3E2418;
-            margin: 0 0 20px;
+            margin: 0 0 24px;
             line-height: 1.3;
         }
-        .agreement-modal-body h3 {
-            font-size: 17px;
-            font-weight: 700;
-            color: #4A2C17;
-            margin: 28px 0 10px;
+        .agreement-reading-column h3 {
+            text-align: left;
+            font-size: 15px;
+            font-weight: 600;
+            color: #2A1208;
+            margin: 24px 0 8px;
             line-height: 1.4;
         }
-        .agreement-modal-body h3:first-of-type {
+        .agreement-reading-column h3:first-of-type {
             margin-top: 8px;
         }
-        .agreement-modal-body p {
-            font-size: 16px;
-            line-height: 1.6;
+        .agreement-reading-column p {
+            text-align: left;
+            font-size: 15px;
+            font-weight: 400;
+            line-height: 1.65;
             color: #3E2418;
             margin: 0 0 14px;
         }
+
+        /* Reservation details — flat definition-list rows, matching the
+           account page's definition-list pattern (muted label left,
+           weight-500 value right, hairline row dividers, top/bottom border
+           framing the whole block). */
+        .agreement-detail-list {
+            margin: 20px 0 28px;
+            border-top: 1px solid #E5DBCC;
+            border-bottom: 1px solid #E5DBCC;
+        }
+        .agreement-detail-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 10px 0;
+            border-bottom: 1px solid #F2EADD;
+        }
+        .agreement-detail-row:last-child {
+            border-bottom: none;
+        }
+        .agreement-detail-row dt {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 400;
+            color: #8A7965;
+        }
+        .agreement-detail-row dd {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 500;
+            color: #3E2418;
+            text-align: right;
+        }
+
         .agreement-modal-error {
+            max-width: 66ch;
+            margin: 0 auto;
             font-size: 15px;
             color: #b42318;
             text-align: center;
             padding: 40px 0;
+        }
+
+        @media (max-width: 420px) {
+            .agreement-detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 2px;
+            }
+            .agreement-detail-row dd {
+                text-align: left;
+            }
         }
         .agreement-modal-footer {
             position: sticky;

@@ -10,6 +10,7 @@ const boardFooterMessage = document.getElementById('boardFooterMessage');
 const boardStatusDot = document.getElementById('boardStatusDot');
 const boardShell = document.getElementById('boardShell');
 const boardSignedOutState = document.getElementById('boardSignedOutState');
+const boardLogoutBtn = document.getElementById('boardLogoutBtn');
 
 const state = {
   days: [],
@@ -355,12 +356,20 @@ async function checkSession() {
   return true;
 }
 
+async function handleLogout() {
+  boardLogoutBtn.disabled = true;
+  await supabase.auth.signOut();
+  window.location.replace('/admin/index.html');
+}
+
 async function init() {
   const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
   if (!session) {
     window.location.replace('/admin/index.html');
     return;
   }
+
+  boardLogoutBtn?.addEventListener('click', handleLogout);
 
   renderClock();
   await refreshSchedule();

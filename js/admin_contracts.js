@@ -21,8 +21,6 @@ const chipsRow = document.getElementById('chipsRow');
 
 
 const statPendingContracts = document.getElementById('statPendingContracts');
-const statReplacementContracts = document.getElementById('statReplacementContracts');
-const statRequestedContracts = document.getElementById('statRequestedContracts');
 const statVerifiedContracts = document.getElementById('statVerifiedContracts');
 const statTotalContracts = document.getElementById('statTotalContracts');
 
@@ -291,13 +289,6 @@ function getReservationApprovalState(reservation) {
     };
   }
 
-  if (contract.key !== 'approved') {
-    return {
-      canApprove: false,
-      reason: 'Verify the signed contract first before approving the reservation.'
-    };
-  }
-
   return { canApprove: true, reason: '' };
 }
 
@@ -318,16 +309,15 @@ function getContractCounts(list) {
   return list.reduce((counts, reservation) => {
     const key = getContractReviewMeta(reservation).key;
     counts.total += 1;
-    if (key === 'pending') counts.pending += 1;
-    if (key === 'resubmitted') counts.resubmitted += 1;
-    if (key === 'resubmission_requested') counts.resubmissionRequested += 1;
-    if (key === 'approved') counts.approved += 1;
+    if (key === 'approved') {
+      counts.approved += 1;
+    } else {
+      counts.pending += 1;
+    }
     return counts;
   }, {
     total: 0,
     pending: 0,
-    resubmitted: 0,
-    resubmissionRequested: 0,
     approved: 0
   });
 }
@@ -336,19 +326,14 @@ function renderStats(list) {
   const counts = getContractCounts(list);
 
   if (statPendingContracts) statPendingContracts.textContent = String(counts.pending);
-  if (statReplacementContracts) statReplacementContracts.textContent = String(counts.resubmitted);
-  if (statRequestedContracts) statRequestedContracts.textContent = String(counts.resubmissionRequested);
   if (statVerifiedContracts) statVerifiedContracts.textContent = String(counts.approved);
   if (statTotalContracts) statTotalContracts.textContent = String(counts.total);
-
 
   if (!chipsRow) return;
 
   const chipCounts = {
     all: counts.total,
     pending: counts.pending,
-    resubmitted: counts.resubmitted,
-    resubmission_requested: counts.resubmissionRequested,
     approved: counts.approved
   };
 
@@ -380,7 +365,9 @@ function matchesSearch(reservation, term) {
 
 function matchesStatus(reservation, status) {
   if (status === 'all') return true;
-  return getContractReviewMeta(reservation).key === status;
+  const key = getContractReviewMeta(reservation).key;
+  if (status === 'pending') return key !== 'approved';
+  return key === status;
 }
 
 function renderTable(list) {
@@ -603,68 +590,42 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   await logReservationStatusChange(reservationId, previousStatus, status);
 }
 
-async function markReservationContractVerified(reservationId) {
-  const { data, error } = await supabase
-    .from('reservation_contracts')
-    .update({
-      review_status: 'verified',
-      review_notes: null,
-      reviewed_at: new Date().toISOString(),
-      verified_date: new Date().toISOString()
-    })
-    .eq('reservation_id', reservationId)
-    .not('contract_url', 'is', null)
-    .select('reservation_id')
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error('No uploaded contract was found for this reservation.');
-  }
-}
-
-async function requestReservationContractResubmission(reservationId, reviewNotes) {
-  const trimmedNotes = String(reviewNotes || '').trim();
-  if (!trimmedNotes) {
-    throw new Error('Please enter the contract correction note before requesting resubmission.');
+function renderSignatureCheckPanel(contract) {
+  const note = String(contract.contract?.review_notes || '');
+  let state = 'not-scanned';
+  if (/signature detected/i.test(note)) {
+    state = 'detected';
+  } else if (/no .*signature detected|not detected/i.test(note)) {
+    state = 'not-detected';
   }
 
-  const reviewedAt = new Date().toISOString();
-  let response = await supabase
-    .from('reservation_contracts')
-    .update({
-      review_status: 'resubmission_requested',
-      review_notes: trimmedNotes,
-      reviewed_at: reviewedAt,
-      verified_date: null,
-      resubmitted_at: null
-    })
-    .eq('reservation_id', reservationId)
-    .not('contract_url', 'is', null)
-    .select('reservation_id')
-    .maybeSingle();
+  const copy = {
+    detected: {
+      icon: '✓',
+      title: 'Signature check: detected',
+      sub: 'Automatic scan found a signature in the signature area.'
+    },
+    'not-detected': {
+      icon: '✕',
+      title: 'Signature check: not detected',
+      sub: 'Automatic scan did not find a signature in the uploaded file.'
+    },
+    'not-scanned': {
+      icon: '•',
+      title: 'Signature check: not yet scanned',
+      sub: 'This contract has not been through the automatic signature scan yet.'
+    }
+  }[state];
 
-  if (response.error && isMissingColumnError(response.error, 'resubmitted_at')) {
-    response = await supabase
-      .from('reservation_contracts')
-      .update({
-        review_status: 'resubmission_requested',
-        review_notes: trimmedNotes,
-        reviewed_at: reviewedAt,
-        verified_date: null
-      })
-      .eq('reservation_id', reservationId)
-      .not('contract_url', 'is', null)
-      .select('reservation_id')
-      .maybeSingle();
-  }
-
-  const { data, error } = response;
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error('No uploaded contract was found for this reservation.');
-  }
+  return `
+    <div class="signature-check-panel state-${state}">
+      <span class="signature-check-icon">${copy.icon}</span>
+      <span class="signature-check-copy">
+        <span class="signature-check-title">${escapeHtml(copy.title)}</span>
+        <span class="signature-check-sub">${escapeHtml(copy.sub)}</span>
+      </span>
+    </div>
+  `;
 }
 
 function setContractDetailsMessage(message = '', isError = false) {
@@ -724,14 +685,15 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
     buildDetailCard('Total Price', formatCurrency(reservation.total_price)),
     buildDetailCard('Reservation Status', `<span class="status-pill ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>`, { raw: true }),
     buildDetailCard('Contract Status', `<span class="status-pill ${escapeHtml(contract.key)}">${escapeHtml(contract.label)}</span>`, { raw: true }),
-    contract.reviewedAt ? buildDetailCard('Reviewed', contract.reviewedAt) : '',
+    (contract.reviewedAt && contract.reviewedAt !== contract.verification) ? buildDetailCard('Reviewed', contract.reviewedAt) : '',
     contract.resubmittedAt ? buildDetailCard('Replacement Submitted', contract.resubmittedAt) : '',
     contract.note ? buildDetailCard('Latest Review Note', contract.note, { full: true }) : ''
   ].filter(Boolean).join('');
 
   contractReviewSection.innerHTML = `
+    ${contractRecord?.contract_url ? renderSignatureCheckPanel(contract) : ''}
     <div class="details-grid compact-grid">
-      ${buildDetailCard('Verification', contract.verification, { subtle: contract.key !== 'approved' })}
+      ${buildDetailCard(contract.key === 'approved' ? 'Verified' : 'Verification', contract.verification, { subtle: contract.key !== 'approved' })}
       ${buildDetailCard('Contract File', contractRecord?.contract_url ? 'Uploaded and ready to open' : 'Missing', { subtle: !contractRecord?.contract_url })}
     </div>
     <div class="details-action-row">
@@ -743,39 +705,16 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
 
   const showReservationActions = currentRole !== 'admin' && ['pending', 'resubmission_requested'].includes(reservationStatus.key);
 
-  contractActionsSection.innerHTML = currentRole === 'admin' ? '' : `
-    <div class="action-stack">
-      <div class="details-action-row">
-        ${['pending', 'resubmitted'].includes(contract.key)
-          ? `<button class="action-btn approve" data-action="verify-contract" data-reservation-id="${reservation.reservation_id}">Approve Contract</button>`
-          : ''}
-        ${showReservationActions
-          ? `<button
-              class="action-btn approve"
-              data-action="approve-reservation"
-              data-reservation-id="${reservation.reservation_id}"
-              ${approvalState.canApprove ? '' : 'disabled'}
-              title="${escapeHtml(approvalState.canApprove ? 'Approve the linked reservation.' : approvalState.reason)}"
-            >Approve Reservation</button>`
-          : ''}
-        ${showReservationActions
-          ? `<button class="action-btn decline" data-action="decline-reservation" data-reservation-id="${reservation.reservation_id}">Decline Reservation</button>`
-          : ''}
-      </div>
-      ${contract.key !== 'approved' ? `
-        <label class="modal-field contract-note-field">
-          <span class="modal-label">Correction note for the customer</span>
-          <textarea
-            class="modal-textarea"
-            rows="4"
-            data-contract-review-note="${reservation.reservation_id}"
-            placeholder="Explain what the customer needs to fix before uploading the contract again."
-          >${escapeHtml(contract.key === 'resubmission_requested' ? (contractRecord?.review_notes || '') : '')}</textarea>
-        </label>
-        <div class="details-action-row">
-          <button class="action-btn request" data-action="request-contract-resubmission" data-reservation-id="${reservation.reservation_id}">Request Resubmission</button>
-        </div>
-      ` : ''}
+  contractActionsSection.innerHTML = (currentRole === 'admin' || !showReservationActions) ? '' : `
+    <div class="details-action-row">
+      <button
+        class="action-btn approve"
+        data-action="approve-reservation"
+        data-reservation-id="${reservation.reservation_id}"
+        ${approvalState.canApprove ? '' : 'disabled'}
+        title="${escapeHtml(approvalState.canApprove ? 'Approve the linked reservation.' : approvalState.reason)}"
+      >Approve Reservation</button>
+      <button class="action-btn decline" data-action="decline-reservation" data-reservation-id="${reservation.reservation_id}">Decline Reservation</button>
     </div>
   `;
 
@@ -801,17 +740,6 @@ async function performContractAction(action, button) {
   const reservationId = button.dataset.reservationId;
   const reservation = getReservationById(reservationId);
   const previousStatus = reservation?.status || null;
-
-  if (action === 'verify-contract') {
-    await markReservationContractVerified(reservationId);
-    return { message: 'Contract approved. You can now approve the reservation.' };
-  }
-
-  if (action === 'request-contract-resubmission') {
-    const noteInput = contractActionsSection?.querySelector(`[data-contract-review-note="${reservationId}"]`);
-    await requestReservationContractResubmission(reservationId, noteInput?.value || '');
-    return { message: 'Customer has been asked to re-upload the signed contract.' };
-  }
 
   if (action === 'approve-reservation') {
     const approvalState = getReservationApprovalState(reservation);

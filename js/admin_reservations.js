@@ -5,8 +5,6 @@ import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
-  fetchDateAvailability,
-  getBookingScope as getSharedBookingScope,
   getOccupiedScopesFromReservations,
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
@@ -57,34 +55,6 @@ const dayPanelCount = document.getElementById('dayPanelCount');
 const dayPanelBookings = document.getElementById('dayPanelBookings');
 const dayPanelFooter = document.getElementById('dayPanelFooter');
 const dayPanelActionBtn = document.getElementById('dayPanelActionBtn');
-const reservationDetailsModal = document.getElementById('reservationDetailsModal');
-const reservationDetailsClose = document.getElementById('reservationDetailsClose');
-const reservationDetailsDismiss = document.getElementById('reservationDetailsDismiss');
-const reservationDetailsHero = document.getElementById('reservationDetailsHero');
-const reservationDetailsMeta = document.getElementById('reservationDetailsMeta');
-const reservationSummaryGrid = document.getElementById('reservationSummaryGrid');
-const reservationPaymentSection = document.getElementById('reservationPaymentSection');
-const reservationContractSection = document.getElementById('reservationContractSection');
-const reservationStaffSection = document.getElementById('reservationStaffSection');
-const reservationActionsSection = document.getElementById('reservationActionsSection');
-const reservationDetailsMessage = document.getElementById('reservationDetailsMessage');
-const assignmentModal = document.getElementById('assignmentModal');
-const assignmentModalClose = document.getElementById('assignmentModalClose');
-const assignmentCancelBtn = document.getElementById('assignmentCancelBtn');
-const assignmentSaveBtn = document.getElementById('assignmentSaveBtn');
-const assignmentModalMessage = document.getElementById('assignmentModalMessage');
-const assignmentSearchInput = document.getElementById('assignmentSearchInput');
-const assignmentStaffList = document.getElementById('assignmentStaffList');
-const assignmentReservationSummary = document.getElementById('assignmentReservationSummary');
-const assignmentReservationMeta = document.getElementById('assignmentReservationMeta');
-const assignmentSelectionCount = document.getElementById('assignmentSelectionCount');
-const assignmentNoteInput = document.getElementById('assignmentNoteInput');
-const PAYMENT_METHOD_LABELS = {
-  card: 'Card',
-  bancnet: 'BancNet',
-  gcash_maya: 'GCash/Maya',
-  cash: 'Cash'
-};
 const PAYMENT_TYPE_LABELS = {
   reservation_fee: 'Reservation Fee',
   down_payment: 'Down Payment',
@@ -117,11 +87,6 @@ let staffDirectory = [];
 let assignmentMapByReservationId = {};
 let assignmentFeatureReady = true;
 let assignmentFeatureMessage = '';
-let activeAssignmentReservationId = null;
-let assignmentSelection = new Set();
-let assignmentSearchTerm = '';
-let activeDetailsReservationId = null;
-let reservationDetailsFlash = null;
 let showPendingRescheduleOnly = false;
 
 function setMessage(el, msg, isError = false) {
@@ -265,17 +230,6 @@ function formatCurrency(value) {
   return `₱${Number(value || 0).toLocaleString()}`;
 }
 
-function formatDateTime(value) {
-  if (!value) return 'Not recorded';
-  return new Date(value).toLocaleString('en-PH', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
 function buildLocalDateKey(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   return [
@@ -395,10 +349,6 @@ function getEmptyFilterMessage(status) {
   return 'No reservations match the current filter.';
 }
 
-function getReservationById(reservationId) {
-  return reservationsCache.find((reservation) => String(reservation.reservation_id) === String(reservationId)) || null;
-}
-
 function getCustomerInitials(name, email = '') {
   const initials = String(name || '')
     .split(' ')
@@ -408,18 +358,6 @@ function getCustomerInitials(name, email = '') {
     .join('');
 
   return initials || String(email || 'R').charAt(0).toUpperCase();
-}
-
-function buildDetailCard(label, value, options = {}) {
-  const classes = ['detail-card'];
-  if (options.full) classes.push('full');
-  const valueClass = options.subtle ? 'detail-value subtle' : 'detail-value';
-  return `
-    <div class="${classes.join(' ')}">
-      <span class="detail-label">${escapeHtml(label)}</span>
-      <div class="${valueClass}">${options.raw ? value : escapeHtml(value)}</div>
-    </div>
-  `;
 }
 
 function getStaffDisplayName(profile) {
@@ -432,41 +370,8 @@ function getStaffDisplayName(profile) {
   return nameParts.join(' ') || profile?.email || 'Unnamed staff';
 }
 
-function formatStaffRole(staffRole) {
-  const normalized = String(staffRole || '').trim().toLowerCase();
-  if (!normalized) return 'Staff';
-
-  return normalized
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
 function getAssignedStaff(reservationId) {
   return assignmentMapByReservationId[reservationId] || [];
-}
-
-function getAssignmentNoteForReservation(reservationId) {
-  const assignedStaff = getAssignedStaff(reservationId);
-  const noteHolder = assignedStaff.find((staff) => String(staff?.assignment_note || '').trim());
-  return String(noteHolder?.assignment_note || '').trim();
-}
-
-function canAssignEmployees(reservation) {
-  return ['approved', 'confirmed'].includes(String(reservation?.status || '').toLowerCase());
-}
-
-function getAssignmentAvailability(reservation) {
-  const disabledReason = !assignmentFeatureReady
-    ? assignmentFeatureMessage
-    : (!staffDirectory.length ? 'No staff accounts are available yet.' : '');
-
-  return {
-    canAssign: canAssignEmployees(reservation),
-    disabled: Boolean(disabledReason),
-    disabledReason
-  };
 }
 
 function setCalendarExpanded(nextExpanded) {
@@ -585,7 +490,6 @@ async function reopenDate(dateIso) {
   }
 }
 
-
 function redirectLogin() {
   window.location.replace('/admin/index.html');
 }
@@ -600,55 +504,8 @@ function formatStatusPill(status) {
   return { key, label };
 }
 
-function getBookingScope(reservation) {
-  return getSharedBookingScope(
-    reservation?.location_type,
-    reservation?.package?.package_name || reservation?.package_name || '',
-    reservation?.booking_scope || reservation?.package?.booking_scope || null
-  );
-}
-
 function getScopeLabel(scope) {
   return getSharedScopeLabel(scope);
-}
-
-function getApprovalLimitMessage(reservation) {
-  const dateKey = String(reservation.event_date || '').split('T')[0];
-  if (!dateKey) return 'Cannot approve this reservation because it has no event date.';
-
-  const BLOCKING = new Set([
-    'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
-    'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
-  ]);
-  const count = (reservationsCache || []).filter((r) =>
-    String(r.event_date || '').split('T')[0] === dateKey &&
-    String(r.reservation_id) !== String(reservation.reservation_id) &&
-    BLOCKING.has(String(r.status || '').toLowerCase())
-  ).length;
-
-  if (count < 2) return '';
-
-  const formattedDate = new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-PH', {
-    year: 'numeric', month: 'long', day: 'numeric'
-  });
-  return `Cannot approve this reservation. ${formattedDate} is already fully booked (maximum 2 reservations per day).`;
-}
-
-function getReservationDurationHours(reservation) {
-  const storedDuration = Number(reservation?.duration_hours || 0);
-  if (storedDuration > 0) return storedDuration;
-
-  const packageDuration = Number(reservation?.package?.duration_hours || 0);
-  if (packageDuration > 0) return packageDuration;
-
-  const packageName = String(reservation?.package?.package_name || '').toLowerCase();
-  if (packageName.includes('vip lite')) return 2;
-  if (packageName.includes('vip plus')) return 3;
-  if (packageName.includes('vip max')) return 4;
-  if (packageName.includes('main hall basic')) return 2;
-  if (packageName.includes('main hall plus')) return 3;
-  if (packageName.includes('catering')) return 4;
-  return 3;
 }
 
 function isMissingColumnError(error, columnName) {
@@ -656,112 +513,6 @@ function isMissingColumnError(error, columnName) {
   return message.includes(`Could not find the '${columnName}' column`)
     || message.includes(`column reservation_contracts.${columnName} does not exist`)
     || message.includes(`column reservation_staff_assignments.${columnName} does not exist`);
-}
-
-function getContractReviewMeta(reservation) {
-  const contract = reservation?.contracts?.[0] || null;
-  const reviewStatus = String(contract?.review_status || '').toLowerCase();
-  const reservationStatus = String(reservation?.status || '').toLowerCase();
-  const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
-
-  if (!contract) {
-    return {
-      key: 'default',
-      label: 'Contract missing',
-      verification: 'No contract file uploaded yet',
-      note: '',
-      reviewedAt: '',
-      resubmittedAt: '',
-      hasFile: false,
-      contract
-    };
-  }
-
-  if (reviewStatus === 'verified' || contract?.verified_date) {
-    return {
-      key: 'approved',
-      label: 'Verified contract',
-      verification: contract?.verified_date ? formatDateTime(contract.verified_date) : 'Verified',
-      note: '',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-
-  if (reviewStatus === 'resubmission_requested' || (!reviewStatus && reservationStatus === 'resubmission_requested')) {
-    return {
-      key: 'resubmission_requested',
-      label: 'Resubmission requested',
-      verification: 'Waiting for customer re-upload',
-      note: contract?.review_notes || 'Customer needs to upload a corrected signed contract.',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt: '',
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-
-  if (reviewStatus === 'pending_review' && contract?.resubmitted_at) {
-    return {
-      key: 'resubmitted',
-      label: 'Replacement submitted',
-      verification: 'Corrected contract is ready for review',
-      note: '',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-
-  if (reviewStatus === 'pending_review' || contract?.contract_url) {
-    return {
-      key: 'pending',
-      label: 'Pending review',
-      verification: 'Awaiting contract review',
-      note: contract?.review_notes || '',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-
-  return {
-    key: 'default',
-    label: 'Contract missing',
-    verification: 'No contract file uploaded yet',
-    note: '',
-    reviewedAt: '',
-    resubmittedAt: '',
-    hasFile: false,
-    contract
-  };
-}
-
-function contractStatus(res) {
-  return getContractReviewMeta(res);
-}
-
-function getReservationApprovalState(reservation) {
-  const contract = getContractReviewMeta(reservation);
-  if (!contract.hasFile) {
-    return {
-      canApprove: false,
-      reason: 'The reservation cannot be approved until the customer uploads a signed contract.'
-    };
-  }
-
-  if (contract.key !== 'approved') {
-    return {
-      canApprove: false,
-      reason: 'Verify the signed contract first before approving the reservation.'
-    };
-  }
-
-  return { canApprove: true, reason: '' };
 }
 
 function getReservationPayments(reservation) {
@@ -816,10 +567,6 @@ function getReservationBalanceSummary(reservation) {
 
 function getPaymentTypeLabel(type) {
   return PAYMENT_TYPE_LABELS[type] || type || 'Payment';
-}
-
-function getPaymentMethodLabel(method) {
-  return PAYMENT_METHOD_LABELS[method] || method || 'Method';
 }
 
 function formatReadableKey(value) {
@@ -990,7 +737,7 @@ function renderTable(list) {
     const status = formatStatusPill(getEffectiveReservationStatus(res));
     const staffSummary = getStaffSummary(res.reservation_id);
     return `
-      <tr class="reservation-row">
+      <tr class="reservation-row" data-reservation-id="${res.reservation_id}">
         <td data-label="Customer / Package">
           <div class="reservation-customer">
             <span class="avatar">${escapeHtml(getCustomerInitials(res.contact_name, res.contact_email))}</span>
@@ -1029,281 +776,6 @@ function renderTable(list) {
       </tr>
     `;
   }).join('');
-}
-
-function setReservationDetailsMessage(message = '', isError = false) {
-  if (!reservationDetailsMessage) return;
-  reservationDetailsMessage.textContent = message;
-  reservationDetailsMessage.classList.toggle('error', isError);
-}
-
-function getLatestPaymentEntry(reservation) {
-  return getReservationPayments(reservation)
-    .slice()
-    .sort((left, right) => new Date(right.submitted_at || right.verified_at || 0) - new Date(left.submitted_at || left.verified_at || 0))[0] || null;
-}
-
-function renderReservationDetailsModal() {
-  const reservation = getReservationById(activeDetailsReservationId);
-  if (!reservation) {
-    closeReservationDetailsModal();
-    return;
-  }
-
-  const paymentSummary = paymentStatus(reservation);
-  const balance = getReservationBalanceSummary(reservation);
-  const reservationStatus = formatStatusPill(getEffectiveReservationStatus(reservation));
-  const contract = contractStatus(reservation);
-  const contractRecord = contract.contract;
-  const latestPayment = getLatestPaymentEntry(reservation);
-  const pendingPayment = getPendingPayment(reservation);
-  const activeRescheduleRequest = getLatestOpenRescheduleRequest(reservation);
-  const assignedStaff = getAssignedStaff(reservation.reservation_id);
-  const staffSummary = getStaffSummary(reservation.reservation_id);
-  const assignmentState = getAssignmentAvailability(reservation);
-  const approvalState = getReservationApprovalState(reservation);
-  const heroName = reservation.contact_name || 'Unknown customer';
-  const heroPackage = reservation.package?.package_name || 'Reservation';
-
-  if (reservationDetailsHero) {
-    reservationDetailsHero.innerHTML = `
-      <div class="reservation-hero-main">
-        <span class="reservation-hero-avatar">${escapeHtml(getCustomerInitials(heroName, reservation.contact_email))}</span>
-        <div class="reservation-hero-copy">
-          <div class="reservation-hero-name">${escapeHtml(heroName)}</div>
-          <div class="reservation-hero-sub">${escapeHtml(reservation.contact_email || 'No email on file')}</div>
-          <div class="reservation-hero-package">${escapeHtml(heroPackage)}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (reservationDetailsMeta) {
-    reservationDetailsMeta.innerHTML = [
-      buildDetailCard('Event Date', formatReservationDate(reservation.event_date)),
-      buildDetailCard('Event Time', formatReservationTime(reservation.event_time)),
-      buildDetailCard('Payment', paymentSummary.label),
-      buildDetailCard('Status', reservationStatus.label),
-      buildDetailCard('Staff', staffSummary.label),
-      buildDetailCard('Location', reservation.venue_location || reservation.location_type || 'No location specified')
-    ].join('');
-  }
-
-  if (reservationSummaryGrid) {
-    reservationSummaryGrid.innerHTML = [
-      buildDetailCard('Reservation Number', reservation.reservation_number || 'Not assigned'),
-      buildDetailCard('Event Type', reservation.event_type || 'Not specified'),
-      buildDetailCard('Guest Count', reservation.guest_count ? `${reservation.guest_count} pax` : 'Not specified'),
-      buildDetailCard('Total Amount', formatCurrency(reservation.total_price)),
-      buildDetailCard('Contact Number', reservation.contact_phone || 'No phone on file'),
-      buildDetailCard('Location Type', reservation.location_type || 'Not specified'),
-      buildDetailCard('Created', formatDateTime(reservation.created_at)),
-      buildDetailCard('Special Requests', reservation.special_requests || 'No notes provided.', { full: true, subtle: !reservation.special_requests })
-    ].join('');
-  }
-
-  if (reservationPaymentSection) {
-    const paymentCards = [
-      buildDetailCard('Total Amount', formatCurrency(balance.totalAmount)),
-      buildDetailCard('Approved Payments', formatCurrency(balance.approvedTotal)),
-      buildDetailCard('Remaining Balance', balance.remainingBalance <= 0 ? 'Paid in Full' : formatCurrency(balance.remainingBalance)),
-      buildDetailCard('Pay By', balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel),
-      latestPayment
-        ? buildDetailCard('Latest Payment Type', getPaymentTypeLabel(latestPayment.payment_type))
-        : buildDetailCard('Latest Payment', 'No submitted payment yet.', { subtle: true }),
-      latestPayment
-        ? buildDetailCard('Latest Amount', formatCurrency(latestPayment.amount))
-        : buildDetailCard('Latest Method', 'No payment submitted yet.', { subtle: true }),
-      latestPayment
-        ? buildDetailCard('Latest Method', getPaymentMethodLabel(latestPayment.payment_method))
-        : buildDetailCard('Latest Submitted', 'No submission yet.', { subtle: true }),
-      latestPayment
-        ? buildDetailCard('Latest Submitted', formatDateTime(latestPayment.submitted_at))
-        : buildDetailCard('Balance Status', balance.statusLabel)
-    ].join('');
-
-    const paymentActions = (pendingPayment && currentRole !== 'admin') ? `
-      <div class="details-action-row">
-        <button class="action-btn approve" data-action="approve-payment" data-reservation-id="${reservation.reservation_id}" data-payment-id="${pendingPayment.payment_id}">
-          ${escapeHtml(pendingPayment.payment_method === 'cash' ? 'Verify Cash Payment' : 'Approve Payment')}
-        </button>
-        <button class="action-btn decline" data-action="reject-payment" data-reservation-id="${reservation.reservation_id}" data-payment-id="${pendingPayment.payment_id}">
-          Reject Payment
-        </button>
-      </div>
-    ` : '';
-
-    const paymentLinks = `
-      <div class="details-action-row">
-        <a class="action-btn view" href="/admin/payments.html?reservation=${encodeURIComponent(reservation.reservation_id)}">Open Payments</a>
-        ${pendingPayment?.proof_url ? `<a class="action-btn view" href="${pendingPayment.proof_url}" target="_blank" rel="noopener noreferrer">View Proof</a>` : ''}
-      </div>
-    `;
-
-    reservationPaymentSection.innerHTML = `
-      <div class="details-grid compact-grid">
-        <div class="detail-card detail-card-summary">
-          <span class="detail-label">Current Payment State</span>
-          <div class="detail-badge-stack">
-            <span class="status-pill ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
-            <span class="detail-inline-copy">${escapeHtml(paymentSummary.sublabel || balance.statusLabel)}</span>
-          </div>
-        </div>
-        ${paymentCards}
-      </div>
-      ${paymentActions}
-      ${paymentLinks}
-    `;
-  }
-
-  if (reservationContractSection) {
-    const contractNoteMarkup = contract.note
-      ? buildDetailCard('Admin Note', contract.note, { full: true })
-      : '';
-    const contractReviewMetaMarkup = contract.reviewedAt
-      ? buildDetailCard('Reviewed', contract.reviewedAt)
-      : '';
-    const contractResubmittedMarkup = contract.resubmittedAt
-      ? buildDetailCard('Replacement Submitted', contract.resubmittedAt)
-      : '';
-    const contractActionMarkup = contract.hasFile ? `
-      <div class="details-action-row">
-        <a class="action-btn view" href="${contractRecord.contract_url}" target="_blank" rel="noopener noreferrer">View Contract</a>
-        ${(currentRole !== 'admin' && ['pending', 'resubmitted'].includes(contract.key))
-          ? `<button class="action-btn approve" data-action="verify-contract" data-reservation-id="${reservation.reservation_id}">Verify Contract</button>`
-          : ''}
-      </div>
-      ${(currentRole !== 'admin' && contract.key !== 'approved') ? `
-        <label class="modal-field">
-          <span class="modal-label">Correction note for the customer</span>
-          <textarea
-            class="modal-textarea contract-review-note"
-            data-contract-review-note="${reservation.reservation_id}"
-            rows="4"
-            placeholder="Explain what the customer needs to fix before uploading the contract again."
-          >${escapeHtml(contract.key === 'resubmission_requested' ? (contractRecord?.review_notes || '') : '')}</textarea>
-        </label>
-        <div class="details-action-row">
-          <button class="action-btn request" data-action="request-contract-resubmission" data-reservation-id="${reservation.reservation_id}">
-            Request Contract Resubmission
-          </button>
-        </div>
-      ` : ''}
-    ` : `
-      <div class="details-action-row">
-        <span class="details-empty-inline">No contract file uploaded yet.</span>
-      </div>
-    `;
-
-    reservationContractSection.innerHTML = `
-      <div class="details-grid compact-grid">
-        ${buildDetailCard('Contract Status', contract.label)}
-        ${buildDetailCard('Verification', contract.verification, { subtle: contract.key !== 'approved' })}
-        ${contractReviewMetaMarkup}
-        ${contractResubmittedMarkup}
-        ${contractNoteMarkup}
-      </div>
-      ${contractActionMarkup}
-    `;
-  }
-
-  if (reservationStaffSection) {
-    const assignActionMarkup = currentRole === 'admin' ? '' : `
-      <div class="details-action-row">
-        <button
-          class="action-btn assign"
-          data-action="assign-employee"
-          data-reservation-id="${reservation.reservation_id}"
-          title="${escapeHtml(assignmentState.disabled ? assignmentState.disabledReason : 'Assign staff to this reservation.')}"
-          ${(!assignmentState.canAssign || assignmentState.disabled) ? 'disabled' : ''}
-        >
-          Assign Staff
-        </button>
-        ${!assignmentState.canAssign ? '<span class="details-empty-inline">Staff assignment becomes available after approval.</span>' : ''}
-        ${(assignmentState.canAssign && assignmentState.disabled) ? `<span class="details-empty-inline">${escapeHtml(assignmentState.disabledReason)}</span>` : ''}
-      </div>
-    `;
-    reservationStaffSection.innerHTML = `
-        <div class="assigned-staff-list">
-          ${assignedStaff.length
-            ? assignedStaff.map((staff) => `
-            <span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))} · ${escapeHtml(formatStaffRole(staff.staff_role))}</span>
-          `).join('')
-          : '<span class="staff-pill unassigned">Not assigned yet</span>'}
-        </div>
-      ${assignActionMarkup}
-    `;
-  }
-
-  if (reservationActionsSection) {
-    const reservationActionMarkup = currentRole === 'admin' ? '' : ['pending', 'resubmission_requested'].includes(reservationStatus.key) ? `
-      <div class="details-action-row">
-        <button
-          class="action-btn approve"
-          data-action="approve"
-          data-id="${reservation.reservation_id}"
-          data-reservation-id="${reservation.reservation_id}"
-          ${approvalState.canApprove ? '' : 'disabled'}
-          title="${escapeHtml(approvalState.reason || 'Approve reservation')}"
-        >
-          Approve
-        </button>
-        <button class="action-btn decline" data-action="decline" data-id="${reservation.reservation_id}" data-reservation-id="${reservation.reservation_id}">Decline</button>
-      </div>
-      ${!approvalState.canApprove ? `<div class="details-empty-inline">${escapeHtml(approvalState.reason)}</div>` : ''}
-    ` : reservationStatus.key === 'cancellation_requested' ? `
-      <div class="details-empty-inline">Customer has requested to cancel this reservation. Verify the cancellation fee payment first, then process the cancellation below.</div>
-      <div class="details-action-row">
-        <button class="action-btn approve" data-action="confirm-cancellation" data-reservation-id="${reservation.reservation_id}">
-          Process Cancellation
-        </button>
-      </div>
-    ` : '<div class="details-empty-inline">No reservation status action is needed right now.</div>';
-
-    const rescheduleMarkup = activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'pending' ? `
-      <div class="details-grid compact-grid">
-        ${buildDetailCard('Requested Date', formatReservationDate(activeRescheduleRequest.requested_date))}
-        ${buildDetailCard('Requested Time', formatReservationTime(activeRescheduleRequest.requested_time))}
-      </div>
-      ${currentRole === 'admin' ? '' : `
-      <div class="details-action-row">
-        <button class="action-btn approve" data-action="approve-reschedule" data-request-id="${activeRescheduleRequest.reschedule_request_id}" data-reservation-id="${reservation.reservation_id}">
-          Approve Reschedule
-        </button>
-        <button class="action-btn decline" data-action="reject-reschedule" data-request-id="${activeRescheduleRequest.reschedule_request_id}" data-reservation-id="${reservation.reservation_id}">
-          Reject Request
-        </button>
-      </div>
-      `}
-    ` : '';
-
-    reservationActionsSection.innerHTML = `
-      ${reservationActionMarkup}
-      ${rescheduleMarkup}
-    `;
-  }
-
-  if (reservationDetailsFlash) {
-    setReservationDetailsMessage(reservationDetailsFlash.message, reservationDetailsFlash.isError);
-    reservationDetailsFlash = null;
-  } else {
-    setReservationDetailsMessage('');
-  }
-}
-
-function openReservationDetailsModal(reservationId) {
-  activeDetailsReservationId = reservationId;
-  renderReservationDetailsModal();
-  reservationDetailsModal?.classList.remove('hidden');
-  reservationDetailsModal?.setAttribute('aria-hidden', 'false');
-}
-
-function closeReservationDetailsModal() {
-  activeDetailsReservationId = null;
-  reservationDetailsFlash = null;
-  reservationDetailsModal?.classList.add('hidden');
-  reservationDetailsModal?.setAttribute('aria-hidden', 'true');
-  setReservationDetailsMessage('');
 }
 
 function filterAndRender() {
@@ -1531,19 +1003,6 @@ async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
   }, {});
 }
 
-async function logReservationStatusChange(reservationId, previousStatus, newStatus) {
-  const { error } = await supabase
-    .from('reservation_status')
-    .insert({
-      reservation_id: reservationId,
-      previous_status: previousStatus || null,
-      new_status: newStatus,
-      changed_at: new Date().toISOString()
-    });
-
-  if (error) throw error;
-}
-
 async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
 
@@ -1574,514 +1033,6 @@ async function fetchReservationContracts(reservationIds) {
   }
 
   throw error;
-}
-
-async function markReservationContractVerified(reservationId) {
-  const { data, error } = await supabase
-    .from('reservation_contracts')
-    .update({
-      review_status: 'verified',
-      review_notes: null,
-      reviewed_at: new Date().toISOString(),
-      verified_date: new Date().toISOString()
-    })
-    .eq('reservation_id', reservationId)
-    .not('contract_url', 'is', null)
-    .select('reservation_id')
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error('No uploaded contract was found for this reservation.');
-  }
-}
-
-async function requestReservationContractResubmission(reservationId, reviewNotes) {
-  const trimmedNotes = String(reviewNotes || '').trim();
-  if (!trimmedNotes) {
-    throw new Error('Please enter the contract correction note before requesting resubmission.');
-  }
-
-  const reviewedAt = new Date().toISOString();
-  let response = await supabase
-    .from('reservation_contracts')
-    .update({
-      review_status: 'resubmission_requested',
-      review_notes: trimmedNotes,
-      reviewed_at: reviewedAt,
-      verified_date: null,
-      resubmitted_at: null
-    })
-    .eq('reservation_id', reservationId)
-    .not('contract_url', 'is', null)
-    .select('reservation_id')
-    .maybeSingle();
-
-  if (response.error && isMissingColumnError(response.error, 'resubmitted_at')) {
-    response = await supabase
-      .from('reservation_contracts')
-      .update({
-        review_status: 'resubmission_requested',
-        review_notes: trimmedNotes,
-        reviewed_at: reviewedAt,
-        verified_date: null
-      })
-      .eq('reservation_id', reservationId)
-      .not('contract_url', 'is', null)
-      .select('reservation_id')
-      .maybeSingle();
-  }
-
-  const { data, error } = response;
-
-  if (error) throw error;
-  if (!data) {
-    throw new Error('No uploaded contract was found for this reservation.');
-  }
-}
-
-async function updateReservationStatus(reservationId, status, previousStatus = null) {
-  const normalizedPreviousStatus = String(previousStatus || '').toLowerCase();
-  const normalizedNextStatus = String(status || '').toLowerCase();
-
-  if (normalizedPreviousStatus && normalizedPreviousStatus === normalizedNextStatus) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from('reservations')
-    .update({ status })
-    .eq('reservation_id', reservationId);
-  if (error) throw error;
-
-  await logReservationStatusChange(reservationId, previousStatus, status);
-}
-
-function generateReceiptNumber(paymentId) {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
-  return `AR-${stamp}-${String(paymentId || '').slice(0, 6).toUpperCase()}`;
-}
-
-async function ensureReceiptForPayment(paymentId) {
-  const { data: existingReceipt, error: receiptLookupError } = await supabase
-    .from('receipts')
-    .select('receipt_id, payment_id, receipt_number, issued_at')
-    .eq('payment_id', paymentId)
-    .maybeSingle();
-
-  if (receiptLookupError) throw receiptLookupError;
-  if (existingReceipt) return existingReceipt;
-
-  const payload = {
-    payment_id: paymentId,
-    receipt_number: generateReceiptNumber(paymentId),
-    issued_at: new Date().toISOString()
-  };
-
-  const { data: receipt, error: receiptInsertError } = await supabase
-    .from('receipts')
-    .insert(payload)
-    .select('receipt_id, payment_id, receipt_number, issued_at')
-    .single();
-
-  if (receiptInsertError) throw receiptInsertError;
-  return receipt;
-}
-
-async function handlePaymentReview(reservationId, paymentId, nextStatus) {
-  const reservation = reservationsCache.find((entry) => String(entry.reservation_id) === String(reservationId));
-  const payment = getReservationPayments(reservation || {}).find((entry) => String(entry.payment_id) === String(paymentId));
-
-  if (!reservation || !payment) {
-    throw new Error('Payment record could not be found.');
-  }
-
-  if (nextStatus === 'approved' && payment.payment_type === 'reschedule_fee' && payment.reschedule_request_id) {
-    const request = getReservationRescheduleRequests(reservation)
-      .find((entry) => String(entry.reschedule_request_id) === String(payment.reschedule_request_id));
-
-    if (!request) {
-      throw new Error('Linked reschedule request could not be found.');
-    }
-
-    const availability = await fetchDateAvailability(supabase, {
-      eventDate: request.requested_date,
-      scope: getBookingScope(reservation),
-      durationHours: getReservationDurationHours(reservation),
-      excludeReservationId: reservation.reservation_id
-    });
-
-    if (availability.scopeTaken) {
-      throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
-    }
-  }
-
-  const updatePayload = {
-    payment_status: nextStatus,
-    verified_at: new Date().toISOString()
-  };
-
-  const { error: paymentError } = await supabase
-    .from('payment')
-    .update(updatePayload)
-    .eq('payment_id', paymentId);
-
-  if (paymentError) throw paymentError;
-
-  if (nextStatus === 'approved') {
-    if (payment.payment_type === 'reschedule_fee' && payment.reschedule_request_id) {
-      const request = getReservationRescheduleRequests(reservation)
-        .find((entry) => String(entry.reschedule_request_id) === String(payment.reschedule_request_id));
-
-      if (!request) {
-        throw new Error('Linked reschedule request could not be found.');
-      }
-
-      const { error: reservationError } = await supabase
-        .from('reservations')
-        .update({
-          event_date: request.requested_date,
-          event_time: request.requested_time,
-          status: 'rescheduled'
-        })
-        .eq('reservation_id', reservationId);
-
-      if (reservationError) {
-        await supabase
-          .from('payment')
-          .update({
-            payment_status: 'pending_review',
-            verified_at: null
-          })
-          .eq('payment_id', paymentId);
-        throw reservationError;
-      }
-
-      const { error: requestError } = await supabase
-        .from('reschedule_requests')
-        .update({
-          status: 'completed',
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('reschedule_request_id', payment.reschedule_request_id);
-
-      if (requestError) throw requestError;
-    }
-
-    await ensureReceiptForPayment(paymentId);
-  }
-}
-
-async function handleRescheduleReview(requestId, nextStatus) {
-  const reservation = reservationsCache.find((entry) => (
-    getReservationRescheduleRequests(entry).some((request) => String(request.reschedule_request_id) === String(requestId))
-  ));
-  const request = reservation
-    ? getReservationRescheduleRequests(reservation).find((entry) => String(entry.reschedule_request_id) === String(requestId))
-    : null;
-
-  if (nextStatus === 'approved_pending_payment' && reservation && request) {
-    const availability = await fetchDateAvailability(supabase, {
-      eventDate: request.requested_date,
-      scope: getBookingScope(reservation),
-      durationHours: getReservationDurationHours(reservation),
-      excludeReservationId: reservation.reservation_id
-    });
-
-    if (availability.scopeTaken) {
-      throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
-    }
-  }
-
-  const updatePayload = {
-    status: nextStatus,
-    reviewed_at: new Date().toISOString()
-  };
-
-  const { error } = await supabase
-    .from('reschedule_requests')
-    .update(updatePayload)
-    .eq('reschedule_request_id', requestId);
-
-  if (error) throw error;
-}
-
-function setAssignmentModalMessage(message, isError = false) {
-  if (!assignmentModalMessage) return;
-  assignmentModalMessage.textContent = message;
-  assignmentModalMessage.classList.toggle('error', isError);
-}
-
-function renderAssignmentSelectionCount() {
-  if (!assignmentSelectionCount) return;
-  const count = assignmentSelection.size;
-  assignmentSelectionCount.textContent = count === 1 ? '1 selected' : `${count} selected`;
-}
-
-function renderAssignmentStaffList() {
-  if (!assignmentStaffList) return;
-
-  const filteredStaff = staffDirectory.filter((staff) => {
-    if (!assignmentSearchTerm) return true;
-    const haystacks = [
-      getStaffDisplayName(staff),
-      formatStaffRole(staff.staff_role)
-    ]
-      .filter(Boolean)
-      .map((value) => value.toLowerCase());
-    return haystacks.some((value) => value.includes(assignmentSearchTerm));
-  });
-
-  if (!staffDirectory.length) {
-    assignmentStaffList.innerHTML = '<div class="assignment-staff-empty">No staff profiles are available yet.</div>';
-    renderAssignmentSelectionCount();
-    return;
-  }
-
-  if (!filteredStaff.length) {
-    assignmentStaffList.innerHTML = '<div class="assignment-staff-empty">No staff matched your search.</div>';
-    renderAssignmentSelectionCount();
-    return;
-  }
-
-  assignmentStaffList.innerHTML = filteredStaff.map((staff) => `
-    <label class="assignment-staff-option">
-      <input
-        type="checkbox"
-        value="${escapeHtml(String(staff.staff_id))}"
-        ${assignmentSelection.has(String(staff.staff_id)) ? 'checked' : ''}
-      />
-      <span class="assignment-staff-copy">
-        <span class="assignment-staff-name">${escapeHtml(getStaffDisplayName(staff))}</span>
-        <span class="assignment-staff-role">${escapeHtml(formatStaffRole(staff.staff_role))}</span>
-      </span>
-    </label>
-  `).join('');
-
-  renderAssignmentSelectionCount();
-}
-
-function closeAssignmentModal() {
-  activeAssignmentReservationId = null;
-  assignmentSelection = new Set();
-  assignmentSearchTerm = '';
-  assignmentModal?.classList.add('hidden');
-  assignmentModal?.setAttribute('aria-hidden', 'true');
-  if (assignmentSearchInput) assignmentSearchInput.value = '';
-  if (assignmentNoteInput) assignmentNoteInput.value = '';
-  assignmentSaveBtn?.removeAttribute('disabled');
-  setAssignmentModalMessage('');
-}
-
-function openAssignmentModal(reservationId) {
-  if (!assignmentFeatureReady) {
-    setMessage(tableMessage, assignmentFeatureMessage, true);
-    return;
-  }
-
-  const reservation = reservationsCache.find((entry) => String(entry.reservation_id) === String(reservationId));
-  if (!reservation) return;
-
-  activeAssignmentReservationId = reservationId;
-  assignmentSelection = new Set(getAssignedStaff(reservationId).map((staff) => String(staff.staff_id)));
-  assignmentSearchTerm = '';
-
-  if (assignmentReservationSummary) {
-    assignmentReservationSummary.textContent = `${reservation.contact_name || 'Customer'} - ${reservation.package?.package_name || 'Reservation'}`;
-  }
-  if (assignmentReservationMeta) {
-    assignmentReservationMeta.textContent = `${formatReservationDate(reservation.event_date)} at ${formatReservationTime(reservation.event_time)}`;
-  }
-  if (assignmentNoteInput) {
-    assignmentNoteInput.value = getAssignmentNoteForReservation(reservationId);
-  }
-
-  assignmentModal?.classList.remove('hidden');
-  assignmentModal?.setAttribute('aria-hidden', 'false');
-  renderAssignmentStaffList();
-  setAssignmentModalMessage(staffDirectory.length ? 'Choose the staff members you want assigned to this reservation.' : 'No staff profiles are available yet.', !staffDirectory.length);
-  assignmentSearchInput?.focus();
-}
-
-async function saveAssignmentSelection() {
-  if (!activeAssignmentReservationId) return;
-
-  assignmentSaveBtn?.setAttribute('disabled', 'true');
-  setAssignmentModalMessage('Saving staff assignment...');
-
-  const assignmentNote = String(assignmentNoteInput?.value || '').trim();
-  const selectedStaffIds = Array.from(assignmentSelection);
-  const existingStaffIds = new Set(
-    getAssignedStaff(activeAssignmentReservationId).map((staff) => String(staff.staff_id))
-  );
-  const selectedStaffIdSet = new Set(selectedStaffIds);
-  const staffIdsToDelete = Array.from(existingStaffIds).filter((staffId) => !selectedStaffIdSet.has(staffId));
-  const staffIdsToInsert = selectedStaffIds.filter((staffId) => !existingStaffIds.has(staffId));
-
-  try {
-    if (staffIdsToDelete.length) {
-      const { error: deleteError } = await supabase
-        .from('reservation_staff_assignments')
-        .delete()
-        .eq('reservation_id', activeAssignmentReservationId)
-        .in('roster_staff_id', staffIdsToDelete.map(Number));
-
-      if (deleteError) throw deleteError;
-    }
-
-    if (staffIdsToInsert.length) {
-      const payload = staffIdsToInsert.map((staffId) => ({
-        reservation_id: activeAssignmentReservationId,
-        roster_staff_id: Number(staffId),
-        assigned_by: adminSession?.user?.id || null,
-        assignment_note: assignmentNote || null
-      }));
-
-      const { error: insertError } = await supabase
-        .from('reservation_staff_assignments')
-        .insert(payload);
-
-      if (insertError) throw insertError;
-    }
-
-    if (selectedStaffIds.length) {
-      const { error: updateError } = await supabase
-        .from('reservation_staff_assignments')
-        .update({ assignment_note: assignmentNote || null })
-        .eq('reservation_id', activeAssignmentReservationId)
-        .in('roster_staff_id', selectedStaffIds.map(Number));
-
-      if (updateError) throw updateError;
-    }
-
-    closeAssignmentModal();
-    await loadData();
-    setMessage(tableMessage, 'Staff assignment updated.', false);
-  } catch (error) {
-    assignmentFeatureReady = false;
-    assignmentFeatureMessage = getAssignmentSchemaHint(error);
-    assignmentSaveBtn?.removeAttribute('disabled');
-    setAssignmentModalMessage(`Failed to save assignment: ${assignmentFeatureMessage}`, true);
-  }
-}
-
-async function performReservationAction(action, button) {
-  if (currentRole === 'admin') {
-    throw new Error('This action requires the Manager role.');
-  }
-
-  const reservationId = button.dataset.reservationId || button.dataset.id;
-  const reservation = getReservationById(reservationId);
-  const previousStatus = reservation?.status || null;
-
-  if (action === 'assign-employee') {
-    closeReservationDetailsModal();
-    openAssignmentModal(reservationId);
-    return { shouldReload: false };
-  }
-
-  if (action === 'approve') {
-    const limitMessage = getApprovalLimitMessage(reservation);
-    if (limitMessage) {
-      throw new Error(limitMessage);
-    }
-    const approvalState = getReservationApprovalState(reservation);
-    if (!approvalState.canApprove) {
-      throw new Error(approvalState.reason);
-    }
-    await updateReservationStatus(reservationId, 'approved', previousStatus);
-    return { shouldReload: true, message: 'Reservation approved.' };
-  }
-
-  if (action === 'decline') {
-    await updateReservationStatus(reservationId, 'declined', previousStatus);
-    return { shouldReload: true, message: 'Reservation declined.' };
-  }
-
-  if (action === 'verify-contract') {
-    await markReservationContractVerified(reservationId);
-    return { shouldReload: true, message: 'Contract verified. You can now approve the reservation.' };
-  }
-
-  if (action === 'request-contract-resubmission') {
-    const noteInput = reservationContractSection?.querySelector(`[data-contract-review-note="${reservationId}"]`);
-    await requestReservationContractResubmission(reservationId, noteInput?.value || '');
-    return { shouldReload: true, message: 'Customer has been asked to re-upload the signed contract.' };
-  }
-
-  if (action === 'confirm-cancellation') {
-    await updateReservationStatus(reservationId, 'cancelled', 'cancellation_requested');
-    return { shouldReload: true, message: 'Reservation has been cancelled.' };
-  }
-
-  if (action === 'approve-reschedule') {
-    await handleRescheduleReview(button.dataset.requestId, 'approved_pending_payment');
-    return { shouldReload: true, message: 'Reschedule request approved.' };
-  }
-
-  if (action === 'reject-reschedule') {
-    await handleRescheduleReview(button.dataset.requestId, 'rejected');
-    return { shouldReload: true, message: 'Reschedule request rejected.' };
-  }
-
-  if (action === 'approve-payment') {
-    await handlePaymentReview(reservationId, button.dataset.paymentId, 'approved');
-    return { shouldReload: true, message: 'Payment approved.' };
-  }
-
-  if (action === 'reject-payment') {
-    await handlePaymentReview(reservationId, button.dataset.paymentId, 'rejected');
-    return { shouldReload: true, message: 'Payment rejected.' };
-  }
-
-  return { shouldReload: false };
-}
-
-function wireTableActions() {
-  reservationsBody?.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.action-btn');
-    if (!btn) return;
-    const action = btn.dataset.action;
-    if (!action) return;
-    if (action !== 'view-details') return;
-    openReservationDetailsModal(btn.dataset.reservationId);
-  });
-}
-
-function wireReservationDetailsModal() {
-  reservationDetailsClose?.addEventListener('click', closeReservationDetailsModal);
-  reservationDetailsDismiss?.addEventListener('click', closeReservationDetailsModal);
-  reservationDetailsModal?.addEventListener('click', async (event) => {
-    if (event.target === reservationDetailsModal) {
-      closeReservationDetailsModal();
-      return;
-    }
-
-    const button = event.target.closest('[data-action]');
-    if (!button) return;
-
-    const action = button.dataset.action;
-    if (!action || action === 'view-details') return;
-
-    try {
-      setReservationDetailsMessage('Updating reservation...');
-      const result = await performReservationAction(action, button);
-      if (result?.shouldReload) {
-        reservationDetailsFlash = { message: result.message || 'Updated.', isError: false };
-        await loadData();
-        setMessage(tableMessage, result.message || 'Updated.', false);
-      } else if (result?.message) {
-        reservationDetailsFlash = { message: result.message, isError: false };
-      }
-    } catch (error) {
-      setReservationDetailsMessage(error.message, true);
-      setMessage(tableMessage, `Failed to update: ${error.message}`, true);
-    }
-  });
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && activeDetailsReservationId) closeReservationDetailsModal();
-  });
 }
 
 function startOfMonth(date) {
@@ -2173,7 +1124,7 @@ function renderCalendar(bookedDates = []) {
     cell.setAttribute('aria-label', titleText);
     cell.innerHTML = `
       <span class="calendar-day-number">${dateObj.getDate()}</span>
-      ${isCurrentMonth && booked ? '<span class="calendar-day-dot"></span>' : ''}
+      ${isCurrentMonth && booked ? `<span class="calendar-day-marker"><span class="calendar-day-dot"></span>${dayCount}</span>` : ''}
     `;
 
     if (isCurrentMonth) {
@@ -2330,13 +1281,6 @@ async function loadData() {
     renderStats(reservationsCache);
     filterAndRender();
     await loadCalendar();
-    if (activeDetailsReservationId) {
-      if (getReservationById(activeDetailsReservationId)) {
-        renderReservationDetailsModal();
-      } else {
-        closeReservationDetailsModal();
-      }
-    }
     if (!assignmentFeatureReady) {
       setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
     }
@@ -2376,39 +1320,25 @@ function wireBlackoutModal() {
   });
 }
 
+function goToReservationDetails(reservationId) {
+  if (!reservationId) return;
+  window.location.href = `/admin/reservation-details.html?id=${encodeURIComponent(reservationId)}`;
+}
+
 function wireDayPanelBookingLinks() {
   dayPanelBookings?.addEventListener('click', (event) => {
     const link = event.target.closest('.day-booking-link');
     if (!link) return;
     event.preventDefault();
-    const reservationId = link.dataset.reservationId;
-    if (reservationId) openReservationDetailsModal(reservationId);
+    goToReservationDetails(link.dataset.reservationId);
   });
 }
 
-function wireAssignmentModal() {
-  assignmentCancelBtn?.addEventListener('click', closeAssignmentModal);
-  assignmentModalClose?.addEventListener('click', closeAssignmentModal);
-  assignmentSaveBtn?.addEventListener('click', saveAssignmentSelection);
-  assignmentModal?.addEventListener('click', (event) => {
-    if (event.target === assignmentModal) closeAssignmentModal();
-  });
-  assignmentSearchInput?.addEventListener('input', (event) => {
-    assignmentSearchTerm = String(event.target?.value || '').trim().toLowerCase();
-    renderAssignmentStaffList();
-  });
-  assignmentStaffList?.addEventListener('change', (event) => {
-    const checkbox = event.target.closest('input[type="checkbox"]');
-    if (!checkbox) return;
-    if (checkbox.checked) {
-      assignmentSelection.add(checkbox.value);
-    } else {
-      assignmentSelection.delete(checkbox.value);
-    }
-    renderAssignmentSelectionCount();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && activeAssignmentReservationId) closeAssignmentModal();
+function wireTableActions() {
+  reservationsBody?.addEventListener('click', (event) => {
+    const row = event.target.closest('.reservation-row');
+    if (!row) return;
+    goToReservationDetails(row.dataset.reservationId);
   });
 }
 
@@ -2435,7 +1365,6 @@ refreshBtn?.addEventListener('click', loadData);
   if (event === 'SIGNED_OUT') redirectLogin();
 });*/
 
-
 function applyStatusFilterFromUrl() {
   const requestedStatus = new URLSearchParams(window.location.search).get('status');
   if (!requestedStatus || !chipsRow) return;
@@ -2446,28 +1375,29 @@ function applyStatusFilterFromUrl() {
   if (statusDropdown) statusDropdown.value = 'all';
 }
 
+// Legacy deep links (e.g. notification emails) point to
+// /admin/reservations.html?reservation=<id>; forward them to the dedicated
+// details page instead of opening the old in-page modal.
+function redirectLegacyReservationLink() {
+  const requestedId = new URLSearchParams(window.location.search).get('reservation');
+  if (!requestedId) return false;
+  window.location.replace(`/admin/reservation-details.html?id=${encodeURIComponent(requestedId)}`);
+  return true;
+}
+
 //  run immediately (UI setup)
+redirectLegacyReservationLink();
 setCalendarExpanded(false);
 wireFilters();
 applyStatusFilterFromUrl();
 wireTableActions();
-wireReservationDetailsModal();
 wireCalendarToggle();
 wireCalendarNav();
 wireBlackoutModal();
-wireAssignmentModal();
 wireDayPanelBookingLinks();
 
 wireLogoutButton();
 watchAuthState();
-
-function openReservationFromUrlIfPresent() {
-  const requestedId = new URLSearchParams(window.location.search).get('reservation');
-  if (!requestedId) return;
-  if (getReservationById(requestedId)) {
-    openReservationDetailsModal(requestedId);
-  }
-}
 
 validateAdminSession({
   onSuccess: async ({ session, profile }) => {
@@ -2480,6 +1410,5 @@ validateAdminSession({
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     initManagerNotificationBell(supabase, session.user.id);
     await loadData();
-    openReservationFromUrlIfPresent();
   }
 });

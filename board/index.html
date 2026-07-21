@@ -45,10 +45,16 @@
 
     <footer class="board-footer">
       <span class="board-footer-device">Front Counter Display</span>
-      <span class="board-footer-status">
-        <span class="board-status-dot" id="boardStatusDot"></span>
-        <span id="boardFooterMessage">Connecting...</span>
-      </span>
+      <div class="board-footer-right">
+        <span class="board-footer-status">
+          <span class="board-status-dot" id="boardStatusDot"></span>
+          <span id="boardFooterMessage">Connecting...</span>
+        </span>
+        <button type="button" class="board-logout-btn" id="boardLogoutBtn" title="Sign out this display" aria-label="Sign out this display">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          <span>Sign out</span>
+        </button>
+      </div>
     </footer>
   </div>
 

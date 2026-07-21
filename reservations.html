@@ -403,7 +403,9 @@
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </header>
-            <div class="agreement-modal-body" id="agreement-modal-body"></div>
+            <div class="agreement-modal-body" id="agreement-modal-body">
+                <div class="agreement-reading-column" id="agreement-reading-column"></div>
+            </div>
             <footer class="agreement-modal-footer">
                 <button type="button" class="agreement-modal-btn-outline" id="agreement-modal-footer-close-btn">Close</button>
                 <button type="button" class="agreement-modal-btn-solid" id="agreement-modal-finish-btn">I've finished reading</button>
@@ -610,6 +612,7 @@
     const agreementModalBackdrop  = document.getElementById('agreement-modal-backdrop');
     const agreementModalTitle     = document.getElementById('agreement-modal-title');
     const agreementModalBody      = document.getElementById('agreement-modal-body');
+    const agreementReadingColumn  = document.getElementById('agreement-reading-column');
     const agreementModalCloseBtn        = document.getElementById('agreement-modal-close-btn');
     const agreementModalFooterCloseBtn  = document.getElementById('agreement-modal-footer-close-btn');
     const agreementModalFinishBtn       = document.getElementById('agreement-modal-finish-btn');
@@ -1046,20 +1049,25 @@ By signing below, the Client confirms that the reservation details above are acc
     // Turns the flat, `\n`-separated agreement text into a heading hierarchy:
     // the first line becomes the document title (h2), lines that open with
     // "N. Title." (the convention every contract template + the fallback
-    // body follow) become sub-headings (h3), everything else stays a
-    // paragraph. Used by both the modal renderer and the PDF export so they
-    // never drift out of sync with each other.
+    // body follow) become sub-headings (h3), a run of consecutive
+    // "Label: Value" lines (Reservation Number, Package, Event Date, etc.)
+    // becomes a single definition-list block, and everything else stays a
+    // paragraph. Used by the modal renderer only.
     function parseAgreementSections(text) {
         const lines = String(text || '').split('\n').map(l => l.trim());
         const blocks = [];
         let sawTitle = false;
+        const detailLinePattern = /^([A-Za-z][A-Za-z\s]{1,40}):\s*(.+)$/;
+        let i = 0;
 
-        for (const line of lines) {
-            if (!line) continue;
+        while (i < lines.length) {
+            const line = lines[i];
+            if (!line) { i++; continue; }
 
             if (!sawTitle) {
                 sawTitle = true;
                 blocks.push({ tag: 'h2', text: line });
+                i++;
                 continue;
             }
 
@@ -1067,24 +1075,59 @@ By signing below, the Client confirms that the reservation details above are acc
             if (sectionMatch) {
                 blocks.push({ tag: 'h3', text: `${sectionMatch[1]}. ${sectionMatch[2]}.` });
                 if (sectionMatch[3]) blocks.push({ tag: 'p', text: sectionMatch[3] });
+                i++;
                 continue;
             }
 
+            const detailMatch = line.match(detailLinePattern);
+            if (detailMatch) {
+                const rows = [];
+                let j = i;
+                while (j < lines.length) {
+                    const m = lines[j].match(detailLinePattern);
+                    if (!m) break;
+                    rows.push({ label: m[1].trim(), value: m[2].trim() });
+                    j++;
+                }
+                if (rows.length >= 2) {
+                    blocks.push({ tag: 'dl', rows });
+                    i = j;
+                    continue;
+                }
+            }
+
             blocks.push({ tag: 'p', text: line });
+            i++;
         }
 
         return blocks;
     }
 
+    function renderAgreementBlock(block) {
+        if (block.tag === 'dl') {
+            return `
+                <dl class="agreement-detail-list">
+                    ${block.rows.map(row => `
+                        <div class="agreement-detail-row">
+                            <dt>${escapeHtml(row.label)}</dt>
+                            <dd>${escapeHtml(row.value)}</dd>
+                        </div>
+                    `).join('')}
+                </dl>
+            `;
+        }
+        return `<${block.tag}>${escapeHtml(block.text)}</${block.tag}>`;
+    }
+
     function renderAgreementModalBody() {
-        if (!agreementModalBody) return;
+        if (!agreementReadingColumn) return;
         const blocks = parseAgreementSections(signatureState.agreementText);
-        agreementModalBody.innerHTML = blocks.map(b => `<${b.tag}>${escapeHtml(b.text)}</${b.tag}>`).join('');
+        agreementReadingColumn.innerHTML = blocks.map(renderAgreementBlock).join('');
     }
 
     function showAgreementModalError() {
-        if (!agreementModalBody) return;
-        agreementModalBody.innerHTML = `
+        if (!agreementReadingColumn) return;
+        agreementReadingColumn.innerHTML = `
             <p class="agreement-modal-error">
                 We couldn't load the agreement text right now.
                 <button type="button" class="contract-retry-btn" id="agreement-modal-retry-btn">Retry</button>

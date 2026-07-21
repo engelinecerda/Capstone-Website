@@ -333,10 +333,37 @@ html, body.board-body {
   color: var(--user-role);
 }
 
+.board-footer-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .board-footer-status {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.board-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 0.5px solid var(--sidebar-line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--user-role);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.board-logout-btn:hover {
+  background: var(--nav-hover-bg);
+  color: var(--sidebar-cream);
 }
 
 .board-status-dot {

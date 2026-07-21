@@ -1347,7 +1347,9 @@ body {
 }
 
 .res-status.cancelled,
-.res-status.declined {
+.res-status.declined,
+.res-status.overdue,
+.res-status.rejected {
     background-color: var(--acc-red-bg);
     color: var(--acc-red-text);
 }
