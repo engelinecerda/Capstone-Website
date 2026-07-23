@@ -57,8 +57,15 @@ export const PAYMENT_METHODS = {
 
 export const PAYMENT_METHOD_ORDER = ['gcash', 'maya', 'bpi', 'card', 'cash'];
 
-// Maps the DB's mode_of_payment value to the internal key used in PAYMENT_METHODS
-const DB_MODE_TO_KEY = { 'GCash': 'gcash', 'Maya': 'maya', 'BPI': 'bpi' };
+// Maps a method's free-text `label` to the internal key used in
+// PAYMENT_METHODS. Matched by substring (case-insensitive) since admins can
+// name a method however they like (e.g. "GCash – Personal").
+const DB_LABEL_TO_KEY = [
+    { match: 'gcash', key: 'gcash' },
+    { match: 'maya',  key: 'maya' },
+    { match: 'bpi',   key: 'bpi' },
+    { match: 'bank',  key: 'bpi' },
+];
 
 const DB_DETAIL_LABEL = {
     gcash: 'GCash Number',
@@ -66,31 +73,48 @@ const DB_DETAIL_LABEL = {
     bpi:   'Account Number',
 };
 
+function resolveMethodKey(row) {
+    if (row.type === 'cash') return 'cash';
+    const label = String(row.label || '').toLowerCase();
+    const match = DB_LABEL_TO_KEY.find(({ match }) => label.includes(match));
+    return match?.key || null;
+}
+
 /**
- * Fetches the latest payment method entries from the `payment_method` table
- * and patches PAYMENT_METHODS in-place so every reference sees live DB data.
- * Falls back silently to the hardcoded defaults if the fetch fails.
+ * Fetches active payment methods from the `payment_method` table and patches
+ * PAYMENT_METHODS in-place so every reference sees live DB data. Falls back
+ * silently to the hardcoded defaults if the fetch fails.
  */
 export async function loadDynamicPaymentMethods(supabase) {
     try {
         const { data, error } = await supabase
             .from('payment_method')
             .select('*')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false });
 
         if (error) throw error;
         if (!data || !data.length) return;
 
-        // Use only the most recent row per mode (data is newest-first)
+        // Use only the most recently sorted row per resolved key.
         const seen = new Set();
         for (const row of data) {
-            const key = DB_MODE_TO_KEY[row.mode_of_payment];
+            const key = resolveMethodKey(row);
             if (!key || seen.has(key)) continue;
             seen.add(key);
 
-            const accountName   = row.account_name               || '';
-            const accountNumber = row['phone/account_number']     || '';
-            const qrImage       = row.qr_image                    || PAYMENT_METHODS[key].qrImage;
+            if (key === 'cash') {
+                PAYMENT_METHODS.cash = {
+                    ...PAYMENT_METHODS.cash,
+                    helper: row.instructions || PAYMENT_METHODS.cash.helper,
+                };
+                continue;
+            }
+
+            const accountName   = row.account_name || '';
+            const accountNumber = row.account_number || row.phone_number || '';
+            const qrImage       = row.qr_image || PAYMENT_METHODS[key].qrImage;
 
             PAYMENT_METHODS[key] = {
                 ...PAYMENT_METHODS[key],

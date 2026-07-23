@@ -2,10 +2,10 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
-  getOccupiedScopesFromReservations,
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
 import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
@@ -17,18 +17,11 @@ const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
 const chipsRow = document.getElementById('chipsRow');
 const refreshBtn = document.getElementById('refreshBtn');
-const calendarToggleBtn = document.getElementById('calendarToggleBtn');
-const calendarCollapse = document.getElementById('calendarCollapse');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
 const navReviewCount = document.getElementById('navReviewCount');
 const statIds = ['pending', 'approved', 'completed', 'total'];
-const calendarGrid = document.getElementById('calendarGrid');
-const calendarMonthLabel = document.getElementById('calendarMonthLabel');
-const prevMonthBtn = document.getElementById('prevMonth');
-const nextMonthBtn = document.getElementById('nextMonth');
-const calendarMessage = document.getElementById('calendarMessage');
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
 const sidebarRolePillEl = document.getElementById('sidebarRolePill');
@@ -37,24 +30,6 @@ const rescheduleAlert = document.getElementById('rescheduleAlert');
 const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
 const rescheduleAlertText = document.getElementById('rescheduleAlertText');
 const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
-const blackoutModal = document.getElementById('blackoutModal');
-const blackoutModalClose = document.getElementById('blackoutModalClose');
-const blackoutCancelBtn = document.getElementById('blackoutCancelBtn');
-const blackoutConfirmBtn = document.getElementById('blackoutConfirmBtn');
-const blackoutModalTitle = document.getElementById('blackoutModalTitle');
-const blackoutModalCopy = document.getElementById('blackoutModalCopy');
-const blackoutModalWarning = document.getElementById('blackoutModalWarning');
-const blackoutReasonField = document.getElementById('blackoutReasonField');
-const blackoutReasonLabel = document.getElementById('blackoutReasonLabel');
-const blackoutReasonInput = document.getElementById('blackoutReason');
-const blackoutModalMessage = document.getElementById('blackoutModalMessage');
-const calendarDayPanel = document.getElementById('calendarDayPanel');
-const dayPanelDate = document.getElementById('dayPanelDate');
-const dayPanelStatusPill = document.getElementById('dayPanelStatusPill');
-const dayPanelCount = document.getElementById('dayPanelCount');
-const dayPanelBookings = document.getElementById('dayPanelBookings');
-const dayPanelFooter = document.getElementById('dayPanelFooter');
-const dayPanelActionBtn = document.getElementById('dayPanelActionBtn');
 const PAYMENT_TYPE_LABELS = {
   reservation_fee: 'Reservation Fee',
   down_payment: 'Down Payment',
@@ -64,25 +39,12 @@ const PAYMENT_TYPE_LABELS = {
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
-const CAPACITY_BLOCKING_STATUSES = new Set([
-  'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
-  'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
-]);
 
 let reservationsCache = [];
 let reservationsFiltered = [];
 let reservationsCurrentPage = 1;
-let blackouts = new Set();
-let currentMonth = new Date();
 let adminSession = null;
 let currentRole = null;
-const BLACKOUT_DATE_COLUMNS = ['closed_date', 'date'];
-const BLACKOUT_REASON_COLUMNS = ['note', 'reason'];
-let blackoutDateColumn = null;
-let blackoutReasonColumn = null;
-let pendingBlackoutDate = null;
-let isCalendarExpanded = false;
-let selectedCalendarDate = null;
 let staffDirectory = [];
 let assignmentMapByReservationId = {};
 let assignmentFeatureReady = true;
@@ -93,29 +55,6 @@ function setMessage(el, msg, isError = false) {
   if (!el) return;
   el.textContent = msg;
   el.classList.toggle('error', isError);
-}
-
-function getBlackoutSchemaHint(error) {
-  const message = error?.message || '';
-  if (
-    message.includes("Could not find the 'date' column of 'calendar_blackouts' in the schema cache")
-    || message.includes('column calendar_blackouts.date does not exist')
-  ) {
-    return "calendar_blackouts exists, but Supabase cannot see a `date` column yet. Run the Step 7 SQL again, or add `date date` plus a unique index on `date`, then reload the schema cache.";
-  }
-  if (message.includes('null value in column "closed_date"')) {
-    return "calendar_blackouts expects the blackout date in `closed_date`, not `date`. The page will now auto-detect that column, so reload and try again.";
-  }
-  if (message.includes('row-level security policy')) {
-    return "Your session is logged in, but the `calendar_blackouts` RLS policy is still denying inserts. If `profiles` now uses `user_id`, recreate the blackout policy so it checks `p.user_id = auth.uid()` and confirm your profile row has `role = 'manager'`.";
-  }
-  if (
-    message.includes("Could not find the 'note' column of 'calendar_blackouts' in the schema cache")
-    || message.includes('column calendar_blackouts.note does not exist')
-  ) {
-    return "The blackout was not saved because `calendar_blackouts` does not have a `note` column yet. Add a `note text` column or update the table to store the close reason.";
-  }
-  return message;
 }
 
 function getAssignmentSchemaHint(error) {
@@ -152,62 +91,6 @@ function getStaffDirectoryHint(error) {
   return message || 'Staff roster could not be loaded right now.';
 }
 
-async function resolveBlackoutDateColumn() {
-  if (blackoutDateColumn) return blackoutDateColumn;
-
-  let lastError = null;
-  for (const column of BLACKOUT_DATE_COLUMNS) {
-    const { error } = await supabase
-      .from('calendar_blackouts')
-      .select(column)
-      .limit(1);
-
-    if (!error) {
-      blackoutDateColumn = column;
-      return blackoutDateColumn;
-    }
-
-    lastError = error;
-  }
-
-  throw lastError || new Error('Unable to determine the blackout date column.');
-}
-
-async function resolveBlackoutReasonColumn() {
-  if (blackoutReasonColumn) return blackoutReasonColumn;
-
-  let lastError = null;
-  for (const column of BLACKOUT_REASON_COLUMNS) {
-    const { error } = await supabase
-      .from('calendar_blackouts')
-      .select(column)
-      .limit(1);
-
-    if (!error) {
-      blackoutReasonColumn = column;
-      return blackoutReasonColumn;
-    }
-
-    lastError = error;
-  }
-
-  throw lastError || new Error('Unable to determine the blackout reason column.');
-}
-
-function setModalMessage(message, isError = false) {
-  if (!blackoutModalMessage) return;
-  blackoutModalMessage.textContent = message;
-  blackoutModalMessage.classList.toggle('error', isError);
-}
-
-function formatBlackoutDate(dateIso) {
-  return new Date(`${dateIso}T00:00:00`).toLocaleDateString('en-PH', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-}
 
 function formatDateKey(value) {
   return String(value || '').split('T')[0];
@@ -372,122 +255,6 @@ function getStaffDisplayName(profile) {
 
 function getAssignedStaff(reservationId) {
   return assignmentMapByReservationId[reservationId] || [];
-}
-
-function setCalendarExpanded(nextExpanded) {
-  isCalendarExpanded = Boolean(nextExpanded);
-  calendarCollapse?.classList.toggle('hidden', !isCalendarExpanded);
-  calendarCollapse?.setAttribute('aria-hidden', String(!isCalendarExpanded));
-  calendarToggleBtn?.classList.toggle('is-active', isCalendarExpanded);
-  calendarToggleBtn?.setAttribute('aria-expanded', String(isCalendarExpanded));
-  const toggleLabel = calendarToggleBtn?.querySelector('span');
-  if (toggleLabel) {
-    toggleLabel.textContent = isCalendarExpanded ? 'Hide calendar' : 'Show calendar';
-  }
-}
-
-function formatShortMonthDay(dateIso) {
-  return new Date(`${dateIso}T00:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-}
-
-function getReservationsForDate(dateIso) {
-  return (reservationsCache || []).filter((r) => String(r.event_date || '').split('T')[0] === dateIso);
-}
-
-function closeBlackoutModal() {
-  pendingBlackoutDate = null;
-  blackoutModal?.classList.add('hidden');
-  blackoutModal?.setAttribute('aria-hidden', 'true');
-  blackoutConfirmBtn?.removeAttribute('disabled');
-  if (blackoutReasonInput) blackoutReasonInput.value = '';
-  setModalMessage('');
-}
-
-function openBlackoutModal(dateIso) {
-  pendingBlackoutDate = dateIso;
-  if (blackoutModalTitle) {
-    blackoutModalTitle.textContent = `Close ${formatShortMonthDay(dateIso)}?`;
-  }
-  if (blackoutModalCopy) {
-    blackoutModalCopy.textContent = 'Customers will not be able to book this date.';
-  }
-  const bookingCount = getReservationsForDate(dateIso).length;
-  if (blackoutModalWarning) {
-    if (bookingCount > 0) {
-      blackoutModalWarning.hidden = false;
-      blackoutModalWarning.textContent = `This date has ${bookingCount} reservation${bookingCount !== 1 ? 's' : ''}. Closing prevents new bookings only — existing reservations are not affected.`;
-    } else {
-      blackoutModalWarning.hidden = true;
-      blackoutModalWarning.textContent = '';
-    }
-  }
-  if (blackoutReasonInput) blackoutReasonInput.value = '';
-  setModalMessage('');
-  blackoutModal?.classList.remove('hidden');
-  blackoutModal?.setAttribute('aria-hidden', 'false');
-  blackoutReasonInput?.focus();
-}
-
-async function confirmBlackout() {
-  if (!pendingBlackoutDate) return;
-
-  blackoutConfirmBtn?.setAttribute('disabled', 'true');
-  setModalMessage('Saving closed date...');
-
-  try {
-    const dateColumn = await resolveBlackoutDateColumn();
-    const reason = blackoutReasonInput?.value.trim() || '';
-    if (!reason) {
-      setModalMessage('Please enter the reason for closing this date.', true);
-      blackoutConfirmBtn?.removeAttribute('disabled');
-      blackoutReasonInput?.focus();
-      return;
-    }
-
-    const reasonColumn = await resolveBlackoutReasonColumn();
-    const payload = {
-      [dateColumn]: pendingBlackoutDate,
-      [reasonColumn]: reason,
-      created_by: adminSession?.user?.id || null
-    };
-
-    const { error } = await supabase
-      .from('calendar_blackouts')
-      .upsert(payload, { onConflict: dateColumn });
-
-    if (error) throw error;
-
-    blackouts.add(pendingBlackoutDate);
-    setMessage(calendarMessage, `Closed ${formatBlackoutDate(pendingBlackoutDate)}.`, false);
-    renderCalendar(approvedDatesFromCache());
-    renderDayDetailPanel();
-    closeBlackoutModal();
-  } catch (error) {
-    blackoutConfirmBtn?.removeAttribute('disabled');
-    setModalMessage(getBlackoutSchemaHint(error), true);
-  }
-}
-
-async function reopenDate(dateIso) {
-  dayPanelActionBtn?.setAttribute('disabled', 'true');
-  try {
-    const dateColumn = await resolveBlackoutDateColumn();
-    const { error } = await supabase
-      .from('calendar_blackouts')
-      .delete()
-      .eq(dateColumn, dateIso);
-
-    if (error) throw error;
-
-    blackouts.delete(dateIso);
-    setMessage(calendarMessage, `Reopened ${formatBlackoutDate(dateIso)}.`, false);
-    renderCalendar(approvedDatesFromCache());
-    renderDayDetailPanel();
-  } catch (error) {
-    setMessage(calendarMessage, `Failed to reopen date: ${getBlackoutSchemaHint(error)}`, true);
-  } finally {
-    dayPanelActionBtn?.removeAttribute('disabled');
-  }
 }
 
 function redirectLogin() {
@@ -1035,212 +802,6 @@ async function fetchReservationContracts(reservationIds) {
   throw error;
 }
 
-function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-function endOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
-
-function bindCalendarAction(cell, handler) {
-  cell.setAttribute('role', 'button');
-  cell.tabIndex = 0;
-  cell.addEventListener('click', handler);
-  cell.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handler();
-    }
-  });
-}
-
-function renderCalendar(bookedDates = []) {
-  if (!calendarGrid) return;
-  const start = startOfMonth(currentMonth);
-  const bookedSet = new Set(bookedDates.map(d => d.split('T')[0]));
-  const closedSet = blackouts;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayIso = formatDateKey([
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0')
-  ].join('-'));
-  const gridStart = new Date(start);
-  gridStart.setDate(start.getDate() - start.getDay());
-
-  calendarGrid.innerHTML = '';
-
-  for (let index = 0; index < 42; index += 1) {
-    const dateObj = new Date(gridStart);
-    dateObj.setDate(gridStart.getDate() + index);
-    const iso = formatDateKey([
-      dateObj.getFullYear(),
-      String(dateObj.getMonth() + 1).padStart(2, '0'),
-      String(dateObj.getDate()).padStart(2, '0')
-    ].join('-'));
-    const isCurrentMonth = dateObj.getMonth() === currentMonth.getMonth();
-    const isPast = dateObj < today;
-    const isToday = iso === todayIso;
-    const booked = bookedSet.has(iso);
-    const closed = closedSet.has(iso);
-    const formattedDate = formatBlackoutDate(iso);
-    const dayCount = (reservationsCache || []).filter((r) =>
-      String(r.event_date || '').split('T')[0] === iso &&
-      CAPACITY_BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())
-    ).length;
-
-    const cell = document.createElement('div');
-    cell.className = 'calendar-cell';
-
-    let titleText = `${formattedDate} is open.`;
-
-    if (!isCurrentMonth) {
-      cell.classList.add('outside-month');
-      titleText = `${formattedDate} is outside the current month.`;
-    } else {
-      if (closed) {
-        cell.classList.add('closed');
-        titleText = `${formattedDate} is closed.`;
-      }
-      if (isPast) {
-        titleText = `${formattedDate} is in the past.`;
-      }
-      if (booked) {
-        titleText = dayCount
-          ? `${formattedDate} has ${dayCount} reservation${dayCount !== 1 ? 's' : ''}.`
-          : `${formattedDate} has bookings.`;
-      }
-      if (isToday) {
-        cell.classList.add('today');
-      }
-      if (iso === selectedCalendarDate) {
-        cell.classList.add('selected');
-      }
-    }
-
-    cell.dataset.date = iso;
-    cell.title = titleText;
-    cell.setAttribute('aria-label', titleText);
-    cell.innerHTML = `
-      <span class="calendar-day-number">${dateObj.getDate()}</span>
-      ${isCurrentMonth && booked ? `<span class="calendar-day-marker"><span class="calendar-day-dot"></span>${dayCount}</span>` : ''}
-    `;
-
-    if (isCurrentMonth) {
-      cell.classList.add('is-actionable');
-      bindCalendarAction(cell, () => selectCalendarDate(iso));
-    } else {
-      cell.setAttribute('aria-disabled', 'true');
-    }
-    calendarGrid.appendChild(cell);
-  }
-  calendarMonthLabel.textContent = currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-function selectCalendarDate(dateIso) {
-  selectedCalendarDate = dateIso;
-  renderCalendar(approvedDatesFromCache());
-  renderDayDetailPanel();
-}
-
-function renderDayDetailPanel() {
-  if (!calendarDayPanel || !selectedCalendarDate) return;
-  const iso = selectedCalendarDate;
-  const dateObj = new Date(`${iso}T00:00:00`);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const isPast = dateObj < today;
-  const closed = blackouts.has(iso);
-
-  if (dayPanelDate) {
-    dayPanelDate.textContent = dateObj.toLocaleDateString('en-PH', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric'
-    });
-  }
-
-  if (dayPanelStatusPill) {
-    dayPanelStatusPill.textContent = closed ? 'Closed' : 'Open';
-    dayPanelStatusPill.className = `status-pill ${closed ? 'cancelled' : 'completed'}`;
-  }
-
-  const bookings = getReservationsForDate(iso);
-
-  if (dayPanelCount) {
-    dayPanelCount.textContent = bookings.length
-      ? `${bookings.length} booking${bookings.length !== 1 ? 's' : ''} on this date`
-      : 'No bookings on this date';
-  }
-
-  if (dayPanelBookings) {
-    dayPanelBookings.innerHTML = bookings.map((reservation) => {
-      const status = formatStatusPill(getEffectiveReservationStatus(reservation));
-      return `
-        <div class="day-booking-card">
-          <div class="day-booking-head">
-            <span class="day-booking-name">${escapeHtml(reservation.contact_name || 'Unknown customer')}</span>
-            <span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
-          </div>
-          <p class="day-booking-meta">${escapeHtml(reservation.event_type || 'Event')} &middot; ${escapeHtml(reservation.event_time || 'No time selected')} &middot; ${escapeHtml(String(reservation.guest_count || 0))} guests</p>
-          <a href="#" class="day-booking-link" data-reservation-id="${escapeHtml(reservation.reservation_id)}">View reservation &rarr;</a>
-        </div>
-      `;
-    }).join('');
-  }
-
-  if (dayPanelFooter && dayPanelActionBtn) {
-    if (isPast) {
-      dayPanelFooter.hidden = true;
-    } else {
-      dayPanelFooter.hidden = false;
-      dayPanelActionBtn.textContent = closed ? 'Reopen this date' : 'Close this date';
-      dayPanelActionBtn.className = `day-panel-action ${closed ? 'action-reopen' : 'action-close'}`;
-      dayPanelActionBtn.onclick = closed
-        ? () => reopenDate(iso)
-        : () => openBlackoutModal(iso);
-    }
-  }
-}
-
-async function fetchBlackouts() {
-  try {
-    const dateColumn = await resolveBlackoutDateColumn();
-    const { data, error } = await supabase
-      .from('calendar_blackouts')
-      .select(dateColumn);
-    if (error) throw error;
-    blackouts = new Set((data || []).map(row => row[dateColumn]));
-  } catch (err) {
-    setMessage(calendarMessage, `Calendar note: ${getBlackoutSchemaHint(err)}`, true);
-  }
-}
-
-function approvedDatesFromCache() {
-  const dates = new Set(
-    reservationsCache
-      .map((reservation) => formatDateKey(reservation.event_date))
-      .filter(Boolean)
-  );
-
-  return Array.from(dates).filter((dateKey) => getOccupiedScopesFromReservations(reservationsCache, dateKey).length > 0);
-}
-
-async function loadCalendar() {
-  await fetchBlackouts();
-  renderCalendar(approvedDatesFromCache());
-  if (!selectedCalendarDate) {
-    const now = new Date();
-    selectedCalendarDate = formatDateKey([
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, '0'),
-      String(now.getDate()).padStart(2, '0')
-    ].join('-'));
-  }
-  renderDayDetailPanel();
-}
-
 async function loadData() {
   setMessage(tableMessage, 'Loading reservations...');
   try {
@@ -1280,7 +841,6 @@ async function loadData() {
     });
     renderStats(reservationsCache);
     filterAndRender();
-    await loadCalendar();
     if (!assignmentFeatureReady) {
       setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
     }
@@ -1297,41 +857,9 @@ async function loadData() {
   }
 }
 
-function wireCalendarNav() {
-  prevMonthBtn?.addEventListener('click', () => {
-    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-    renderCalendar(approvedDatesFromCache());
-  });
-  nextMonthBtn?.addEventListener('click', () => {
-    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-    renderCalendar(approvedDatesFromCache());
-  });
-}
-
-function wireBlackoutModal() {
-  blackoutCancelBtn?.addEventListener('click', closeBlackoutModal);
-  blackoutModalClose?.addEventListener('click', closeBlackoutModal);
-  blackoutConfirmBtn?.addEventListener('click', confirmBlackout);
-  blackoutModal?.addEventListener('click', (event) => {
-    if (event.target === blackoutModal) closeBlackoutModal();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && pendingBlackoutDate) closeBlackoutModal();
-  });
-}
-
 function goToReservationDetails(reservationId) {
   if (!reservationId) return;
   window.location.href = `/admin/reservation-details.html?id=${encodeURIComponent(reservationId)}`;
-}
-
-function wireDayPanelBookingLinks() {
-  dayPanelBookings?.addEventListener('click', (event) => {
-    const link = event.target.closest('.day-booking-link');
-    if (!link) return;
-    event.preventDefault();
-    goToReservationDetails(link.dataset.reservationId);
-  });
 }
 
 function wireTableActions() {
@@ -1339,12 +867,6 @@ function wireTableActions() {
     const row = event.target.closest('.reservation-row');
     if (!row) return;
     goToReservationDetails(row.dataset.reservationId);
-  });
-}
-
-function wireCalendarToggle() {
-  calendarToggleBtn?.addEventListener('click', () => {
-    setCalendarExpanded(!isCalendarExpanded);
   });
 }
 
@@ -1387,14 +909,9 @@ function redirectLegacyReservationLink() {
 
 //  run immediately (UI setup)
 redirectLegacyReservationLink();
-setCalendarExpanded(false);
 wireFilters();
 applyStatusFilterFromUrl();
 wireTableActions();
-wireCalendarToggle();
-wireCalendarNav();
-wireBlackoutModal();
-wireDayPanelBookingLinks();
 
 wireLogoutButton();
 watchAuthState();
@@ -1409,6 +926,7 @@ validateAdminSession({
     const roleBottomEl = document.getElementById('sidebarRoleBottom');
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     initManagerNotificationBell(supabase, session.user.id);
+    initAdminNav({ role: profile.role });
     await loadData();
   }
 });

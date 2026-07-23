@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 const result = await validateAdminSession({ fallbackLabel: 'Notifications' });
@@ -14,6 +15,7 @@ watchAuthState();
 wireLogoutButton();
 setupInactivityLogout(profile.role);
 initAdminSidebarBadges(supabase);
+initAdminNav({ role: profile.role });
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const listEl     = document.getElementById('notifPageList');

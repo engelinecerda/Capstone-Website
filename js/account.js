@@ -277,8 +277,7 @@ function isReservationContractsColumnMissing(error, columnName) {
 
 function getReservationContractMeta(reservationId) {
     const contract = getReservationContract(reservationId);
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
-    return computeContractMeta(contract, reservation?.status);
+    return computeContractMeta(contract);
 }
 
 function isPastReservation(reservation) {
@@ -2083,9 +2082,9 @@ function setInlineMessage(container, message, type = '') {
 }
 
 function openSubmissionFeedbackModal({
-    eyebrow = 'Contract Resubmitted',
-    title = 'Replacement Contract Submitted',
-    copy = 'Your corrected signed contract was sent to the admin for review.'
+    eyebrow = 'Submitted',
+    title = 'Submission Received',
+    copy = 'Your submission has been received.'
 } = {}) {
     if (submissionFeedbackEyebrow) submissionFeedbackEyebrow.textContent = eyebrow;
     if (submissionFeedbackTitle) submissionFeedbackTitle.textContent = title;

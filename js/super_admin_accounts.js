@@ -4,6 +4,7 @@
     import { setupInactivityLogout } from './super_admin_inactivity.js';
     import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
     import { getPortalInitials } from './admin_auth.js';
+    import { initAdminNav } from './admin_nav.js';
 
    
     // ── STATE ────────────────────────────────────────────────────────
@@ -544,6 +545,7 @@
     wireLogoutButton();
     setupInactivityLogout();
     initAdminSidebarBadges(supabase);
+    initAdminNav({ role: result.profile.role });
     loadAccounts();
     }
 

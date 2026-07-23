@@ -6,6 +6,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { initAdminNav } from './admin_nav.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
@@ -17,7 +18,6 @@ const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const demandYearSelect = document.getElementById('demandYear');
 const pageDate = document.getElementById('pageDate');
-const replacementAlert = document.getElementById('replacementAlert');
 const qaPendingCount = document.getElementById('qaPendingCount');
 const API = "https://capstone-website-papg.onrender.com";
 
@@ -41,8 +41,7 @@ const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
     approved: document.getElementById('approvedReservationsValue'),
     completed: document.getElementById('completedEventsValue'),
-    customers: document.getElementById('totalCustomersValue'),
-    replacementContracts: document.getElementById('replacementContractsValue')
+    customers: document.getElementById('totalCustomersValue')
 };
 
 const statusTotalEl = document.getElementById('statusTotal');
@@ -127,12 +126,6 @@ function getContractStatusMeta(contract) {
     const reviewStatus = String(contract.review_status || '').toLowerCase();
     if (reviewStatus === 'verified' || contract.verified_date) {
         return { key: 'approved', label: 'Verified', sublabel: 'Ready for approval' };
-    }
-    if (reviewStatus === 'resubmission_requested') {
-        return { key: 'resubmission_requested', label: 'Fix Requested', sublabel: 'Waiting for customer' };
-    }
-    if (reviewStatus === 'pending_review' && contract.resubmitted_at) {
-        return { key: 'resubmitted', label: 'Replacement Submitted', sublabel: 'Needs admin review' };
     }
     if (reviewStatus === 'pending_review' || contract.contract_url) {
         return { key: 'pending', label: 'Pending Review', sublabel: 'Initial contract uploaded' };
@@ -417,8 +410,8 @@ function renderStatusDonut(totals, total) {
     }
 }
 
-function updateStats(reservations, contractsByReservationId = {}) {
-    const totals = { pending: 0, approved: 0, declined: 0, completed: 0, cancelled: 0, rescheduled: 0, replacementContracts: 0 };
+function updateStats(reservations) {
+    const totals = { pending: 0, approved: 0, declined: 0, completed: 0, cancelled: 0, rescheduled: 0 };
     const customerIds = new Set();
     reservations.forEach((reservation) => {
         const status = (reservation.status || 'pending').toLowerCase();
@@ -429,17 +422,11 @@ function updateStats(reservations, contractsByReservationId = {}) {
         if (status === 'cancelled') totals.cancelled += 1;
         if (status === 'rescheduled') totals.rescheduled += 1;
         if (reservation.user_id) customerIds.add(reservation.user_id);
-        const contract = contractsByReservationId[reservation.reservation_id];
-        if (String(contract?.review_status || '').toLowerCase() === 'pending_review' && contract?.resubmitted_at) {
-            totals.replacementContracts += 1;
-        }
     });
     if (statTargets.pending) statTargets.pending.textContent = String(totals.pending);
     if (statTargets.approved) statTargets.approved.textContent = String(totals.approved);
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
     if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
-    if (statTargets.replacementContracts) statTargets.replacementContracts.textContent = String(totals.replacementContracts);
-    if (replacementAlert) replacementAlert.hidden = totals.replacementContracts === 0;
     if (qaPendingCount) qaPendingCount.textContent = `${totals.pending} pending approval`;
 
     updateTrends(reservations);
@@ -515,28 +502,23 @@ async function fetchContracts(reservationIds) {
 
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
-    updateStats([], {});
+    updateStats([]);
     renderReservationsTable([], {});
     renderMonthlyChart([]);
 
     let reservationsCount = 0;
-    let replacementContracts = 0;
     let hasError = false;
 
     const fastPath = (async () => {
         try {
             const reservations = await fetchReservations();
             reservationsCount = reservations.length;
-            updateStats(reservations, {});
+            updateStats(reservations);
             renderReservationsTable(reservations, {});
             renderMonthlyChart(reservations);
             refreshSidebarBadges();
             const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
             const contractsByReservationId = await fetchContracts(reservationIds);
-            replacementContracts = Object.values(contractsByReservationId)
-                .filter((c) => String(c?.review_status || '').toLowerCase() === 'pending_review' && c?.resubmitted_at)
-                .length;
-            updateStats(reservations, contractsByReservationId);
             renderReservationsTable(reservations, contractsByReservationId);
         } catch (error) {
             console.error('Failed to load reservations/contracts:', error);
@@ -574,7 +556,7 @@ async function loadDashboard() {
     if (!hasError) {
         setDashboardMessage(
             reservationsCount
-                ? `Showing ${Math.min(reservationsCount, 10)} of ${reservationsCount} reservation(s). ${replacementContracts} replacement contract${replacementContracts === 1 ? '' : 's'} waiting for review.`
+                ? `Showing ${Math.min(reservationsCount, 10)} of ${reservationsCount} reservation(s).`
                 : 'No reservations available yet.'
         );
     }
@@ -657,6 +639,7 @@ validateAdminSession({
         if (sidebarAvatar) sidebarAvatar.textContent = getPortalInitials(profile);
         if (sidebarRoleBottom) sidebarRoleBottom.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
         refreshSidebarBadges = initAdminSidebarBadges(supabase);
+        initAdminNav({ role: profile.role });
         initManagerNotificationBell(supabase, session.user.id);
         loadDashboard();
         if (profile.role === 'admin') loadSystemOverview();

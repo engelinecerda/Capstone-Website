@@ -9,6 +9,7 @@ import {
 } from './admin_auth.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { initAdminNav } from './admin_nav.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -353,6 +354,7 @@ validateAdminSession({
     state.profile = profile;
     setupInactivityLogout(profile.role);
     initAdminSidebarBadges(supabase);
+    initAdminNav({ role: profile.role });
     initManagerNotificationBell(supabase, session.user.id);
     renderProfileShell();
     setPageMessage('Your profile is ready.');

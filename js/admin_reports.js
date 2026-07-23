@@ -1,6 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
 import { applyRoleVisibility } from './session_validation.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
@@ -352,6 +353,7 @@ async function validateAdminSession() {
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
     applyRoleVisibility(profile.role);
+    initAdminNav({ role: profile.role });
 
     return session;
 }

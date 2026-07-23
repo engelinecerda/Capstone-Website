@@ -24,13 +24,6 @@ import {
     computeCanCancel
 } from './reservation_shared.js';
 
-const CLOUDINARY_CONFIG = {
-    cloudName: 'dtt707f1w',
-    uploadPreset: 'eli_contracts',
-    contractFolder: 'contracts',
-    maxFileSize: 10 * 1024 * 1024
-};
-
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
     window.location.href = '/login.html';
@@ -179,7 +172,6 @@ function getCancellationFeePayment(payments) {
 function buildStepperSteps(reservation, contractMeta, balance, payments) {
     const verificationDone = isReservationPaymentEnabled(reservation);
     const paymentDone = balance.remainingBalance <= 0;
-    const isResubmission = contractMeta.statusKey === 'resubmission_requested';
     const latestApprovedPaymentDate = getLatestApprovedPaymentDate(payments);
 
     return [
@@ -195,7 +187,7 @@ function buildStepperSteps(reservation, contractMeta, balance, payments) {
             state: verificationDone ? 'done' : 'current',
             sub: verificationDone
                 ? (contractMeta.reviewedAt || 'Verified')
-                : (isResubmission ? 'Corrected contract needed' : 'In review — 1 to 2 days')
+                : 'In review — 1 to 2 days'
         },
         {
             key: 'payment',
@@ -276,14 +268,6 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
         };
     }
 
-    if (contractMeta.statusKey === 'resubmission_requested') {
-        return {
-            tone: 'amber',
-            icon: 'circle-exclamation',
-            body: contractMeta.note || 'Please upload a corrected signed contract so we can verify your booking.'
-        };
-    }
-
     if (!verificationDone) {
         return {
             tone: 'amber',
@@ -309,7 +293,6 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
 
 function contractBadgeClass(contractMeta) {
     if (contractMeta.statusKey === 'verified') return 'approved';
-    if (contractMeta.statusKey === 'resubmission_requested') return 'resubmission_requested';
     if (contractMeta.statusKey === 'missing') return 'completed';
     return 'pending';
 }
@@ -363,29 +346,6 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildContractResubmissionBlock(contractMeta) {
-    if (contractMeta.statusKey !== 'resubmission_requested') return '';
-
-    return `
-        <div class="rd-contract-reupload">
-            <p class="rd-contract-reupload-alert">Admin asked for a corrected signed contract. Upload the updated file to send it back for review.</p>
-            <div class="payment-proof-box">
-                <label class="payment-field full" for="replacement-contract-file">
-                    <span class="rd-dl-label-plain">Replacement signed contract</span>
-                    <div class="payment-upload-control">
-                        <label class="payment-upload-button" for="replacement-contract-file">Choose file</label>
-                        <span class="payment-upload-name" data-contract-filename>No file chosen</span>
-                    </div>
-                    <input id="replacement-contract-file" type="file" accept=".pdf,.jpg,.jpeg,.png" data-field="replacement_contract" hidden />
-                </label>
-                <p class="payment-proof-note">Accepted formats: PDF, JPG, JPEG, and PNG. Maximum 10MB.</p>
-            </div>
-            <button type="button" class="rd-btn-solid" data-action="submit-contract-resubmission">Submit replacement contract</button>
-            <p class="account-modal-message" data-contract-resubmission-message></p>
-        </div>
-    `;
-}
-
 function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl) {
     const paymentDone = balance.remainingBalance <= 0;
     const verificationDone = isReservationPaymentEnabled(reservation);
@@ -425,7 +385,6 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                 ` : `
                     <p class="rd-inline-note">Your signed contract will appear here once submitted.</p>
                 `}
-                ${buildContractResubmissionBlock(contractMeta)}
             </div>
 
             ${showPaymentCta ? `
@@ -531,7 +490,7 @@ function render() {
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate });
-    const contractMeta = computeContractMeta(contract, reservation.status);
+    const contractMeta = computeContractMeta(contract);
     const canReschedule = computeCanReschedule(reservation.status, rescheduleRequests);
     const canCancel = computeCanCancel(reservation.status, payments);
     const isTerminalCancelled = ['cancelled', 'declined'].includes(effectiveStatus);
@@ -587,130 +546,6 @@ function render() {
     `;
 }
 
-async function uploadContractFile(file) {
-    if (!file) return '';
-    if (file.size > CLOUDINARY_CONFIG.maxFileSize) {
-        throw new Error('Contract file must be 10MB or smaller.');
-    }
-    if (Number(file.size || 0) <= 0) {
-        throw new Error('The selected contract file is empty. Please choose a valid file.');
-    }
-
-    const mimeType = String(file.type || '').toLowerCase();
-    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
-    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']);
-    const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
-
-    if (!allowedTypes.has(mimeType) && !allowedExtensions.has(extension)) {
-        throw new Error('Please upload the signed contract as a PDF, JPG, JPEG, or PNG file.');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-    formData.append('folder', CLOUDINARY_CONFIG.contractFolder);
-
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/auto/upload`, {
-        method: 'POST',
-        body: formData
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to upload the replacement signed contract.');
-    }
-
-    const result = await response.json();
-    return result.secure_url || '';
-}
-
-function setContractMessage(message, isError = false) {
-    const messageEl = pageContainer.querySelector('[data-contract-resubmission-message]');
-    if (!messageEl) return;
-    messageEl.textContent = message;
-    messageEl.classList.remove('error', 'success');
-    if (message) {
-        messageEl.classList.add(isError ? 'error' : 'success');
-    }
-}
-
-async function submitReplacementContract() {
-    const { reservation, contract } = pageData;
-    const contractMeta = computeContractMeta(contract, reservation.status);
-    const fileInput = pageContainer.querySelector('[data-field="replacement_contract"]');
-    const submitBtn = pageContainer.querySelector('[data-action="submit-contract-resubmission"]');
-    const replacementFile = fileInput?.files?.[0] || null;
-
-    if (!contract) {
-        setContractMessage('This reservation contract could not be found.', true);
-        return;
-    }
-
-    const allowedForUpload = ['resubmission_requested', 'missing'];
-    if (!allowedForUpload.includes(contractMeta.statusKey)) {
-        setContractMessage('Contract upload is not available for this reservation right now.', true);
-        return;
-    }
-
-    if (!replacementFile) {
-        setContractMessage('Please choose the corrected signed contract first.', true);
-        return;
-    }
-
-    setContractMessage('Uploading replacement contract...');
-    submitBtn?.setAttribute('disabled', 'true');
-
-    try {
-        const contractUrl = await uploadContractFile(replacementFile);
-        const resubmittedAt = new Date().toISOString();
-        const updatePayload = {
-            contract_url: contractUrl,
-            review_status: 'pending_review',
-            review_notes: null,
-            reviewed_at: null,
-            verified_date: null,
-            resubmitted_at: resubmittedAt
-        };
-
-        let updateResult = await supabase
-            .from('reservation_contracts')
-            .update(updatePayload)
-            .eq('reservation_id', reservationId)
-            .select('reservation_id')
-            .maybeSingle();
-
-        if (updateResult.error && isReservationContractsColumnMissing(updateResult.error, 'resubmitted_at')) {
-            const fallbackPayload = {
-                contract_url: contractUrl,
-                review_status: 'pending_review',
-                review_notes: null,
-                reviewed_at: null,
-                verified_date: null
-            };
-            updateResult = await supabase
-                .from('reservation_contracts')
-                .update(fallbackPayload)
-                .eq('reservation_id', reservationId)
-                .select('reservation_id')
-                .maybeSingle();
-        }
-
-        const { data, error } = updateResult;
-        if (error) throw error;
-        if (!data) throw new Error('Your reservation contract could not be updated.');
-
-        // A DB trigger (trg_auto_verify_contract) picks up this update and
-        // calls the verify-contract edge function server-side, so the client
-        // does not invoke it directly here — doing both would double the
-        // GCP Vision usage for a single submission.
-        await loadPageData();
-        render();
-        setContractMessage('Your corrected signed contract was submitted and is being verified.');
-    } catch (error) {
-        submitBtn?.removeAttribute('disabled');
-        setContractMessage(`Failed to submit replacement contract: ${error.message}`, true);
-    }
-}
-
 async function init() {
     try {
         await loadPageData();
@@ -722,12 +557,6 @@ async function init() {
 }
 
 pageContainer?.addEventListener('click', async (event) => {
-    const submitBtn = event.target.closest('[data-action="submit-contract-resubmission"]');
-    if (submitBtn) {
-        await submitReplacementContract();
-        return;
-    }
-
     const payBtn = event.target.closest('.rd-pay-cta');
     if (payBtn && !payBtn.disabled) {
         const url = payBtn.dataset.paymentUrl;

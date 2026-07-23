@@ -670,3 +670,102 @@
   font-size: 11px;
   color: #8A7A6C;
 }
+
+/* ============================================================
+   Post-approval staff assignment prompt
+   Reuses .modal-backdrop for the overlay and .header-action-btn
+   for the footer buttons — only the card chrome is new here.
+   ============================================================ */
+.approval-prompt-card {
+  width: min(100%, 380px);
+  background: #FFFFFF;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(58, 34, 17, 0.16);
+  padding: 0;
+}
+
+.approval-prompt-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px;
+}
+
+.approval-prompt-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #EAF3DE;
+  color: #3B6D11;
+  margin-bottom: 10px;
+}
+
+.approval-prompt-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.approval-prompt-meta {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #8A7A6C;
+}
+
+.approval-prompt-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 18px 18px;
+  background: #FAF6F0;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.approval-prompt-note-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  color: #6B3F23;
+}
+
+.approval-prompt-note-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.approval-prompt-note-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.approval-prompt-note-sub {
+  font-size: 11px;
+  color: #8A7A6C;
+  line-height: 1.4;
+}
+
+.approval-prompt-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 0.5px solid #E8DFD3;
+}
+
+.approval-prompt-footer .header-action-btn {
+  flex: 1;
+}

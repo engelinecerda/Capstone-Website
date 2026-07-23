@@ -91,7 +91,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 4px 18px;
+  padding: 4px 4px 0;
 }
 
 .sidebar-brand-icon {

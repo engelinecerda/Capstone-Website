@@ -85,7 +85,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 4px 18px;
+  padding: 4px 4px 0;
 }
 
 .sidebar-brand-icon {
@@ -658,17 +658,6 @@ body {
   font-size: 12.5px;
   background: #fff;
   color: var(--text);
-}
-
-/* ── ALERT BANNER ────────────────────────── */
-.alert-banner {
-  background: var(--pending);
-  color: var(--pending-txt);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 12.5px;
-  font-weight: 500;
-  margin-bottom: 16px;
 }
 
 /* ── RECENT RESERVATIONS ─────────────────── */

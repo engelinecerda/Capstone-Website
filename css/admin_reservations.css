@@ -175,7 +175,6 @@ body {
 
 .filters-bar,
 .refresh-panel-btn,
-.calendar-toggle-btn,
 .table-card,
 .calendar-card {
   background: var(--panel-bg);
@@ -257,24 +256,19 @@ body {
   cursor: pointer;
 }
 
-.calendar-toggle-btn {
-  border-radius: 10px;
-  padding: 9px 16px;
+.calendar-open-link {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
+  height: 36px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3D1A0A;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
 }
 
-.calendar-toggle-btn.is-active {
-  background: var(--active-bg);
-  border-color: var(--active-bg);
-  color: #fff;
+.calendar-open-link:hover {
+  text-decoration: underline;
 }
 
 .refresh-panel-btn:hover {

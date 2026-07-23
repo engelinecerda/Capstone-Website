@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Options - ELI Coffee Events</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_payment_options.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <section class="page-shell">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Payment Options <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Bank, e-wallet, and cash options customers see at checkout, plus installment and refund rules.</p>
+        </div>
+      </div>
+
+      <!-- Methods -->
+      <div class="card">
+        <p class="card-title">Payment Methods</p>
+        <p class="card-sub">Bank, e-wallet, and cash options customers see at checkout. Deactivating a method hides it from customers without deleting its history.</p>
+
+        <div class="card-header-row">
+          <button type="button" class="btn-primary" id="pm2AddBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add method
+          </button>
+        </div>
+
+        <p class="form-message" id="pm2-message"></p>
+
+        <div class="table-wrap">
+          <table class="pm2-table">
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Details</th>
+                <th>QR</th>
+                <th>Active</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pm2Body">
+              <tr><td colspan="6">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Rules -->
+      <div class="card">
+        <p class="card-title">Payment Rules</p>
+        <p class="card-sub">Installments, holds, and refunds. Deposit percentage and balance-due timing are managed in the <a href="/admin/super%20admin/super_admin_settings.html#reservation-rules" style="color:var(--active-bg);font-weight:600;">Reservation Rules</a> tab.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Maximum installments</p>
+            <p class="pr-row-desc">How many separate payments a customer may split the balance into.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-max-installments" min="1" value="2">
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Auto-hold on missed deposit</p>
+            <p class="pr-row-desc">Automatically place a reservation on hold if the required deposit is not received on time.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle">
+              <input type="checkbox" id="pr-auto-hold" checked>
+              <span class="pm2-toggle-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Refund window</p>
+            <p class="pr-row-desc">Number of days after a cancellation during which a refund can still be requested.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-refund-window" min="0" value="14">
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Currency</p>
+            <p class="pr-row-desc">Single currency used across all reservations and payments.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="text" class="pr-input-inline" id="pr-currency" value="PHP" disabled>
+          </div>
+        </div>
+
+        <p class="form-message" id="pr-settings-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="pr-save-btn">Save Payment Rules</button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── CONFIRM MODAL (Payment Rules) ── -->
+  <div class="modal-backdrop hidden" id="settingsConfirmModal">
+    <div class="modal-card">
+      <p class="modal-eyebrow">Confirm Changes</p>
+      <h2 class="modal-title" id="settingsConfirmTitle">Confirm changes</h2>
+      <p class="modal-copy" id="settingsConfirmCopy"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="settingsConfirmCancel">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="settingsConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADD/EDIT PAYMENT METHOD MODAL ── -->
+  <div class="modal-backdrop hidden" id="pm2Modal">
+    <div class="modal-card pm2-modal-card">
+      <p class="modal-eyebrow" id="pm2ModalEyebrow">Add Method</p>
+      <h2 class="modal-title" id="pm2ModalTitle">Add payment method</h2>
+      <p class="modal-copy">Customers will see exactly what you enter below during checkout.</p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">Type</label>
+          <select class="field-input" id="pm2Type">
+            <option value="bank">Bank</option>
+            <option value="ewallet">E-wallet</option>
+            <option value="cash">Cash</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Label</label>
+          <input type="text" class="field-input" id="pm2Label" placeholder="e.g. GCash – Personal">
+          <span class="field-note">Shown to customers as the method name.</span>
+        </div>
+
+        <!-- Bank + E-wallet: account name -->
+        <div class="field pm2-fields-bank pm2-fields-ewallet">
+          <label class="field-label">Account name</label>
+          <input type="text" class="field-input" id="pm2AccountName" placeholder="e.g. ELI Coffee Events">
+        </div>
+
+        <!-- Bank only -->
+        <div class="field pm2-fields-bank">
+          <label class="field-label">Account number</label>
+          <input type="text" class="field-input" id="pm2AccountNumber" placeholder="e.g. 1234-5678-90">
+        </div>
+
+        <!-- E-wallet only -->
+        <div class="field pm2-fields-ewallet">
+          <label class="field-label">Mobile number</label>
+          <input type="text" class="field-input" id="pm2PhoneNumber" placeholder="e.g. 0917 123 4567">
+        </div>
+
+        <!-- Bank + E-wallet: QR upload -->
+        <div class="field pm2-fields-bank pm2-fields-ewallet">
+          <label class="field-label">QR code image <span class="field-label-opt">(optional)</span></label>
+          <input type="file" class="field-input" id="pm2QrFile" accept="image/png,image/jpeg">
+          <span class="field-note">PNG or JPG, max 2 MB.</span>
+          <div id="pm2QrPreviewWrap" class="hidden" style="margin-top:8px;">
+            <img id="pm2QrPreviewImg" src="" alt="QR preview" style="max-width:120px;border-radius:8px;border:1px solid var(--border);">
+          </div>
+          <div id="pm2ProgressWrap" class="hidden pm2-progress-track" style="margin-top:8px;">
+            <div class="pm2-progress-fill" id="pm2ProgressBar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Cash only -->
+        <div class="field pm2-fields-cash">
+          <label class="field-label">Instructions</label>
+          <textarea class="field-input" id="pm2Instructions" rows="2" placeholder="e.g. Pay in cash at the counter."></textarea>
+        </div>
+        <div class="field pm2-fields-cash">
+          <label class="field-label">Latest pay-by (days before event)</label>
+          <input type="number" class="field-input" id="pm2CashWindowDays" min="0" value="1">
+        </div>
+        <div class="field pm2-fields-cash">
+          <label class="field-label">Pay-in location <span class="field-label-opt">(optional)</span></label>
+          <input type="text" class="field-input" id="pm2PayLocation" placeholder="e.g. Counter">
+        </div>
+      </div>
+
+      <div class="pm2-preview-card">
+        <p class="pm2-preview-label">Customer preview</p>
+        <p id="pm2Preview" class="pm2-preview-text">—</p>
+      </div>
+
+      <p class="form-message" id="pm2ModalMsg"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="pm2ModalCancel">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="pm2ModalSave">Save method</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAYMENT METHOD STATUS CONFIRM MODAL ── -->
+  <div class="modal-backdrop hidden" id="pm2ConfirmModal">
+    <div class="modal-card">
+      <p class="modal-eyebrow">Confirm</p>
+      <h2 class="modal-title" id="pm2ConfirmTitle">Confirm</h2>
+      <p class="modal-copy" id="pm2ConfirmCopy"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="pm2ConfirmCancel">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="pm2ConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin_payment_options.js"></script>
+</body>
+</html>

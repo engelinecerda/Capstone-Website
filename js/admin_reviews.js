@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { markAdminReviewsSeen, refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
@@ -375,6 +376,7 @@ validateAdminSession({
     const roleBottomEl = document.getElementById('sidebarRoleBottom');
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     initManagerNotificationBell(supabase, session.user.id);
+    initAdminNav({ role: profile.role });
 
     // Wire UI
     searchInput?.addEventListener('input', applyFilters);

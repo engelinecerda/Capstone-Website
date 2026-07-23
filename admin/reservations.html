@@ -24,73 +24,7 @@
     </div>
 
     <div class="sidebar-content">
-      <nav class="sidebar-nav">
-        <p class="sidebar-section-label">Operations</p>
-        <a href="/admin/dashboard.html" class="nav-item">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
-          <span class="nav-label">Dashboard</span>
-        </a>
-        <a href="/admin/reservations.html" class="nav-item active">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-          <span class="nav-label">Reservations</span>
-          <span class="nav-badge" id="navReservationCount" hidden>0</span>
-        </a>
-        <a href="/admin/payments.html" class="nav-item">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span>
-          <span class="nav-label">Payments</span>
-          <span class="nav-badge" id="navPaymentCount" hidden>0</span>
-        </a>
-        <a href="/admin/contracts.html" class="nav-item">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-          <span class="nav-label">Contracts</span>
-          <span class="nav-badge" id="navContractCount" hidden>0</span>
-        </a>
-        <a href="/admin/customers.html" class="nav-item">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-          <span class="nav-label">Customers</span>
-        </a>
-        <a href="/admin/reviews.html" class="nav-item">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></span>
-          <span class="nav-label">Reviews</span>
-          <span class="nav-badge" id="navReviewCount" hidden>0</span>
-        </a>
-        <a href="/admin/reports.html" class="nav-item">
-          <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-          <span class="nav-label">Reports</span>
-        </a>
-
-        <p class="sidebar-section-label super-admin-only">System</p>
-        <a href="/admin/super%20admin/super_admin_packages.html" class="nav-item super-admin-only">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3 8 12 13 21 8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
-          </span>
-          <span class="nav-label">Packages</span>
-        </a>
-        <a href="/admin/super%20admin/super_admin_settings.html" class="nav-item super-admin-only">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </span>
-          <span class="nav-label">System settings</span>
-        </a>
-        <a href="/admin/super%20admin/super_admin_backup.html" class="nav-item super-admin-only">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15"/></svg>
-          </span>
-          <span class="nav-label">Backup & restore</span>
-        </a>
-        <a href="/admin/super%20admin/super_admin_accounts.html" class="nav-item super-admin-only">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </span>
-          <span class="nav-label">Accounts management</span>
-        </a>
-        <a href="/admin/super%20admin/super_admin_audit.html" class="nav-item super-admin-only">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg>
-          </span>
-          <span class="nav-label">Audit trail</span>
-        </a>
-      </nav>
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
 
       <div class="sidebar-user">
         <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
@@ -112,7 +46,7 @@
       <header class="page-header">
         <div>
           <h1 class="page-title">Reservation management<span class="view-only-pill">View only</span></h1>
-          <p class="page-sub">Review bookings, update statuses, and manage day availability.</p>
+          <p class="page-sub">Review bookings and update statuses.</p>
         </div>
         <div class="header-actions">
           <span id="managerNotifBell"></span>
@@ -178,73 +112,12 @@
         </div>
 
         <div class="toolbar-actions">
-          <button
-            type="button"
-            class="refresh-btn calendar-toggle-btn"
-            id="calendarToggleBtn"
-            aria-expanded="false"
-            aria-controls="calendarCollapse"
-          >
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-            <span>Show calendar</span>
-          </button>
+          <a href="/admin/availability-calendar.html" class="calendar-open-link">Open availability calendar &rarr;</a>
         </div>
       </section>
 
       <section class="workspace-grid">
         <div class="workspace-main">
-          <section class="card calendar-card hidden" id="calendarCollapse" aria-hidden="true">
-            <div class="calendar-panel-head">
-              <div class="calendar-panel-header-row">
-                <div>
-                  <h2 class="card-title">Availability calendar</h2>
-                  <p class="card-sub">Select a date to view bookings or close it to new reservations.</p>
-                </div>
-                <div class="calendar-legend-inline">
-                  <span class="legend-item-sm"><span class="legend-dot"></span>Has bookings</span>
-                  <span class="legend-item-sm"><span class="legend-swatch-closed"></span>Closed</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="calendar-layout">
-              <div class="calendar-grid-col">
-                <div class="calendar-header">
-                  <button id="prevMonth" class="calendar-nav" aria-label="Previous month">&lsaquo;</button>
-                  <div id="calendarMonthLabel" class="calendar-month"></div>
-                  <button id="nextMonth" class="calendar-nav" aria-label="Next month">&rsaquo;</button>
-                </div>
-                <div class="calendar-grid-wrap">
-                  <div class="calendar-weekdays" aria-hidden="true">
-                    <span>Su</span>
-                    <span>Mo</span>
-                    <span>Tu</span>
-                    <span>We</span>
-                    <span>Th</span>
-                    <span>Fr</span>
-                    <span>Sa</span>
-                  </div>
-                  <div class="calendar-grid" id="calendarGrid"></div>
-                </div>
-              </div>
-
-              <div class="calendar-day-panel" id="calendarDayPanel">
-                <div class="day-panel-header">
-                  <span class="day-panel-date" id="dayPanelDate">&mdash;</span>
-                  <span class="status-pill" id="dayPanelStatusPill"></span>
-                </div>
-                <p class="day-panel-count" id="dayPanelCount">No bookings on this date</p>
-                <div class="day-panel-bookings" id="dayPanelBookings"></div>
-                <div class="day-panel-footer" id="dayPanelFooter">
-                  <button type="button" class="day-panel-action" id="dayPanelActionBtn"></button>
-                  <p class="day-panel-helper">Closing prevents new bookings. Existing reservations are not affected.</p>
-                </div>
-              </div>
-            </div>
-
-            <p class="calendar-message" id="calendarMessage"></p>
-          </section>
-
           <section class="chips-row" id="chipsRow">
             <button class="chip active" data-status="all">All (0)</button>
             <button class="chip" data-status="upcoming">Upcoming (0)</button>
@@ -285,32 +158,6 @@
       </section>
     </section>
   </main>
-
-  <div class="modal-backdrop hidden" id="blackoutModal" aria-hidden="true">
-    <div class="modal-card blackout-modal-card" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle">
-      <button type="button" class="modal-close" id="blackoutModalClose" aria-label="Close dialog">x</button>
-      <h2 class="modal-title" id="blackoutModalTitle">Close this date?</h2>
-      <p class="modal-copy" id="blackoutModalCopy">Customers will not be able to book this date.</p>
-      <p class="modal-warning" id="blackoutModalWarning" hidden></p>
-
-      <label class="modal-field" for="blackoutReason" id="blackoutReasonField">
-        <span class="modal-label" id="blackoutReasonLabel">Reason for closing this date</span>
-        <textarea
-          id="blackoutReason"
-          class="modal-textarea"
-          rows="3"
-          placeholder="Enter the reason for closing this date..."
-        ></textarea>
-      </label>
-
-      <p class="modal-message" id="blackoutModalMessage"></p>
-
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn-secondary" id="blackoutCancelBtn">Cancel</button>
-        <button type="button" class="modal-btn modal-btn-primary" id="blackoutConfirmBtn">Close date</button>
-      </div>
-    </div>
-  </div>
 
   <script type="module" src="../js/admin_reservations.js"></script>
 </body>

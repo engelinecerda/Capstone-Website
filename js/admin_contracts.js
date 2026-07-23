@@ -3,6 +3,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
@@ -200,7 +201,6 @@ function formatReservationStatus(status) {
 function getContractReviewMeta(reservation) {
   const contract = reservation?.contracts?.[0] || null;
   const reviewStatus = String(contract?.review_status || '').toLowerCase();
-  const reservationStatus = String(reservation?.status || '').toLowerCase();
   const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
   if (!contract) {
@@ -221,32 +221,6 @@ function getContractReviewMeta(reservation) {
       key: 'approved',
       label: 'Verified contract',
       verification: contract?.verified_date ? formatDateTime(contract.verified_date) : 'Verified',
-      note: '',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-
-  if (reviewStatus === 'resubmission_requested' || (!reviewStatus && reservationStatus === 'resubmission_requested')) {
-    return {
-      key: 'resubmission_requested',
-      label: 'Resubmission requested',
-      verification: 'Waiting for customer re-upload',
-      note: contract?.review_notes || 'Customer needs to upload a corrected signed contract.',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt: '',
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-
-  if (reviewStatus === 'pending_review' && contract?.resubmitted_at) {
-    return {
-      key: 'resubmitted',
-      label: 'Replacement submitted',
-      verification: 'Corrected contract is ready for review',
       note: '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
       resubmittedAt,
@@ -864,6 +838,7 @@ validateAdminSession({
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     refreshSidebarBadges = initAdminSidebarBadges(supabase);
     initManagerNotificationBell(supabase, session.user.id);
+    initAdminNav({ role: profile.role });
     wireFilters();
     wireTableActions();
     wireModals();

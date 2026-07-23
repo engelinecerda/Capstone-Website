@@ -4,6 +4,7 @@ import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/sess
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
+import { initAdminNav } from './admin_nav.js';
 
 const RIZAL_DEFAULTS = {
   center_lat: 14.5794,
@@ -342,6 +343,7 @@ async function init() {
   wireLogoutButton();
   setupInactivityLogout();
   initAdminSidebarBadges(supabase);
+  initAdminNav({ role: result.profile.role });
 
   await loadMapScope();
   await loadVisionUsage();

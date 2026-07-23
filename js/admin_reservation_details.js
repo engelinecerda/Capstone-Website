@@ -2,6 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { fetchDateAvailability, getBookingScope as getSharedBookingScope } from './reservation_availability.js';
 
@@ -58,6 +59,11 @@ const assignmentStaffList = document.getElementById('assignmentStaffList');
 const assignmentReservationSummary = document.getElementById('assignmentReservationSummary');
 const assignmentReservationMeta = document.getElementById('assignmentReservationMeta');
 const assignmentSelectionRow = document.getElementById('assignmentSelectionRow');
+
+const approvalPromptModal = document.getElementById('approvalPromptModal');
+const approvalPromptMeta = document.getElementById('approvalPromptMeta');
+const approvalPromptLaterBtn = document.getElementById('approvalPromptLaterBtn');
+const approvalPromptAssignBtn = document.getElementById('approvalPromptAssignBtn');
 
 const PAYMENT_METHOD_LABELS = {
   card: 'Card',
@@ -357,7 +363,6 @@ function paymentStatus(res) {
 function getContractReviewMeta(reservation) {
   const contract = reservation?.contracts?.[0] || null;
   const reviewStatus = String(contract?.review_status || '').toLowerCase();
-  const reservationStatus = String(reservation?.status || '').toLowerCase();
   const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
   if (!contract) {
@@ -368,30 +373,6 @@ function getContractReviewMeta(reservation) {
       key: 'approved',
       label: 'Verified contract',
       verification: contract?.verified_date ? formatDateTime(contract.verified_date) : 'Verified',
-      note: '',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-  if (reviewStatus === 'resubmission_requested' || (!reviewStatus && reservationStatus === 'resubmission_requested')) {
-    return {
-      key: 'resubmission_requested',
-      label: 'Resubmission requested',
-      verification: 'Waiting for customer re-upload',
-      note: contract?.review_notes || 'Customer needs to upload a corrected signed contract.',
-      reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt: '',
-      hasFile: Boolean(contract.contract_url),
-      contract
-    };
-  }
-  if (reviewStatus === 'pending_review' && contract?.resubmitted_at) {
-    return {
-      key: 'resubmitted',
-      label: 'Replacement submitted',
-      verification: 'Corrected contract is ready for review',
       note: '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
       resubmittedAt,
@@ -937,6 +918,7 @@ function wireHeaderActions() {
         if (!approvalState.canApprove) throw new Error(approvalState.reason);
         await updateReservationStatus(reservation.reservation_id, 'approved', previousStatus);
         await reloadAndRender('Reservation approved.');
+        maybeShowApprovalPrompt();
       } else if (action === 'decline') {
         await updateReservationStatus(reservation.reservation_id, 'declined', previousStatus);
         await reloadAndRender('Reservation declined.');
@@ -1161,6 +1143,54 @@ function wireAssignmentModal() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Post-approval staff assignment prompt                             */
+/* ---------------------------------------------------------------- */
+
+function closeApprovalPrompt() {
+  approvalPromptModal?.classList.add('hidden');
+  approvalPromptModal?.setAttribute('aria-hidden', 'true');
+}
+
+function openApprovalPrompt() {
+  const reservation = currentReservation;
+  const metaParts = [
+    reservation.contact_name || 'Customer',
+    reservation.package?.package_name || 'No package selected',
+    formatReservationDate(reservation.event_date)
+  ];
+  approvalPromptMeta.textContent = metaParts.join(' · ');
+  approvalPromptModal.classList.remove('hidden');
+  approvalPromptModal.setAttribute('aria-hidden', 'false');
+}
+
+// Approval is already committed by the time this runs, so any failure here
+// must never surface as an approval error — it only decides whether a
+// follow-up prompt appears.
+function maybeShowApprovalPrompt() {
+  try {
+    if (currentRole === 'admin') return;
+    if (assignedStaffForReservation.length > 0) return;
+    openApprovalPrompt();
+  } catch (err) {
+    /* prompt is best-effort; approval already stands */
+  }
+}
+
+function wireApprovalPrompt() {
+  approvalPromptLaterBtn?.addEventListener('click', closeApprovalPrompt);
+  approvalPromptAssignBtn?.addEventListener('click', () => {
+    closeApprovalPrompt();
+    openAssignmentModal();
+  });
+  approvalPromptModal?.addEventListener('click', (event) => {
+    if (event.target === approvalPromptModal) closeApprovalPrompt();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !approvalPromptModal.classList.contains('hidden')) closeApprovalPrompt();
+  });
+}
+
+/* ---------------------------------------------------------------- */
 /* Sticky header scroll state                                        */
 /* ---------------------------------------------------------------- */
 
@@ -1215,6 +1245,7 @@ async function init() {
 wireHeaderActions();
 wireRescheduleReviewPanel();
 wireAssignmentModal();
+wireApprovalPrompt();
 wireStickyHeaderScroll();
 wireBreadcrumb();
 wireLogoutButton();
@@ -1236,6 +1267,8 @@ validateAdminSession({
       contractBadgeEl: navContractCount,
       reviewBadgeEl: navReviewCount
     });
+    window.__ADMIN_ACTIVE_NAV__ = 'reservations';
+    initAdminNav({ role: profile.role });
     await init();
   }
 });

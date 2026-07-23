@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Availability Calendar - Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_availability_calendar.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Manager</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="page-shell">
+      <header class="page-header">
+        <div>
+          <h1 class="page-title">Availability calendar<span class="view-only-pill">View only</span></h1>
+          <p class="page-sub">Close dates the café cannot accept bookings, and reopen them anytime.</p>
+        </div>
+        <div class="header-actions">
+          <span id="managerNotifBell"></span>
+          <button type="button" class="refresh-btn" id="refreshBtn">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="stat-row availability-stat-row">
+        <div class="stat-card">
+          <p class="stat-label">Open days this month</p>
+          <div class="stat-value" id="statOpenDays">0</div>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Days with bookings</p>
+          <div class="stat-value" id="statBookingDays">0</div>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Closed days this month</p>
+          <div class="stat-value" id="statClosedDays">0</div>
+        </div>
+      </section>
+
+      <div class="availability-layout">
+        <section class="card availability-calendar-card">
+          <div class="calendar-card-head">
+            <div class="calendar-header">
+              <button type="button" id="prevMonth" class="calendar-nav" aria-label="Previous month">&lsaquo;</button>
+              <div id="calendarMonthLabel" class="calendar-month"></div>
+              <button type="button" id="nextMonth" class="calendar-nav" aria-label="Next month">&rsaquo;</button>
+            </div>
+            <div class="calendar-legend-inline">
+              <span class="legend-item-sm"><span class="legend-dot"></span>Has bookings</span>
+              <span class="legend-item-sm"><span class="legend-swatch-closed"></span>Closed</span>
+            </div>
+          </div>
+
+          <div class="calendar-grid-wrap">
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </div>
+
+          <p class="calendar-message" id="calendarMessage"></p>
+        </section>
+
+        <div class="availability-side-col">
+          <section class="card availability-day-card">
+            <div class="day-panel-header">
+              <span class="day-panel-date" id="dayPanelDate">&mdash;</span>
+              <span class="status-pill" id="dayPanelStatusPill"></span>
+            </div>
+            <p class="day-panel-count" id="dayPanelCount">No bookings on this date</p>
+            <div class="day-panel-bookings" id="dayPanelBookings"></div>
+            <div class="day-panel-footer" id="dayPanelFooter">
+              <button type="button" class="day-panel-action" id="dayPanelActionBtn"></button>
+              <p class="day-panel-helper">Closing prevents new bookings. Existing reservations are not affected.</p>
+            </div>
+          </section>
+
+          <section class="card availability-closed-card">
+            <div class="closed-dates-head">
+              <h2 class="card-title">Closed dates</h2>
+              <p class="card-sub" id="closedDatesMonthLabel"></p>
+            </div>
+            <div class="closed-dates-list" id="closedDatesList"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="blackoutModal" aria-hidden="true">
+    <div class="modal-card blackout-modal-card" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle">
+      <button type="button" class="modal-close" id="blackoutModalClose" aria-label="Close dialog">x</button>
+      <h2 class="modal-title" id="blackoutModalTitle">Close this date?</h2>
+      <p class="modal-copy" id="blackoutModalCopy">Customers will not be able to book this date.</p>
+      <p class="modal-warning" id="blackoutModalWarning" hidden></p>
+
+      <p class="modal-message" id="blackoutModalMessage"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="blackoutCancelBtn">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="blackoutConfirmBtn">Close date</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../js/admin_availability_calendar.js"></script>
+</body>
+</html>

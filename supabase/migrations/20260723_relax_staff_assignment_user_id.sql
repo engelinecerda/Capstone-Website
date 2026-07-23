@@ -1,0 +1,21 @@
+-- ============================================================
+-- reservation_staff_assignments.staff_user_id -- drop NOT NULL
+--
+-- 20260716_staff_roster_and_board_account.sql introduced roster_staff_id
+-- as the new way to record a staff assignment (staff are now a roster of
+-- names with no auth account, not individual users) and deliberately left
+-- staff_user_id in place rather than dropping it -- that's a manual,
+-- operator-only destructive step described at the bottom of that file and
+-- never run.
+--
+-- It never relaxed the NOT NULL constraint on staff_user_id though, and
+-- the app (js/admin_reservation_details.js saveAssignmentSelection) only
+-- ever wrote roster_staff_id going forward. Every assignment insert has
+-- been failing on "null value in column staff_user_id violates not-null
+-- constraint" since -- surfaced through the app as a misleading RLS error
+-- because that failure was previously masked by a missing manager/admin
+-- RLS policy on this table (see 20260723_admin_manage_staff_assignments.sql),
+-- which failed first and produced its own, unrelated error text.
+-- ============================================================
+alter table public.reservation_staff_assignments
+  alter column staff_user_id drop not null;

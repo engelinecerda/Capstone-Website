@@ -5,6 +5,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { logAudit } from './audit_logger.js';
+import { initAdminNav } from './admin_nav.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allLogs     = [];
@@ -366,6 +367,7 @@ function init() {
 
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+      initAdminNav({ role: profile.role });
 
       const avatarEl = document.getElementById('sidebarAvatar');
       if (avatarEl) avatarEl.textContent = getPortalInitials(profile);

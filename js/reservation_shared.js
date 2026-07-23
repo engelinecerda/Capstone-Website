@@ -199,12 +199,11 @@ export function getCancellationFee(reservation) {
     return String(reservation?.location_type || '').toLowerCase() === 'offsite' ? 2000 : 500;
 }
 
-// Pure contract-meta computation — takes the raw contract row and the
-// reservation's legacy status string directly rather than looking them up
-// from a page-specific state object, so callers on any page can use it.
-export function computeContractMeta(contract, legacyReservationStatus) {
+// Pure contract-meta computation — takes the raw contract row directly
+// rather than looking it up from a page-specific state object, so callers
+// on any page can use it.
+export function computeContractMeta(contract) {
     const reviewStatus = String(contract?.review_status || '').toLowerCase();
-    const legacyStatus = String(legacyReservationStatus || '').toLowerCase();
     const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
     if (reviewStatus === 'verified' || contract?.verified_date) {
@@ -213,34 +212,6 @@ export function computeContractMeta(contract, legacyReservationStatus) {
             key: 'approved',
             statusKey: 'verified',
             verification: `Verified ${formatDateTime(contract.verified_date)}`,
-            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-            resubmittedAt,
-            note: '',
-            hasFile: Boolean(contract?.contract_url),
-            contract
-        };
-    }
-
-    if (reviewStatus === 'resubmission_requested' || (!reviewStatus && legacyStatus === 'resubmission_requested')) {
-        return {
-            label: 'Resubmission requested',
-            key: 'resubmission_requested',
-            statusKey: 'resubmission_requested',
-            verification: 'Please upload a corrected signed contract.',
-            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-            resubmittedAt,
-            note: contract?.review_notes || 'Admin requested a corrected signed contract.',
-            hasFile: Boolean(contract?.contract_url),
-            contract
-        };
-    }
-
-    if (reviewStatus === 'pending_review' && contract?.resubmitted_at) {
-        return {
-            label: 'Replacement submitted',
-            key: 'pending',
-            statusKey: 'replacement_submitted',
-            verification: 'Your corrected contract is waiting for admin review.',
             reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
             resubmittedAt,
             note: '',

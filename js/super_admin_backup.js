@@ -7,6 +7,7 @@ import { validateAdminSession, wireLogoutButton, watchAuthState } from './sessio
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
+import { initAdminNav } from './admin_nav.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID  = '840885111053-9o5sunpcth34kfv4c1fc74fp0h9nn2ub.apps.googleusercontent.com';
@@ -802,6 +803,7 @@ function init() {
       currentAdminId = session.user.id;
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+      initAdminNav({ role: profile.role });
 
       const avatarEl = document.getElementById('sidebarAvatar');
       if (avatarEl) avatarEl.textContent = getPortalInitials(profile);

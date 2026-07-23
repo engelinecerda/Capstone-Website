@@ -520,22 +520,6 @@
     color: var(--acc-text-muted);
 }
 
-.rd-contract-reupload {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--acc-border-tan);
-}
-
-.rd-contract-reupload-alert {
-    margin: 0;
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: var(--acc-amber-text);
-    font-weight: 500;
-}
-
 /* ========================
    Buttons
 ======================== */
