@@ -225,18 +225,21 @@ async function saveOperatingHours() {
 }
 
 // ── Reservation rules ─────────────────────────────────────────────────────
-// deposit_pct drives the customer payment page's Custom Amount minimum;
-// auto_cancel_days drives the overdue grace deadline shown there and used
-// by the auto_cancel_overdue_reservations() scheduled job. See
-// js/customer_payments.js RESERVATION_RULES_DEFAULTS for the matching
-// customer-side fallback (kept in sync manually — this file intentionally
-// doesn't import the customer-facing module).
+// auto_cancel_days drives the overdue grace deadline shown on the customer
+// payment page and used by the auto_cancel_overdue_reservations() scheduled
+// job. See js/customer_payments.js RESERVATION_RULES_DEFAULTS for the
+// matching customer-side fallback (kept in sync manually — this file
+// intentionally doesn't import the customer-facing module).
+//
+// deposit_pct used to live here and double as the Custom Amount minimum.
+// It's now payment_type.percent_of_total (code='partial_payment'), edited
+// on the Payment Options page — the single writable source, so it isn't
+// duplicated here.
 const DEFAULT_RESERVATION_RULES = {
   min_advance_days: 14,
   max_advance_days: 365,
   min_pax: 20,
   max_pax: 150,
-  deposit_pct: 30,
   full_payment_days: 7,
   auto_cancel_days: 5,
   contract_resubmission_days: 3
@@ -247,7 +250,6 @@ const rulesFields = {
   max_advance_days: () => document.getElementById('field-max-advance'),
   min_pax: () => document.getElementById('field-min-pax'),
   max_pax: () => document.getElementById('field-max-pax'),
-  deposit_pct: () => document.getElementById('field-deposit-pct'),
   full_payment_days: () => document.getElementById('field-full-payment-days'),
   auto_cancel_days: () => document.getElementById('field-auto-cancel-days'),
   contract_resubmission_days: () => document.getElementById('field-contract-days')
@@ -282,7 +284,6 @@ function validateReservationRules(config) {
   }
   if (config.min_advance_days >= config.max_advance_days) return 'Minimum advance booking must be less than maximum advance booking.';
   if (config.min_pax >= config.max_pax) return 'Minimum pax must be less than maximum pax.';
-  if (config.deposit_pct > 100) return 'Down payment percentage cannot exceed 100.';
   return null;
 }
 

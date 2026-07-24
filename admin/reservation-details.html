@@ -102,10 +102,33 @@
             <section class="card details-card-flex">
               <div class="card-head-row">
                 <h2 class="card-title">Payment <span class="status-pill" id="paymentStatusPill"></span></h2>
-                <a class="card-head-link" id="openPaymentsLink" href="#">Open payments &rarr;</a>
+                <div class="payment-card-head-actions">
+                  <button type="button" class="header-action-btn" id="recordPaymentBtn">Record payment</button>
+                  <a class="card-head-link" id="openPaymentsLink" href="#">Open payments &rarr;</a>
+                </div>
               </div>
               <div class="dl-grid-2col" id="paymentDetailsGrid"></div>
               <div class="dl-rows" id="paymentDetailsRows"></div>
+
+              <div class="payment-history-wrap">
+                <h3 class="payment-history-title">Payment history</h3>
+                <div class="payment-history-table-wrap">
+                  <table class="payment-history-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Method</th>
+                        <th>Amount</th>
+                        <th>Reference / receipt no.</th>
+                        <th>Recorded by</th>
+                        <th>Status</th>
+                        <th>Receipt</th>
+                      </tr>
+                    </thead>
+                    <tbody id="paymentHistoryBody"></tbody>
+                  </table>
+                </div>
+              </div>
             </section>
           </div>
 
@@ -199,6 +222,89 @@
       <div class="approval-prompt-footer">
         <button type="button" class="header-action-btn" id="approvalPromptLaterBtn">Later</button>
         <button type="button" class="header-action-btn primary" id="approvalPromptAssignBtn">Assign staff</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="receiptViewerModal" aria-hidden="true">
+    <div class="modal-card receipt-viewer-card" role="dialog" aria-modal="true" aria-labelledby="receiptViewerTitle">
+      <div class="assignment-modal-header">
+        <div>
+          <h2 class="assignment-modal-title" id="receiptViewerTitle">Receipt</h2>
+        </div>
+        <button type="button" class="assignment-modal-close" id="receiptViewerClose" aria-label="Close receipt viewer">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="assignment-modal-body">
+        <div id="receiptViewerBody"></div>
+      </div>
+      <div class="assignment-modal-footer" id="receiptViewerActions"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="recordPaymentModal" aria-hidden="true">
+    <div class="modal-card assignment-modal-card" role="dialog" aria-modal="true" aria-labelledby="recordPaymentModalTitle">
+      <div class="assignment-modal-header">
+        <div>
+          <h2 class="assignment-modal-title" id="recordPaymentModalTitle">Record payment</h2>
+          <p class="assignment-modal-subtitle">For payments made at the café</p>
+        </div>
+        <button type="button" class="assignment-modal-close" id="recordPaymentModalClose" aria-label="Close record payment dialog">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="assignment-modal-body">
+        <div class="assignment-context-block">
+          <span class="record-payment-context-label">Reservation</span>
+          <p class="assignment-context-main" id="recordPaymentContextName">Loading...</p>
+          <p class="assignment-context-sub" id="recordPaymentContextDate"></p>
+          <div class="record-payment-context-balance-row">
+            <span>Outstanding balance</span>
+            <span id="recordPaymentContextBalance"></span>
+          </div>
+        </div>
+
+        <label class="record-payment-field-label" for="recordPaymentMethodSelect">Payment method</label>
+        <div class="record-payment-method-row">
+          <span class="record-payment-method-icon" id="recordPaymentMethodIcon"></span>
+          <select id="recordPaymentMethodSelect" class="record-payment-input" required></select>
+        </div>
+        <p class="record-payment-helper">Only methods where the café issues the receipt are listed here.</p>
+
+        <label class="record-payment-field-label" for="recordPaymentAmountInput">Amount received</label>
+        <input id="recordPaymentAmountInput" class="record-payment-input" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+        <p class="record-payment-inline-warning hidden" id="recordPaymentAmountWarning"></p>
+
+        <label class="record-payment-field-label" for="recordPaymentDateInput">Actual payment date</label>
+        <input id="recordPaymentDateInput" class="record-payment-input" type="date" />
+        <p class="record-payment-planned-note hidden" id="recordPaymentPlannedNote"></p>
+
+        <label class="record-payment-field-label" for="recordPaymentReferenceInput">Official receipt no. <span class="record-payment-optional">(optional)</span></label>
+        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" />
+
+        <label class="record-payment-field-label">Receipt photo <span class="record-payment-optional">(optional)</span></label>
+        <label class="record-payment-file-drop" for="recordPaymentFileInput">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Upload JPG, JPEG, PNG, or PDF — max 5MB</span>
+          <input id="recordPaymentFileInput" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" hidden />
+        </label>
+        <div class="record-payment-file-preview hidden" id="recordPaymentFilePreviewWrap">
+          <img id="recordPaymentFilePreviewImg" alt="Receipt preview" />
+          <span class="record-payment-file-name" id="recordPaymentFileName"></span>
+          <button type="button" class="record-payment-file-remove" id="recordPaymentFileRemoveBtn" aria-label="Remove file">&times;</button>
+        </div>
+
+        <label class="record-payment-field-label" for="recordPaymentNotesInput">Notes <span class="record-payment-optional">(optional)</span></label>
+        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks"></textarea>
+
+        <p class="modal-message" id="recordPaymentMessage"></p>
+      </div>
+
+      <div class="assignment-modal-footer">
+        <button type="button" class="header-action-btn" id="recordPaymentCancelBtn">Cancel</button>
+        <button type="button" class="header-action-btn primary" id="recordPaymentSaveBtn">Record payment</button>
       </div>
     </div>
   </div>

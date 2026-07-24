@@ -236,7 +236,7 @@
 
         <div class="settings-card">
           <p class="settings-card-title">Reservation Rules</p>
-          <p class="settings-card-sub">Control booking windows, guest limits, and deposit requirements across all packages.</p>
+          <p class="settings-card-sub">Control booking windows and guest limits across all packages. Down payment and custom-amount deposit percentages are on the <a href="/admin/config/payment-options.html" style="color:var(--primary);font-weight:600;">Payment Options</a> page.</p>
 
           <div class="form-grid">
             <div class="form-group">
@@ -261,13 +261,6 @@
               <label class="form-label">Maximum Pax</label>
               <input type="number" class="form-input" id="field-max-pax" value="150" min="1">
               <span class="form-hint">Hard cap on guests; packages above this are blocked.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Down Payment Percentage (%)
-                <span class="dirty-dot visible" id="dot-deposit-pct"></span>
-              </label>
-              <input type="number" class="form-input dirty" id="field-deposit-pct" value="30" data-original="25" min="0" max="100">
-              <span class="form-hint">Percentage of total package price required as down payment.</span>
             </div>
             <div class="form-group">
               <label class="form-label">Full Payment Deadline (days before event)</label>

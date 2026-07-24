@@ -227,6 +227,12 @@ body {
     gap: 10px;
 }
 
+.payment-empty-methods {
+    font-size: 13.5px;
+    color: var(--pay-muted, #7A6A5C);
+    padding: 12px 0;
+}
+
 .payment-select-chip {
     min-height: 40px;
     border-radius: 8px;

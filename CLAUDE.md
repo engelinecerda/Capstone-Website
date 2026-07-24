@@ -37,8 +37,9 @@ Functions live in `supabase/functions/<name>/index.ts` and run on Deno:
 - `verify-contract` — Google Cloud Vision signature detection on uploaded PDFs
 - `ocr-payment` — Google Cloud Vision text extraction from payment receipts
 - `send-notification-email` — Resend email dispatch triggered by `notifications` table inserts
+- `delete-payment-method` — admin-only hard delete of an unreferenced `payment_method` row; also destroys its Cloudinary QR asset (signed request — the admin UI's unsigned upload preset cannot delete)
 
-Required secrets: `GCP_VISION_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`.
+Required secrets: `GCP_VISION_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
 
 ## Supabase Client Setup
 

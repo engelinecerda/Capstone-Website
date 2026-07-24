@@ -181,7 +181,6 @@ async function loadCategories() {
       show(pkgCatEmpty);
       return;
     }
-    allCategories = cats;
 
     // Batch-fetch package counts
     const { data: countRows } = await supabase
@@ -195,12 +194,24 @@ async function loadCategories() {
         packageCountMap[r.package_category_id] = (packageCountMap[r.package_category_id] || 0) + 1;
     });
 
-    renderCategoryGrid(cats);
+    // A category whose products are all inactive shouldn't appear in the
+    // catalogue — filter on live package counts, not just the category's
+    // own is_active flag.
+    const visibleCats = cats.filter(c => (packageCountMap[c.package_category_id] || 0) > 0);
+    allCategories = visibleCats;
+
+    if (!visibleCats.length) {
+      hide(pkgCatLoading);
+      show(pkgCatEmpty);
+      return;
+    }
+
+    renderCategoryGrid(visibleCats);
     hide(pkgCatLoading);
     show(pkgCatGrid);
 
     // Auto-select first category without scrolling (data loads immediately on page open)
-    selectCategory(cats[0], { scroll: false });
+    selectCategory(visibleCats[0], { scroll: false });
 
   } catch (err) {
     console.error('loadCategories:', err);
@@ -577,7 +588,12 @@ function buildInclusionsPanel(pkg) {
     }).join('');
   }
 
-  const items = parseItemList(pkg.description || '');
+  // Structured inclusions (admin's repeatable-list editor) take priority
+  // once a package has been re-saved through it; packages not yet re-edited
+  // keep rendering via the legacy description-parsing fallback below.
+  const items = Array.isArray(pkg.inclusions) && pkg.inclusions.length
+    ? pkg.inclusions
+    : parseItemList(pkg.description || '');
   if (!items.length) {
     return `<p style="font-size:14px;color:var(--text-light)">Inclusions are provided upon inquiry. Please contact us for details.</p>`;
   }

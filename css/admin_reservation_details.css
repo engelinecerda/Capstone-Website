@@ -769,3 +769,398 @@
 .approval-prompt-footer .header-action-btn {
   flex: 1;
 }
+
+/* ============================================================
+   Payment card — head actions, overpaid note, history table
+   ============================================================ */
+.payment-card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.payment-card-head-actions .header-action-btn {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 11.5px;
+}
+
+.payment-overpaid-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #8A7A6C;
+}
+
+.payment-history-wrap {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--border);
+}
+
+.payment-history-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.payment-history-table-wrap {
+  overflow-x: auto;
+}
+
+.payment-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.payment-history-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: #7A6A5C;
+  padding: 0 8px 8px 0;
+  border-bottom: 0.5px solid var(--border);
+  white-space: nowrap;
+}
+
+.payment-history-table td {
+  padding: 10px 8px 10px 0;
+  border-bottom: 0.5px solid #EFE8DD;
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.payment-history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.payment-history-date {
+  white-space: nowrap;
+}
+
+.payment-history-amount {
+  text-align: right;
+}
+
+.payment-history-view-link {
+  font-size: 12px;
+  color: #3D1A0A;
+  text-decoration: none;
+}
+
+.payment-history-view-link:hover {
+  text-decoration: underline;
+}
+
+.payment-history-no-receipt {
+  color: #9B8B7C;
+}
+
+.payment-history-empty-row td {
+  padding: 16px 0;
+  text-align: center;
+  color: #8A7A6C;
+  font-size: 12px;
+  border-bottom: none;
+}
+
+/* ============================================================
+   Receipt viewer modal — reuses admin_payments.js's zoom-capable
+   image pattern (this page doesn't load admin_payments.css, so the
+   pieces it needs are duplicated here rather than cross-importing
+   an unrelated page's stylesheet).
+   ============================================================ */
+.receipt-viewer-card {
+  width: min(100%, 560px);
+}
+
+.proof-preview-stage {
+  min-height: 320px;
+  border: 1px solid #FBF8F3;
+  border-radius: 12px;
+  background: #FBF8F3;
+  overflow: auto;
+  padding: 14px;
+}
+
+.proof-preview-canvas {
+  min-width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.proof-preview-image {
+  display: block;
+  max-width: none;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #FBF8F3;
+  background: #fff;
+  transition: width 0.18s ease;
+}
+
+.proof-zoom-indicator {
+  min-width: 56px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 0.5px solid var(--btn-secondary-border);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.proof-empty {
+  min-height: 160px;
+  border: 1px dashed #E2D8CB;
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--muted);
+  background: #FBF8F3;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.proof-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* ============================================================
+   Record payment modal
+   ============================================================ */
+.record-payment-field-label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.record-payment-field-label:first-of-type {
+  margin-top: 0;
+}
+
+.record-payment-optional {
+  font-weight: 400;
+  color: #8A7A6C;
+}
+
+.payment-context-balance {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.record-payment-context-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8A7A6C;
+}
+
+.record-payment-context-balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid #E8DFD3;
+  font-size: 11px;
+  color: #7A6A5C;
+}
+
+.record-payment-context-balance-row span:last-child {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.record-payment-method-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-payment-method-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 0.5px solid #E8DFD3;
+  background: #FBF8F3;
+  color: #6B3F23;
+}
+
+.record-payment-method-row .record-payment-input {
+  flex: 1;
+}
+
+.record-payment-helper {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: #8A7A6C;
+}
+
+.record-payment-planned-note {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: #8A7A6C;
+}
+
+.record-payment-planned-note.hidden {
+  display: none;
+}
+
+.record-payment-input,
+.record-payment-textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 0.5px solid #E8DFD3;
+  background: #FBF8F3;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.record-payment-input {
+  height: 34px;
+  padding: 0 12px;
+}
+
+.record-payment-textarea {
+  padding: 8px 12px;
+  resize: vertical;
+}
+
+.record-payment-input:focus,
+.record-payment-textarea:focus {
+  border-color: #B98F6A;
+}
+
+.record-payment-inline-warning {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: #854F0B;
+}
+
+.record-payment-inline-warning.hidden {
+  display: none;
+}
+
+.method-select-row {
+  display: flex;
+  gap: 8px;
+}
+
+.method-chip {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  border-radius: 8px;
+  border: 0.5px solid #E8DFD3;
+  background: #FFFFFF;
+  color: #6B3F23;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.method-chip:hover {
+  background: #F5EEE4;
+}
+
+.method-chip.active {
+  background: #EFE8DD;
+  border-color: #D8CCBD;
+  color: #3D1A0A;
+}
+
+.record-payment-file-drop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0.5px dashed #D8CCBD;
+  background: #FBF8F3;
+  color: #7A6A5C;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.record-payment-file-drop:hover {
+  background: #F5EEE4;
+}
+
+.record-payment-file-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.record-payment-file-preview.hidden {
+  display: none;
+}
+
+.record-payment-file-preview img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 0.5px solid #E8DFD3;
+}
+
+.record-payment-file-preview img.hidden {
+  display: none;
+}
+
+.record-payment-file-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-payment-file-remove {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #8A7A6C;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.record-payment-file-remove:hover {
+  color: #A32D2D;
+}

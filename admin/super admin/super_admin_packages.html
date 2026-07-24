@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Package Management - ELI Coffee Events</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Bookable Inventory - ELI Coffee Events</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/super_admin_packages.css">
@@ -47,231 +47,164 @@
     <section class="page-shell">
 
       <!-- ============================================= -->
-      <!-- ========== CATEGORY VIEW (default) ========== -->
+      <!-- ========== INVENTORY VIEW (default) ========== -->
       <!-- ============================================= -->
-      <div id="categoryView">
+      <div id="inventoryView">
         <div class="page-header">
           <div>
-            <h1 class="page-title">Package Management <span class="admin-badge" id="adminBadge">Loading...</span></h1>
-            <p class="page-sub">Manage package categories and their packages</p>
+            <h1 class="page-title">Inventory <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+            <p class="page-sub">Packages, add-ons, and the categories that group them</p>
           </div>
-          <button type="button" class="btn-primary" id="addCategoryBtn">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add New Category
-          </button>
-        </div>
-
-        <!-- Category Stats -->
-        <section class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-top"><span class="stat-label">Active Categories</span></div>
-            <div class="stat-value" id="catStatActive">0</div>
-            <div class="stat-caption">Currently available</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-top"><span class="stat-label">Archived Categories</span></div>
-            <div class="stat-value" id="catStatArchived">0</div>
-            <div class="stat-caption">Not visible to customers</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-top"><span class="stat-label">Total Categories</span></div>
-            <div class="stat-value" id="catStatTotal">0</div>
-            <div class="stat-caption">All time created</div>
-          </div>
-        </section>
-
-        <!-- Category Filter Bar -->
-        <div class="filter-bar">
-          <div class="search-wrap">
-            <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="catSearchInput" class="search-input" placeholder="Search categories by name...">
-          </div>
-          <div class="filter-right">
-            <button type="button" class="btn-toggle" id="catToggleArchiveBtn">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-              <span id="catToggleArchiveLabel">Show Archived</span>
+          <div class="header-btn-group">
+            <button type="button" class="btn-cancel" id="openVenuesBtn">Venues</button>
+            <button type="button" class="btn-cancel" id="addCategoryBtn">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New category
+            </button>
+            <button type="button" class="btn-primary" id="addPackageBtn">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New package
             </button>
           </div>
         </div>
 
-        <!-- Page message -->
-        <p class="page-message" id="catPageMessage"></p>
+        <!-- Health strip: only rendered when something can't be booked -->
+        <div class="health-strip hidden" id="healthStrip">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <p class="health-strip-copy" id="healthStripCopy"></p>
+          <button type="button" class="health-strip-action" id="healthStripAction">Show them</button>
+        </div>
 
-        <!-- Active Categories Table -->
-        <div class="card" id="activeCatSection">
-          <div class="section-head">
-            <div>
-              <h2 class="section-title">Active Categories</h2>
-              <p class="section-sub">Currently available package categories</p>
-            </div>
+        <!-- Toolbar -->
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="inventorySearchInput" class="search-input" placeholder="Search packages and add-ons...">
           </div>
-          <div class="table-wrap">
-            <table class="pkg-table">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Packages</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="activeCatBody">
-                <tr class="empty-row"><td colspan="4">Loading categories...</td></tr>
-              </tbody>
-            </table>
+          <div class="filter-right">
+            <div class="seg-control" id="kindSeg">
+              <button type="button" class="seg-btn active" data-kind="">All</button>
+              <button type="button" class="seg-btn" data-kind="main">Packages</button>
+              <button type="button" class="seg-btn" data-kind="add on">Add-ons</button>
+            </div>
+            <div class="seg-control" id="statusSeg">
+              <button type="button" class="seg-btn active" data-status="active">Active</button>
+              <button type="button" class="seg-btn" data-status="archived">Archived</button>
+            </div>
+            <div class="seg-control" id="viewSeg">
+              <button type="button" class="seg-btn active" data-view="grid" aria-label="Grid view">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              </button>
+              <button type="button" class="seg-btn" data-view="list" aria-label="List view">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Archived Categories Table -->
-        <div class="card" id="archivedCatSection" style="display:none;">
-          <div class="section-head">
-            <div>
-              <h2 class="section-title">Archived Categories</h2>
-              <p class="section-sub">Categories no longer offered but kept in records</p>
+        <p class="page-message" id="inventoryPageMessage"></p>
+
+        <div class="inventory-layout">
+          <!-- Category rail -->
+          <nav class="category-rail" id="categoryRail" aria-label="Filter by category">
+            <p class="rail-loading">Loading categories…</p>
+          </nav>
+
+          <!-- Content: grid (default) or list, same filtered data -->
+          <div class="inventory-content">
+            <div class="inventory-grid" id="inventoryGrid"></div>
+
+            <div class="table-wrap hidden" id="inventoryListWrap">
+              <table class="pkg-table" id="inventoryListTable">
+                <thead>
+                  <tr>
+                    <th>Package</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Capacity</th>
+                    <th>Tiers</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="inventoryListBody">
+                  <tr class="empty-row"><td colspan="6">Loading packages...</td></tr>
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div class="table-wrap">
-            <table class="pkg-table">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Packages</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="archivedCatBody">
-                <tr class="empty-row"><td colspan="4">No archived categories.</td></tr>
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
 
       <!-- ============================================= -->
-      <!-- ========== PACKAGE VIEW (per category) ====== -->
+      <!-- ========== VENUE VIEW ======================== -->
       <!-- ============================================= -->
-      <div id="packageView" style="display:none;">
-
-        <!-- Breadcrumb -->
+      <div id="venueView" style="display:none;">
         <div class="breadcrumb-bar">
-          <button type="button" class="btn-back" id="backToCategoriesBtn">
+          <button type="button" class="btn-back" id="backToCategoriesFromVenuesBtn">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-            Back to Categories
+            Back to Inventory
           </button>
-          <div class="breadcrumb">
-            <span class="breadcrumb-link" id="breadcrumbLink">Package Categories</span>
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
-            <span class="breadcrumb-current" id="breadcrumbCatName">Category</span>
-          </div>
         </div>
 
         <div class="page-header">
           <div>
-            <h1 class="page-title" id="pkgViewTitle">Packages</h1>
-            <p class="page-sub" id="pkgViewSub">Manage packages in this category</p>
+            <h1 class="page-title">Venues</h1>
+            <p class="page-sub">Physical spaces at the café that onsite packages can be booked into.</p>
           </div>
-          <button type="button" class="btn-primary" id="addPackageBtn">
+          <button type="button" class="btn-primary" id="addVenueBtn">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add New Package
+            Add New Venue
           </button>
         </div>
 
-        <!-- Package Stats -->
-        <section class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-top"><span class="stat-label">Active Packages</span></div>
-            <div class="stat-value" id="pkgStatActive">0</div>
-            <div class="stat-caption">Currently available</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-top"><span class="stat-label">Archived Packages</span></div>
-            <div class="stat-value" id="pkgStatArchived">0</div>
-            <div class="stat-caption">Not visible to customers</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-top"><span class="stat-label">Total Packages</span></div>
-            <div class="stat-value" id="pkgStatTotal">0</div>
-            <div class="stat-caption">In this category</div>
-          </div>
-        </section>
+        <p class="page-message" id="venuePageMessage"></p>
 
-        <!-- Package Filter Bar -->
-        <div class="filter-bar">
-          <div class="search-wrap">
-            <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="pkgSearchInput" class="search-input" placeholder="Search packages by name...">
-          </div>
-          <div class="filter-right">
-            <div class="select-wrap">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-              <select id="pkgTypeFilter" class="filter-select">
-                <option value="">All Types</option>
-                <option value="main">Main</option>
-                <option value="add on">Add On</option>
-              </select>
-            </div>
-            <button type="button" class="btn-toggle" id="pkgToggleArchiveBtn">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-              <span id="pkgToggleArchiveLabel">Show Archived</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Page message -->
-        <p class="page-message" id="pkgPageMessage"></p>
-
-        <!-- Active Packages Table -->
-        <div class="card" id="activePkgSection">
+        <div class="card" id="activeVenueSection">
           <div class="section-head">
             <div>
-              <h2 class="section-title">Active Packages</h2>
-              <p class="section-sub">Currently available packages for customers</p>
+              <h2 class="section-title">Active Venues</h2>
+              <p class="section-sub">Selectable when mapping an onsite package.</p>
             </div>
           </div>
           <div class="table-wrap">
             <table class="pkg-table">
               <thead>
                 <tr>
-                  <th>Package</th>
-                  <th>Type</th>
-                  <th>Price</th>
+                  <th>Venue</th>
                   <th>Capacity</th>
-                  <th>Duration</th>
+                  <th>Mapped packages</th>
+                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="activePkgBody">
-                <tr class="empty-row"><td colspan="7">Loading packages...</td></tr>
+              <tbody id="activeVenueBody">
+                <tr class="empty-row"><td colspan="6">Loading venues...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Archived Packages Table -->
-        <div class="card" id="archivedPkgSection" style="display:none;">
+        <div class="card" id="archivedVenueSection" style="display:none;">
           <div class="section-head">
             <div>
-              <h2 class="section-title">Archived Packages</h2>
-              <p class="section-sub">Packages no longer offered but kept in records</p>
+              <h2 class="section-title">Archived Venues</h2>
             </div>
           </div>
           <div class="table-wrap">
             <table class="pkg-table">
               <thead>
                 <tr>
-                  <th>Package</th>
-                  <th>Type</th>
-                  <th>Price</th>
+                  <th>Venue</th>
                   <th>Capacity</th>
-                  <th>Duration</th>
+                  <th>Mapped packages</th>
+                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="archivedPkgBody">
-                <tr class="empty-row"><td colspan="7">No archived packages.</td></tr>
+              <tbody id="archivedVenueBody">
+                <tr class="empty-row"><td colspan="6">No archived venues.</td></tr>
               </tbody>
             </table>
           </div>
@@ -324,12 +257,12 @@
           <label class="modal-label" for="catDescriptionInput">Description *</label>
           <textarea id="catDescriptionInput" class="modal-textarea" rows="4" placeholder="Venue and catering package for intimate weddings and simple celebrations..."></textarea>
         </div>
-        <!-- Inclusions field -->
+        <!-- Category Highlights field (catalogue display copy — not inherited by packages) -->
         <div class="modal-field">
-          <label class="modal-label" for="catInclusionsInput">Inclusions</label>
+          <label class="modal-label" for="catInclusionsInput">Category Highlights</label>
           <textarea id="catInclusionsInput" class="modal-textarea" rows="4" placeholder="E.g., Main Hall access, 3 hours use, buffet setup, drinks, lights and sounds..."></textarea>
-          <span class="modal-hint">One item per line or comma separated. Use headers with a colon to group items (e.g., <strong>Venue:</strong>, <strong>Catering:</strong>).</span>
-        </div>  
+          <span class="modal-hint">Shown as a highlights blurb on this category's customer-facing overview card — separate from each package's own inclusions list. One item per line or comma separated.</span>
+        </div>
         <p class="modal-message hidden" id="catModalMessage"></p>
       </div>
       <div class="modal-footer">
@@ -355,62 +288,77 @@
         </button>
       </div>
       <div class="modal-body">
-        <div class="modal-field">
-          <label class="modal-label">Package Image *</label>
-          <div class="image-upload-area" id="pkgImageUploadArea">
-            <div class="image-upload-placeholder" id="pkgImagePlaceholder">
-              <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-              <span>Upload package image</span>
-              <span class="image-hint">JPG, PNG or WEBP (recommended: 1200x800px)</span>
-            </div>
-            <img class="image-preview hidden" id="pkgImagePreview" alt="Package preview">
-            <input type="file" id="pkgImageInput" accept="image/jpeg,image/png,image/webp" class="file-input-hidden">
-            <div class="image-actions">
-              <label for="pkgImageInput" class="choose-file-btn">Choose File</label>
-              <button type="button" class="remove-image-btn hidden" id="pkgRemoveImageBtn">
-                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                Remove Image
-              </button>
-            </div>
-            <span class="file-name" id="pkgFileName">No file chosen</span>
-          </div>
+        <div class="unsaved-banner hidden" id="pkgUnsavedBanner">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          You have unsaved changes.
         </div>
 
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="pkgName">Package Name *</label>
             <input type="text" id="pkgName" class="modal-input" placeholder="E.g., VIP Plus Package">
+            <span class="field-error hidden" id="pkgNameError"></span>
           </div>
           <div class="modal-field">
             <label class="modal-label" for="pkgType">Package Type *</label>
             <select id="pkgType" class="modal-input modal-select">
               <option value="">Select package type</option>
-              <option value="main">Main</option>
+              <option value="main">Main (package)</option>
               <option value="add on">Add On</option>
             </select>
           </div>
         </div>
 
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="pkgCategorySelect">Category *</label>
+            <select id="pkgCategorySelect" class="modal-input modal-select"></select>
+            <span class="modal-hint" id="pkgCategoryHint">Packages must have a category. Add-ons may leave this unset.</span>
+            <span class="field-error hidden" id="pkgCategoryError"></span>
+          </div>
+        </div>
+
         <div class="modal-field">
           <label class="modal-label" for="pkgDescription">Description *</label>
-          <textarea id="pkgDescription" class="modal-textarea" rows="3" placeholder="Brief description of the package..."></textarea>
-          <span class="modal-hint">One item per line or comma separated. Use headers with a colon to group items (e.g., <strong>Venue:</strong>, <strong>Catering:</strong>).</span>
+          <textarea id="pkgDescription" class="modal-textarea" rows="6" placeholder="Brief description of the package..."></textarea>
+        </div>
+
+        <!-- Inclusions (structured, repeatable list — not the description) -->
+        <div class="modal-field">
+          <label class="modal-label">Inclusions *</label>
+          <div id="pkgInclusionsList" class="inclusions-list"></div>
+          <button type="button" class="btn-cancel" id="pkgAddInclusionBtn" style="font-size:12px;padding:6px 12px;">+ Add item</button>
         </div>
 
         <div class="modal-row modal-row-three">
           <div class="modal-field">
             <label class="modal-label" for="pkgPrice">Price (₱) *</label>
             <input type="number" id="pkgPrice" class="modal-input" placeholder="3999" min="0" step="0.01">
-          </div>
-          <div class="modal-field">
-            <label class="modal-label" for="pkgCapacity">Guest Capacity *</label>
-            <input type="number" id="pkgCapacity" class="modal-input" placeholder="30" min="1">
+            <span class="field-error hidden" id="pkgPriceError"></span>
           </div>
           <div class="modal-field">
             <label class="modal-label" for="pkgDuration">Duration (hours) *</label>
             <input type="number" id="pkgDuration" class="modal-input" placeholder="3" min="1">
+            <span class="field-error hidden" id="pkgDurationError"></span>
+          </div>
+          <div class="modal-field" id="pkgMaxQuantityField" style="display:none;">
+            <label class="modal-label" for="pkgMaxQuantity">Max quantity per booking</label>
+            <input type="number" id="pkgMaxQuantity" class="modal-input" placeholder="1" min="1" value="1">
           </div>
         </div>
+
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="pkgMinGuests">Min Guests</label>
+            <input type="number" id="pkgMinGuests" class="modal-input" placeholder="20" min="0">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="pkgMaxGuests">Max Guests *</label>
+            <input type="number" id="pkgMaxGuests" class="modal-input" placeholder="30" min="1">
+            <span class="field-error hidden" id="pkgMaxGuestsError"></span>
+          </div>
+        </div>
+        <p class="modal-hint" id="pkgGuestRangeHint"></p>
 
         <div class="modal-row">
           <div class="modal-field">
@@ -418,18 +366,25 @@
             <input type="number" id="pkgExtensionPrice" class="modal-input" placeholder="800" min="0" step="0.01">
             <span class="modal-hint">Leave blank if no extension rate applies.</span>
           </div>
-          <div class="modal-field">
-            <label class="modal-label" for="pkgLocationType">Location Type</label>
+          <div class="modal-field" id="pkgLocationField">
+            <label class="modal-label" for="pkgLocationType">Service Mode</label>
             <select id="pkgLocationType" class="modal-input modal-select">
-              <option value="">Select location type</option>
-              <option value="onsite">Onsite</option>
-              <option value="offsite">Offsite</option>
+              <option value="">Select service mode</option>
+              <option value="onsite">Onsite (at the café)</option>
+              <option value="offsite">Offsite (we travel)</option>
               <option value="both">Both</option>
             </select>
           </div>
         </div>
 
-        <div class="modal-field">
+        <!-- Venues (onsite packages only) -->
+        <div class="modal-field" id="pkgVenuesField" style="display:none;">
+          <label class="modal-label">Venues *</label>
+          <div id="pkgVenuesList" class="checklist-list"></div>
+          <p class="modal-hint" id="pkgVenueCapacityHint"></p>
+        </div>
+
+        <div class="modal-field" id="pkgBookingScopeField">
           <label class="modal-label" for="pkgBookingScope">Booking Scope (Main packages only) *</label>
           <select id="pkgBookingScope" class="modal-input modal-select">
             <option value="">Select the team/resource this package occupies</option>
@@ -438,6 +393,28 @@
             <option value="offsite">Offsite / Catering Team</option>
           </select>
           <span class="modal-hint">Determines which reservations block each other on the calendar. Required for Main packages — add-ons don't need this.</span>
+        </div>
+
+        <!-- Photos (multi, drag/keyboard reorder, cover select, alt text) -->
+        <div class="modal-field">
+          <label class="modal-label">Photos *</label>
+          <div id="pkgPhotosGrid" class="photo-grid"></div>
+          <input type="file" id="pkgPhotoInput" accept="image/jpeg,image/png,image/webp" class="file-input-hidden" multiple>
+          <label for="pkgPhotoInput" class="choose-file-btn">Add photos</label>
+          <span class="modal-hint">JPG, PNG or WEBP, max 5 MB each, up to 8 photos. Resized automatically before upload. Click a photo's star to make it the cover; alt text is required before the package can be activated.</span>
+        </div>
+
+        <!-- Activation checklist -->
+        <div class="modal-field">
+          <label class="modal-label">Before this can go active</label>
+          <div id="pkgActivationChecklist" class="checklist-list"></div>
+        </div>
+
+        <div class="modal-field">
+          <label class="pkg-active-toggle-label">
+            <input type="checkbox" id="pkgActiveToggle">
+            <span>Active (visible to customers)</span>
+          </label>
         </div>
 
         <p class="modal-message hidden" id="pkgModalMessage"></p>
@@ -472,7 +449,7 @@
     </div>
   </div>
 
-     <!-- ── TIER ADD / EDIT MODAL ── -->
+  <!-- ── TIER ADD / EDIT MODAL ── -->
     <div class="modal-overlay hidden" id="tierModal" aria-hidden="true">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tierModalTitle">
         <div class="modal-header">
@@ -515,6 +492,98 @@
         </div>
       </div>
     </div>
+
+  <!-- ── TIER DRAWER (right-anchored, replaces the old below-table panel) ── -->
+  <div class="tier-drawer-scrim hidden" id="tierDrawerScrim"></div>
+  <aside class="tier-drawer" id="tierDrawer" role="dialog" aria-modal="true" aria-labelledby="tierDrawerTitle" aria-hidden="true">
+    <div class="tier-drawer-header">
+      <div>
+        <p class="tier-drawer-eyebrow">Tiers</p>
+        <h2 class="tier-drawer-title" id="tierDrawerTitle">Package name</h2>
+      </div>
+      <button type="button" class="modal-close" id="tierDrawerClose" aria-label="Close tiers drawer">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="tier-drawer-body">
+      <div id="tierDrawerList"><p class="modal-hint">No tiers yet.</p></div>
+    </div>
+    <div class="tier-drawer-footer">
+      <button type="button" class="btn-cancel" id="addTierBtn">+ Add tier</button>
+      <button type="button" class="btn-primary" id="tierDrawerDone">Done</button>
+    </div>
+  </aside>
+
+  <!-- ── VENUE ADD / EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="venueModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="venueModalTitle">Add New Venue</h2>
+          <p class="modal-sub" id="venueModalSub">A physical space at the café</p>
+        </div>
+        <button type="button" class="modal-close" id="venueModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="venueName">Venue Name *</label>
+            <input type="text" id="venueName" class="modal-input" placeholder="E.g., Main Hall">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="venueCapacity">Capacity (guests) *</label>
+            <input type="number" id="venueCapacity" class="modal-input" placeholder="50" min="1">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="venueDescription">Description</label>
+          <textarea id="venueDescription" class="modal-textarea" rows="2" placeholder="E.g., second floor, garden-facing"></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="venueSortOrder">Sort Order</label>
+          <input type="number" id="venueSortOrder" class="modal-input" value="0" min="0">
+        </div>
+        <div class="modal-field" id="venueMappedPackagesField" style="display:none;">
+          <label class="modal-label">Packages mapped to this venue</label>
+          <div id="venueMappedPackagesList" class="checklist-list"></div>
+        </div>
+        <p class="modal-message hidden" id="venueModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="venueModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="venueModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="venueModalSaveLabel">Add Venue</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DELETE / REASSIGN MODAL (category delete, package delete, venue delete) ── -->
+  <div class="modal-overlay hidden" id="deleteModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="modal-title" id="deleteModalTitle">Delete</h2>
+        <button type="button" class="modal-close" id="deleteModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="confirm-copy" id="deleteModalCopy"></p>
+        <div class="modal-field hidden" id="deleteReassignField">
+          <label class="modal-label" for="deleteReassignSelect">Reassign affected packages to</label>
+          <select id="deleteReassignSelect" class="modal-input modal-select"></select>
+        </div>
+        <p class="modal-message hidden" id="deleteModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="deleteModalCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="deleteModalOk">Delete</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/js/super_admin_packages.js"></script>
 </body>

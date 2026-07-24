@@ -470,6 +470,7 @@
         getCalendarRange,
         getScopeLabel,
     } from '/js/reservation_availability.js';
+    import { loadReservationFormConfig } from '/js/reservation_form_config.js';
 
     const { data: { session } } = await supabase.auth.getSession();
     const isLoggedIn = !!session;
@@ -703,6 +704,23 @@ By signing below, the Client confirms that the reservation details above are acc
             ]
         }
     };
+
+    // Admin-editable overrides from admin/config/form.html — only replaces
+    // the hardcoded copy above when a non-empty saved body exists; on any
+    // fetch/parse failure this resolves to {} and POLICY_CONTENT above (the
+    // fallback) is left untouched.
+    const FORM_CONFIG = await loadReservationFormConfig(supabase);
+    if (FORM_CONFIG.policyOverrides.terms) POLICY_CONTENT.terms = FORM_CONFIG.policyOverrides.terms;
+    if (FORM_CONFIG.policyOverrides.privacy) POLICY_CONTENT.privacy = FORM_CONFIG.policyOverrides.privacy;
+
+    if (!FORM_CONFIG.fieldRules.contact_phone_required) {
+        const phoneEl = document.getElementById('phone');
+        if (phoneEl) phoneEl.placeholder = 'Phone Number (Optional)';
+    }
+    if (FORM_CONFIG.fieldRules.special_requests_required) {
+        const requestsEl = document.getElementById('requests');
+        if (requestsEl) requestsEl.placeholder = 'Notes & Special Requests';
+    }
 
     let activePolicyKey = 'terms';
 
@@ -2268,13 +2286,16 @@ By signing below, the Client confirms that the reservation details above are acc
         }
 
         if (id === 'rs4') {
-            const name  = document.getElementById('name')?.value.trim();
-            const phone = document.getElementById('phone')?.value.trim();
-            const email = document.getElementById('email')?.value.trim();
-            if (!name || !phone || !email) { alert('Please fill in all contact details.'); return false; }
+            const name     = document.getElementById('name')?.value.trim();
+            const phone    = document.getElementById('phone')?.value.trim();
+            const email    = document.getElementById('email')?.value.trim();
+            const requests = document.getElementById('requests')?.value.trim() || '';
+            if (!name || !email) { alert('Please fill in all contact details.'); return false; }
+            if (FORM_CONFIG.fieldRules.contact_phone_required && !phone) { alert('Please fill in all contact details.'); return false; }
+            if (FORM_CONFIG.fieldRules.special_requests_required && !requests) { alert('Please let us know your special requests before continuing.'); return false; }
             if (!/^\S+@\S+\.\S+$/.test(email)) { alert('Please enter a valid email address.'); return false; }
             S.name = name; S.phone = phone; S.email = email;
-            S.requests = document.getElementById('requests')?.value.trim() || '';
+            S.requests = requests;
             return true;
         }
 

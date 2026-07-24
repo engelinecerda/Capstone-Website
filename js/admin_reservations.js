@@ -8,6 +8,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
+import { getPaymentStatusPillMeta } from './reservation_shared.js';
 import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const tableMessage = document.getElementById('tableMessage');
@@ -30,19 +31,12 @@ const rescheduleAlert = document.getElementById('rescheduleAlert');
 const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
 const rescheduleAlertText = document.getElementById('rescheduleAlertText');
 const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
-const PAYMENT_TYPE_LABELS = {
-  reservation_fee: 'Reservation Fee',
-  down_payment: 'Down Payment',
-  full_payment: 'Full Payment',
-  reschedule_fee: 'Reschedule Fee',
-  cancellation_fee: 'Cancellation Fee'
-};
-const PAYMENT_BALANCE_DUE_DAYS = 7;
 const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
 
 let reservationsCache = [];
 let reservationsFiltered = [];
 let reservationsCurrentPage = 1;
+let paymentSummaryMap = {};
 let adminSession = null;
 let currentRole = null;
 let staffDirectory = [];
@@ -282,58 +276,21 @@ function isMissingColumnError(error, columnName) {
     || message.includes(`column reservation_staff_assignments.${columnName} does not exist`);
 }
 
-function getReservationPayments(reservation) {
-  return reservation.payments || [];
-}
-
 function getReservationRescheduleRequests(reservation) {
   return reservation.reschedule_requests || [];
 }
 
-function getApprovedBasePaymentsTotal(reservation) {
-  return getReservationPayments(reservation)
-    .filter((payment) => (
-      !payment.reschedule_request_id
-      && String(payment.payment_status || '').toLowerCase() === 'approved'
-    ))
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-}
-
-function getReservationBalanceSummary(reservation) {
-  const totalAmount = Number(reservation?.total_price || 0);
-  const approvedTotal = getApprovedBasePaymentsTotal(reservation);
-  const remainingBalance = Math.max(totalAmount - approvedTotal, 0);
-  const eventDateKey = formatDateKey(reservation?.event_date);
-
-  let dueDateKey = '';
-  let dueDateLabel = 'No due date';
-  if (eventDateKey) {
-    const dueDate = new Date(`${eventDateKey}T00:00:00`);
-    if (!Number.isNaN(dueDate.getTime())) {
-      dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
-      dueDateKey = buildLocalDateKey(dueDate);
-      dueDateLabel = formatReservationDate(dueDateKey);
-    }
-  }
-
-  const isPastDue = Boolean(remainingBalance > 0 && dueDateKey && getTodayDateKey() > dueDateKey);
-  const hasPartialPayment = approvedTotal > 0 && remainingBalance > 0;
-
-  return {
-    totalAmount,
-    approvedTotal,
-    remainingBalance,
-    dueDateKey,
-    dueDateLabel,
-    isPastDue,
-    hasPartialPayment,
-    toneKey: remainingBalance <= 0 ? 'approved' : isPastDue ? 'unpaid' : 'pending',
-    statusLabel: remainingBalance <= 0 ? 'Paid in Full' : isPastDue ? 'Overdue' : hasPartialPayment ? 'Partially Paid' : 'Initial Payment'
-  };
-}
-
-function getPaymentTypeLabel(type) {
-  return PAYMENT_TYPE_LABELS[type] || type || 'Payment';
+async function fetchPaymentSummaries(reservationIds) {
+  if (!reservationIds.length) return {};
+  const { data, error } = await supabase
+    .from('reservation_payment_summary')
+    .select('reservation_id, reservation_total, total_paid, outstanding_balance, latest_payment_date, computed_status')
+    .in('reservation_id', reservationIds);
+  if (error) throw error;
+  return (data || []).reduce((map, row) => {
+    map[row.reservation_id] = row;
+    return map;
+  }, {});
 }
 
 function formatReadableKey(value) {
@@ -342,12 +299,6 @@ function formatReadableKey(value) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
-}
-
-function getPendingPayment(reservation) {
-  return getReservationPayments(reservation)
-    .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
-    .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
 }
 
 function getLatestOpenRescheduleRequest(reservation) {
@@ -390,38 +341,17 @@ function renderPendingRescheduleAlert(list) {
   }
 }
 
+// Sourced from reservation_payment_summary (the one server-side computed-
+// status view every surface reads), replacing the old per-file re-derivation
+// that didn't exclude cancellation_fee/reschedule_fee from the paid total.
 function paymentStatus(res) {
-  const balance = getReservationBalanceSummary(res);
-  const pendingPayment = getPendingPayment(res);
-  if (pendingPayment) {
-    return {
-      label: 'Pending Review',
-      key: 'pending',
-      sublabel: `${getPaymentTypeLabel(pendingPayment.payment_type)} / ${formatCurrency(balance.remainingBalance)} remaining`
-    };
-  }
-
-  if (balance.remainingBalance <= 0) {
-    return { label: 'Paid', key: 'approved', sublabel: 'Paid in full' };
-  }
-
-  if (balance.hasPartialPayment) {
-    return {
-      label: balance.isPastDue ? 'Overdue' : 'Partially Paid',
-      key: balance.toneKey,
-      sublabel: `Remaining ${formatCurrency(balance.remainingBalance)} / Pay by ${balance.dueDateLabel}`
-    };
-  }
-
-  const rescheduleRequest = getLatestOpenRescheduleRequest(res);
-  if (rescheduleRequest && String(rescheduleRequest.status || '').toLowerCase() === 'approved_pending_payment') {
-    return { label: 'Pending', key: 'pending', sublabel: 'Reschedule fee' };
-  }
-
+  const summary = paymentSummaryMap[res.reservation_id];
+  const statusMeta = getPaymentStatusPillMeta(summary?.computed_status);
+  const outstanding = Number(summary?.outstanding_balance ?? res.total_price ?? 0);
   return {
-    label: balance.isPastDue ? 'Overdue' : 'Unpaid',
-    key: balance.isPastDue ? 'unpaid' : 'pending',
-    sublabel: balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'No payment yet'
+    label: statusMeta.label,
+    key: statusMeta.key,
+    sublabel: outstanding > 0 ? `${formatCurrency(outstanding)} outstanding` : 'Fully settled'
   };
 }
 
@@ -811,6 +741,9 @@ async function loadData() {
     reservationsCache = await fetchReservations();
     staffDirectory = [];
     assignmentMapByReservationId = {};
+    paymentSummaryMap = await fetchPaymentSummaries(
+      reservationsCache.map((reservation) => reservation.reservation_id).filter(Boolean)
+    ).catch(() => ({}));
 
     try {
       staffDirectory = await fetchStaffRoster();

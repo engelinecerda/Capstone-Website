@@ -454,6 +454,13 @@ body {
   margin-bottom: 16px;
 }
 
+/* Same specificity as the base rule above, placed immediately after it so
+   the responsive breakpoints further down this file (which also target
+   .stat-grid at equal specificity) still win by source order. */
+.stat-grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .stat-card {
   background: var(--card-bg);
   border: 0.5px solid var(--border);
@@ -632,7 +639,8 @@ table td {
 }
 
 .status-pill.declined,
-.status-pill.rejected {
+.status-pill.rejected,
+.status-pill.overpaid {
   background: var(--declined);
   color: var(--declined-txt);
 }

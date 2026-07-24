@@ -1,7 +1,10 @@
 // super_admin_packages.js
-// Two-level view: Categories → Packages
-// Tables: public."(TEST) package_category" + public.package
-// Image host: Cloudinary
+// Bookable inventory: a single filterable Inventory view (category rail +
+// card grid / list) replacing the old category-drilldown + package-table
+// pages, plus Venues (its own page) and a tier side-drawer.
+// Tables: public.package_category, public.package, public.package_tier,
+// public.venue, public.package_venue, public.package_photo.
+// Image host: Cloudinary (cloud dgneg418t, preset eli_coffee_packages).
 
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
@@ -14,66 +17,71 @@ import { logAudit } from './audit_logger.js';
 // ─── Cloudinary config ────────────────────────────────────────────────────────
 const CLOUDINARY_UPLOAD_URL    = 'https://api.cloudinary.com/v1_1/dgneg418t/image/upload';
 const CLOUDINARY_UPLOAD_PRESET = 'eli_coffee_packages';
+const MAX_PHOTO_EDGE = 1600;
+const MAX_PHOTOS_PER_PACKAGE = 8;
 
 // ─── Supabase tables ────────────────────────────────────────────────────────
 const CATEGORY_TABLE = 'package_category';
 const TIER_TABLE = 'package_tier';
+const VENUE_TABLE = 'venue';
+const PACKAGE_VENUE_TABLE = 'package_venue';
+const PACKAGE_PHOTO_TABLE = 'package_photo';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allCategories         = [];
 let allPackages           = [];
-let catShowingArchived    = false;
-let pkgShowingArchived    = false;
 let editingCategoryId     = null;
 let editingPackageId      = null;
-let activeCategoryId      = null;   
-let activeCategoryName    = '';
-let pendingAction         = null;   
+let pendingAction         = null;
 let catPendingImageFile   = null;
-let pkgPendingImageFile   = null;
-let allTiers             = [];
-let editingTierId        = null;
-let tierForPackageId     = null;
-let tierForPackageName   = '';
-let tierPanelEl          = null;
+let allTiers              = [];
+let editingTierId         = null;
+let tierForPackageId      = null;
+let tierForPackageName    = '';
+
+// Bookable-inventory additions
+let allVenues             = [];
+let editingVenueId        = null;
+let pendingDeleteAction   = null;   // { scope, id, mode: 'delete'|'archive'|'blocked' }
+let pkgPhotos             = [];     // [{ photo_id?, image_url?, file?, alt_text, is_cover, sort_order }]
+let pkgInclusions         = [];     // [string, ...]
+let pkgVenueIds           = new Set();
+
+// Inventory rebuild: rail/toolbar/health-strip state
+let selectedRailCategoryId = null;   // null = All, 'uncategorised', or a real package_category_id
+let selectedKind            = '';    // '' | 'main' | 'add on'
+let selectedStatus          = 'active'; // 'active' | 'archived'
+let viewMode                = 'grid';   // 'grid' | 'list'
+let healthFilterActive      = false;
+let openCardMenuEl          = null;  // currently-open kebab popover element
+let allPackageVenueCounts   = new Map(); // package_id -> mapped venue count
+let allTiersByPackage       = new Map(); // package_id -> active tier[]
+const archivedRefCountCache = new Map(); // package_id -> reservation reference count (lazy)
+
+// Package-modal dirty-tracking
+let pkgFormSnapshot   = null;
+let tierDrawerTriggerEl = null;
 
 // ─── DOM: Views ───────────────────────────────────────────────────────────────
-const categoryView = document.getElementById('categoryView');
-const packageView  = document.getElementById('packageView');
+const inventoryView = document.getElementById('inventoryView');
+const venueView     = document.getElementById('venueView');
 
-// ─── DOM: Category View ───────────────────────────────────────────────────────
-const catSearchInput        = document.getElementById('catSearchInput');
-const catToggleArchiveBtn   = document.getElementById('catToggleArchiveBtn');
-const catToggleArchiveLabel = document.getElementById('catToggleArchiveLabel');
-const activeCatSection      = document.getElementById('activeCatSection');
-const archivedCatSection    = document.getElementById('archivedCatSection');
-const activeCatBody         = document.getElementById('activeCatBody');
-const archivedCatBody       = document.getElementById('archivedCatBody');
-const catStatActive         = document.getElementById('catStatActive');
-const catStatArchived       = document.getElementById('catStatArchived');
-const catStatTotal          = document.getElementById('catStatTotal');
-const catPageMessage        = document.getElementById('catPageMessage');
-const addCategoryBtn        = document.getElementById('addCategoryBtn');
-
-// ─── DOM: Package View ────────────────────────────────────────────────────────
-const pkgSearchInput        = document.getElementById('pkgSearchInput');
-const pkgTypeFilter         = document.getElementById('pkgTypeFilter');
-const pkgToggleArchiveBtn   = document.getElementById('pkgToggleArchiveBtn');
-const pkgToggleArchiveLabel = document.getElementById('pkgToggleArchiveLabel');
-const activePkgSection      = document.getElementById('activePkgSection');
-const archivedPkgSection    = document.getElementById('archivedPkgSection');
-const activePkgBody         = document.getElementById('activePkgBody');
-const archivedPkgBody       = document.getElementById('archivedPkgBody');
-const pkgStatActive         = document.getElementById('pkgStatActive');
-const pkgStatArchived       = document.getElementById('pkgStatArchived');
-const pkgStatTotal          = document.getElementById('pkgStatTotal');
-const pkgPageMessage        = document.getElementById('pkgPageMessage');
-const addPackageBtn         = document.getElementById('addPackageBtn');
-const backToCategoriesBtn   = document.getElementById('backToCategoriesBtn');
-const breadcrumbLink        = document.getElementById('breadcrumbLink');
-const breadcrumbCatName     = document.getElementById('breadcrumbCatName');
-const pkgViewTitle          = document.getElementById('pkgViewTitle');
-const pkgViewSub            = document.getElementById('pkgViewSub');
+// ─── DOM: Inventory toolbar / rail / content ──────────────────────────────────
+const healthStrip         = document.getElementById('healthStrip');
+const healthStripCopy     = document.getElementById('healthStripCopy');
+const healthStripAction   = document.getElementById('healthStripAction');
+const inventorySearchInput = document.getElementById('inventorySearchInput');
+const kindSeg              = document.getElementById('kindSeg');
+const statusSeg            = document.getElementById('statusSeg');
+const viewSeg              = document.getElementById('viewSeg');
+const inventoryPageMessage = document.getElementById('inventoryPageMessage');
+const categoryRail         = document.getElementById('categoryRail');
+const inventoryGrid        = document.getElementById('inventoryGrid');
+const inventoryListWrap    = document.getElementById('inventoryListWrap');
+const inventoryListBody    = document.getElementById('inventoryListBody');
+const addCategoryBtn       = document.getElementById('addCategoryBtn');
+const addPackageBtn        = document.getElementById('addPackageBtn');
+const openVenuesBtn        = document.getElementById('openVenuesBtn');
 
 // ─── DOM: Category Modal ──────────────────────────────────────────────────────
 const categoryModal      = document.getElementById('categoryModal');
@@ -85,8 +93,8 @@ const catModalSave       = document.getElementById('catModalSave');
 const catModalSaveLabel  = document.getElementById('catModalSaveLabel');
 const catModalMessage    = document.getElementById('catModalMessage');
 const catNameInput       = document.getElementById('catNameInput');
-const catDescriptionInput = document.getElementById('catDescriptionInput');  
-const catInclusionsInput  = document.getElementById('catInclusionsInput'); 
+const catDescriptionInput = document.getElementById('catDescriptionInput');
+const catInclusionsInput  = document.getElementById('catInclusionsInput');
 const catImageInput      = document.getElementById('catImageInput');
 const catImagePreview    = document.getElementById('catImagePreview');
 const catImagePlaceholder= document.getElementById('catImagePlaceholder');
@@ -102,20 +110,38 @@ const pkgModalCancel     = document.getElementById('pkgModalCancel');
 const pkgModalSave       = document.getElementById('pkgModalSave');
 const pkgModalSaveLabel  = document.getElementById('pkgModalSaveLabel');
 const pkgModalMessage    = document.getElementById('pkgModalMessage');
-const pkgImageInput      = document.getElementById('pkgImageInput');
-const pkgImagePreview    = document.getElementById('pkgImagePreview');
-const pkgImagePlaceholder= document.getElementById('pkgImagePlaceholder');
-const pkgFileName        = document.getElementById('pkgFileName');
-const pkgRemoveImageBtn  = document.getElementById('pkgRemoveImageBtn');
+const pkgUnsavedBanner   = document.getElementById('pkgUnsavedBanner');
 const pkgName            = document.getElementById('pkgName');
+const pkgNameError       = document.getElementById('pkgNameError');
 const pkgType            = document.getElementById('pkgType');
+const pkgCategorySelect  = document.getElementById('pkgCategorySelect');
+const pkgCategoryHint    = document.getElementById('pkgCategoryHint');
+const pkgCategoryError   = document.getElementById('pkgCategoryError');
 const pkgDescription     = document.getElementById('pkgDescription');
 const pkgPrice           = document.getElementById('pkgPrice');
-const pkgCapacity        = document.getElementById('pkgCapacity');
+const pkgPriceError      = document.getElementById('pkgPriceError');
 const pkgDuration        = document.getElementById('pkgDuration');
+const pkgDurationError   = document.getElementById('pkgDurationError');
+const pkgMaxQuantityField= document.getElementById('pkgMaxQuantityField');
+const pkgMaxQuantity     = document.getElementById('pkgMaxQuantity');
+const pkgMinGuests       = document.getElementById('pkgMinGuests');
+const pkgMaxGuests       = document.getElementById('pkgMaxGuests');
+const pkgMaxGuestsError  = document.getElementById('pkgMaxGuestsError');
+const pkgGuestRangeHint  = document.getElementById('pkgGuestRangeHint');
 const pkgExtensionPrice  = document.getElementById('pkgExtensionPrice');
+const pkgLocationField   = document.getElementById('pkgLocationField');
 const pkgLocationType    = document.getElementById('pkgLocationType');
+const pkgVenuesField     = document.getElementById('pkgVenuesField');
+const pkgVenuesList      = document.getElementById('pkgVenuesList');
+const pkgVenueCapacityHint = document.getElementById('pkgVenueCapacityHint');
+const pkgBookingScopeField = document.getElementById('pkgBookingScopeField');
 const pkgBookingScope    = document.getElementById('pkgBookingScope');
+const pkgPhotosGrid      = document.getElementById('pkgPhotosGrid');
+const pkgPhotoInput      = document.getElementById('pkgPhotoInput');
+const pkgInclusionsListEl = document.getElementById('pkgInclusionsList');
+const pkgAddInclusionBtn = document.getElementById('pkgAddInclusionBtn');
+const pkgActivationChecklist = document.getElementById('pkgActivationChecklist');
+const pkgActiveToggle    = document.getElementById('pkgActiveToggle');
 
 // ─── DOM: Confirm Modal ───────────────────────────────────────────────────────
 const confirmModal   = document.getElementById('confirmModal');
@@ -126,7 +152,18 @@ const confirmCancel  = document.getElementById('confirmCancel');
 const confirmOk      = document.getElementById('confirmOk');
 const confirmMessage = document.getElementById('confirmMessage');
 
-// ─── DOM: Package tier ───────────────────────────────────────────────────────
+// ─── DOM: Delete/Reassign Modal ───────────────────────────────────────────────
+const deleteModal          = document.getElementById('deleteModal');
+const deleteModalTitle     = document.getElementById('deleteModalTitle');
+const deleteModalCopy      = document.getElementById('deleteModalCopy');
+const deleteModalClose     = document.getElementById('deleteModalClose');
+const deleteModalCancel    = document.getElementById('deleteModalCancel');
+const deleteModalOk        = document.getElementById('deleteModalOk');
+const deleteModalMessage   = document.getElementById('deleteModalMessage');
+const deleteReassignField  = document.getElementById('deleteReassignField');
+const deleteReassignSelect = document.getElementById('deleteReassignSelect');
+
+// ─── DOM: Package tier (Add/Edit form modal) ──────────────────────────────────
 const tierModal          = document.getElementById('tierModal');
 const tierModalTitle     = document.getElementById('tierModalTitle');
 const tierModalSub       = document.getElementById('tierModalSub');
@@ -139,6 +176,39 @@ const tierNameInput      = document.getElementById('tierName');
 const tierSubtitle       = document.getElementById('tierSubtitle');
 const tierFullInclusions = document.getElementById('tierFullInclusions');
 const tierSortOrder      = document.getElementById('tierSortOrder');
+
+// ─── DOM: Tier drawer (right-anchored, replaces the old below-table panel) ────
+const tierDrawerScrim = document.getElementById('tierDrawerScrim');
+const tierDrawer      = document.getElementById('tierDrawer');
+const tierDrawerTitle = document.getElementById('tierDrawerTitle');
+const tierDrawerList  = document.getElementById('tierDrawerList');
+const tierDrawerClose = document.getElementById('tierDrawerClose');
+const tierDrawerDone  = document.getElementById('tierDrawerDone');
+const addTierBtn      = document.getElementById('addTierBtn');
+
+// ─── DOM: Venue View + Modal ──────────────────────────────────────────────────
+const addVenueBtn           = document.getElementById('addVenueBtn');
+const venuePageMessage      = document.getElementById('venuePageMessage');
+const activeVenueSection    = document.getElementById('activeVenueSection');
+const archivedVenueSection  = document.getElementById('archivedVenueSection');
+const activeVenueBody       = document.getElementById('activeVenueBody');
+const archivedVenueBody     = document.getElementById('archivedVenueBody');
+const backToCategoriesFromVenuesBtn = document.getElementById('backToCategoriesFromVenuesBtn');
+
+const venueModal          = document.getElementById('venueModal');
+const venueModalTitle     = document.getElementById('venueModalTitle');
+const venueModalSub       = document.getElementById('venueModalSub');
+const venueModalClose     = document.getElementById('venueModalClose');
+const venueModalCancel    = document.getElementById('venueModalCancel');
+const venueModalSave      = document.getElementById('venueModalSave');
+const venueModalSaveLabel = document.getElementById('venueModalSaveLabel');
+const venueModalMessage   = document.getElementById('venueModalMessage');
+const venueName           = document.getElementById('venueName');
+const venueCapacity       = document.getElementById('venueCapacity');
+const venueDescription    = document.getElementById('venueDescription');
+const venueSortOrder      = document.getElementById('venueSortOrder');
+const venueMappedPackagesField = document.getElementById('venueMappedPackagesField');
+const venueMappedPackagesList  = document.getElementById('venueMappedPackagesList');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -185,7 +255,7 @@ function normalizeTierInclusions(raw) {
     .join('\n');               // store as newline-separated
 }
 
-// ─── Cloudinary upload ────────────────────────────────────────────────────────
+// ─── Cloudinary upload / cleanup ──────────────────────────────────────────────
 async function uploadToCloudinary(file, folder = 'eli_coffee_packages') {
   const form = new FormData();
   form.append('file', file);
@@ -201,6 +271,17 @@ async function uploadToCloudinary(file, folder = 'eli_coffee_packages') {
   return data.secure_url;
 }
 
+// Best-effort — a failed Cloudinary cleanup should never block a DB delete
+// the admin is waiting on (mirrors the payment-methods delete pattern).
+async function destroyCloudinaryImage(imageUrl) {
+  if (!imageUrl) return;
+  try {
+    await supabase.functions.invoke('delete-cloudinary-image', { body: { image_url: imageUrl } });
+  } catch (err) {
+    console.warn('[Packages] Cloudinary cleanup failed (non-blocking):', err?.message || err);
+  }
+}
+
 function validateImageFile(file) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
     return 'Only JPG, PNG, or WEBP images are allowed.';
@@ -209,6 +290,36 @@ function validateImageFile(file) {
     return 'Image must be under 5 MB.';
   }
   return null;
+}
+
+// Caps the long edge at MAX_PHOTO_EDGE before upload — unresized phone
+// photos make the customer catalogue unusable on mobile data.
+function resizeImageFile(file, maxEdge = MAX_PHOTO_EDGE) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width <= maxEdge && height <= maxEdge) { resolve(file); return; }
+        const scale = maxEdge / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          resolve(blob ? new File([blob], file.name, { type: file.type }) : file);
+        }, file.type, 0.9);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
 }
 
 function previewImageFile(file, previewEl, placeholderEl, fileNameEl) {
@@ -230,101 +341,357 @@ function clearImageUI(previewEl, placeholderEl, fileNameEl, inputEl) {
   if (inputEl) inputEl.value = '';
 }
 
+// ─── Reference counting (delete-vs-archive, mirrors the payment-methods pattern) ─
+async function countPackageReservationRefs(packageId) {
+  const { count, error } = await supabase
+    .from('reservations')
+    .select('reservation_id', { count: 'exact', head: true })
+    .or(`package_id.eq.${packageId},add_on_id.eq.${packageId}`);
+  if (error) throw error;
+  return count || 0;
+}
+
+async function countCategoryPackageRefs(categoryId) {
+  const { count, error } = await supabase
+    .from('package')
+    .select('package_id', { count: 'exact', head: true })
+    .eq('package_category_id', categoryId);
+  if (error) throw error;
+  return count || 0;
+}
+
+async function getVenueMappedPackages(venueId) {
+  const { data, error } = await supabase
+    .from(PACKAGE_VENUE_TABLE)
+    .select('package_id')
+    .eq('venue_id', venueId);
+  if (error) throw error;
+  const ids = (data || []).map(r => r.package_id);
+  if (!ids.length) return [];
+  const { data: pkgs, error: pkgErr } = await supabase
+    .from('package')
+    .select('package_id, package_name')
+    .in('package_id', ids);
+  if (pkgErr) throw pkgErr;
+  return pkgs || [];
+}
+
+// Lazy, batched reservation reference counts for archived packages — only
+// fetched for ids not already cached, so viewing the Archived segment
+// repeatedly doesn't re-query.
+async function ensureArchivedRefCounts(ids) {
+  const missing = ids.filter(id => !archivedRefCountCache.has(id));
+  if (!missing.length) return false;
+  try {
+    const { data, error } = await supabase
+      .from('reservations')
+      .select('package_id, add_on_id')
+      .or(`package_id.in.(${missing.join(',')}),add_on_id.in.(${missing.join(',')})`);
+    if (error) throw error;
+    const counts = {};
+    (data || []).forEach(r => {
+      if (r.package_id && missing.includes(r.package_id)) counts[r.package_id] = (counts[r.package_id] || 0) + 1;
+      if (r.add_on_id && missing.includes(r.add_on_id)) counts[r.add_on_id] = (counts[r.add_on_id] || 0) + 1;
+    });
+    missing.forEach(id => archivedRefCountCache.set(id, counts[id] || 0));
+  } catch {
+    missing.forEach(id => archivedRefCountCache.set(id, 0));
+  }
+  return true;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // VIEW SWITCHING
 // ═══════════════════════════════════════════════════════════════════════════════
-function showCategoryView() {
-  activeCategoryId   = null;
-  activeCategoryName = '';
-  categoryView.style.display = '';
-  packageView.style.display  = 'none';
-  pkgShowingArchived = false;
-  applyPkgArchiveToggle();
+function hideAllViews() {
+  inventoryView.style.display = 'none';
+  venueView.style.display     = 'none';
 }
 
-function showPackageView(categoryId, categoryName) {
-  activeCategoryId   = categoryId;
-  activeCategoryName = categoryName;
-
-  breadcrumbCatName.textContent = categoryName;
-  pkgViewTitle.textContent      = categoryName;
-  pkgViewSub.textContent        = `Manage packages in "${categoryName}"`;
-
-  categoryView.style.display = 'none';
-  packageView.style.display  = '';
-
-  pkgShowingArchived = false;
-  applyPkgArchiveToggle();
-  pkgSearchInput.value = '';
-  pkgTypeFilter.value  = '';
-
-  loadPackagesForCategory(categoryId);
+function showInventoryView() {
+  hideAllViews();
+  inventoryView.style.display = '';
 }
 
-backToCategoriesBtn.addEventListener('click', showCategoryView);
-breadcrumbLink.addEventListener('click', showCategoryView);
-breadcrumbLink.style.cursor = 'pointer';
+async function showVenueView() {
+  hideAllViews();
+  venueView.style.display = '';
+  await loadVenues();
+}
+
+openVenuesBtn.addEventListener('click', showVenueView);
+backToCategoriesFromVenuesBtn.addEventListener('click', showInventoryView);
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CATEGORY: SUPABASE
+// INVENTORY: LOAD (all categories + all packages, batched venue/tier counts)
 // ═══════════════════════════════════════════════════════════════════════════════
-
-
-async function loadCategories() {
-  setMessage(catPageMessage, 'Loading categories…');
-  try {
-    // Load categories
-    const { data: cats, error: catErr } = await supabase
-      .from(CATEGORY_TABLE)
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (catErr) throw catErr;
-    allCategories = cats || [];
-
-    // Load all packages to count per category
-    const { data: pkgs, error: pkgErr } = await supabase
-      .from('package')
-      .select('package_id, package_category_id, is_active');
-    if (pkgErr) throw pkgErr;
-    allPackages = pkgs || [];
-
-    renderCategoryTables();
-    setMessage(catPageMessage, '');
-  } catch (err) {
-    setMessage(catPageMessage, `Failed to load categories: ${err.message}`, 'error');
-    renderCategoryTables();
-  }
-}
-
-async function loadPackagesForCategory(categoryId) {
-  setMessage(pkgPageMessage, 'Loading packages…');
+async function loadCoverPhotosForAllPackages() {
+  const ids = allPackages.map(p => p.package_id);
+  if (!ids.length) return;
   try {
     const { data, error } = await supabase
-      .from('package')
-      .select('*')
-      .eq('package_category_id', categoryId)
-      .order('created_at', { ascending: false });
+      .from(PACKAGE_PHOTO_TABLE)
+      .select('package_id, image_url, is_cover')
+      .in('package_id', ids)
+      .eq('is_cover', true);
     if (error) throw error;
-    allPackages = data || [];
-    renderPackageTables();
-    setMessage(pkgPageMessage, '');
+    const byId = {};
+    (data || []).forEach(row => { byId[row.package_id] = row.image_url; });
+    allPackages.forEach(p => { p._coverImage = byId[p.package_id] || null; });
+  } catch {
+    // Non-fatal — thumbnails just fall back to the legacy package_image.
+  }
+}
+
+async function loadInventory() {
+  setMessage(inventoryPageMessage, 'Loading inventory…');
+  try {
+    const [
+      { data: cats, error: catErr },
+      { data: pkgs, error: pkgErr },
+      { data: venueMaps, error: vmErr },
+      { data: tiers, error: tierErr }
+    ] = await Promise.all([
+      supabase.from(CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+      supabase.from('package').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+      supabase.from(PACKAGE_VENUE_TABLE).select('package_id'),
+      supabase.from(TIER_TABLE).select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+    ]);
+    if (catErr) throw catErr;
+    if (pkgErr) throw pkgErr;
+    if (vmErr) throw vmErr;
+    if (tierErr) throw tierErr;
+
+    allCategories = cats || [];
+    allPackages   = pkgs || [];
+
+    allPackageVenueCounts = new Map();
+    (venueMaps || []).forEach(row => {
+      allPackageVenueCounts.set(row.package_id, (allPackageVenueCounts.get(row.package_id) || 0) + 1);
+    });
+
+    allTiersByPackage = new Map();
+    (tiers || []).forEach(t => {
+      if (!allTiersByPackage.has(t.package_id)) allTiersByPackage.set(t.package_id, []);
+      allTiersByPackage.get(t.package_id).push(t);
+    });
+
+    await loadCoverPhotosForAllPackages();
+
+    renderCategoryRail();
+    renderInventory();
+    setMessage(inventoryPageMessage, '');
   } catch (err) {
-    setMessage(pkgPageMessage, `Failed to load packages: ${err.message}`, 'error');
-    renderPackageTables();
+    setMessage(inventoryPageMessage, `Failed to load inventory: ${err.message}`, 'error');
+    renderCategoryRail();
+    renderInventory();
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CATEGORY: RENDERING
+// HEALTH STRIP
 // ═══════════════════════════════════════════════════════════════════════════════
-function getCategoryPackageCount(catId) {
-  // Count from preloaded package list (loaded in loadCategories)
-  return allPackages.filter(p => p.package_category_id === catId && p.is_active).length;
+function computeHealthIssues() {
+  const ids = new Set();
+  allPackages.forEach(pkg => {
+    if (!pkg.is_active) return;
+    const isAddon = pkg.package_type === 'add on';
+    const hasPhoto = !!(pkg._coverImage || pkg.package_image);
+    const isOnsite = pkg.location_type === 'onsite' || pkg.location_type === 'both';
+    const needsVenue = !isAddon && isOnsite && !(allPackageVenueCounts.get(pkg.package_id) > 0);
+    if (!hasPhoto || needsVenue) ids.add(pkg.package_id);
+  });
+  return { count: ids.size, ids };
 }
 
-function buildCatThumb(cat) {
-  if (cat.category_image) {
-    return `<div class="pkg-thumb"><img src="${escapeHtml(cat.category_image)}" alt="${escapeHtml(cat.category_name)}" loading="lazy"></div>`;
+function renderHealthStrip() {
+  const { count } = computeHealthIssues();
+  if (!count) {
+    healthStrip.classList.add('hidden');
+    healthFilterActive = false;
+    return;
+  }
+  healthStrip.classList.remove('hidden');
+  healthStripCopy.textContent = `${count} package${count === 1 ? '' : 's'} can't be booked yet. Missing a photo or a venue assignment keeps them hidden from customers even while active.`;
+}
+
+healthStripAction.addEventListener('click', () => {
+  healthFilterActive = true;
+  inventorySearchInput.value = '';
+  selectedKind = '';
+  selectedStatus = 'active';
+  selectedRailCategoryId = null;
+  syncKindSegUI();
+  syncStatusSegUI();
+  renderCategoryRail();
+  renderInventory();
+});
+
+function syncKindSegUI() {
+  kindSeg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.kind === selectedKind));
+}
+function syncStatusSegUI() {
+  statusSeg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.status === selectedStatus));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CATEGORY RAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderCategoryRail() {
+  // Guard: if the previously-selected category no longer exists (deleted), fall back to All.
+  if (selectedRailCategoryId && selectedRailCategoryId !== 'uncategorised' &&
+      !allCategories.some(c => c.package_category_id === selectedRailCategoryId)) {
+    selectedRailCategoryId = null;
+  }
+
+  const activeCount = allPackages.filter(p => p.is_active).length;
+  const uncatCount  = allPackages.filter(p => p.is_active && !p.package_category_id).length;
+
+  const allItem = `
+    <button type="button" class="rail-item ${selectedRailCategoryId === null ? 'active' : ''}" data-rail-id="all">
+      <span class="rail-swatch" style="background:var(--btn-primary-bg)"></span>
+      <span class="rail-item-name">All</span>
+      <span class="rail-count">${activeCount}</span>
+    </button>`;
+
+  const catItems = allCategories.map(cat => {
+    const count = allPackages.filter(p => p.package_category_id === cat.package_category_id && p.is_active).length;
+    const isArchived = !cat.is_active;
+    const kebabItems = isArchived
+      ? `<button type="button" class="card-menu-item" data-cat-action="edit" data-id="${cat.package_category_id}">Edit</button>
+         <button type="button" class="card-menu-item" data-cat-action="restore" data-id="${cat.package_category_id}">Restore</button>
+         <div class="card-menu-divider"></div>
+         <button type="button" class="card-menu-item destructive" data-cat-action="delete" data-id="${cat.package_category_id}">Delete</button>`
+      : `<button type="button" class="card-menu-item" data-cat-action="edit" data-id="${cat.package_category_id}">Edit</button>
+         <button type="button" class="card-menu-item" data-cat-action="archive" data-id="${cat.package_category_id}">Archive</button>
+         <div class="card-menu-divider"></div>
+         <button type="button" class="card-menu-item destructive" data-cat-action="delete" data-id="${cat.package_category_id}">Delete</button>`;
+    return `
+      <div class="rail-item-wrap card-menu">
+        <button type="button" class="rail-item ${selectedRailCategoryId === cat.package_category_id ? 'active' : ''} ${isArchived ? 'is-archived' : ''}" data-rail-id="${cat.package_category_id}">
+          <span class="rail-swatch"></span>
+          <span class="rail-item-name">${escapeHtml(cat.category_name)}${isArchived ? ' (archived)' : ''}</span>
+          <span class="rail-count">${count}</span>
+        </button>
+        <button type="button" class="icon-btn" data-menu-trigger aria-haspopup="true" aria-expanded="false" aria-label="More actions for ${escapeHtml(cat.category_name)}">⋮</button>
+        <div class="card-menu-popover" hidden>${kebabItems}</div>
+      </div>`;
+  }).join('');
+
+  const uncatItem = `
+    <button type="button" class="rail-item ${uncatCount > 0 ? 'rail-flag' : ''} ${selectedRailCategoryId === 'uncategorised' ? 'active' : ''}" data-rail-id="uncategorised">
+      <span class="rail-swatch" style="background:var(--muted-2)"></span>
+      <span class="rail-item-name">Uncategorised</span>
+      <span class="rail-count">${uncatCount}</span>
+    </button>`;
+
+  categoryRail.innerHTML = allItem + catItems + uncatItem;
+}
+
+categoryRail.addEventListener('click', (e) => {
+  const menuTrigger = e.target.closest('[data-menu-trigger]');
+  if (menuTrigger) {
+    const popover = menuTrigger.nextElementSibling;
+    const isOpen = openCardMenuEl === popover;
+    closeOpenCardMenu();
+    if (!isOpen) { popover.hidden = false; menuTrigger.setAttribute('aria-expanded', 'true'); openCardMenuEl = popover; }
+    return;
+  }
+  const catActionBtn = e.target.closest('[data-cat-action]');
+  if (catActionBtn) {
+    closeOpenCardMenu();
+    handleCatTableAction(e);
+    return;
+  }
+  const railBtn = e.target.closest('.rail-item[data-rail-id]');
+  if (railBtn) {
+    const id = railBtn.dataset.railId;
+    selectedRailCategoryId = id === 'all' ? null : id;
+    healthFilterActive = false;
+    renderCategoryRail();
+    renderInventory();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KEBAB MENU (shared: package cards, list rows, category rail items)
+// ═══════════════════════════════════════════════════════════════════════════════
+function closeOpenCardMenu() {
+  if (openCardMenuEl) {
+    openCardMenuEl.hidden = true;
+    const trigger = openCardMenuEl.previousElementSibling;
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    openCardMenuEl = null;
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (openCardMenuEl && !e.target.closest('.card-menu')) closeOpenCardMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && openCardMenuEl) closeOpenCardMenu();
+});
+
+function buildCardMenu(pkg) {
+  const isArchived = !pkg.is_active;
+  const isAddon = pkg.package_type === 'add on';
+  const items = isArchived
+    ? [
+        { action: 'edit', label: 'Edit' },
+        { action: 'delete', label: 'Delete', destructive: true },
+      ]
+    : [
+        { action: 'duplicate', label: 'Duplicate' },
+        ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }]),
+        { divider: true },
+        { action: 'archive', label: 'Archive' },
+        { action: 'delete', label: 'Delete', destructive: true },
+      ];
+  const itemsHtml = items.map(it => {
+    if (it.divider) return '<div class="card-menu-divider"></div>';
+    return `<button type="button" class="card-menu-item ${it.destructive ? 'destructive' : ''}" data-pkg-action="${it.action}" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">${it.label}</button>`;
+  }).join('');
+  return `
+    <div class="card-menu">
+      <button type="button" class="icon-btn" data-menu-trigger aria-haspopup="true" aria-expanded="false" aria-label="More actions for ${escapeHtml(pkg.package_name)}">⋮</button>
+      <div class="card-menu-popover" hidden>${itemsHtml}</div>
+    </div>`;
+}
+
+function handleInventoryClick(e) {
+  const trigger = e.target.closest('[data-menu-trigger]');
+  if (trigger) {
+    const popover = trigger.nextElementSibling;
+    const isOpen = openCardMenuEl === popover;
+    closeOpenCardMenu();
+    if (!isOpen) { popover.hidden = false; trigger.setAttribute('aria-expanded', 'true'); openCardMenuEl = popover; }
+    return;
+  }
+  if (e.target.closest('[data-pkg-action]')) {
+    closeOpenCardMenu();
+    handlePkgTableAction(e);
+    return;
+  }
+  closeOpenCardMenu();
+}
+
+inventoryGrid.addEventListener('click', handleInventoryClick);
+inventoryListBody.addEventListener('click', handleInventoryClick);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVENTORY: FILTER + RENDER
+// ═══════════════════════════════════════════════════════════════════════════════
+function guestRangeLabel(pkg) {
+  const min = pkg.min_guests;
+  const max = pkg.max_guests ?? pkg.guest_capacity;
+  if (min && max) return `${min}–${max} pax`;
+  return formatCapacity(max);
+}
+
+function buildPkgThumb(pkg) {
+  const cover = pkg._coverImage || pkg.package_image;
+  if (cover) {
+    return `<div class="pkg-thumb"><img src="${escapeHtml(cover)}" alt="${escapeHtml(pkg.package_name)}" loading="lazy"></div>`;
   }
   return `<div class="pkg-thumb">
     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -333,115 +700,198 @@ function buildCatThumb(cat) {
   </div>`;
 }
 
-function buildCatRow(cat) {
-  const isArchived = !cat.is_active;
-  const pkgCount = getCategoryPackageCount(cat.package_category_id);
+function buildTierLadder(pkg) {
+  if (pkg.package_type === 'add on') {
+    return `<p class="tier-ladder">Add-ons don't use tiers</p>`;
+  }
+  const tiers = allTiersByPackage.get(pkg.package_id) || [];
+  if (!tiers.length) {
+    return `<p class="tier-ladder"><button type="button" class="tier-ladder-link" data-pkg-action="tiers" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">No tiers set — Add tiers</button></p>`;
+  }
+  const bars = tiers.slice(0, 3).map(() => '<span class="tier-ladder-bar"></span>').join('');
+  return `<p class="tier-ladder"><span class="tier-ladder-bars">${bars}</span>&nbsp;${tiers.length} tier${tiers.length === 1 ? '' : 's'} · <button type="button" class="tier-ladder-link" data-pkg-action="tiers" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">Manage</button></p>`;
+}
 
-  const actions = isArchived
-    ? `<div class="action-cell">
-        <button class="action-btn edit" data-cat-action="edit" data-id="${cat.package_category_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Edit
-        </button>
-        <button class="action-btn restore" data-cat-action="restore" data-id="${cat.package_category_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          Restore
-        </button>
-      </div>`
-    : `<div class="action-cell">
-        <button class="action-btn view" data-cat-action="view" data-id="${cat.package_category_id}" data-name="${escapeHtml(cat.category_name)}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          View
-        </button>
-        <button class="action-btn edit" data-cat-action="edit" data-id="${cat.package_category_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Edit
-        </button>
-        <button class="action-btn archive" data-cat-action="archive" data-id="${cat.package_category_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          Archive
-        </button>
-      </div>`;
+function archivedReasonLine(pkg) {
+  const count = archivedRefCountCache.get(pkg.package_id);
+  if (count === undefined) return `<p class="tier-ladder">Archived</p>`;
+  if (count === 0) return `<p class="tier-ladder">Not used on any booking</p>`;
+  return `<p class="tier-ladder">Kept on ${count} past booking${count === 1 ? '' : 's'}</p>`;
+}
+
+function buildPkgCard(pkg) {
+  const isArchived = !pkg.is_active;
+  const isAddon = pkg.package_type === 'add on';
+  const isOffsite = pkg.location_type === 'offsite';
+  const needsVenue = !isArchived && !isAddon && (pkg.location_type === 'onsite' || pkg.location_type === 'both') && !(allPackageVenueCounts.get(pkg.package_id) > 0);
+  const cat = allCategories.find(c => c.package_category_id === pkg.package_category_id);
+  const catLabel = cat ? cat.category_name : 'Uncategorised';
+  const modeLabel = isAddon
+    ? 'Add-on'
+    : pkg.location_type === 'onsite' ? 'Onsite'
+    : pkg.location_type === 'offsite' ? 'Travels to you'
+    : pkg.location_type === 'both' ? 'Onsite or travels'
+    : '—';
+
+  const flags = [];
+  if (needsVenue) flags.push('<span class="pkg-flag flag-warn">Needs venue</span>');
+  if (isOffsite) flags.push('<span class="pkg-flag flag-neutral">Offsite</span>');
+  if (isArchived) flags.push('<span class="pkg-flag flag-archived">Archived</span>');
+
+  const photo = pkg._coverImage || pkg.package_image;
+  const photoHtml = photo
+    ? `<img class="pkg-card-photo" src="${escapeHtml(photo)}" alt="${escapeHtml(pkg.package_name)}" loading="lazy">`
+    : `<div class="pkg-card-photo-empty">No photo</div>`;
+
+  const inlineAction = isArchived
+    ? `<button type="button" class="pkg-card-icon-btn" data-pkg-action="restore" data-id="${pkg.package_id}" aria-label="Restore ${escapeHtml(pkg.package_name)}">↺</button>`
+    : `<button type="button" class="pkg-card-icon-btn" data-pkg-action="edit" data-id="${pkg.package_id}" aria-label="Edit ${escapeHtml(pkg.package_name)}">✎</button>`;
+
+  return `
+    <div class="pkg-card ${isArchived ? 'is-archived' : ''}" data-package-id="${pkg.package_id}">
+      <div class="pkg-card-photo-wrap">
+        ${photoHtml}
+        <div class="pkg-card-flags">${flags.join('')}</div>
+        <div class="pkg-card-actions">
+          ${inlineAction}
+          ${buildCardMenu(pkg)}
+        </div>
+      </div>
+      <div class="pkg-card-body">
+        <div class="pkg-card-name">${escapeHtml(pkg.package_name)}</div>
+        <p class="pkg-card-meta">${escapeHtml(catLabel)} · ${escapeHtml(modeLabel)}</p>
+        <div class="pkg-spec-line">
+          <span class="pkg-spec-price">${formatCurrency(pkg.price)}</span>
+          <span class="spec-leader"></span>
+          <span class="spec-figures">${escapeHtml(guestRangeLabel(pkg))} · ${escapeHtml(formatDuration(pkg.duration_hours))}</span>
+        </div>
+        ${isArchived ? archivedReasonLine(pkg) : buildTierLadder(pkg)}
+      </div>
+    </div>`;
+}
+
+function buildPkgListRow(pkg) {
+  const isArchived = !pkg.is_active;
+  const cat = allCategories.find(c => c.package_category_id === pkg.package_category_id);
+  const catLabel = cat ? cat.category_name : 'Uncategorised';
+  const needsVenue = !isArchived && pkg.package_type !== 'add on' &&
+    (pkg.location_type === 'onsite' || pkg.location_type === 'both') && !(allPackageVenueCounts.get(pkg.package_id) > 0);
+
+  const inlineAction = isArchived
+    ? `<button type="button" class="action-btn edit" data-pkg-action="restore" data-id="${pkg.package_id}">Restore</button>`
+    : `<button type="button" class="action-btn edit" data-pkg-action="edit" data-id="${pkg.package_id}">Edit</button>`;
 
   return `<tr>
     <td>
-      <div class="pkg-cell clickable-cat" data-cat-action="view" data-id="${cat.package_category_id}" data-name="${escapeHtml(cat.category_name)}">
-        ${buildCatThumb(cat)}
+      <div class="pkg-cell">
+        ${buildPkgThumb(pkg)}
         <div>
-          <div class="pkg-name">${escapeHtml(cat.category_name)}</div>
-          <div class="pkg-id">${escapeHtml(cat.package_category_id.slice(0, 8))}…</div>
+          <div class="pkg-name">${escapeHtml(pkg.package_name)}</div>
+          <div>
+            ${isArchived ? '<span class="status-pill archived">Archived</span>' : ''}
+            ${needsVenue ? '<span class="pkg-flag flag-warn">Needs venue</span>' : ''}
+          </div>
         </div>
       </div>
     </td>
-    <td><span class="count-pill">${pkgCount} active package${pkgCount !== 1 ? 's' : ''}</span></td>
-    <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
-    <td>${actions}</td>
+    <td>${escapeHtml(catLabel)}</td>
+    <td>${escapeHtml(formatCurrency(pkg.price))}</td>
+    <td>${escapeHtml(guestRangeLabel(pkg))}</td>
+    <td>${buildTierLadder(pkg)}</td>
+    <td>
+      <div class="list-actions">
+        ${inlineAction}
+        ${buildCardMenu(pkg)}
+      </div>
+    </td>
   </tr>`;
 }
 
-function getFilteredCategories(isActive) {
-  const term = (catSearchInput.value || '').trim().toLowerCase();
-  return allCategories.filter(cat => {
-    if (Boolean(cat.is_active) !== isActive) return false;
-    if (term && !(cat.category_name || '').toLowerCase().includes(term)) return false;
+function emptyStateCopy() {
+  if (healthFilterActive) return "Nothing left to fix — the health strip will clear once this reloads.";
+  if (selectedStatus === 'archived') return 'No archived packages here yet.';
+  const catNote = selectedRailCategoryId === 'uncategorised' ? ' in Uncategorised' : selectedRailCategoryId ? ' in this category' : '';
+  return `No packages${catNote} yet. Add one so customers have something to book.`;
+}
+
+function getFilteredInventory() {
+  const term = (inventorySearchInput.value || '').trim().toLowerCase();
+
+  if (healthFilterActive) {
+    const { ids } = computeHealthIssues();
+    return allPackages.filter(p => ids.has(p.package_id));
+  }
+
+  return allPackages.filter(pkg => {
+    const isActive = selectedStatus === 'active';
+    if (Boolean(pkg.is_active) !== isActive) return false;
+    if (selectedKind && pkg.package_type !== selectedKind) return false;
+    if (selectedRailCategoryId === 'uncategorised') {
+      if (pkg.package_category_id) return false;
+    } else if (selectedRailCategoryId) {
+      if (pkg.package_category_id !== selectedRailCategoryId) return false;
+    }
+    if (term) {
+      const hay = `${pkg.package_name} ${pkg.package_type} ${pkg.description || ''}`.toLowerCase();
+      if (!hay.includes(term)) return false;
+    }
     return true;
   });
 }
 
-function renderCategoryTables() {
-  const active   = getFilteredCategories(true);
-  const archived = getFilteredCategories(false);
+function renderInventory() {
+  const filtered = getFilteredInventory();
 
-  activeCatBody.innerHTML = active.length
-    ? active.map(buildCatRow).join('')
-    : '<tr class="empty-row"><td colspan="4">No active categories found.</td></tr>';
-
-  archivedCatBody.innerHTML = archived.length
-    ? archived.map(buildCatRow).join('')
-    : '<tr class="empty-row"><td colspan="4">No archived categories.</td></tr>';
-
-  updateCategoryStats();
-}
-
-function updateCategoryStats() {
-  const active   = allCategories.filter(c => c.is_active).length;
-  const archived = allCategories.filter(c => !c.is_active).length;
-  catStatActive.textContent   = active;
-  catStatArchived.textContent = archived;
-  catStatTotal.textContent    = allCategories.length;
-}
-
-// ─── Category archive toggle ─────────────────────────────────────────────────
-function applyCatArchiveToggle() {
-  if (catShowingArchived) {
-    archivedCatSection.style.display = '';
-    activeCatSection.style.display   = 'none';
-    catToggleArchiveLabel.textContent = 'Show Active';
-    catToggleArchiveBtn.classList.add('showing-active');
+  if (viewMode === 'grid') {
+    inventoryGrid.classList.remove('hidden');
+    inventoryListWrap.classList.add('hidden');
+    inventoryGrid.innerHTML = filtered.length
+      ? filtered.map(buildPkgCard).join('')
+      : `<p class="page-message">${emptyStateCopy()}</p>`;
   } else {
-    activeCatSection.style.display   = '';
-    archivedCatSection.style.display = 'none';
-    catToggleArchiveLabel.textContent = 'Show Archived';
-    catToggleArchiveBtn.classList.remove('showing-active');
+    inventoryGrid.classList.add('hidden');
+    inventoryListWrap.classList.remove('hidden');
+    inventoryListBody.innerHTML = filtered.length
+      ? filtered.map(buildPkgListRow).join('')
+      : `<tr class="empty-row"><td colspan="6">${emptyStateCopy()}</td></tr>`;
+  }
+
+  renderHealthStrip();
+
+  if (selectedStatus === 'archived' && filtered.length) {
+    ensureArchivedRefCounts(filtered.map(p => p.package_id)).then(changed => {
+      if (changed) renderInventory();
+    });
   }
 }
 
-catToggleArchiveBtn.addEventListener('click', () => { catShowingArchived = !catShowingArchived; applyCatArchiveToggle(); });
-catSearchInput.addEventListener('input', renderCategoryTables);
-
-// ─── Category table action delegation ─────────────────────────────────────────
-function handleCatTableAction(e) {
-  const btn = e.target.closest('[data-cat-action]');
+kindSeg.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
   if (!btn) return;
-  const { catAction, id, name } = btn.dataset;
-  if (catAction === 'view')    showPackageView(id, name);
-  if (catAction === 'edit')    openEditCategoryModal(id);
-  if (catAction === 'archive') openConfirmArchiveCategory(id);
-  if (catAction === 'restore') openConfirmRestoreCategory(id);
-}
+  selectedKind = btn.dataset.kind;
+  healthFilterActive = false;
+  syncKindSegUI();
+  renderInventory();
+});
 
-activeCatBody.addEventListener('click', handleCatTableAction);
-archivedCatBody.addEventListener('click', handleCatTableAction);
+statusSeg.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  selectedStatus = btn.dataset.status;
+  healthFilterActive = false;
+  syncStatusSegUI();
+  renderInventory();
+});
+
+viewSeg.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  viewMode = btn.dataset.view;
+  viewSeg.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+  renderInventory();
+});
+
+inventorySearchInput.addEventListener('input', () => { healthFilterActive = false; renderInventory(); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CATEGORY: MODAL (Add / Edit)
@@ -453,7 +903,7 @@ function openAddCategoryModal() {
   catModalSub.textContent       = 'Create a new package category';
   catModalSaveLabel.textContent = 'Add Category';
   catNameInput.value = '';
-  catDescriptionInput.value = '';   
+  catDescriptionInput.value = '';
   catInclusionsInput.value  = '';
   catImageInput.value = '';
   clearImageUI(catImagePreview, catImagePlaceholder, catFileName, catImageInput);
@@ -472,8 +922,8 @@ function openEditCategoryModal(catId) {
   catModalSub.textContent       = 'Update category details';
   catModalSaveLabel.textContent = 'Save Changes';
   catNameInput.value = cat.category_name || '';
-  catDescriptionInput.value = cat.description || '';                      
-  catInclusionsInput.value  = cat.package_category_inclusions || ''; 
+  catDescriptionInput.value = cat.description || '';
+  catInclusionsInput.value  = cat.package_category_inclusions || '';
 
   if (cat.category_image) {
     catImagePreview.src = cat.category_image;
@@ -513,8 +963,8 @@ catRemoveImageBtn.addEventListener('click', () => {
 // Category save
 catModalSave.addEventListener('click', async () => {
   const name = catNameInput.value.trim();
-  const description = catDescriptionInput.value.trim();                   
-  const inclusions  = catInclusionsInput.value.trim(); 
+  const description = catDescriptionInput.value.trim();
+  const inclusions  = catInclusionsInput.value.trim();
 
   if (!name) { setModalMsg(catModalMessage, 'Category name is required.'); return; }
 
@@ -533,7 +983,7 @@ catModalSave.addEventListener('click', async () => {
       imageUrl = null; // explicitly clear
     }
 
-    const payload = { 
+    const payload = {
       category_name: name,
       description: description,
       package_category_inclusions: inclusions
@@ -556,7 +1006,7 @@ catModalSave.addEventListener('click', async () => {
         details:  `Category updated: ${name}`,
         entityId: editingCategoryId
       });
-      setMessage(catPageMessage, 'Category updated successfully.', 'success');
+      setMessage(inventoryPageMessage, 'Category updated successfully.', 'success');
     } else {
       payload.is_active = true;
       const { data, error } = await supabase
@@ -572,10 +1022,11 @@ catModalSave.addEventListener('click', async () => {
         details:  `New category created: ${name}`,
         entityId: data.package_category_id
       });
-      setMessage(catPageMessage, 'Category added successfully.', 'success');
+      setMessage(inventoryPageMessage, 'Category added successfully.', 'success');
     }
 
-    renderCategoryTables();
+    renderCategoryRail();
+    renderInventory();
     closeModal(categoryModal);
 
   } catch (err) {
@@ -594,7 +1045,7 @@ catModalCancel.addEventListener('click', () => closeModal(categoryModal));
 categoryModal.addEventListener('click', e => { if (e.target === categoryModal) closeModal(categoryModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CATEGORY: ARCHIVE / RESTORE
+// CATEGORY: ARCHIVE / RESTORE / DELETE
 // ═══════════════════════════════════════════════════════════════════════════════
 function openConfirmArchiveCategory(catId) {
   const cat = allCategories.find(c => c.package_category_id === catId);
@@ -620,227 +1071,569 @@ function openConfirmRestoreCategory(catId) {
   openModal(confirmModal);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE: RENDERING
-// ═══════════════════════════════════════════════════════════════════════════════
-function buildPkgThumb(pkg) {
-  if (pkg.package_image) {
-    return `<div class="pkg-thumb"><img src="${escapeHtml(pkg.package_image)}" alt="${escapeHtml(pkg.package_name)}" loading="lazy"></div>`;
+// Category delete: blocked while any package references it — offer
+// reassignment to another active category rather than a dead end.
+async function openConfirmDeleteCategory(catId) {
+  const cat = allCategories.find(c => c.package_category_id === catId);
+  if (!cat) return;
+
+  setMessage(inventoryPageMessage, 'Checking packages…');
+  let count;
+  try {
+    count = await countCategoryPackageRefs(catId);
+  } catch (err) {
+    setMessage(inventoryPageMessage, `Failed to check packages: ${err.message}`, 'error');
+    return;
   }
-  return `<div class="pkg-thumb">
-    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-    </svg>
-  </div>`;
-}
+  setMessage(inventoryPageMessage, '');
 
-function buildPkgRow(pkg) {
-  const isArchived = !pkg.is_active;
-  const actions = isArchived
-    ? `<div class="action-cell">
-        <button class="action-btn edit" data-pkg-action="edit" data-id="${pkg.package_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Edit
-        </button>
-        <button class="action-btn restore" data-pkg-action="restore" data-id="${pkg.package_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          Restore
-        </button>
-      </div>`
-    : `<div class="action-cell">
-        <button class="action-btn tiers" data-pkg-action="tiers" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          Tiers
-        </button>
-        <button class="action-btn edit" data-pkg-action="edit" data-id="${pkg.package_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Edit
-        </button>
-        <button class="action-btn archive" data-pkg-action="archive" data-id="${pkg.package_id}">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          Archive
-        </button>
-      </div>`;
+  pendingDeleteAction = { scope: 'category', id: catId };
+  deleteModalOk.disabled = false;
 
-  return `<tr>
-    <td>
-      <div class="pkg-cell">
-        ${buildPkgThumb(pkg)}
-        <div>
-          <div class="pkg-name">${escapeHtml(pkg.package_name)}</div>
-          <div class="pkg-id">${escapeHtml(pkg.package_id.slice(0, 8))}…</div>
-        </div>
-      </div>
-    </td>
-    <td><span class="category-pill">${escapeHtml(pkg.package_type || '—')}</span></td>
-    <td>${escapeHtml(formatCurrency(pkg.price))}</td>
-    <td>${escapeHtml(formatCapacity(pkg.guest_capacity))}</td>
-    <td>${escapeHtml(formatDuration(pkg.duration_hours))}</td>
-    <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
-    <td>${actions}</td>
-  </tr>`;
-}
+  if (count > 0) {
+    const others = allCategories.filter(c => c.package_category_id !== catId && c.is_active);
+    deleteReassignField.classList.remove('hidden');
+    deleteReassignSelect.innerHTML = others
+      .map(c => `<option value="${c.package_category_id}">${escapeHtml(c.category_name)}</option>`)
+      .join('');
 
-function getFilteredPackages(isActive) {
-  const term    = (pkgSearchInput.value || '').trim().toLowerCase();
-  const typeVal = pkgTypeFilter.value;
-  return allPackages.filter(pkg => {
-    if (Boolean(pkg.is_active) !== isActive) return false;
-    if (typeVal && pkg.package_type !== typeVal) return false;
-    if (term) {
-      const hay = `${pkg.package_name} ${pkg.package_type} ${pkg.description || ''}`.toLowerCase();
-      if (!hay.includes(term)) return false;
+    deleteModalTitle.textContent = 'Category In Use';
+    if (others.length) {
+      deleteModalCopy.textContent = `${count} package${count === 1 ? '' : 's'} use "${cat.category_name}". Choose a category to reassign them to, or Cancel and use Archive instead.`;
+    } else {
+      deleteModalCopy.textContent = `${count} package${count === 1 ? '' : 's'} use "${cat.category_name}", and there's no other active category to reassign them to. Cancel and use Archive instead, or create another category first.`;
+      deleteModalOk.disabled = true;
     }
-    return true;
+  } else {
+    deleteReassignField.classList.add('hidden');
+    deleteModalTitle.textContent = 'Delete Category';
+    deleteModalCopy.textContent = `Delete "${cat.category_name}"? This can't be undone.`;
+  }
+
+  deleteModalOk.textContent = 'Delete';
+  setModalMsg(deleteModalMessage, '');
+  openModal(deleteModal);
+}
+
+function handleCatTableAction(e) {
+  const btn = e.target.closest('[data-cat-action]');
+  if (!btn) return;
+  const { catAction, id } = btn.dataset;
+  if (catAction === 'edit')    openEditCategoryModal(id);
+  if (catAction === 'archive') openConfirmArchiveCategory(id);
+  if (catAction === 'restore') openConfirmRestoreCategory(id);
+  if (catAction === 'delete')  openConfirmDeleteCategory(id);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: DUPLICATE
+// ═══════════════════════════════════════════════════════════════════════════════
+// Duplicate: clone a package's fields (+ inclusions + venue mappings), not
+// its photos (Cloudinary assets aren't cheap to fork silently) or reservations.
+// Starts inactive so the admin reviews it before it goes live.
+async function duplicatePackage(packageId) {
+  const pkg = allPackages.find(p => p.package_id === packageId);
+  if (!pkg) return;
+  setMessage(inventoryPageMessage, 'Duplicating…');
+  try {
+    const clonePayload = { ...pkg };
+    delete clonePayload.package_id;
+    delete clonePayload.created_at;
+    delete clonePayload._coverImage;
+    clonePayload.package_name = `${pkg.package_name} (Copy)`;
+    clonePayload.is_active = false;
+    clonePayload.package_image = null;
+
+    const { data, error } = await supabase.from('package').insert(clonePayload).select().single();
+    if (error) throw error;
+
+    const { data: venueRows } = await supabase.from(PACKAGE_VENUE_TABLE).select('venue_id').eq('package_id', packageId);
+    if (venueRows && venueRows.length) {
+      await supabase.from(PACKAGE_VENUE_TABLE).insert(venueRows.map(v => ({ package_id: data.package_id, venue_id: v.venue_id })));
+      allPackageVenueCounts.set(data.package_id, venueRows.length);
+    }
+
+    allPackages.unshift(data);
+    await logAudit({
+      action: 'Duplicated Package',
+      category: 'package',
+      details: `Duplicated "${pkg.package_name}" as "${clonePayload.package_name}"`,
+      entityId: data.package_id
+    });
+    renderCategoryRail();
+    renderInventory();
+    setMessage(inventoryPageMessage, 'Package duplicated — review and activate it when ready.', 'success');
+  } catch (err) {
+    setMessage(inventoryPageMessage, `Failed to duplicate: ${err.message}`, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: PHOTOS (in-modal state)
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderPkgPhotosGrid() {
+  if (!pkgPhotos.length) {
+    pkgPhotosGrid.innerHTML = '<p class="modal-hint">No photos yet.</p>';
+  } else {
+    pkgPhotosGrid.innerHTML = pkgPhotos.map((photo, index) => {
+      const src = photo._localPreview || photo.image_url || '';
+      return `
+        <div class="photo-grid-item ${photo.is_cover ? 'is-cover' : ''}" data-index="${index}">
+          <img src="${escapeHtml(src)}" alt="">
+          <div class="photo-grid-controls">
+            <button type="button" data-photo-action="cover" class="${photo.is_cover ? 'active' : ''}" title="Set as cover">★</button>
+            <button type="button" data-photo-action="left" title="Move left">‹</button>
+            <button type="button" data-photo-action="right" title="Move right">›</button>
+            <button type="button" data-photo-action="remove" title="Remove">✕</button>
+          </div>
+          <input type="text" class="photo-alt-input" data-photo-alt-index="${index}" placeholder="Alt text (required)" value="${escapeHtml(photo.alt_text || '')}">
+        </div>
+      `;
+    }).join('');
+  }
+  updateUnsavedBanner();
+}
+
+pkgPhotosGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-photo-action]');
+  if (!btn) return;
+  const item = btn.closest('[data-index]');
+  const index = Number(item.dataset.index);
+  const action = btn.dataset.photoAction;
+
+  if (action === 'cover') {
+    pkgPhotos.forEach((p, i) => { p.is_cover = i === index; });
+  } else if (action === 'remove') {
+    pkgPhotos.splice(index, 1);
+    if (pkgPhotos.length && !pkgPhotos.some(p => p.is_cover)) pkgPhotos[0].is_cover = true;
+  } else if (action === 'left' && index > 0) {
+    [pkgPhotos[index - 1], pkgPhotos[index]] = [pkgPhotos[index], pkgPhotos[index - 1]];
+  } else if (action === 'right' && index < pkgPhotos.length - 1) {
+    [pkgPhotos[index + 1], pkgPhotos[index]] = [pkgPhotos[index], pkgPhotos[index + 1]];
+  }
+  pkgPhotos.forEach((p, i) => { p.sort_order = i; });
+  renderPkgPhotosGrid();
+  renderActivationChecklist();
+});
+
+pkgPhotosGrid.addEventListener('input', (e) => {
+  const input = e.target.closest('[data-photo-alt-index]');
+  if (!input) return;
+  const index = Number(input.dataset.photoAltIndex);
+  if (pkgPhotos[index]) pkgPhotos[index].alt_text = input.value;
+  renderActivationChecklist();
+});
+
+pkgPhotoInput.addEventListener('change', async () => {
+  const files = Array.from(pkgPhotoInput.files || []);
+  pkgPhotoInput.value = '';
+  if (!files.length) return;
+
+  for (const file of files) {
+    if (pkgPhotos.length >= MAX_PHOTOS_PER_PACKAGE) {
+      setModalMsg(pkgModalMessage, `Maximum ${MAX_PHOTOS_PER_PACKAGE} photos per package.`);
+      break;
+    }
+    const err = validateImageFile(file);
+    if (err) { setModalMsg(pkgModalMessage, err); continue; }
+    const resized = await resizeImageFile(file);
+    const localPreview = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(resized);
+    });
+    pkgPhotos.push({
+      file: resized,
+      _localPreview: localPreview,
+      alt_text: '',
+      is_cover: pkgPhotos.length === 0,
+      sort_order: pkgPhotos.length
+    });
+  }
+  renderPkgPhotosGrid();
+  renderActivationChecklist();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: INCLUSIONS (structured list, in-modal state)
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderPkgInclusionsList() {
+  if (!pkgInclusions.length) {
+    pkgInclusionsListEl.innerHTML = '<p class="modal-hint">No inclusions yet — add at least one.</p>';
+  } else {
+    pkgInclusionsListEl.innerHTML = pkgInclusions.map((item, index) => `
+      <div class="inclusion-row" data-index="${index}">
+        <button type="button" class="reorder-btn" data-inclusion-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="reorder-btn" data-inclusion-action="down" ${index === pkgInclusions.length - 1 ? 'disabled' : ''}>↓</button>
+        <input type="text" data-inclusion-index="${index}" value="${escapeHtml(item)}" placeholder="e.g. 3-hour venue use">
+        <button type="button" data-inclusion-action="remove" title="Remove">✕</button>
+      </div>
+    `).join('');
+  }
+  updateUnsavedBanner();
+}
+
+pkgAddInclusionBtn.addEventListener('click', () => {
+  pkgInclusions.push('');
+  renderPkgInclusionsList();
+  renderActivationChecklist();
+  pkgInclusionsListEl.querySelector(`[data-inclusion-index="${pkgInclusions.length - 1}"]`)?.focus();
+});
+
+pkgInclusionsListEl.addEventListener('input', (e) => {
+  const input = e.target.closest('[data-inclusion-index]');
+  if (!input) return;
+  pkgInclusions[Number(input.dataset.inclusionIndex)] = input.value;
+  renderActivationChecklist();
+});
+
+pkgInclusionsListEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-inclusion-action]');
+  if (!btn) return;
+  const index = Number(btn.closest('[data-index]').dataset.index);
+  const action = btn.dataset.inclusionAction;
+  if (action === 'remove') pkgInclusions.splice(index, 1);
+  if (action === 'up' && index > 0) [pkgInclusions[index - 1], pkgInclusions[index]] = [pkgInclusions[index], pkgInclusions[index - 1]];
+  if (action === 'down' && index < pkgInclusions.length - 1) [pkgInclusions[index + 1], pkgInclusions[index]] = [pkgInclusions[index], pkgInclusions[index + 1]];
+  renderPkgInclusionsList();
+  renderActivationChecklist();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: VENUES (mapping, in-modal state)
+// ═══════════════════════════════════════════════════════════════════════════════
+function computeEffectiveMaxGuests(pkg, venue) {
+  const pkgMax = Number(pkg?.max_guests ?? pkg?.guest_capacity ?? Infinity);
+  const venueCap = Number(venue?.capacity ?? Infinity);
+  return Math.min(pkgMax, venueCap);
+}
+
+function renderPkgVenuesList() {
+  const minGuests = Number(pkgMinGuests.value) || 0;
+  const activeVenues = allVenues.filter(v => v.is_active);
+
+  if (!activeVenues.length) {
+    pkgVenuesList.innerHTML = '<p class="modal-hint">No active venues yet — add one from the Venues screen first.</p>';
+    return;
+  }
+
+  pkgVenuesList.innerHTML = activeVenues.map(v => {
+    const checked = pkgVenueIds.has(v.venue_id);
+    const belowMin = minGuests > 0 && v.capacity < minGuests;
+    return `
+      <label class="venue-option-row ${belowMin ? 'capacity-warn' : ''}">
+        <input type="checkbox" data-venue-id="${v.venue_id}" ${checked ? 'checked' : ''} ${belowMin ? 'disabled' : ''}>
+        <span>${escapeHtml(v.name)}</span>
+        <span class="venue-option-cap">${belowMin ? `Holds ${v.capacity} — below the ${minGuests} minimum` : `${v.capacity} pax`}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+pkgVenuesList.addEventListener('change', (e) => {
+  const cb = e.target.closest('[data-venue-id]');
+  if (!cb) return;
+  if (cb.checked) pkgVenueIds.add(cb.dataset.venueId);
+  else pkgVenueIds.delete(cb.dataset.venueId);
+  updateVenueCapacityHint();
+  renderActivationChecklist();
+  updateUnsavedBanner();
+});
+
+function updateVenueCapacityHint() {
+  const maxGuests = Number(pkgMaxGuests.value) || null;
+  if (!maxGuests || !pkgVenueIds.size) { pkgVenueCapacityHint.textContent = ''; return; }
+  const warnings = [];
+  pkgVenueIds.forEach(id => {
+    const v = allVenues.find(x => x.venue_id === id);
+    if (v && maxGuests > v.capacity) {
+      warnings.push(`${v.name} holds ${v.capacity}, below this package's ${maxGuests} max — effective max there will be ${computeEffectiveMaxGuests({ max_guests: maxGuests }, v)}.`);
+    }
+  });
+  pkgVenueCapacityHint.textContent = warnings.join(' ');
+}
+
+function updatePkgLocationVisibility() {
+  const isAddon = pkgType.value === 'add on';
+  const loc = pkgLocationType.value;
+  const isOnsite = loc === 'onsite' || loc === 'both';
+
+  pkgVenuesField.style.display = (!isAddon && isOnsite) ? '' : 'none';
+  if (!isOnsite) pkgVenueIds.clear();
+  if (isOnsite) renderPkgVenuesList();
+
+  pkgLocationField.style.display = isAddon ? 'none' : '';
+  pkgBookingScopeField.style.display = isAddon ? 'none' : '';
+  pkgMaxQuantityField.style.display = isAddon ? '' : 'none';
+  pkgCategoryHint.textContent = isAddon
+    ? 'Packages must have a category. Add-ons may leave this unset.'
+    : 'Required for packages.';
+}
+
+let pkgLocationPrevValue = '';
+pkgLocationType.addEventListener('change', () => {
+  const wasOnsite = pkgLocationPrevValue === 'onsite' || pkgLocationPrevValue === 'both';
+  const nowOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
+  if (wasOnsite && !nowOnsite && pkgVenueIds.size > 0) {
+    const proceed = window.confirm(`Switching to offsite will remove ${pkgVenueIds.size} venue mapping(s) for this package. Continue?`);
+    if (!proceed) { pkgLocationType.value = pkgLocationPrevValue; return; }
+    pkgVenueIds.clear();
+  }
+  pkgLocationPrevValue = pkgLocationType.value;
+  updatePkgLocationVisibility();
+  renderActivationChecklist();
+});
+
+pkgType.addEventListener('change', () => { updatePkgLocationVisibility(); renderActivationChecklist(); });
+pkgMinGuests.addEventListener('input', renderPkgVenuesList);
+pkgMaxGuests.addEventListener('input', () => {
+  if (Number(pkgMinGuests.value) > Number(pkgMaxGuests.value) && pkgMaxGuests.value !== '') {
+    pkgGuestRangeHint.textContent = 'Min guests must be less than or equal to max guests.';
+    pkgGuestRangeHint.style.color = '#b91c1c';
+  } else {
+    pkgGuestRangeHint.textContent = '';
+  }
+  updateVenueCapacityHint();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: INLINE FIELD VALIDATION (blur)
+// ═══════════════════════════════════════════════════════════════════════════════
+function setFieldError(inputEl, errorEl, message) {
+  if (message) {
+    inputEl.classList.add('invalid');
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+  } else {
+    inputEl.classList.remove('invalid');
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+}
+
+function clearFieldErrors() {
+  setFieldError(pkgName, pkgNameError, '');
+  setFieldError(pkgPrice, pkgPriceError, '');
+  setFieldError(pkgDuration, pkgDurationError, '');
+  setFieldError(pkgMaxGuests, pkgMaxGuestsError, '');
+  setFieldError(pkgCategorySelect, pkgCategoryError, '');
+}
+
+pkgName.addEventListener('blur', () => {
+  setFieldError(pkgName, pkgNameError, pkgName.value.trim() ? '' : 'Package name is required.');
+});
+pkgPrice.addEventListener('blur', () => {
+  const v = pkgPrice.value;
+  setFieldError(pkgPrice, pkgPriceError, (v === '' || isNaN(Number(v)) || Number(v) < 0) ? 'A valid price is required.' : '');
+});
+pkgDuration.addEventListener('blur', () => {
+  const v = pkgDuration.value;
+  setFieldError(pkgDuration, pkgDurationError, (!v || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 1) ? 'A valid duration in hours is required.' : '');
+});
+pkgMaxGuests.addEventListener('blur', () => {
+  const v = pkgMaxGuests.value;
+  setFieldError(pkgMaxGuests, pkgMaxGuestsError, (v === '' || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 1) ? 'A valid max guest count is required.' : '');
+});
+pkgCategorySelect.addEventListener('blur', () => {
+  const needsCategory = pkgType.value === 'main';
+  setFieldError(pkgCategorySelect, pkgCategoryError, (needsCategory && !pkgCategorySelect.value) ? 'Packages must have a category.' : '');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: UNSAVED-CHANGES GUARD
+// ═══════════════════════════════════════════════════════════════════════════════
+function getPkgFormState() {
+  return JSON.stringify({
+    name: pkgName.value, type: pkgType.value, category: pkgCategorySelect.value,
+    description: pkgDescription.value, price: pkgPrice.value, duration: pkgDuration.value,
+    maxQty: pkgMaxQuantity.value, minGuests: pkgMinGuests.value, maxGuests: pkgMaxGuests.value,
+    extPrice: pkgExtensionPrice.value, location: pkgLocationType.value, bookingScope: pkgBookingScope.value,
+    active: pkgActiveToggle.checked,
+    inclusions: pkgInclusions,
+    venues: Array.from(pkgVenueIds).sort(),
+    photos: pkgPhotos.map(p => ({ id: p.photo_id || null, url: p.image_url || null, alt: p.alt_text, cover: p.is_cover })),
   });
 }
 
-function renderPackageTables() {
-  const active   = getFilteredPackages(true);
-  const archived = getFilteredPackages(false);
-
-  activePkgBody.innerHTML = active.length
-    ? active.map(buildPkgRow).join('')
-    : '<tr class="empty-row"><td colspan="7">No active packages found.</td></tr>';
-
-  archivedPkgBody.innerHTML = archived.length
-    ? archived.map(buildPkgRow).join('')
-    : '<tr class="empty-row"><td colspan="7">No archived packages.</td></tr>';
-
-  updatePackageStats();
+function snapshotPkgForm() {
+  pkgFormSnapshot = getPkgFormState();
+  pkgUnsavedBanner.classList.add('hidden');
 }
 
-function updatePackageStats() {
-  const active   = allPackages.filter(p => p.is_active).length;
-  const archived = allPackages.filter(p => !p.is_active).length;
-  pkgStatActive.textContent   = active;
-  pkgStatArchived.textContent = archived;
-  pkgStatTotal.textContent    = allPackages.length;
+function isPkgFormDirty() {
+  if (pkgFormSnapshot === null) return false;
+  return getPkgFormState() !== pkgFormSnapshot;
 }
 
-// ─── Package archive toggle ──────────────────────────────────────────────────
-function applyPkgArchiveToggle() {
-  if (pkgShowingArchived) {
-    archivedPkgSection.style.display = '';
-    activePkgSection.style.display   = 'none';
-    pkgToggleArchiveLabel.textContent = 'Show Active';
-    pkgToggleArchiveBtn.classList.add('showing-active');
-  } else {
-    activePkgSection.style.display   = '';
-    archivedPkgSection.style.display = 'none';
-    pkgToggleArchiveLabel.textContent = 'Show Archived';
-    pkgToggleArchiveBtn.classList.remove('showing-active');
+function updateUnsavedBanner() {
+  pkgUnsavedBanner.classList.toggle('hidden', !isPkgFormDirty());
+}
+
+function attemptClosePackageModal() {
+  if (isPkgFormDirty() && !window.confirm('Discard unsaved changes?')) return;
+  pkgFormSnapshot = null;
+  closeModal(packageModal);
+}
+
+packageModal.querySelector('.modal-body').addEventListener('input', updateUnsavedBanner);
+packageModal.querySelector('.modal-body').addEventListener('change', updateUnsavedBanner);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: ACTIVATION CHECKLIST
+// ═══════════════════════════════════════════════════════════════════════════════
+function getActivationBlockers() {
+  const blockers = [];
+  if (!pkgPhotos.length) blockers.push('At least one photo');
+  if (pkgPhotos.some(p => !p.alt_text || !p.alt_text.trim())) blockers.push('Alt text on every photo');
+  if (!pkgInclusions.some(i => i.trim())) blockers.push('At least one inclusion');
+  const isAddon = pkgType.value === 'add on';
+  const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
+  if (!isAddon && isOnsite && pkgVenueIds.size === 0) blockers.push('At least one venue mapping (onsite package)');
+  if (!isAddon && (!pkgPrice.value || Number(pkgPrice.value) <= 0)) blockers.push('A price greater than ₱0');
+  return blockers;
+}
+
+function renderActivationChecklist() {
+  const blockers = getActivationBlockers();
+  const items = [
+    { label: 'At least one photo', met: pkgPhotos.length > 0 },
+    { label: 'Alt text on every photo', met: pkgPhotos.length > 0 && pkgPhotos.every(p => p.alt_text && p.alt_text.trim()) },
+    { label: 'At least one inclusion', met: pkgInclusions.some(i => i.trim()) },
+  ];
+  const isAddon = pkgType.value === 'add on';
+  const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
+  if (!isAddon && isOnsite) items.push({ label: 'At least one venue mapping', met: pkgVenueIds.size > 0 });
+  if (!isAddon) items.push({ label: 'Price greater than ₱0', met: Number(pkgPrice.value) > 0 });
+
+  pkgActivationChecklist.innerHTML = items.map(item => `
+    <div class="checklist-item ${item.met ? 'met' : 'unmet'}">${item.met ? '✓' : '○'} ${escapeHtml(item.label)}</div>
+  `).join('');
+
+  if (blockers.length && pkgActiveToggle.checked) {
+    pkgActiveToggle.checked = false;
   }
+  pkgActiveToggle.disabled = blockers.length > 0;
 }
 
-pkgToggleArchiveBtn.addEventListener('click', () => { pkgShowingArchived = !pkgShowingArchived; applyPkgArchiveToggle(); });
-pkgSearchInput.addEventListener('input', renderPackageTables);
-pkgTypeFilter.addEventListener('change', renderPackageTables);
-
-// ─── Package table action delegation ──────────────────────────────────────────
-function handlePkgTableAction(e) {
-  const btn = e.target.closest('[data-pkg-action]');
-  if (!btn) return;
-  const { pkgAction, id, name } = btn.dataset;
-  if (pkgAction === 'edit')    openEditPackageModal(id);
-  if (pkgAction === 'archive') openConfirmArchivePackage(id);
-  if (pkgAction === 'restore') openConfirmRestorePackage(id);
-  if (pkgAction === 'tiers')   openTierPanel(id, name);
-}
-
-activePkgBody.addEventListener('click', handlePkgTableAction);
-archivedPkgBody.addEventListener('click', handlePkgTableAction);
+[pkgPrice, pkgType, pkgLocationType, pkgMinGuests, pkgMaxGuests].forEach(el => {
+  el.addEventListener('input', renderActivationChecklist);
+  el.addEventListener('change', renderActivationChecklist);
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE: MODAL (Add / Edit)
 // ═══════════════════════════════════════════════════════════════════════════════
-function openAddPackageModal() {
-  editingPackageId   = null;
-  pkgPendingImageFile = null;
-  pkgModalTitle.textContent     = 'Add New Package';
-  pkgModalSub.textContent       = `Add a package to "${activeCategoryName}"`;
-  pkgModalSaveLabel.textContent = 'Add Package';
-  clearPackageForm();
-  setModalMsg(pkgModalMessage, '');
-  openModal(packageModal);
+function populateCategorySelect(preselectId) {
+  pkgCategorySelect.innerHTML =
+    '<option value="">No category (add-ons only)</option>' +
+    allCategories.filter(c => c.is_active).map(c =>
+      `<option value="${c.package_category_id}">${escapeHtml(c.category_name)}</option>`
+    ).join('');
+  pkgCategorySelect.value = preselectId || '';
 }
 
-function openEditPackageModal(packageId) {
+function openAddPackageModal() {
+  editingPackageId   = null;
+  pkgModalTitle.textContent     = 'Add New Package';
+  pkgModalSub.textContent       = 'Create a new event package with details, pricing, and image';
+  pkgModalSaveLabel.textContent = 'Add Package';
+  clearPackageForm();
+  const preselect = (selectedRailCategoryId && selectedRailCategoryId !== 'uncategorised') ? selectedRailCategoryId : '';
+  populateCategorySelect(preselect);
+  pkgLocationPrevValue = '';
+  updatePkgLocationVisibility();
+  renderActivationChecklist();
+  setModalMsg(pkgModalMessage, '');
+  openModal(packageModal);
+  snapshotPkgForm();
+}
+
+async function openEditPackageModal(packageId) {
   const pkg = allPackages.find(p => p.package_id === packageId);
   if (!pkg) return;
 
   editingPackageId    = packageId;
-  pkgPendingImageFile = null;
   pkgModalTitle.textContent     = 'Edit Package';
   pkgModalSub.textContent       = 'Update the package details below';
   pkgModalSaveLabel.textContent = 'Save Changes';
+  clearFieldErrors();
 
   pkgName.value           = pkg.package_name || '';
   pkgType.value           = pkg.package_type || '';
   pkgDescription.value    = pkg.description || '';
   pkgPrice.value          = pkg.price ?? '';
-  pkgCapacity.value       = pkg.guest_capacity ?? '';
+  pkgMinGuests.value      = pkg.min_guests ?? '';
+  pkgMaxGuests.value      = pkg.max_guests ?? pkg.guest_capacity ?? '';
+  pkgMaxQuantity.value    = pkg.max_quantity ?? 1;
   pkgDuration.value       = pkg.duration_hours ?? '';
   pkgExtensionPrice.value = pkg.extension_price ?? '';
   pkgLocationType.value   = pkg.location_type || '';
+  pkgLocationPrevValue    = pkg.location_type || '';
   pkgBookingScope.value   = pkg.booking_scope || '';
+  pkgActiveToggle.checked = !!pkg.is_active;
 
-  if (pkg.package_image) {
-    pkgImagePreview.src = pkg.package_image;
-    pkgImagePreview.classList.remove('hidden');
-    pkgImagePlaceholder.style.display = 'none';
-    pkgFileName.textContent = 'Current image loaded';
-    pkgRemoveImageBtn.classList.remove('hidden');
-  } else {
-    clearImageUI(pkgImagePreview, pkgImagePlaceholder, pkgFileName, pkgImageInput);
-    pkgRemoveImageBtn.classList.add('hidden');
+  populateCategorySelect(pkg.package_category_id);
+
+  pkgInclusions = Array.isArray(pkg.inclusions) && pkg.inclusions.length
+    ? [...pkg.inclusions]
+    : [];
+  renderPkgInclusionsList();
+
+  setModalMsg(pkgModalMessage, 'Loading photos and venues…', 'success');
+  openModal(packageModal);
+
+  try {
+    const [{ data: photos }, { data: venueRows }] = await Promise.all([
+      supabase.from(PACKAGE_PHOTO_TABLE).select('*').eq('package_id', packageId).order('sort_order', { ascending: true }),
+      supabase.from(PACKAGE_VENUE_TABLE).select('venue_id').eq('package_id', packageId)
+    ]);
+    pkgPhotos = (photos || []).map(p => ({ ...p }));
+    pkgVenueIds = new Set((venueRows || []).map(r => r.venue_id));
+  } catch (err) {
+    setModalMsg(pkgModalMessage, `Failed to load photos/venues: ${err.message}`);
   }
 
+  renderPkgPhotosGrid();
+  updatePkgLocationVisibility();
+  renderActivationChecklist();
   setModalMsg(pkgModalMessage, '');
-  openModal(packageModal);
+  snapshotPkgForm();
 }
 
 function clearPackageForm() {
-  [pkgName, pkgDescription, pkgPrice, pkgCapacity, pkgDuration, pkgExtensionPrice].forEach(el => el.value = '');
+  [pkgName, pkgDescription, pkgPrice, pkgDuration, pkgExtensionPrice, pkgMinGuests, pkgMaxGuests].forEach(el => el.value = '');
   pkgType.value         = '';
   pkgLocationType.value = '';
   pkgBookingScope.value = '';
-  pkgImageInput.value   = '';
-  clearImageUI(pkgImagePreview, pkgImagePlaceholder, pkgFileName, pkgImageInput);
-  pkgRemoveImageBtn.classList.add('hidden');
+  pkgMaxQuantity.value  = '1';
+  pkgActiveToggle.checked = false;
+  pkgPhotos      = [];
+  pkgInclusions  = [];
+  pkgVenueIds    = new Set();
+  clearFieldErrors();
+  renderPkgPhotosGrid();
+  renderPkgInclusionsList();
 }
-
-// Package image input
-pkgImageInput.addEventListener('change', () => {
-  const file = pkgImageInput.files[0];
-  if (!file) return;
-  const err = validateImageFile(file);
-  if (err) { setModalMsg(pkgModalMessage, err); pkgImageInput.value = ''; return; }
-  pkgPendingImageFile = file;
-  setModalMsg(pkgModalMessage, '');
-  previewImageFile(file, pkgImagePreview, pkgImagePlaceholder, pkgFileName);
-  pkgRemoveImageBtn.classList.remove('hidden');
-});
-
-pkgRemoveImageBtn.addEventListener('click', () => {
-  pkgPendingImageFile = null;
-  clearImageUI(pkgImagePreview, pkgImagePlaceholder, pkgFileName, pkgImageInput);
-  pkgRemoveImageBtn.classList.add('hidden');
-  pkgRemoveImageBtn.dataset.removeExisting = 'true';
-});
 
 // Package validation
 function validatePackageForm() {
   if (!pkgName.value.trim()) return 'Package name is required.';
   if (!pkgType.value)        return 'Package type is required.';
+  if (pkgType.value === 'main' && !pkgCategorySelect.value) return 'Packages must have a category.';
   if (pkgPrice.value === '' || isNaN(Number(pkgPrice.value)) || Number(pkgPrice.value) < 0)
     return 'A valid price is required.';
-  if (pkgCapacity.value !== '' && isNaN(parseInt(pkgCapacity.value)))
-    return 'A valid guest capacity is required.';
+  if (pkgMaxGuests.value === '' || isNaN(parseInt(pkgMaxGuests.value, 10)) || parseInt(pkgMaxGuests.value, 10) < 1)
+    return 'A valid max guest count is required.';
+  if (pkgMinGuests.value !== '' && Number(pkgMinGuests.value) > Number(pkgMaxGuests.value))
+    return 'Min guests must be less than or equal to max guests.';
   if (!pkgDuration.value || isNaN(parseInt(pkgDuration.value)) || parseInt(pkgDuration.value) < 1)
     return 'A valid duration in hours is required.';
   if (pkgType.value === 'main' && !pkgBookingScope.value)
     return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
+  if (pkgType.value === 'main') {
+    const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
+    if (isOnsite && pkgVenueIds.size === 0) return 'Onsite packages need at least one venue mapping to activate, though you can save as draft.';
+  }
   return null;
 }
 
@@ -854,29 +1647,28 @@ pkgModalSave.addEventListener('click', async () => {
   setModalMsg(pkgModalMessage, '');
 
   try {
-    let imageUrl = undefined;
-    if (pkgPendingImageFile) {
-      setModalMsg(pkgModalMessage, 'Uploading image…', 'success');
-      imageUrl = await uploadToCloudinary(pkgPendingImageFile);
-      setModalMsg(pkgModalMessage, '');
-    } else if (pkgRemoveImageBtn.dataset.removeExisting === 'true') {
-      imageUrl = null;
-    }
+    const maxGuests = parseInt(pkgMaxGuests.value, 10);
+    const cleanInclusions = pkgInclusions.map(i => i.trim()).filter(Boolean);
 
     const payload = {
       package_name:       pkgName.value.trim(),
       package_type:       pkgType.value,
       description:        pkgDescription.value.trim() || null,
       price:              Number(pkgPrice.value),
-      guest_capacity:     parseInt(pkgCapacity.value, 10),
+      guest_capacity:     maxGuests, // kept in sync with max_guests for existing consumers
+      min_guests:         pkgMinGuests.value !== '' ? Number(pkgMinGuests.value) : null,
+      max_guests:         maxGuests,
+      max_quantity:       pkgType.value === 'add on' ? (parseInt(pkgMaxQuantity.value, 10) || 1) : 1,
+      inclusions:         cleanInclusions,
       duration_hours:     parseInt(pkgDuration.value, 10),
       extension_price:    pkgExtensionPrice.value !== '' ? Number(pkgExtensionPrice.value) : null,
       location_type:      pkgLocationType.value || null,
       booking_scope:      pkgBookingScope.value || null,
-      package_category_id: activeCategoryId,
+      package_category_id: pkgCategorySelect.value || null,
+      is_active:          !!pkgActiveToggle.checked,
     };
 
-    if (imageUrl !== undefined) payload.package_image = imageUrl;
+    let packageId = editingPackageId;
 
     if (editingPackageId) {
       const { data, error } = await supabase
@@ -891,29 +1683,78 @@ pkgModalSave.addEventListener('click', async () => {
       await logAudit({
         action:   'Updated Package',
         category: 'package',
-        details:  `Package updated: ${payload.package_name} (Category: ${activeCategoryName})`,
+        details:  `Package updated: ${payload.package_name}`,
         entityId: editingPackageId
       });
-      setMessage(pkgPageMessage, 'Package updated successfully.', 'success');
+      setMessage(inventoryPageMessage, 'Package updated successfully.', 'success');
     } else {
-      payload.is_active = true;
       const { data, error } = await supabase
         .from('package')
         .insert(payload)
         .select()
         .single();
       if (error) throw error;
+      packageId = data.package_id;
       allPackages.unshift(data);
       await logAudit({
         action:   'Added Package',
         category: 'package',
-        details:  `New package created: ${payload.package_name} (Category: ${activeCategoryName})`,
+        details:  `New package created: ${payload.package_name}`,
         entityId: data.package_id
       });
-      setMessage(pkgPageMessage, 'Package added successfully.', 'success');
+      setMessage(inventoryPageMessage, 'Package added successfully.', 'success');
     }
 
-    renderPackageTables();
+    // Photos: upload any pending files, then replace the photo rows for
+    // this package (simplest correct approach — small galleries, max 8).
+    setModalMsg(pkgModalMessage, 'Saving photos…', 'success');
+    for (const photo of pkgPhotos) {
+      if (photo.file && !photo.image_url) {
+        photo.image_url = await uploadToCloudinary(photo.file);
+      }
+    }
+    const { data: existingPhotos } = await supabase.from(PACKAGE_PHOTO_TABLE).select('photo_id, image_url').eq('package_id', packageId);
+    const keptIds = new Set(pkgPhotos.filter(p => p.photo_id).map(p => p.photo_id));
+    for (const old of (existingPhotos || [])) {
+      if (!keptIds.has(old.photo_id)) {
+        await supabase.from(PACKAGE_PHOTO_TABLE).delete().eq('photo_id', old.photo_id);
+        await destroyCloudinaryImage(old.image_url);
+      }
+    }
+    for (let i = 0; i < pkgPhotos.length; i++) {
+      const photo = pkgPhotos[i];
+      const row = { package_id: packageId, image_url: photo.image_url, alt_text: photo.alt_text || null, is_cover: !!photo.is_cover, sort_order: i };
+      if (photo.photo_id) {
+        await supabase.from(PACKAGE_PHOTO_TABLE).update(row).eq('photo_id', photo.photo_id);
+      } else {
+        const { data: inserted } = await supabase.from(PACKAGE_PHOTO_TABLE).insert(row).select('photo_id').single();
+        if (inserted) photo.photo_id = inserted.photo_id;
+      }
+    }
+    const coverPhoto = pkgPhotos.find(p => p.is_cover);
+    const savedIdx = allPackages.findIndex(p => p.package_id === packageId);
+    if (savedIdx !== -1) allPackages[savedIdx]._coverImage = coverPhoto ? coverPhoto.image_url : null;
+
+    // Venue mappings: capacity-validate, then replace the set for this package.
+    setModalMsg(pkgModalMessage, 'Saving venue mappings…', 'success');
+    const minGuests = pkgMinGuests.value !== '' ? Number(pkgMinGuests.value) : null;
+    for (const venueId of pkgVenueIds) {
+      const venue = allVenues.find(v => v.venue_id === venueId);
+      if (venue && minGuests && venue.capacity < minGuests) {
+        throw new Error(`${venue.name} holds ${venue.capacity} guests. ${payload.package_name} requires at least ${minGuests}.`);
+      }
+    }
+    await supabase.from(PACKAGE_VENUE_TABLE).delete().eq('package_id', packageId);
+    if (pkgVenueIds.size) {
+      await supabase.from(PACKAGE_VENUE_TABLE).insert(
+        Array.from(pkgVenueIds).map(venue_id => ({ package_id: packageId, venue_id }))
+      );
+    }
+    allPackageVenueCounts.set(packageId, pkgVenueIds.size);
+
+    pkgFormSnapshot = null;
+    renderCategoryRail();
+    renderInventory();
     closeModal(packageModal);
 
   } catch (err) {
@@ -921,18 +1762,16 @@ pkgModalSave.addEventListener('click', async () => {
   } finally {
     pkgModalSave.disabled = false;
     pkgModalSaveLabel.textContent = editingPackageId ? 'Save Changes' : 'Add Package';
-    pkgRemoveImageBtn.dataset.removeExisting = '';
-    pkgPendingImageFile = null;
   }
 });
 
 addPackageBtn.addEventListener('click', openAddPackageModal);
-pkgModalClose.addEventListener('click',  () => closeModal(packageModal));
-pkgModalCancel.addEventListener('click', () => closeModal(packageModal));
-packageModal.addEventListener('click', e => { if (e.target === packageModal) closeModal(packageModal); });
+pkgModalClose.addEventListener('click',  attemptClosePackageModal);
+pkgModalCancel.addEventListener('click', attemptClosePackageModal);
+packageModal.addEventListener('click', e => { if (e.target === packageModal) attemptClosePackageModal(); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE: ARCHIVE / RESTORE
+// PACKAGE: ARCHIVE / RESTORE / DELETE
 // ═══════════════════════════════════════════════════════════════════════════════
 function openConfirmArchivePackage(packageId) {
   const pkg = allPackages.find(p => p.package_id === packageId);
@@ -958,8 +1797,111 @@ function openConfirmRestorePackage(packageId) {
   openModal(confirmModal);
 }
 
+// Package delete: zero reservations → real delete (+ Cloudinary cleanup).
+// One or more → offer archive instead, naming the count.
+async function openConfirmDeletePackage(packageId) {
+  const pkg = allPackages.find(p => p.package_id === packageId);
+  if (!pkg) return;
+
+  setMessage(inventoryPageMessage, 'Checking reservations…');
+  let count;
+  try {
+    count = await countPackageReservationRefs(packageId);
+  } catch (err) {
+    setMessage(inventoryPageMessage, `Failed to check reservations: ${err.message}`, 'error');
+    return;
+  }
+  setMessage(inventoryPageMessage, '');
+
+  deleteReassignField.classList.add('hidden');
+
+  if (count > 0) {
+    pendingDeleteAction = { scope: 'package', id: packageId, mode: 'archive' };
+    deleteModalTitle.textContent = 'Archive Instead';
+    deleteModalCopy.textContent  = `${count} reservation${count === 1 ? '' : 's'} use "${pkg.package_name}". Archive it instead — it stays on those bookings but is hidden from customers.`;
+    deleteModalOk.textContent    = 'Archive';
+  } else {
+    pendingDeleteAction = { scope: 'package', id: packageId, mode: 'delete' };
+    deleteModalTitle.textContent = 'Delete Package';
+    deleteModalCopy.textContent  = `Delete "${pkg.package_name}"? This removes its photos and venue mappings too. This can't be undone.`;
+    deleteModalOk.textContent    = 'Delete';
+  }
+  deleteModalOk.disabled = false;
+  setModalMsg(deleteModalMessage, '');
+  openModal(deleteModal);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// CONFIRM MODAL: Shared handler
+// SHARED DELETE MODAL HANDLER (category / package / venue)
+// ═══════════════════════════════════════════════════════════════════════════════
+deleteModalOk.addEventListener('click', async () => {
+  if (!pendingDeleteAction) return;
+  const { scope, id, mode } = pendingDeleteAction;
+  deleteModalOk.disabled = true;
+
+  try {
+    if (scope === 'category') {
+      if (!deleteReassignField.classList.contains('hidden') && deleteReassignSelect.value) {
+        const { error: reErr } = await supabase.from('package').update({ package_category_id: deleteReassignSelect.value }).eq('package_category_id', id);
+        if (reErr) throw reErr;
+        allPackages.forEach(p => { if (p.package_category_id === id) p.package_category_id = deleteReassignSelect.value; });
+      }
+      const cat = allCategories.find(c => c.package_category_id === id);
+      const { error } = await supabase.from(CATEGORY_TABLE).delete().eq('package_category_id', id);
+      if (error) throw error;
+      allCategories = allCategories.filter(c => c.package_category_id !== id);
+      await logAudit({ action: 'Deleted Category', category: 'package', details: `Deleted category: ${cat?.category_name}`, entityId: id });
+      renderCategoryRail();
+      renderInventory();
+      setMessage(inventoryPageMessage, 'Category deleted.', 'success');
+
+    } else if (scope === 'package') {
+      const pkg = allPackages.find(p => p.package_id === id);
+      if (mode === 'archive') {
+        const { error } = await supabase.from('package').update({ is_active: false }).eq('package_id', id);
+        if (error) throw error;
+        const idx = allPackages.findIndex(p => p.package_id === id);
+        if (idx !== -1) allPackages[idx] = { ...allPackages[idx], is_active: false };
+        await logAudit({ action: 'Archived Package', category: 'package', details: `Archived (has reservations): ${pkg?.package_name}`, entityId: id });
+        setMessage(inventoryPageMessage, 'Package archived.', 'success');
+      } else {
+        const { data: photos } = await supabase.from(PACKAGE_PHOTO_TABLE).select('image_url').eq('package_id', id);
+        for (const photo of (photos || [])) { await destroyCloudinaryImage(photo.image_url); }
+        if (pkg?.package_image) await destroyCloudinaryImage(pkg.package_image);
+        const { error } = await supabase.from('package').delete().eq('package_id', id);
+        if (error) throw error;
+        await logAudit({ action: 'Deleted Package', category: 'package', details: `Deleted package: ${pkg?.package_name}`, entityId: id });
+        setMessage(inventoryPageMessage, 'Package deleted.', 'success');
+      }
+      allPackages = allPackages.filter(p => p.package_id !== id || mode === 'archive');
+      renderCategoryRail();
+      renderInventory();
+
+    } else if (scope === 'venue') {
+      const venue = allVenues.find(v => v.venue_id === id);
+      const { error } = await supabase.from(VENUE_TABLE).delete().eq('venue_id', id);
+      if (error) throw error;
+      allVenues = allVenues.filter(v => v.venue_id !== id);
+      await logAudit({ action: 'Deleted Venue', category: 'package', details: `Deleted venue: ${venue?.name}`, entityId: id });
+      renderVenueTables();
+      setMessage(venuePageMessage, 'Venue deleted.', 'success');
+    }
+
+    closeModal(deleteModal);
+  } catch (err) {
+    setModalMsg(deleteModalMessage, `Failed: ${err.message}`);
+  } finally {
+    deleteModalOk.disabled = false;
+    pendingDeleteAction = null;
+  }
+});
+
+deleteModalClose.addEventListener('click',  () => closeModal(deleteModal));
+deleteModalCancel.addEventListener('click', () => closeModal(deleteModal));
+deleteModal.addEventListener('click', e => { if (e.target === deleteModal) closeModal(deleteModal); });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIRM MODAL: Shared handler (archive/restore for category, package, tier, venue)
 // ═══════════════════════════════════════════════════════════════════════════════
 confirmOk.addEventListener('click', async () => {
   if (!pendingAction) return;
@@ -985,10 +1927,9 @@ confirmOk.addEventListener('click', async () => {
         details:  `Category ${type === 'archive' ? 'archived' : 'restored'}: ${cat?.category_name}`,
         entityId: id
       });
-      catShowingArchived = !isActive;
-      applyCatArchiveToggle();
-      renderCategoryTables();
-      setMessage(catPageMessage, type === 'archive' ? 'Category archived.' : 'Category restored.', 'success');
+      renderCategoryRail();
+      renderInventory();
+      setMessage(inventoryPageMessage, type === 'archive' ? 'Category archived.' : 'Category restored.', 'success');
     }
 
     if (scope === 'package') {
@@ -1001,16 +1942,18 @@ confirmOk.addEventListener('click', async () => {
       if (count === 0) throw new Error('No rows updated — check database permissions.');
       const idx = allPackages.findIndex(p => p.package_id === id);
       if (idx !== -1) allPackages[idx] = { ...allPackages[idx], is_active: isActive };
+      const catName = allCategories.find(c => c.package_category_id === pkg?.package_category_id)?.category_name || 'Uncategorised';
       await logAudit({
         action:   type === 'archive' ? 'Archived Package' : 'Restored Package',
         category: 'package',
-        details:  `Package ${type === 'archive' ? 'archived' : 'restored'}: ${pkg?.package_name} (Category: ${activeCategoryName})`,
+        details:  `Package ${type === 'archive' ? 'archived' : 'restored'}: ${pkg?.package_name} (Category: ${catName})`,
         entityId: id
       });
-      pkgShowingArchived = !isActive;
-      applyPkgArchiveToggle();
-      renderPackageTables();
-      setMessage(pkgPageMessage, type === 'archive' ? 'Package archived.' : 'Package restored.', 'success');
+      selectedStatus = isActive ? 'active' : 'archived';
+      syncStatusSegUI();
+      renderCategoryRail();
+      renderInventory();
+      setMessage(inventoryPageMessage, type === 'archive' ? 'Package archived.' : 'Package restored.', 'success');
     }
 
     if (scope === 'tier') {
@@ -1030,6 +1973,28 @@ confirmOk.addEventListener('click', async () => {
         entityId: id
       });
       renderTierTable();
+      allTiersByPackage.set(tierForPackageId, allTiers.filter(t => t.is_active));
+      renderInventory();
+    }
+
+    if (scope === 'venue') {
+      const venue = allVenues.find(v => v.venue_id === id);
+      const { error, count } = await supabase
+        .from(VENUE_TABLE)
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('venue_id', id);
+      if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
+      const idx = allVenues.findIndex(v => v.venue_id === id);
+      if (idx !== -1) allVenues[idx] = { ...allVenues[idx], is_active: isActive };
+      await logAudit({
+        action:   type === 'archive' ? 'Archived Venue' : 'Restored Venue',
+        category: 'package',
+        details:  `Venue ${type === 'archive' ? 'archived' : 'restored'}: ${venue?.name}`,
+        entityId: id
+      });
+      renderVenueTables();
+      setMessage(venuePageMessage, type === 'archive' ? 'Venue archived.' : 'Venue restored.', 'success');
     }
 
     closeModal(confirmModal);
@@ -1046,81 +2011,67 @@ confirmCancel.addEventListener('click', () => closeModal(confirmModal));
 confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeModal(confirmModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE TIER
+// PACKAGE TIER — right-anchored drawer (replaces the old below-table panel)
 // ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE TIER
-// ═══════════════════════════════════════════════════════════════════════════════
-function createTierPanel() {
-  if (tierPanelEl) return;
-  tierPanelEl = document.createElement('div');
-  tierPanelEl.className = 'card';
-  tierPanelEl.id = 'tierPanel';
-  tierPanelEl.style.display = 'none';
-  tierPanelEl.innerHTML = `
-    <div class="tier-panel-head">
-      <div>
-        <h2 class="section-title" id="tierPanelTitle">Tiers</h2>
-        <p class="section-sub" id="tierPanelSub">Manage tiers for this package</p>
-      </div>
-      <div class="tier-panel-actions">
-        <button type="button" class="btn-primary" id="addTierBtn" style="font-size:13px;padding:8px 14px;">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Tier
-        </button>
-        <button type="button" class="btn-cancel" id="closeTierPanelBtn" style="font-size:13px;padding:8px 14px;">Close</button>
-      </div>
-    </div>
-    <div class="table-wrap" style="margin-top:16px;">
-      <table class="pkg-table">
-        <thead>
-          <tr>
-            <th>Tier</th>
-            <th>Subtitle</th>
-            <th>Order</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tierTableBody">
-          <tr class="empty-row"><td colspan="5">No tiers yet.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  `;
-
-  const activePkg = document.getElementById('activePkgSection');
-  activePkg.parentNode.insertBefore(tierPanelEl, activePkg.nextSibling);
-
-  document.getElementById('addTierBtn').addEventListener('click', openAddTierModal);
-  document.getElementById('closeTierPanelBtn').addEventListener('click', closeTierPanel);
-  document.getElementById('tierTableBody').addEventListener('click', handleTierTableAction);
+function trapFocus(container) {
+  const focusables = container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) return null;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  function handler(e) {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  }
+  container.addEventListener('keydown', handler);
+  first.focus();
+  return handler;
 }
 
-function closeTierPanel() {
-  if (tierPanelEl) tierPanelEl.style.display = 'none';
-  tierForPackageId = null;
+function openTierDrawer(packageId, packageName, triggerEl) {
+  tierForPackageId    = packageId;
+  tierForPackageName  = packageName;
+  tierDrawerTriggerEl = triggerEl || document.activeElement;
+
+  tierDrawerTitle.textContent = packageName;
+
+  tierDrawerScrim.classList.remove('hidden');
+  tierDrawer.classList.add('open');
+  tierDrawer.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('tier-drawer-open');
+
+  loadTiers(packageId);
+
+  const trapHandler = trapFocus(tierDrawer);
+  function escHandler(e) { if (e.key === 'Escape') closeTierDrawer(); }
+  document.addEventListener('keydown', escHandler);
+  tierDrawer._cleanup = () => {
+    if (trapHandler) tierDrawer.removeEventListener('keydown', trapHandler);
+    document.removeEventListener('keydown', escHandler);
+  };
+}
+
+function closeTierDrawer() {
+  tierDrawerScrim.classList.add('hidden');
+  tierDrawer.classList.remove('open');
+  tierDrawer.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('tier-drawer-open');
+  if (tierDrawer._cleanup) { tierDrawer._cleanup(); tierDrawer._cleanup = null; }
+  tierForPackageId   = null;
   tierForPackageName = '';
+  if (tierDrawerTriggerEl && document.body.contains(tierDrawerTriggerEl)) tierDrawerTriggerEl.focus();
+  tierDrawerTriggerEl = null;
 }
 
-async function openTierPanel(packageId, packageName) {
-  createTierPanel();
-  tierForPackageId   = packageId;
-  tierForPackageName = packageName;
-
-  document.getElementById('tierPanelTitle').textContent = `Tiers — ${packageName}`;
-  document.getElementById('tierPanelSub').textContent   = 'Manage Bronze, Silver, Gold tiers';
-
-  tierPanelEl.style.display = '';
-  tierPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  await loadTiers(packageId);
-}
+tierDrawerClose.addEventListener('click', closeTierDrawer);
+tierDrawerDone.addEventListener('click', closeTierDrawer);
+tierDrawerScrim.addEventListener('click', closeTierDrawer);
 
 async function loadTiers(packageId) {
-  const tbody = document.getElementById('tierTableBody');
-  tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Loading tiers...</td></tr>';
-
+  tierDrawerList.innerHTML = '<p class="modal-hint">Loading tiers...</p>';
   try {
     const { data, error } = await supabase
       .from(TIER_TABLE)
@@ -1131,48 +2082,35 @@ async function loadTiers(packageId) {
     allTiers = data || [];
     renderTierTable();
   } catch (err) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Failed to load tiers: ${err.message}</td></tr>`;
+    tierDrawerList.innerHTML = `<p class="modal-hint">Failed to load tiers: ${escapeHtml(err.message)}</p>`;
   }
 }
 
+function medalClassForIndex(i) { return i === 0 ? 'bronze' : i === 1 ? 'silver' : i === 2 ? 'gold' : 'bronze'; }
+function medalLabelForIndex(i) { return i === 0 ? 'B' : i === 1 ? 'S' : i === 2 ? 'G' : '•'; }
+
 function renderTierTable() {
-  const tbody = document.getElementById('tierTableBody');
   if (allTiers.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No tiers yet. Click "Add Tier" to create one.</td></tr>';
+    tierDrawerList.innerHTML = `<p class="modal-hint">Tiers let one package sell at several price points — Bronze, Silver, Gold. Add one to get started.</p>`;
     return;
   }
 
-  tbody.innerHTML = allTiers.map(tier => {
+  tierDrawerList.innerHTML = allTiers.map((tier, i) => {
     const isArchived = !tier.is_active;
     const actions = isArchived
-      ? `<div class="action-cell">
-          <button class="action-btn edit" data-tier-action="edit" data-id="${tier.tier_id}">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Edit
-          </button>
-          <button class="action-btn restore" data-tier-action="restore" data-id="${tier.tier_id}" data-name="${escapeHtml(tier.tier_name)}">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Restore
-          </button>
-        </div>`
-      : `<div class="action-cell">
-          <button class="action-btn edit" data-tier-action="edit" data-id="${tier.tier_id}">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Edit
-          </button>
-          <button class="action-btn archive" data-tier-action="archive" data-id="${tier.tier_id}" data-name="${escapeHtml(tier.tier_name)}">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            Archive
-          </button>
-        </div>`;
-
-    return `<tr>
-      <td><span class="tier-name-text">${escapeHtml(tier.tier_name)}</span></td>
-      <td>${escapeHtml(tier.tier_subtitle || '—')}</td>
-      <td>${tier.sort_order}</td>
-      <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
-      <td>${actions}</td>
-    </tr>`;
+      ? `<button type="button" class="action-btn edit" data-tier-action="edit" data-id="${tier.tier_id}">Edit</button>
+         <button type="button" class="action-btn restore" data-tier-action="restore" data-id="${tier.tier_id}" data-name="${escapeHtml(tier.tier_name)}">Restore</button>`
+      : `<button type="button" class="action-btn edit" data-tier-action="edit" data-id="${tier.tier_id}">Edit</button>
+         <button type="button" class="action-btn archive" data-tier-action="archive" data-id="${tier.tier_id}" data-name="${escapeHtml(tier.tier_name)}">Archive</button>`;
+    return `
+      <div class="tier-row" style="${isArchived ? 'opacity:.55' : ''}">
+        <span class="medal-chip ${medalClassForIndex(i)}">${medalLabelForIndex(i)}</span>
+        <div>
+          <div class="tier-row-name">${escapeHtml(tier.tier_name)}${isArchived ? ' (archived)' : ''}</div>
+          <div class="tier-row-sub">${escapeHtml(tier.tier_subtitle || '—')}</div>
+        </div>
+        <div class="tier-row-actions">${actions}</div>
+      </div>`;
   }).join('');
 }
 
@@ -1184,6 +2122,8 @@ function handleTierTableAction(e) {
   if (tierAction === 'archive') openConfirmTierArchive(id, name);
   if (tierAction === 'restore') openConfirmTierRestore(id, name);
 }
+
+tierDrawerList.addEventListener('click', handleTierTableAction);
 
 // ─── Tier Modal: Add / Edit ───────────────────────────────────────────────────
 function clearTierForm() {
@@ -1273,6 +2213,8 @@ tierModalSave.addEventListener('click', async () => {
 
     allTiers.sort((a, b) => a.sort_order - b.sort_order);
     renderTierTable();
+    allTiersByPackage.set(tierForPackageId, allTiers.filter(t => t.is_active));
+    renderInventory();
     closeModal(tierModal);
   } catch (err) {
     setModalMsg(tierModalMessage, `Failed to save: ${err.message}`);
@@ -1308,6 +2250,260 @@ tierModalClose.addEventListener('click',  () => closeModal(tierModal));
 tierModalCancel.addEventListener('click', () => closeModal(tierModal));
 tierModal.addEventListener('click', e => { if (e.target === tierModal) closeModal(tierModal); });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE ACTION DISPATCH (shared by card kebab, list-row kebab, tier-ladder link)
+// ═══════════════════════════════════════════════════════════════════════════════
+function handlePkgTableAction(e) {
+  const btn = e.target.closest('[data-pkg-action]');
+  if (!btn) return;
+  const { pkgAction, id, name } = btn.dataset;
+  if (pkgAction === 'edit')      openEditPackageModal(id);
+  if (pkgAction === 'archive')   openConfirmArchivePackage(id);
+  if (pkgAction === 'restore')   openConfirmRestorePackage(id);
+  if (pkgAction === 'tiers')     openTierDrawer(id, name, btn);
+  if (pkgAction === 'delete')    openConfirmDeletePackage(id);
+  if (pkgAction === 'duplicate') duplicatePackage(id);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VENUES
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadVenues() {
+  setMessage(venuePageMessage, 'Loading venues…');
+  try {
+    const { data, error } = await supabase
+      .from(VENUE_TABLE)
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    allVenues = data || [];
+
+    // Mapped-package counts, one query for all venues.
+    const { data: mappings } = await supabase.from(PACKAGE_VENUE_TABLE).select('venue_id');
+    const counts = {};
+    (mappings || []).forEach(m => { counts[m.venue_id] = (counts[m.venue_id] || 0) + 1; });
+    allVenues.forEach(v => { v._mappedCount = counts[v.venue_id] || 0; });
+
+    renderVenueTables();
+    setMessage(venuePageMessage, '');
+  } catch (err) {
+    setMessage(venuePageMessage, `Failed to load venues: ${err.message}`, 'error');
+  }
+}
+
+function buildVenueRow(venue) {
+  const isArchived = !venue.is_active;
+  const actions = isArchived
+    ? `<div class="action-cell">
+        <button class="action-btn edit" data-venue-action="edit" data-id="${venue.venue_id}">Edit</button>
+        <button class="action-btn restore" data-venue-action="restore" data-id="${venue.venue_id}">Restore</button>
+        <button class="action-btn archive" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
+      </div>`
+    : `<div class="action-cell">
+        <button class="action-btn edit" data-venue-action="edit" data-id="${venue.venue_id}">Edit</button>
+        <button class="action-btn archive" data-venue-action="archive" data-id="${venue.venue_id}">Archive</button>
+        <button class="action-btn archive" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
+      </div>`;
+
+  return `<tr>
+    <td>
+      <div class="pkg-name">${escapeHtml(venue.name)}</div>
+      ${venue.description ? `<div class="pkg-id">${escapeHtml(venue.description)}</div>` : ''}
+    </td>
+    <td>${venue.capacity} pax</td>
+    <td><span class="count-pill">${venue._mappedCount || 0} package${venue._mappedCount === 1 ? '' : 's'}</span></td>
+    <td>${venue.sort_order}</td>
+    <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
+    <td>${actions}</td>
+  </tr>`;
+}
+
+function renderVenueTables() {
+  const active = allVenues.filter(v => v.is_active);
+  const archived = allVenues.filter(v => !v.is_active);
+
+  activeVenueBody.innerHTML = active.length
+    ? active.map(buildVenueRow).join('')
+    : '<tr class="empty-row"><td colspan="6">No venues yet. Add Main Hall, Garden, or VIP so onsite packages have somewhere to go.</td></tr>';
+
+  archivedVenueSection.style.display = archived.length ? '' : 'none';
+  archivedVenueBody.innerHTML = archived.length
+    ? archived.map(buildVenueRow).join('')
+    : '';
+}
+
+function handleVenueTableAction(e) {
+  const btn = e.target.closest('[data-venue-action]');
+  if (!btn) return;
+  const { venueAction, id } = btn.dataset;
+  if (venueAction === 'edit')    openEditVenueModal(id);
+  if (venueAction === 'archive') openConfirmArchiveVenue(id);
+  if (venueAction === 'restore') openConfirmRestoreVenue(id);
+  if (venueAction === 'delete')  openConfirmDeleteVenue(id);
+}
+
+activeVenueBody.addEventListener('click', handleVenueTableAction);
+archivedVenueBody.addEventListener('click', handleVenueTableAction);
+
+function openAddVenueModal() {
+  editingVenueId = null;
+  venueModalTitle.textContent = 'Add New Venue';
+  venueModalSub.textContent = 'A physical space at the café';
+  venueModalSaveLabel.textContent = 'Add Venue';
+  venueName.value = '';
+  venueCapacity.value = '';
+  venueDescription.value = '';
+  venueSortOrder.value = '0';
+  venueMappedPackagesField.style.display = 'none';
+  setModalMsg(venueModalMessage, '');
+  openModal(venueModal);
+}
+
+async function openEditVenueModal(venueId) {
+  const venue = allVenues.find(v => v.venue_id === venueId);
+  if (!venue) return;
+
+  editingVenueId = venueId;
+  venueModalTitle.textContent = 'Edit Venue';
+  venueModalSub.textContent = 'Update venue details';
+  venueModalSaveLabel.textContent = 'Save Changes';
+  venueName.value = venue.name || '';
+  venueCapacity.value = venue.capacity ?? '';
+  venueDescription.value = venue.description || '';
+  venueSortOrder.value = venue.sort_order ?? 0;
+
+  setModalMsg(venueModalMessage, '');
+  openModal(venueModal);
+
+  try {
+    const mapped = await getVenueMappedPackages(venueId);
+    if (mapped.length) {
+      venueMappedPackagesField.style.display = '';
+      venueMappedPackagesList.innerHTML = mapped.map(p => `<div class="checklist-item met">• ${escapeHtml(p.package_name)}</div>`).join('');
+    } else {
+      venueMappedPackagesField.style.display = 'none';
+    }
+  } catch {
+    venueMappedPackagesField.style.display = 'none';
+  }
+}
+
+venueModalSave.addEventListener('click', async () => {
+  const name = venueName.value.trim();
+  const capacity = parseInt(venueCapacity.value, 10);
+  if (!name) { setModalMsg(venueModalMessage, 'Venue name is required.'); return; }
+  if (!capacity || capacity < 1) { setModalMsg(venueModalMessage, 'A valid capacity is required.'); return; }
+
+  venueModalSave.disabled = true;
+  venueModalSaveLabel.textContent = 'Saving…';
+  setModalMsg(venueModalMessage, '');
+
+  try {
+    const payload = {
+      name,
+      capacity,
+      description: venueDescription.value.trim() || null,
+      sort_order: parseInt(venueSortOrder.value, 10) || 0,
+    };
+
+    if (editingVenueId) {
+      const { data, error } = await supabase.from(VENUE_TABLE).update(payload).eq('venue_id', editingVenueId).select().single();
+      if (error) throw error;
+      const idx = allVenues.findIndex(v => v.venue_id === editingVenueId);
+      if (idx !== -1) allVenues[idx] = { ...allVenues[idx], ...data };
+      await logAudit({ action: 'Updated Venue', category: 'package', details: `Venue updated: ${name}`, entityId: editingVenueId });
+      setMessage(venuePageMessage, 'Venue updated successfully.', 'success');
+    } else {
+      payload.is_active = true;
+      const { data, error } = await supabase.from(VENUE_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      data._mappedCount = 0;
+      allVenues.unshift(data);
+      await logAudit({ action: 'Added Venue', category: 'package', details: `New venue created: ${name}`, entityId: data.venue_id });
+      setMessage(venuePageMessage, 'Venue added successfully.', 'success');
+    }
+
+    renderVenueTables();
+    closeModal(venueModal);
+  } catch (err) {
+    setModalMsg(venueModalMessage, `Failed to save: ${err.message}`);
+  } finally {
+    venueModalSave.disabled = false;
+    venueModalSaveLabel.textContent = editingVenueId ? 'Save Changes' : 'Add Venue';
+  }
+});
+
+addVenueBtn.addEventListener('click', openAddVenueModal);
+venueModalClose.addEventListener('click',  () => closeModal(venueModal));
+venueModalCancel.addEventListener('click', () => closeModal(venueModal));
+venueModal.addEventListener('click', e => { if (e.target === venueModal) closeModal(venueModal); });
+
+function openConfirmArchiveVenue(venueId) {
+  const venue = allVenues.find(v => v.venue_id === venueId);
+  if (!venue) return;
+  pendingAction = { scope: 'venue', type: 'archive', id: venueId };
+  confirmTitle.textContent = 'Archive Venue';
+  confirmOk.textContent    = 'Archive';
+  confirmOk.className      = 'btn-danger';
+  setModalMsg(confirmMessage, '');
+  confirmCopy.textContent  = `Archive "${venue.name}"? It will no longer be selectable when mapping onsite packages.`;
+  openModal(confirmModal);
+
+  // Best-effort enrichment: name the packages this would affect once known.
+  getVenueMappedPackages(venueId).then(mapped => {
+    if (mapped.length && pendingAction && pendingAction.id === venueId) {
+      confirmCopy.textContent = `Archive "${venue.name}"? It's currently mapped to ${mapped.map(p => p.package_name).join(', ')} — they'll keep their existing mapping, but you won't be able to add this venue to new packages until it's restored.`;
+    }
+  }).catch(() => { /* best-effort only */ });
+}
+
+function openConfirmRestoreVenue(venueId) {
+  const venue = allVenues.find(v => v.venue_id === venueId);
+  if (!venue) return;
+  pendingAction = { scope: 'venue', type: 'restore', id: venueId };
+  confirmTitle.textContent = 'Restore Venue';
+  confirmCopy.textContent  = `Restore "${venue.name}"?`;
+  confirmOk.textContent    = 'Restore';
+  confirmOk.className      = 'btn-primary';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+// Venue delete: package_venue.venue_id is ON DELETE RESTRICT, so this is
+// already blocked at the DB level while mapped — this just turns that into
+// a friendly message naming the blocking packages instead of a raw error.
+async function openConfirmDeleteVenue(venueId) {
+  const venue = allVenues.find(v => v.venue_id === venueId);
+  if (!venue) return;
+
+  setMessage(venuePageMessage, 'Checking mapped packages…');
+  let mapped;
+  try {
+    mapped = await getVenueMappedPackages(venueId);
+  } catch (err) {
+    setMessage(venuePageMessage, `Failed to check packages: ${err.message}`, 'error');
+    return;
+  }
+  setMessage(venuePageMessage, '');
+
+  deleteReassignField.classList.add('hidden');
+
+  if (mapped.length) {
+    pendingDeleteAction = { scope: 'venue', id: venueId, mode: 'blocked' };
+    deleteModalTitle.textContent = 'Venue In Use';
+    deleteModalCopy.textContent = `"${venue.name}" is mapped to: ${mapped.map(p => p.package_name).join(', ')}. Remove it from those packages' Venues section first, or Cancel and Archive instead.`;
+    deleteModalOk.disabled = true;
+  } else {
+    pendingDeleteAction = { scope: 'venue', id: venueId, mode: 'delete' };
+    deleteModalTitle.textContent = 'Delete Venue';
+    deleteModalCopy.textContent = `Delete "${venue.name}"? This can't be undone.`;
+    deleteModalOk.disabled = false;
+  }
+  deleteModalOk.textContent = 'Delete';
+  setModalMsg(deleteModalMessage, '');
+  openModal(deleteModal);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // KEYBOARD: Escape closes modals
@@ -1315,9 +2511,11 @@ tierModal.addEventListener('click', e => { if (e.target === tierModal) closeModa
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!categoryModal.classList.contains('hidden')) closeModal(categoryModal);
-  if (!packageModal.classList.contains('hidden'))  closeModal(packageModal);
-  if (!tierModal.classList.contains('hidden'))      closeModal(tierModal);
-  if (!confirmModal.classList.contains('hidden'))   closeModal(confirmModal);
+  if (!packageModal.classList.contains('hidden'))  attemptClosePackageModal();
+  if (!tierModal.classList.contains('hidden'))     closeModal(tierModal);
+  if (!confirmModal.classList.contains('hidden'))  closeModal(confirmModal);
+  if (!venueModal.classList.contains('hidden'))    closeModal(venueModal);
+  if (!deleteModal.classList.contains('hidden'))   closeModal(deleteModal);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1346,10 +2544,8 @@ function init() {
       const adminBadge = document.getElementById('adminBadge');
       if (adminBadge) adminBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
-      // Start on category view
-      showCategoryView();
-      applyCatArchiveToggle();
-      loadCategories();
+      showInventoryView();
+      loadInventory();
     }
   });
 }

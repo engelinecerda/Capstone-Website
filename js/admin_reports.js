@@ -33,8 +33,22 @@ let reportsFiltered = [];
 let reportsCurrentPage = 1;
 
 const state = {
-    reservations: []
+    reservations: [],
+    paymentSummaryMap: {}
 };
+
+async function fetchPaymentSummaries(reservationIds) {
+    if (!reservationIds.length) return {};
+    const { data, error } = await supabase
+        .from('reservation_payment_summary')
+        .select('reservation_id, total_paid')
+        .in('reservation_id', reservationIds);
+    if (error) throw error;
+    return (data || []).reduce((map, row) => {
+        map[row.reservation_id] = row;
+        return map;
+    }, {});
+}
 
 function redirectToAdminLogin() {
     window.location.replace('/admin/index.html');
@@ -130,6 +144,7 @@ function buildSummaryCards(reservations) {
         summary.totalReservations += 1;
         summary.totalGuests += Number(reservation?.guest_count || 0);
         summary[status] = (summary[status] || 0) + 1;
+        summary.totalPaid += Number(state.paymentSummaryMap[reservation.reservation_id]?.total_paid || 0);
         return summary;
     }, {
         totalReservations: 0,
@@ -139,7 +154,8 @@ function buildSummaryCards(reservations) {
         completed: 0,
         cancelled: 0,
         declined: 0,
-        rescheduled: 0
+        rescheduled: 0,
+        totalPaid: 0
     });
 
     return [
@@ -150,7 +166,8 @@ function buildSummaryCards(reservations) {
         { label: 'Completed', value: totals.completed, copy: 'Past reservations already treated as completed.' },
         { label: 'Cancelled', value: totals.cancelled, copy: 'Cancelled reservations within the selected range.' },
         { label: 'Declined', value: totals.declined, copy: 'Reservations that were declined.' },
-        { label: 'Rescheduled', value: totals.rescheduled, copy: 'Reservations currently marked as rescheduled.' }
+        { label: 'Rescheduled', value: totals.rescheduled, copy: 'Reservations currently marked as rescheduled.' },
+        { label: 'Payments Collected', value: `₱${totals.totalPaid.toLocaleString()}`, copy: 'Total approved payments across the filtered reservations.' }
     ];
 }
 
@@ -363,6 +380,9 @@ async function loadReports() {
 
     try {
         state.reservations = await fetchReservations();
+        state.paymentSummaryMap = await fetchPaymentSummaries(
+            state.reservations.map((r) => r.reservation_id).filter(Boolean)
+        ).catch(() => ({}));
         renderReports();
         await refreshAdminSidebarCounts({
             supabase,

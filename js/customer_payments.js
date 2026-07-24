@@ -1,3 +1,5 @@
+import { getCancellationFee as getSharedCancellationFee } from './reservation_shared.js';
+
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
     uploadPreset: 'eli_contracts',
@@ -5,87 +7,34 @@ const CLOUDINARY_CONFIG = {
     maxFileSize: 10 * 1024 * 1024
 };
 
-export const PAYMENT_METHODS = {
-    gcash: {
-        label: 'GCash',
-        shortLabel: 'GCash',
-        type: 'online',
-        qrImage: '/images/qr-gcash.png',
-        details: [
-            { label: 'Account Name', value: 'Engeline Cerda', copyable: true },
-            { label: 'GCash Number', value: '09983839455', copyable: true }
-        ],
-        helper: 'Scan the QR code or send to the GCash number above. Screenshot your payment confirmation and upload it as proof.'
-    },
-    maya: {
-        label: 'Maya',
-        shortLabel: 'Maya',
-        type: 'online',
-        qrImage: '/images/qr-maya.png',
-        details: [
-            { label: 'Account Name', value: 'Evangeline Cerda', copyable: true },
-            { label: 'Maya Number', value: '09696210379', copyable: true }
-        ],
-        helper: 'Scan the QR code or send to the Maya number above. Screenshot your payment confirmation and upload it as proof.'
-    },
-    bpi: {
-        label: 'BPI',
-        shortLabel: 'Bank (BPI)',
-        type: 'online',
-        // No baked-in QR fallback for bank transfer — only shown if an
-        // admin actually uploads one via the payment_method table.
-        qrImage: '',
-        details: [
-            { label: 'Account Name', value: 'Engeline Cerda', copyable: true },
-            { label: 'Account Number', value: '4039941106', copyable: true }
-        ],
-        helper: 'Transfer to the BPI account above. Upload your transaction receipt or screenshot as proof.'
-    },
-    card: {
-        label: 'Card',
-        shortLabel: 'Card',
-        type: 'onsite',
-        helper: 'Pay by card at the cafe on your visit date. The admin will confirm your payment manually.'
-    },
-    cash: {
-        label: 'Cash',
-        shortLabel: 'Cash',
-        type: 'onsite',
-        helper: 'Pay in cash at the cafe on your visit date. The admin will confirm your payment manually.'
-    }
-};
-
-export const PAYMENT_METHOD_ORDER = ['gcash', 'maya', 'bpi', 'card', 'cash'];
-
-// Maps a method's free-text `label` to the internal key used in
-// PAYMENT_METHODS. Matched by substring (case-insensitive) since admins can
-// name a method however they like (e.g. "GCash – Personal").
-const DB_LABEL_TO_KEY = [
+// Substring match against a method's free-text label, used only to derive
+// the legacy `payment.payment_method` mode string ('gcash'/'maya'/'bpi')
+// that validate_payment_submission() still checks reference-number formats
+// against, and that some admin display maps still key off. Methods that
+// don't match fall back to their DB `type` ('bank'/'ewallet'/'cash') — real
+// values, just not one of the three specially-formatted ones.
+const LEGACY_MODE_MATCH = [
     { match: 'gcash', key: 'gcash' },
     { match: 'maya',  key: 'maya' },
     { match: 'bpi',   key: 'bpi' },
-    { match: 'bank',  key: 'bpi' },
 ];
 
-const DB_DETAIL_LABEL = {
-    gcash: 'GCash Number',
-    maya:  'Maya Number',
-    bpi:   'Account Number',
-};
-
-function resolveMethodKey(row) {
-    if (row.type === 'cash') return 'cash';
+function resolveLegacyModeKey(row) {
+    if (row.type === 'cash' || row.type === 'card') return row.type;
     const label = String(row.label || '').toLowerCase();
-    const match = DB_LABEL_TO_KEY.find(({ match }) => label.includes(match));
-    return match?.key || null;
+    const match = LEGACY_MODE_MATCH.find(({ match }) => label.includes(match));
+    return match?.key || row.type;
 }
 
 /**
- * Fetches active payment methods from the `payment_method` table and patches
- * PAYMENT_METHODS in-place so every reference sees live DB data. Falls back
- * silently to the hardcoded defaults if the fetch fails.
+ * Fetches active payment methods straight from the `payment_method` table —
+ * every displayed value (label, account details, QR image, instructions)
+ * comes from the row, in `sort_order`. No hardcoded skeleton: add, rename,
+ * archive, or reorder a method in admin and it's reflected here with no
+ * code change. Returns [] (not a throw) on fetch failure so callers can
+ * show an empty-state message.
  */
-export async function loadDynamicPaymentMethods(supabase) {
+export async function loadPaymentMethods(supabase) {
     try {
         const { data, error } = await supabase
             .from('payment_method')
@@ -95,40 +44,53 @@ export async function loadDynamicPaymentMethods(supabase) {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        if (!data || !data.length) return;
+        if (!data) return [];
 
-        // Use only the most recently sorted row per resolved key.
-        const seen = new Set();
-        for (const row of data) {
-            const key = resolveMethodKey(row);
-            if (!key || seen.has(key)) continue;
-            seen.add(key);
+        return data.map((row) => {
+            // evidence_source is the admin-configured flag (payment_method
+            // table) that decides this: 'cafe_issued' methods have the
+            // customer pick an arrival date instead of entering a reference
+            // number / uploading proof, since the café produces the receipt
+            // at the counter rather than the customer submitting evidence.
+            // Server-derived from `type` (see the payment_method_evidence_
+            // source trigger) so it's always in sync — cash/card today,
+            // but adding a new cafe_issued method needs no code change here.
+            const isOnsite = row.evidence_source === 'cafe_issued';
+            const details = row.type === 'bank'
+                ? [
+                    { label: 'Account Name', value: row.account_name || '', copyable: true },
+                    { label: 'Account Number', value: row.account_number || '', copyable: true },
+                ]
+                : row.type === 'ewallet'
+                ? [
+                    { label: 'Account Name', value: row.account_name || '', copyable: true },
+                    { label: 'Mobile Number', value: row.phone_number || '', copyable: true },
+                ]
+                : undefined;
 
-            if (key === 'cash') {
-                PAYMENT_METHODS.cash = {
-                    ...PAYMENT_METHODS.cash,
-                    helper: row.instructions || PAYMENT_METHODS.cash.helper,
-                };
-                continue;
-            }
+            const onsiteDefaultHelper = row.type === 'card'
+                ? 'Pay by card at the cafe on your visit date, using the POS terminal. The admin will confirm your payment manually.'
+                : 'Pay in cash at the cafe on your visit date. The admin will confirm your payment manually.';
 
-            const accountName   = row.account_name || '';
-            const accountNumber = row.account_number || row.phone_number || '';
-            const qrImage       = row.qr_image || PAYMENT_METHODS[key].qrImage;
-
-            PAYMENT_METHODS[key] = {
-                ...PAYMENT_METHODS[key],
-                qrImage,
-                details: [
-                    { label: 'Account Name',       value: accountName,   copyable: true },
-                    { label: DB_DETAIL_LABEL[key], value: accountNumber, copyable: true },
-                ],
+            return {
+                id: row.payment_method_id,
+                legacyModeKey: resolveLegacyModeKey(row),
+                label: row.label,
+                shortLabel: row.label,
+                type: isOnsite ? 'onsite' : 'online',
+                evidenceSource: row.evidence_source,
+                qrImage: row.qr_image || '',
+                details,
+                payLocation: row.pay_location || '',
+                cashWindowDays: row.cash_window_days ?? null,
+                helper: isOnsite
+                    ? (row.instructions || onsiteDefaultHelper)
+                    : 'Scan the QR code or send to the details above. Screenshot your payment confirmation and upload it as proof.'
             };
-        }
-
-        console.log('[Payments] Payment methods loaded from DB.');
+        });
     } catch (err) {
-        console.warn('[Payments] Could not load payment methods from DB, using defaults:', err?.message || err);
+        console.warn('[Payments] Could not load payment methods from DB:', err?.message || err);
+        return [];
     }
 }
 
@@ -164,21 +126,55 @@ export function validateReferenceNumber(method, value) {
     return pattern.regex.test(String(value || '').trim());
 }
 
+// deposit_pct used to live here and drive the Custom Amount minimum. It's
+// now payment_type.percent_of_total (code='partial_payment') — see
+// PAYMENT_TYPE_DEFAULTS / loadPaymentTypes() below, the single source.
 export const RESERVATION_RULES_DEFAULTS = {
     min_advance_days: 14,
     max_advance_days: 365,
     min_pax: 20,
     max_pax: 150,
-    deposit_pct: 30,
     full_payment_days: 7,
     auto_cancel_days: 5,
     contract_resubmission_days: 3
 };
 
-export const PAY_AT_CAFE_DEFAULTS = {
-    card: 'Card payments are processed on our POS terminal at the counter.',
-    cash: 'Pay in cash at the counter.'
+// Mirrors the seed values in
+// supabase/migrations/20260723_payment_types_and_method_delete.sql so the
+// page still works correctly before an admin has changed anything (or in an
+// environment where the migration hasn't run yet).
+export const PAYMENT_TYPE_DEFAULTS = {
+    reservation_fee: { label: 'Reservation Fee', is_active: true, flat_amount: 999, percent_of_total: null, min_amount: null },
+    down_payment:    { label: 'Down Payment',    is_active: true, flat_amount: null, percent_of_total: 50, min_amount: null },
+    full_payment:    { label: 'Full Payment',    is_active: true, flat_amount: null, percent_of_total: null, min_amount: null },
+    partial_payment: { label: 'Custom Amount',   is_active: true, flat_amount: null, percent_of_total: 30, min_amount: null }
 };
+
+/**
+ * Reads the `payment_type` table into a { [code]: row } map, merged over
+ * PAYMENT_TYPE_DEFAULTS so a missing/inactive-filtered code still has a
+ * safe fallback shape. Unlike loadReservationRules, inactive rows ARE
+ * included here (with is_active: false) — getAvailablePaymentOptions needs
+ * to know a type is off, not just fall back to "on" because the row is
+ * missing from the response.
+ */
+export async function loadPaymentTypes(supabase) {
+    try {
+        const { data, error } = await supabase
+            .from('payment_type')
+            .select('*');
+
+        if (error || !data) return { ...PAYMENT_TYPE_DEFAULTS };
+
+        const map = { ...PAYMENT_TYPE_DEFAULTS };
+        for (const row of data) {
+            if (map[row.code]) map[row.code] = { ...map[row.code], ...row };
+        }
+        return map;
+    } catch {
+        return { ...PAYMENT_TYPE_DEFAULTS };
+    }
+}
 
 /**
  * Reads the shared "reservation_rules" system_settings row. Falls back to
@@ -201,18 +197,23 @@ export async function loadReservationRules(supabase) {
     }
 }
 
-export async function loadPayAtCafeInstructions(supabase) {
+/**
+ * Reads the shared "payment_rules" system_settings row (max_installments,
+ * auto_hold_enabled, refund_window_days, currency, and the cancellation fee
+ * amounts) — mirrors loadReservationRules's fallback-on-missing-row shape.
+ */
+export async function loadPaymentRules(supabase) {
     try {
         const { data, error } = await supabase
             .from('system_settings')
             .select('setting_value')
-            .eq('setting_key', 'pay_at_cafe_instructions')
+            .eq('setting_key', 'payment_rules')
             .maybeSingle();
 
-        if (error || !data) return { ...PAY_AT_CAFE_DEFAULTS };
-        return { ...PAY_AT_CAFE_DEFAULTS, ...JSON.parse(data.setting_value) };
+        if (error || !data) return null;
+        return JSON.parse(data.setting_value);
     } catch {
-        return { ...PAY_AT_CAFE_DEFAULTS };
+        return null;
     }
 }
 
@@ -408,12 +409,16 @@ function buildPaymentOption(reservation, paymentType, amount, paymentsByReservat
         paymentsByReservationId,
         options
     );
+    // payment_type.label (admin-editable on the Payment Options page) wins
+    // over the PAYMENT_TYPE_META fallback when available, so a rename takes
+    // effect on this "what can I pay next" list immediately.
+    const dbLabel = options.paymentTypes?.[paymentType]?.label;
     const baseDescription = PAYMENT_TYPE_META[paymentType]?.description || '';
 
     return {
         paymentType,
         amount,
-        label: PAYMENT_TYPE_META[paymentType]?.label || displayLabel,
+        label: dbLabel || PAYMENT_TYPE_META[paymentType]?.label || displayLabel,
         displayLabel,
         description: baseDescription,
         displayDescription: options.displayDescription || baseDescription,
@@ -430,11 +435,16 @@ function hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, pay
     ));
 }
 
-function getReservationFeeAmount(reservation, remainingBalance) {
+// Onsite fee is admin-configurable (payment_type.flat_amount, code =
+// 'reservation_fee'). Offsite stays a separate fixed ₱5,000 — the
+// payment_type table only has one flat_amount per code, no onsite/offsite
+// split, so this half of the fee intentionally isn't migrated into it.
+function getReservationFeeAmount(reservation, remainingBalance, paymentTypes) {
     const locationType = String(reservation?.location_type || '').toLowerCase();
 
     if (locationType === 'onsite') {
-        return roundCurrency(Math.min(ONSITE_RESERVATION_FEE, remainingBalance));
+        const flatAmount = Number(paymentTypes?.reservation_fee?.flat_amount ?? ONSITE_RESERVATION_FEE);
+        return roundCurrency(Math.min(flatAmount, remainingBalance));
     }
 
     return roundCurrency(Math.min(5000, remainingBalance));
@@ -451,53 +461,76 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
     const approvedBasePayments = balance.approvedBaseTotal;
     const remainingBalance = balance.remainingBalance;
     const pendingBasePayment = getPendingBasePayment(paymentsByReservationId, reservationId);
+    const paymentTypes = options.paymentTypes || PAYMENT_TYPE_DEFAULTS;
     const optionsList = [];
 
     // Every base-payment option is now computed fresh from the CURRENT
     // remaining balance (not gated behind "is this the first payment?"), so
     // Reservation Fee / Down Payment / Full Payment / Custom Amount can all
     // appear together on a second or third payment too — whichever of them
-    // haven't already been used or aren't already pending review.
+    // haven't already been used or aren't already pending review. An
+    // inactive payment_type row is never shown regardless of the above.
     if (!pendingBasePayment && remainingBalance > 0) {
-        const reservationFeeAmount = getReservationFeeAmount(reservation, remainingBalance);
+        const reservationFeeAmount = getReservationFeeAmount(reservation, remainingBalance, paymentTypes);
         if (
-            reservationFeeAmount > 0
+            paymentTypes.reservation_fee?.is_active !== false
+            && reservationFeeAmount > 0
             && reservationFeeAmount < remainingBalance
             && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'reservation_fee')
         ) {
             optionsList.push(buildPaymentOption(reservation, 'reservation_fee', reservationFeeAmount, paymentsByReservationId, {
                 ...options,
+                paymentTypes,
                 displayDescription: 'Confirm your reservation with the reservation fee.'
             }));
         }
 
-        const downPaymentAmount = roundCurrency(Math.min(remainingBalance * 0.5, remainingBalance));
+        // Percent of the ORIGINAL total, minus what's already been paid —
+        // not percent of what's remaining (that would compound: a customer
+        // who already paid the ₱999 reservation fee against a 50% deposit
+        // on ₱10,000 owes ₱4,001, not ₱5,000).
+        const downPaymentPct = Number(paymentTypes.down_payment?.percent_of_total ?? 50);
+        const downPaymentAmount = roundCurrency(Math.min((totalPrice * downPaymentPct / 100) - approvedBasePayments, remainingBalance));
         if (
-            downPaymentAmount > 0
+            paymentTypes.down_payment?.is_active !== false
+            && downPaymentAmount > 0
             && downPaymentAmount < remainingBalance
             && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'down_payment')
         ) {
             optionsList.push(buildPaymentOption(reservation, 'down_payment', downPaymentAmount, paymentsByReservationId, {
                 ...options,
-                displayDescription: 'Pay half of your remaining balance now and settle the rest later.'
+                paymentTypes,
+                displayDescription: 'Pay a percentage of your total now and settle the rest later.'
             }));
         }
 
-        if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'full_payment')) {
+        if (
+            paymentTypes.full_payment?.is_active !== false
+            && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'full_payment')
+        ) {
             optionsList.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, paymentsByReservationId, {
                 ...options,
+                paymentTypes,
                 displayDescription: approvedBasePayments > 0
                     ? (balance.dueDateKey ? `Settle the unpaid balance by ${balance.dueDateLabel}.` : 'Settle the unpaid balance for this reservation.')
                     : 'Settle the reservation in one payment.'
             }));
         }
 
-        if (!hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'partial_payment')) {
-            const depositPct = Number(options.reservationRules?.deposit_pct ?? RESERVATION_RULES_DEFAULTS.deposit_pct);
-            const minAmount = roundCurrency(Math.min(totalPrice * depositPct / 100, remainingBalance));
+        if (
+            paymentTypes.partial_payment?.is_active !== false
+            && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'partial_payment')
+        ) {
+            const customPct = Number(paymentTypes.partial_payment?.percent_of_total ?? RESERVATION_RULES_DEFAULTS.deposit_pct ?? 30);
+            const customFloor = Number(paymentTypes.partial_payment?.min_amount ?? 0);
+            // min(floor, remaining) matters: without the cap, a customer with
+            // less remaining than the floor could never submit their final
+            // payment.
+            const minAmount = roundCurrency(Math.min(Math.max(totalPrice * customPct / 100, customFloor), remainingBalance));
             optionsList.push(buildPaymentOption(reservation, 'partial_payment', 0, paymentsByReservationId, {
                 ...options,
-                displayLabel: 'Custom Amount',
+                paymentTypes,
+                displayLabel: paymentTypes.partial_payment?.label || 'Custom Amount',
                 displayDescription: `Enter any amount between ${safeFormatCurrency(minAmount)} and ${safeFormatCurrency(remainingBalance)}.`,
                 minAmount,
                 maxAmount: remainingBalance
@@ -529,7 +562,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             ['pending_review', 'approved'].includes(String(p.payment_status || '').toLowerCase())
         );
         if (!hasPendingCancellationFee) {
-            const cancellationFeeAmount = String(reservation.location_type || '').toLowerCase() === 'offsite' ? 2000 : 500;
+            const cancellationFeeAmount = getSharedCancellationFee(reservation, options.paymentRules);
             optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', cancellationFeeAmount, paymentsByReservationId, {
                 ...options,
                 displayDescription: 'Required fee to process the cancellation of your reservation.'
@@ -799,7 +832,7 @@ export async function submitCustomerPayment({
     paymentsByReservationId,
     reschedulesByReservationId,
     reservationId,
-    paymentMethod,
+    selectedMethod,
     paymentType,
     rescheduleRequestId = null,
     customAmount = null,
@@ -809,7 +842,8 @@ export async function submitCustomerPayment({
     notes = '',
     proofFile = null,
     formatDate,
-    reservationRules = null
+    reservationRules = null,
+    paymentTypes = null
 }) {
     const reservation = (reservations || []).find((entry) => String(entry.reservation_id) === String(reservationId));
     if (!reservation) {
@@ -821,7 +855,7 @@ export async function submitCustomerPayment({
         reservation,
         paymentsByReservationId,
         reschedulesByReservationId,
-        { formatDate, reservationRules }
+        { formatDate, reservationRules, paymentTypes }
     );
     const selectedOption = availableOptions.find((option) => (
         option.paymentType === paymentType
@@ -831,9 +865,12 @@ export async function submitCustomerPayment({
     if (!selectedOption) {
         throw new Error('This payment option is no longer available. Please refresh the page.');
     }
+    if (!selectedMethod) {
+        throw new Error('Please choose a payment method.');
+    }
 
-    const activeMethod = String(paymentMethod || 'gcash');
-    const isOnsite = PAYMENT_METHODS[activeMethod]?.type === 'onsite';
+    const isOnsite = selectedMethod.type === 'onsite';
+    const legacyModeKey = selectedMethod.legacyModeKey;
     const isCustomAmount = selectedOption.paymentType === 'partial_payment';
 
     let amount = Number(selectedOption.amount || 0);
@@ -870,9 +907,9 @@ export async function submitCustomerPayment({
         if (!referenceNumber) {
             throw new Error('Please enter your reference or transaction number.');
         }
-        if (!validateReferenceNumber(activeMethod, referenceNumber)) {
-            const hint = REFERENCE_NUMBER_PATTERNS[activeMethod]?.hint || 'the correct format';
-            throw new Error(`Please enter a valid ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} reference number (${hint}).`);
+        if (!validateReferenceNumber(legacyModeKey, referenceNumber)) {
+            const hint = REFERENCE_NUMBER_PATTERNS[legacyModeKey]?.hint || 'the correct format';
+            throw new Error(`Please enter a valid ${selectedMethod.label || legacyModeKey} reference number (${hint}).`);
         }
         if (!paymentDate) {
             throw new Error('Please choose the payment date.');
@@ -890,7 +927,9 @@ export async function submitCustomerPayment({
         reservation_id: reservation.reservation_id,
         reschedule_request_id: selectedOption.rescheduleRequestId || null,
         payment_type: selectedOption.paymentType,
-        payment_method: activeMethod,
+        payment_method: legacyModeKey,
+        payment_method_id: selectedMethod.id,
+        payment_method_label: selectedMethod.label || null,
         amount,
         payment_status: 'pending_review',
         reference_number: isOnsite ? null : referenceNumber,

@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { uploadToCloudinary } from './cloudinary_payment_methods.js';
 import { logAudit } from './audit_logger.js';
 import { initAdminNav } from './admin_nav.js';
+import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 
 // ── Confirm modal (Payment Rules) ────────────────────────────────────────────
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
@@ -28,7 +29,8 @@ function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
 let pm2Methods = [];
 let pm2EditingId = null;
 let pm2PendingFile = null;
-let pm2PendingToggle = null;
+// { type: 'toggle', id, activate } | { type: 'archive', id } | { type: 'delete', id }
+let pm2PendingAction = null;
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -46,7 +48,7 @@ function setPm2Message(msg, isError = false) {
 function pm2DetailLabel(method) {
   if (method.type === 'bank') return method.account_number ? `•••• ${String(method.account_number).slice(-4)}` : '—';
   if (method.type === 'ewallet') return method.phone_number || '—';
-  if (method.type === 'cash') return method.pay_location || `${method.cash_window_days ?? '?'} day(s) before event`;
+  if (method.type === 'cash' || method.type === 'card') return method.pay_location || `${method.cash_window_days ?? '?'} day(s) before event`;
   return '—';
 }
 
@@ -62,7 +64,12 @@ function renderPm2Rows() {
   body.innerHTML = pm2Methods.map((m) => `
     <tr>
       <td class="pm2-label-cell">${escHtml(m.label)}</td>
-      <td><span class="pm2-type-pill ${escHtml(m.type)}">${escHtml(m.type)}</span></td>
+      <td>
+        <span class="pm2-icon-pill">
+          ${paymentMethodIconSvg(m.icon_key)}
+          <span class="pm2-type-pill ${escHtml(m.type)}">${escHtml(m.type)}</span>
+        </span>
+      </td>
       <td class="pm2-detail-cell">${escHtml(pm2DetailLabel(m))}</td>
       <td>${m.qr_image ? `<img class="pm2-qr-thumb" src="${escHtml(m.qr_image)}" alt="QR for ${escHtml(m.label)}">` : '—'}</td>
       <td>
@@ -73,6 +80,7 @@ function renderPm2Rows() {
       </td>
       <td class="pm2-actions-cell">
         <button type="button" class="action-btn view pm2-edit-btn" data-id="${escHtml(m.payment_method_id)}">Edit</button>
+        <button type="button" class="action-btn decline pm2-delete-btn" data-id="${escHtml(m.payment_method_id)}">Delete</button>
       </td>
     </tr>
   `).join('');
@@ -98,10 +106,23 @@ async function loadPaymentMethods() {
   renderPm2Rows();
 }
 
+// icon_key defaults per type — matches the same 1:1 mapping the
+// evidence_source DB trigger derives server-side (see the migration).
+// Overridable per-method, this just seeds a sensible starting value
+// whenever the type changes.
+const PM2_DEFAULT_ICON_BY_TYPE = {
+  bank: 'building-bank',
+  ewallet: 'wallet',
+  cash: 'cash',
+  card: 'credit-card'
+};
+
 function pm2SetTypeFields(type) {
   document.querySelectorAll('.pm2-fields-bank').forEach(el => { el.style.display = type === 'bank' ? '' : 'none'; });
   document.querySelectorAll('.pm2-fields-ewallet').forEach(el => { el.style.display = type === 'ewallet' ? '' : 'none'; });
-  document.querySelectorAll('.pm2-fields-cash').forEach(el => { el.style.display = type === 'cash' ? '' : 'none'; });
+  // Card is the same on-site flow as cash (pick an arrival date, staff
+  // confirms in person), so it reuses the exact same field group.
+  document.querySelectorAll('.pm2-fields-cash').forEach(el => { el.style.display = (type === 'cash' || type === 'card') ? '' : 'none'; });
 }
 
 function pm2UpdatePreview() {
@@ -115,7 +136,7 @@ function pm2UpdatePreview() {
   } else if (type === 'ewallet') {
     lines.push(document.getElementById('pm2AccountName')?.value || '');
     lines.push(document.getElementById('pm2PhoneNumber')?.value || '');
-  } else if (type === 'cash') {
+  } else if (type === 'cash' || type === 'card') {
     lines.push(document.getElementById('pm2Instructions')?.value || '');
     const days = document.getElementById('pm2CashWindowDays')?.value;
     if (days) lines.push(`Pay by ${days} day(s) before the event.`);
@@ -141,6 +162,7 @@ function pm2ResetModal() {
   document.getElementById('pm2QrPreviewWrap').classList.add('hidden');
   document.getElementById('pm2ProgressWrap').classList.add('hidden');
   document.getElementById('pm2ModalMsg').textContent = '';
+  document.getElementById('pm2IconKey').value = PM2_DEFAULT_ICON_BY_TYPE.bank;
   pm2SetTypeFields('bank');
   pm2UpdatePreview();
 }
@@ -173,6 +195,7 @@ function openEditMethodModal(id) {
   document.getElementById('pm2Instructions').value = method.instructions || '';
   document.getElementById('pm2CashWindowDays').value = method.cash_window_days ?? 1;
   document.getElementById('pm2PayLocation').value = method.pay_location || '';
+  document.getElementById('pm2IconKey').value = method.icon_key || PM2_DEFAULT_ICON_BY_TYPE[method.type] || 'receipt';
 
   if (method.qr_image) {
     document.getElementById('pm2QrPreviewImg').src = method.qr_image;
@@ -192,9 +215,9 @@ function pm2ValidateFields(type, fields) {
   } else if (type === 'ewallet') {
     if (!fields.account_name) return 'Account name is required for e-wallet methods.';
     if (!fields.phone_number) return 'Mobile number is required for e-wallet methods.';
-  } else if (type === 'cash') {
+  } else if (type === 'cash' || type === 'card') {
     if (fields.cash_window_days === null || Number.isNaN(fields.cash_window_days) || fields.cash_window_days < 0) {
-      return 'Latest pay-by (days before event) is required for cash methods.';
+      return 'Latest pay-by (days before event) is required for cash and card methods.';
     }
   }
   return null;
@@ -241,8 +264,9 @@ async function pm2SaveMethod() {
     account_number: document.getElementById('pm2AccountNumber').value.trim() || null,
     phone_number: document.getElementById('pm2PhoneNumber').value.trim() || null,
     instructions: document.getElementById('pm2Instructions').value.trim() || null,
-    cash_window_days: type === 'cash' ? Number(document.getElementById('pm2CashWindowDays').value) : null,
+    cash_window_days: (type === 'cash' || type === 'card') ? Number(document.getElementById('pm2CashWindowDays').value) : null,
     pay_location: document.getElementById('pm2PayLocation').value.trim() || null,
+    icon_key: document.getElementById('pm2IconKey').value || PM2_DEFAULT_ICON_BY_TYPE[type] || 'receipt',
   };
 
   const validationError = pm2ValidateFields(type, fields);
@@ -305,46 +329,219 @@ function pm2HandleBodyChange(e) {
   const activate = toggle.checked;
   toggle.checked = !activate; // revert until confirmed
 
-  pm2PendingToggle = { id, activate };
+  pm2PendingAction = { type: 'toggle', id, activate };
   document.getElementById('pm2ConfirmTitle').textContent = activate ? 'Activate Method' : 'Deactivate Method';
   document.getElementById('pm2ConfirmCopy').textContent = activate
     ? `Activate "${method.label}"? Customers will see it at checkout again.`
     : `Deactivate "${method.label}"? Customers will no longer see it at checkout.`;
+  document.getElementById('pm2ConfirmOk').textContent = 'Confirm';
   document.getElementById('pm2ConfirmModal').classList.remove('hidden');
 }
 
 function pm2HandleBodyClick(e) {
-  const btn = e.target.closest('.pm2-edit-btn');
-  if (!btn) return;
-  openEditMethodModal(btn.dataset.id);
+  const editBtn = e.target.closest('.pm2-edit-btn');
+  if (editBtn) {
+    openEditMethodModal(editBtn.dataset.id);
+    return;
+  }
+
+  const deleteBtn = e.target.closest('.pm2-delete-btn');
+  if (deleteBtn) {
+    pm2HandleDeleteClick(deleteBtn.dataset.id);
+  }
 }
 
-async function pm2ConfirmToggle() {
-  if (!pm2PendingToggle) return;
-  const { id, activate } = pm2PendingToggle;
+// Zero payment references → offer a real delete. One or more → skip the
+// delete confirm entirely and offer archive instead, showing the count.
+async function pm2HandleDeleteClick(id) {
+  const method = pm2Methods.find(m => m.payment_method_id === id);
+  if (!method) return;
+
+  setPm2Message('Checking payment history…');
+  const { count, error } = await supabase
+    .from('payment')
+    .select('payment_id', { count: 'exact', head: true })
+    .eq('payment_method_id', id);
+
+  if (error) {
+    setPm2Message('Failed to check payment references: ' + error.message, true);
+    return;
+  }
+  setPm2Message('');
+
+  if (count > 0) {
+    pm2PendingAction = { type: 'archive', id };
+    document.getElementById('pm2ConfirmTitle').textContent = 'Archive Instead';
+    document.getElementById('pm2ConfirmCopy').textContent =
+      `${count} payment${count === 1 ? '' : 's'} used this method. Archive it instead — it stays on those records but is hidden from customers.`;
+    document.getElementById('pm2ConfirmOk').textContent = 'Archive';
+  } else {
+    pm2PendingAction = { type: 'delete', id };
+    document.getElementById('pm2ConfirmTitle').textContent = 'Delete Method';
+    document.getElementById('pm2ConfirmCopy').textContent = `Delete "${method.label}"? This can't be undone.`;
+    document.getElementById('pm2ConfirmOk').textContent = 'Delete';
+  }
+  document.getElementById('pm2ConfirmModal').classList.remove('hidden');
+}
+
+async function pm2ConfirmAction() {
+  if (!pm2PendingAction) return;
+  const { type, id } = pm2PendingAction;
   const okBtn = document.getElementById('pm2ConfirmOk');
   okBtn.disabled = true;
 
   try {
-    const { error } = await supabase.from('payment_method').update({ is_active: activate }).eq('payment_method_id', id);
-    if (error) throw error;
-
     const method = pm2Methods.find(m => m.payment_method_id === id);
-    await logAudit({
-      action: activate ? 'Activated Payment Method' : 'Deactivated Payment Method',
-      category: 'payment_config',
-      details: `${activate ? 'Activated' : 'Deactivated'} method: ${method?.label}`,
-      entityId: id
-    });
 
-    await loadPaymentMethods();
-    setPm2Message(activate ? 'Method activated.' : 'Method deactivated.');
+    if (type === 'toggle') {
+      const activate = pm2PendingAction.activate;
+      const { error } = await supabase.from('payment_method').update({ is_active: activate }).eq('payment_method_id', id);
+      if (error) throw error;
+      await logAudit({
+        action: activate ? 'Activated Payment Method' : 'Deactivated Payment Method',
+        category: 'payment_config',
+        details: `${activate ? 'Activated' : 'Deactivated'} method: ${method?.label}`,
+        entityId: id
+      });
+      await loadPaymentMethods();
+      setPm2Message(activate ? 'Method activated.' : 'Method deactivated.');
+    } else if (type === 'archive') {
+      const { error } = await supabase.from('payment_method').update({ is_active: false }).eq('payment_method_id', id);
+      if (error) throw error;
+      await logAudit({
+        action: 'Archived Payment Method',
+        category: 'payment_config',
+        details: `Archived method (has payment history): ${method?.label}`,
+        entityId: id
+      });
+      await loadPaymentMethods();
+      setPm2Message('Method archived.');
+    } else if (type === 'delete') {
+      const { data, error } = await supabase.functions.invoke('delete-payment-method', {
+        body: { payment_method_id: id }
+      });
+      if (error) throw new Error(data?.error || error.message);
+      await logAudit({
+        action: 'Deleted Payment Method',
+        category: 'payment_config',
+        details: `Deleted method: ${method?.label}`,
+        entityId: id
+      });
+      await loadPaymentMethods();
+      setPm2Message('Method deleted.');
+    }
   } catch (err) {
-    setPm2Message('Failed to update: ' + err.message, true);
+    setPm2Message('Failed: ' + err.message, true);
   } finally {
     okBtn.disabled = false;
-    pm2PendingToggle = null;
+    pm2PendingAction = null;
     document.getElementById('pm2ConfirmModal').classList.add('hidden');
+  }
+}
+
+// ── Payment types ──────────────────────────────────────────────────────────
+// Fixed 4 codes (reservation_fee, down_payment, full_payment, partial_payment)
+// — no add/delete, deactivate instead, mirroring payment_method's own
+// is_active pattern. Each row saves independently via its own Save button.
+let ptTypes = [];
+
+function setPtMessage(msg, isError = false) {
+  const el = document.getElementById('pt-message');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+function populatePaymentTypeRow(row) {
+  const code = row.code;
+  const labelEl = document.getElementById(`pt-${code}-label`);
+  const activeEl = document.getElementById(`pt-${code}-active`);
+  if (labelEl) labelEl.value = row.label || '';
+  if (activeEl) activeEl.checked = !!row.is_active;
+
+  if (code === 'reservation_fee') {
+    const flatEl = document.getElementById('pt-reservation_fee-flat');
+    if (flatEl) flatEl.value = row.flat_amount ?? '';
+  } else if (code === 'down_payment') {
+    const percentEl = document.getElementById('pt-down_payment-percent');
+    if (percentEl) percentEl.value = row.percent_of_total ?? '';
+  } else if (code === 'partial_payment') {
+    const percentEl = document.getElementById('pt-partial_payment-percent');
+    const floorEl = document.getElementById('pt-partial_payment-floor');
+    if (percentEl) percentEl.value = row.percent_of_total ?? '';
+    if (floorEl) floorEl.value = row.min_amount ?? '';
+  }
+}
+
+async function loadPaymentTypes() {
+  const { data, error } = await supabase
+    .from('payment_type')
+    .select('*')
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    setPtMessage('Failed to load payment types: ' + error.message, true);
+    return;
+  }
+
+  ptTypes = data || [];
+  ptTypes.forEach(populatePaymentTypeRow);
+}
+
+function ptValidate(code, payload) {
+  if (!payload.label) return 'Label is required.';
+  if (code === 'reservation_fee') {
+    if (!Number.isFinite(payload.flat_amount) || payload.flat_amount < 0) return 'Flat amount must be zero or more.';
+  } else if (code === 'down_payment') {
+    if (!Number.isFinite(payload.percent_of_total) || payload.percent_of_total < 0 || payload.percent_of_total > 100) return 'Percentage must be between 0 and 100.';
+  } else if (code === 'partial_payment') {
+    if (!Number.isFinite(payload.percent_of_total) || payload.percent_of_total < 0 || payload.percent_of_total > 100) return 'Minimum percentage must be between 0 and 100.';
+    if (payload.min_amount !== null && (!Number.isFinite(payload.min_amount) || payload.min_amount < 0)) return 'Peso floor must be zero or more.';
+  }
+  return null;
+}
+
+async function ptSaveType(code) {
+  const btn = document.querySelector(`.pt-save-btn[data-code="${code}"]`);
+  const labelEl = document.getElementById(`pt-${code}-label`);
+  const activeEl = document.getElementById(`pt-${code}-active`);
+
+  const payload = {
+    label: labelEl?.value.trim() || '',
+    is_active: !!activeEl?.checked
+  };
+
+  if (code === 'reservation_fee') {
+    payload.flat_amount = Number(document.getElementById('pt-reservation_fee-flat')?.value);
+  } else if (code === 'down_payment') {
+    payload.percent_of_total = Number(document.getElementById('pt-down_payment-percent')?.value);
+  } else if (code === 'partial_payment') {
+    payload.percent_of_total = Number(document.getElementById('pt-partial_payment-percent')?.value);
+    const floorRaw = document.getElementById('pt-partial_payment-floor')?.value;
+    payload.min_amount = floorRaw === '' ? null : Number(floorRaw);
+  }
+
+  const validationError = ptValidate(code, payload);
+  if (validationError) { setPtMessage(validationError, true); return; }
+
+  if (btn) btn.disabled = true;
+  setPtMessage('Saving…');
+
+  try {
+    const { error } = await supabase.from('payment_type').update(payload).eq('code', code);
+    if (error) throw error;
+    await logAudit({
+      action: 'Updated Payment Type',
+      category: 'payment_config',
+      details: `Updated ${code}: ${JSON.stringify(payload)}`,
+      entityId: code
+    });
+    await loadPaymentTypes();
+    setPtMessage('Saved.');
+  } catch (err) {
+    setPtMessage('Failed to save: ' + err.message, true);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -356,7 +553,9 @@ const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,
   refund_window_days: 14,
-  currency: 'PHP'
+  currency: 'PHP',
+  cancellation_fee_onsite: 500,
+  cancellation_fee_offsite: 2000
 };
 
 function populatePaymentRulesFields(config) {
@@ -364,10 +563,14 @@ function populatePaymentRulesFields(config) {
   const autoHold = document.getElementById('pr-auto-hold');
   const refundWindow = document.getElementById('pr-refund-window');
   const currency = document.getElementById('pr-currency');
+  const cancelOnsite = document.getElementById('pr-cancellation-fee-onsite');
+  const cancelOffsite = document.getElementById('pr-cancellation-fee-offsite');
   if (maxInst) maxInst.value = config.max_installments ?? '';
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
   if (refundWindow) refundWindow.value = config.refund_window_days ?? '';
   if (currency) currency.value = config.currency ?? 'PHP';
+  if (cancelOnsite) cancelOnsite.value = config.cancellation_fee_onsite ?? '';
+  if (cancelOffsite) cancelOffsite.value = config.cancellation_fee_offsite ?? '';
 }
 
 function readPaymentRulesFields() {
@@ -375,13 +578,17 @@ function readPaymentRulesFields() {
     max_installments: Number(document.getElementById('pr-max-installments')?.value),
     auto_hold_enabled: !!document.getElementById('pr-auto-hold')?.checked,
     refund_window_days: Number(document.getElementById('pr-refund-window')?.value),
-    currency: 'PHP'
+    currency: 'PHP',
+    cancellation_fee_onsite: Number(document.getElementById('pr-cancellation-fee-onsite')?.value),
+    cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value)
   };
 }
 
 function validatePaymentRules(config) {
   if (!Number.isFinite(config.max_installments) || config.max_installments < 1) return 'Maximum installments must be at least 1.';
   if (!Number.isFinite(config.refund_window_days) || config.refund_window_days < 0) return 'Refund window must be zero or more days.';
+  if (!Number.isFinite(config.cancellation_fee_onsite) || config.cancellation_fee_onsite < 0) return 'Onsite cancellation fee must be zero or more.';
+  if (!Number.isFinite(config.cancellation_fee_offsite) || config.cancellation_fee_offsite < 0) return 'Offsite cancellation fee must be zero or more.';
   return null;
 }
 
@@ -420,8 +627,8 @@ async function savePaymentRules() {
 
   showSettingsConfirm(
     'Change Payment Rules',
-    `${oldConfig.max_installments} installments, ${oldConfig.refund_window_days}d refund window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}`,
-    `${config.max_installments} installments, ${config.refund_window_days}d refund window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}`,
+    `${oldConfig.max_installments} installments, ${oldConfig.refund_window_days}d refund window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${oldConfig.cancellation_fee_onsite}/₱${oldConfig.cancellation_fee_offsite}`,
+    `${config.max_installments} installments, ${config.refund_window_days}d refund window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${config.cancellation_fee_onsite}/₱${config.cancellation_fee_offsite}`,
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
@@ -462,13 +669,20 @@ async function init() {
   initAdminNav({ role: result.profile.role });
 
   await loadPaymentMethods();
+  await loadPaymentTypes();
   await loadPaymentRules();
+
+  document.querySelectorAll('.pt-save-btn').forEach((btn) => {
+    btn.addEventListener('click', () => ptSaveType(btn.dataset.code));
+  });
 
   document.getElementById('pm2AddBtn')?.addEventListener('click', openAddMethodModal);
   document.getElementById('pm2ModalCancel')?.addEventListener('click', pm2CloseModal);
   document.getElementById('pm2ModalSave')?.addEventListener('click', pm2SaveMethod);
   document.getElementById('pm2Type')?.addEventListener('change', (e) => {
     pm2SetTypeFields(e.target.value);
+    const iconField = document.getElementById('pm2IconKey');
+    if (iconField) iconField.value = PM2_DEFAULT_ICON_BY_TYPE[e.target.value] || 'receipt';
     pm2UpdatePreview();
   });
   ['pm2Label', 'pm2AccountName', 'pm2AccountNumber', 'pm2PhoneNumber', 'pm2Instructions', 'pm2CashWindowDays'].forEach((id) => {
@@ -478,10 +692,10 @@ async function init() {
   document.getElementById('pm2Body')?.addEventListener('change', pm2HandleBodyChange);
   document.getElementById('pm2Body')?.addEventListener('click', pm2HandleBodyClick);
   document.getElementById('pm2ConfirmCancel')?.addEventListener('click', () => {
-    pm2PendingToggle = null;
+    pm2PendingAction = null;
     document.getElementById('pm2ConfirmModal').classList.add('hidden');
   });
-  document.getElementById('pm2ConfirmOk')?.addEventListener('click', pm2ConfirmToggle);
+  document.getElementById('pm2ConfirmOk')?.addEventListener('click', pm2ConfirmAction);
 
   document.getElementById('pr-save-btn')?.addEventListener('click', savePaymentRules);
 }

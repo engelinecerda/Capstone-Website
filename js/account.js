@@ -5,7 +5,8 @@ import {
     fetchReceipts as fetchSharedReceipts,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails as getSharedReservationBalanceDetails,
-    isReservationPaymentEnabled as isSharedReservationPaymentEnabled
+    isReservationPaymentEnabled as isSharedReservationPaymentEnabled,
+    loadPaymentRules
 } from './customer_payments.js';
 import {
     fetchBlackoutDates,
@@ -43,14 +44,6 @@ import {
     computeCanReschedule,
     computeCanCancel
 } from './reservation_shared.js';
-
-const CLOUDINARY_CONFIG = {
-    cloudName: 'dtt707f1w',
-    uploadPreset: 'eli_contracts',
-    paymentFolder: 'payments',
-    contractFolder: 'contracts',
-    maxFileSize: 10 * 1024 * 1024
-};
 
 const PAYMENT_METHODS = {
     card: {
@@ -145,6 +138,7 @@ const submissionFeedbackCopy = document.getElementById('submission-feedback-copy
 
 const state = {
     reservations: [],
+    paymentRules: null,
     contractsByReservationId: {},
     paymentsByReservationId: {},
     receiptsByPaymentId: {},
@@ -846,9 +840,13 @@ function canCancelReservation(reservation) {
     return computeCanCancel(reservation?.status, getReservationPayments(reservation.reservation_id));
 }
 
+// Submission itself now happens on the dedicated /payment.html page (same
+// DB-driven method list + payment_type pricing used everywhere else) —
+// this only decides whether to show a "go pay" CTA or an empty-state
+// message, reusing the same option/gating helpers the rest of this file's
+// status displays already depend on.
 function renderPaymentComposer(reservation) {
     const options = getAvailablePaymentOptions(reservation);
-    const balance = getReservationBalanceDetails(reservation);
     if (!options.length) {
         if (!isReservationPaymentEnabled(reservation)) {
             return '<div class="payment-empty">Payment submission becomes available after admin approves this reservation.</div>';
@@ -859,149 +857,15 @@ function renderPaymentComposer(reservation) {
         return `<div class="payment-empty">${escapeHtml(waitingMessage)}</div>`;
     }
 
-    const defaultMethod = 'card';
-    const canUseCash = options.some((option) => option.paymentType === 'full_payment');
+    const balance = getReservationBalanceDetails(reservation);
     const actionIntro = balance.hasPartialPayment
         ? `This reservation is already confirmed. Settle the remaining balance by ${balance.dueDateLabel}.`
         : 'Choose the payment that works for you to confirm this reservation.';
-    const methodChips = Object.entries(PAYMENT_METHODS).map(([method, meta]) => `
-        <button
-            type="button"
-            class="res-choice-chip payment-choice-card res-payment-method ${method === defaultMethod ? 'active' : ''}"
-            data-method="${escapeHtml(method)}"
-            ${method === 'cash' && !canUseCash ? 'disabled' : ''}
-        >
-            <span class="payment-method-main">
-                <strong>${escapeHtml(meta.label)}</strong>
-            </span>
-            ${method === 'cash' ? '<span class="payment-method-subcopy">Pay in person</span>' : ''}
-            <span class="payment-choice-check" aria-hidden="true"></span>
-        </button>
-    `).join('');
-
-    const optionChips = options.map((option, index) => {
-        const isCustom = option.paymentType === 'partial_payment';
-        return `
-        <button
-            type="button"
-            class="res-choice-chip payment-choice-card payment-type-card res-payment-type ${index === 0 ? 'active' : ''}"
-            data-payment-option="${index}"
-            data-payment-type="${escapeHtml(option.paymentType)}"
-            data-amount="${escapeHtml(option.amount)}"
-            data-custom-amount="${isCustom ? 'true' : 'false'}"
-            data-reschedule-request-id="${escapeHtml(option.rescheduleRequestId || '')}"
-            data-display-label="${escapeHtml(option.displayLabel || option.label)}"
-            data-display-description="${escapeHtml(option.displayDescription || option.description)}"
-        >
-            <div class="payment-type-head">
-                <strong>${escapeHtml(option.displayLabel || option.label)}</strong>
-            </div>
-            <span class="payment-choice-amount">${isCustom ? 'You decide' : escapeHtml(formatCurrency(option.amount))}</span>
-            <span class="payment-choice-copy">${escapeHtml(option.displayDescription || option.description)}</span>
-        </button>`;
-    }).join('');
 
     return `
-        <div class="payment-composer" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-cash-enabled="${canUseCash ? 'true' : 'false'}">
-            <div class="payment-flow-intro">${escapeHtml(actionIntro)}</div>
-            <section class="payment-action-card payment-selection-card">
-                <div class="payment-panel-minihead">
-                    <div class="payment-step-head">
-                        <span class="payment-step-number">1</span>
-                        <div class="payment-step-body">
-                            <div class="payment-step-title">Payment Selection</div>
-                            <div class="payment-step-copy">Choose your method, then send the next required payment for this reservation.</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="payment-selection-stack">
-                    <div class="payment-selection-group">
-                        <div class="payment-selection-label">Payment Method</div>
-                        <div class="payment-card-grid payment-method-grid">${methodChips}</div>
-                    </div>
-                    <div class="payment-selection-group">
-                        <div class="payment-selection-label">Payment Type</div>
-                        <div class="payment-card-grid payment-type-grid">${optionChips}</div>
-                    </div>
-                </div>
-                <div class="payment-selection-summary">
-                    <div class="payment-selection-summary-title" data-selection-summary>
-                        Selected: ${escapeHtml(PAYMENT_METHODS[defaultMethod].label)} / ${escapeHtml(options[0].displayLabel || options[0].label)} / ${escapeHtml(formatCurrency(options[0].amount))}
-                    </div>
-                    <div class="payment-selection-summary-note">
-                        <span class="payment-selection-summary-icon" aria-hidden="true">&#9432;</span>
-                        <span>Amounts are system-defined so customers cannot submit mismatched payment totals.</span>
-                    </div>
-                </div>
-                <div class="payment-method-copy" data-method-helper>${escapeHtml(PAYMENT_METHODS[defaultMethod].helper)}</div>
-                <div class="payment-channel-box" data-payment-channel></div>
-            </section>
-            <section class="payment-action-card payment-details-card">
-                <div class="payment-panel-minihead">
-                    <div class="payment-step-head">
-                        <span class="payment-step-number">2</span>
-                        <div class="payment-step-body">
-                            <div class="payment-step-title">Payment Details</div>
-                            <div class="payment-step-copy">Enter the details that match the payment method you selected.</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="payment-form-grid">
-                    <div class="payment-form-row">
-                        <div class="payment-field payment-reference-field">
-                            <label>Reference / transaction number</label>
-                            <input type="text" data-field="reference_number" placeholder="e.g. 1234567890">
-                        </div>
-                        <div class="payment-field payment-amount-field">
-                            <label>Amount paid</label>
-                            <input type="text" data-field="amount" readonly value="${escapeHtml(formatCurrency(options[0].amount))}">
-                        </div>
-                    </div>
-                    <div class="payment-form-row">
-                        <div class="payment-field payment-payment-date-field">
-                            <label>Date of payment</label>
-                            <input type="date" data-field="payment_date">
-                        </div>
-                        <div class="payment-field payment-cash-date-field" hidden>
-                            <label>Date of arrival at the cafe</label>
-                            <input type="date" data-field="cash_payment_date">
-                        </div>
-                    </div>
-                    <div class="payment-field full">
-                        <label>Notes (optional)</label>
-                        <textarea data-field="notes" placeholder="Add any note for the admin..."></textarea>
-                    </div>
-                </div>
-            </section>
-            <section class="payment-submit-dock">
-                <div class="payment-step-head payment-step-head-compact payment-submit-head">
-                    <span class="payment-step-number">3</span>
-                    <div class="payment-step-body">
-                        <div class="payment-step-title">Upload &amp; Submit</div>
-                        <div class="payment-step-copy">Upload your proof if needed, then send the payment details for review.</div>
-                    </div>
-                </div>
-                <div class="payment-submit-layout">
-                    <div class="payment-proof-field">
-                        <div class="payment-proof-box payment-proof-dock">
-                            <label>Upload proof of payment</label>
-                            <label class="payment-upload-control">
-                                <input type="file" data-field="proof_file" accept="image/png,image/jpeg,image/jpg,image/webp" hidden>
-                                <span class="payment-upload-button">Choose File</span>
-                                <span class="payment-upload-name" data-proof-filename>No file chosen</span>
-                            </label>
-                            <p class="payment-proof-note">Preferred proof: screenshot or image file. Accepted formats: JPG, JPEG, PNG, WEBP. Maximum 10MB.</p>
-                        </div>
-                    </div>
-                    <div class="payment-submit-column">
-                        <div class="payment-submit-copy" data-submit-step-copy>Upload your proof if needed, then send the payment details for review.</div>
-                        <div class="payment-actions">
-                            <button type="button" class="res-primary-btn submit-payment-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Submit Payment</button>
-                        </div>
-                        <p class="res-form-message" data-form-message></p>
-                    </div>
-                </div>
-            </section>
+        <div class="payment-composer-cta">
+            <p class="payment-flow-intro">${escapeHtml(actionIntro)}</p>
+            <a class="res-primary-btn" href="${escapeHtml(buildCustomerPaymentUrl(reservation.reservation_id))}">Go to payment page</a>
         </div>
     `;
 }
@@ -1717,153 +1581,6 @@ async function submitReservationReview() {
     }
 }
 
-function syncPaymentComposerState(section) {
-    if (!section) return;
-
-    const cashEnabled = section.dataset.cashEnabled === 'true';
-    let activeMethod = section.querySelector('.res-payment-method.active')?.dataset.method || 'card';
-    let activeTypeChip = section.querySelector('.res-payment-type.active');
-    const fullPaymentChip = section.querySelector('.res-payment-type[data-payment-type="full_payment"]');
-    const paymentTypeChips = Array.from(section.querySelectorAll('.res-payment-type'));
-
-    if (activeMethod === 'cash' && !cashEnabled) {
-        const cashChip = section.querySelector('.res-payment-method[data-method="cash"]');
-        const firstNonCashChip = section.querySelector('.res-payment-method:not([data-method="cash"])');
-        cashChip?.classList.remove('active');
-        firstNonCashChip?.classList.add('active');
-        activeMethod = firstNonCashChip?.dataset.method || 'card';
-    }
-
-    paymentTypeChips.forEach((chip) => {
-        const shouldHide = activeMethod === 'cash' && chip.dataset.paymentType !== 'full_payment';
-        chip.hidden = shouldHide;
-        if (shouldHide) chip.classList.remove('active');
-    });
-
-    if (activeMethod === 'cash' && fullPaymentChip) {
-        fullPaymentChip.hidden = false;
-        if (!fullPaymentChip.classList.contains('active')) {
-            paymentTypeChips.forEach((chip) => chip.classList.remove('active'));
-            fullPaymentChip.classList.add('active');
-        }
-        activeTypeChip = fullPaymentChip;
-    } else {
-        const visibleActiveChip = paymentTypeChips.find((chip) => !chip.hidden && chip.classList.contains('active'));
-        if (!visibleActiveChip) {
-            paymentTypeChips.find((chip) => !chip.hidden)?.classList.add('active');
-        }
-        activeTypeChip = section.querySelector('.res-payment-type.active');
-    }
-
-    const amount = Number(activeTypeChip?.dataset.amount || 0);
-    const activeDisplayLabel = activeTypeChip?.dataset.displayLabel || getPaymentLabel(activeTypeChip?.dataset.paymentType || '');
-    const activeDisplayDescription = activeTypeChip?.dataset.displayDescription || '';
-    const methodHelperEl = section.querySelector('[data-method-helper]');
-    const channelBoxEl = section.querySelector('[data-payment-channel]');
-    const selectionSummaryEl = section.querySelector('[data-selection-summary]');
-    const amountInput = section.querySelector('[data-field="amount"]');
-    const amountField = section.querySelector('.payment-amount-field');
-    const referenceField = section.querySelector('.payment-reference-field');
-    const paymentDateField = section.querySelector('.payment-payment-date-field');
-    const cashDateField = section.querySelector('.payment-cash-date-field');
-    const proofField = section.querySelector('.payment-proof-field');
-    const proofInput = section.querySelector('[data-field="proof_file"]');
-    const proofFilenameEl = section.querySelector('[data-proof-filename]');
-    const submitStepCopy = section.querySelector('[data-submit-step-copy]');
-
-    if (methodHelperEl) {
-        const methodHelper = PAYMENT_METHODS[activeMethod]?.helper || '';
-        methodHelperEl.textContent = activeMethod === 'cash'
-            ? `${methodHelper} Cash is available for full payment only.`
-            : methodHelper;
-    }
-
-    if (channelBoxEl) {
-        const channel = PAYMENT_METHODS[activeMethod]?.channel;
-        if (channel && activeMethod !== 'cash') {
-            channelBoxEl.hidden = false;
-            channelBoxEl.innerHTML = `
-                <div class="payment-channel-kicker">Payment Instructions</div>
-                <div class="payment-channel-title">Send your payment to:</div>
-                <div class="payment-channel-copy">${escapeHtml(channel.title)}</div>
-                <ul class="payment-channel-list">
-                    ${channel.lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
-                </ul>
-            `;
-        } else {
-            channelBoxEl.hidden = true;
-            channelBoxEl.innerHTML = '';
-        }
-    }
-
-    const isCustomAmount = activeTypeChip?.dataset.customAmount === 'true';
-
-    if (selectionSummaryEl && activeTypeChip) {
-        const amountLabel = isCustomAmount
-            ? (Number(amountInput?.value?.replace(/[^0-9.]/g, '') || 0) > 0 ? formatCurrency(Number(amountInput.value.replace(/[^0-9.]/g, ''))) : 'enter amount')
-            : formatCurrency(amount);
-        selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} / ${activeDisplayLabel} / ${amountLabel}`;
-    }
-
-    if (amountInput) {
-        if (isCustomAmount) {
-            amountInput.removeAttribute('readonly');
-            amountInput.placeholder = 'e.g. 1500';
-            amountInput.value = '';
-            amountInput.type = 'number';
-            amountInput.min = '1';
-            // Update summary live as customer types
-            amountInput.oninput = () => {
-                if (selectionSummaryEl && activeTypeChip) {
-                    const entered = Number(amountInput.value || 0);
-                    const amountLabel = entered > 0 ? formatCurrency(entered) : 'enter amount';
-                    selectionSummaryEl.textContent = `Selected: ${PAYMENT_METHODS[activeMethod]?.label || activeMethod} / ${activeDisplayLabel} / ${amountLabel}`;
-                }
-            };
-        } else {
-            amountInput.setAttribute('readonly', 'true');
-            amountInput.placeholder = '';
-            amountInput.type = 'text';
-            amountInput.removeAttribute('min');
-            amountInput.oninput = null;
-            amountInput.value = formatCurrency(amount);
-        }
-    }
-
-    const isCash = activeMethod === 'cash';
-    if (submitStepCopy) {
-        submitStepCopy.textContent = isCash
-            ? `${activeDisplayDescription || 'Review the payment details.'} Choose when you will visit the cafe to complete this cash payment.`
-            : `${activeDisplayDescription || 'Review the payment details.'} Upload your proof, then send the payment details for review.`;
-    }
-    if (amountField) {
-        amountField.hidden = isCash;
-        amountField.style.display = isCash ? 'none' : '';
-    }
-    if (referenceField) {
-        referenceField.hidden = isCash;
-        referenceField.style.display = isCash ? 'none' : '';
-    }
-    if (paymentDateField) {
-        paymentDateField.hidden = isCash;
-        paymentDateField.style.display = isCash ? 'none' : '';
-    }
-    if (cashDateField) {
-        cashDateField.hidden = !isCash;
-        cashDateField.style.display = isCash ? '' : 'none';
-    }
-    if (proofField) {
-        proofField.hidden = isCash;
-        proofField.style.display = isCash ? 'none' : '';
-    }
-    if (isCash && proofInput) {
-        proofInput.value = '';
-    }
-    if (isCash && proofFilenameEl) {
-        proofFilenameEl.textContent = 'No file chosen';
-    }
-}
-
 function renderReservations() {
     if (!reservationsList) return;
 
@@ -2072,7 +1789,6 @@ function renderPaymentsModule() {
     }
 
     paymentsList.innerHTML = paymentReservations.map(buildPaymentModuleCard).join('');
-    paymentsList.querySelectorAll('.payment-composer').forEach((section) => syncPaymentComposerState(section));
 }
 
 function setInlineMessage(container, message, type = '') {
@@ -2096,47 +1812,6 @@ function openSubmissionFeedbackModal({
 function closeSubmissionFeedbackModal() {
     submissionFeedbackBackdrop?.classList.add('hidden');
     submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'true');
-}
-
-async function uploadPaymentProof(file) {
-    if (!file) return '';
-
-    if (file.size > CLOUDINARY_CONFIG.maxFileSize) {
-        throw new Error('Proof file must be 10MB or smaller.');
-    }
-
-    if (Number(file.size || 0) <= 0) {
-        throw new Error('The selected proof file is empty. Please choose a valid image.');
-    }
-
-    const mimeType = String(file.type || '').toLowerCase();
-    const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
-    const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
-    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-
-    if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
-        throw new Error('Please upload the proof of payment as a JPG, JPEG, PNG, or WEBP image.');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-    formData.append('folder', CLOUDINARY_CONFIG.paymentFolder);
-
-    const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/auto/upload`,
-        {
-            method: 'POST',
-            body: formData
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error('Failed to upload payment proof.');
-    }
-
-    const result = await response.json();
-    return result.secure_url || '';
 }
 
 async function fetchContracts(reservationIds) {
@@ -2295,6 +1970,10 @@ async function fetchReviews(reservationIds) {
 async function loadReservations() {
     if (reservationsList) {
         reservationsList.innerHTML = '<p style="color:#888;text-align:center;padding:40px 0;">Loading...</p>';
+    }
+
+    if (!state.paymentRules) {
+        state.paymentRules = await loadPaymentRules(supabase).catch(() => null);
     }
 
     try {
@@ -2665,7 +2344,7 @@ function openCancelModal(reservationId) {
     if (!reservation) return;
 
     state.cancelModal.reservationId = reservationId;
-    const fee = getCancellationFee(reservation);
+    const fee = getCancellationFee(reservation, state.paymentRules);
     if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
     setCancelModalMessage('');
     cancelReservationBackdrop?.classList.remove('hidden');
@@ -2681,7 +2360,7 @@ async function submitCancellationRequest() {
     setCancelModalMessage('Processing your cancellation request...');
 
     try {
-        const fee = getCancellationFee(reservation);
+        const fee = getCancellationFee(reservation, state.paymentRules);
 
         const { error: statusError } = await supabase
             .from('reservations')
@@ -2783,130 +2462,6 @@ async function submitRescheduleRequest() {
     }
 }
 
-async function submitPayment(section, reservationId) {
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
-    const messageEl = section?.querySelector('[data-form-message]');
-    if (!section || !reservation) return;
-
-    const activeMethod = section.querySelector('.res-payment-method.active')?.dataset.method || 'card';
-    const activeOption = section.querySelector('.res-payment-type.active');
-
-    if (!activeOption) {
-        setInlineMessage(messageEl, 'Please choose a payment type first.', 'error');
-        return;
-    }
-
-    const paymentType = activeOption.dataset.paymentType || '';
-    const isCustomAmount = activeOption.dataset.customAmount === 'true';
-    const rescheduleRequestId = activeOption.dataset.rescheduleRequestId || null;
-    const referenceNumber = section.querySelector('[data-field="reference_number"]')?.value.trim() || '';
-    const paymentDate = section.querySelector('[data-field="payment_date"]')?.value || null;
-    const cashPaymentDate = section.querySelector('[data-field="cash_payment_date"]')?.value || null;
-    const notes = section.querySelector('[data-field="notes"]')?.value.trim() || '';
-    const proofFile = section.querySelector('[data-field="proof_file"]')?.files?.[0] || null;
-
-    // For custom amount, read from the editable input; otherwise use the chip's preset amount
-    const amountRaw = isCustomAmount
-        ? Number(section.querySelector('[data-field="amount"]')?.value || 0)
-        : Number(activeOption.dataset.amount || 0);
-    const amount = Math.round(amountRaw * 100) / 100;
-
-    if (!amount || amount <= 0) {
-        setInlineMessage(messageEl, isCustomAmount ? 'Please enter the amount you want to pay.' : 'This payment option does not have a valid amount.', 'error');
-        return;
-    }
-
-    // Prevent custom amount from exceeding the remaining balance
-    if (isCustomAmount) {
-        const balance = getReservationBalanceDetails(reservation);
-        if (amount > balance.remainingBalance) {
-            setInlineMessage(messageEl, `Amount cannot exceed the remaining balance of ${formatCurrency(balance.remainingBalance)}.`, 'error');
-            return;
-        }
-    }
-
-    if (activeMethod === 'cash') {
-        if (!cashPaymentDate) {
-            setInlineMessage(messageEl, 'Please choose the date you will visit the cafe to pay in cash.', 'error');
-            return;
-        }
-    } else {
-        if (!referenceNumber) {
-            setInlineMessage(messageEl, 'Please enter your reference or transaction number.', 'error');
-            return;
-        }
-        if (!paymentDate) {
-            setInlineMessage(messageEl, 'Please choose the payment date.', 'error');
-            return;
-        }
-        if (!proofFile) {
-            setInlineMessage(messageEl, 'Please upload a proof of payment.', 'error');
-            return;
-        }
-    }
-
-    const submitBtn = section.querySelector('.submit-payment-btn');
-    submitBtn?.setAttribute('disabled', 'true');
-    setInlineMessage(
-        messageEl,
-        activeMethod === 'cash'
-            ? 'Submitting payment details...'
-            : 'Submitting payment details and processing OCR...'
-    );
-
-    try {
-        const proofUrl = activeMethod === 'cash' ? '' : await uploadPaymentProof(proofFile);
-
-        const payload = {
-            reservation_id: reservation.reservation_id,
-            reschedule_request_id: rescheduleRequestId || null,
-            payment_type: paymentType,
-            payment_method: activeMethod,
-            amount,
-            payment_status: 'pending_review',
-            reference_number: activeMethod === 'cash' ? null : referenceNumber,
-            payment_date: activeMethod === 'cash' ? null : paymentDate,
-            notes: notes || null,
-            proof_url: proofUrl || null,
-            cash_payment_date: activeMethod === 'cash' ? cashPaymentDate : null,
-            submitted_at: new Date().toISOString()
-        };
-
-        const { data: insertedRows, error } = await supabase
-            .from('payment')
-            .insert(payload)
-            .select('payment_id')
-            .limit(1);
-
-        if (error) throw error;
-
-        // ── OCR: fire-and-forget — failure never blocks the customer ──────────
-        const newPaymentId = insertedRows?.[0]?.payment_id;
-        let successMessage = 'Payment details submitted for admin review.';
-
-        if (proofUrl && newPaymentId) {
-            const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-payment', {
-                body: { payment_id: newPaymentId, image_url: proofUrl }
-            });
-
-            if (ocrError) {
-                console.warn('OCR invoke failed:', ocrError.message);
-                successMessage = 'Payment details submitted for admin review, but OCR could not be processed yet.';
-            } else if (ocrData?.saved === false) {
-                console.warn('OCR save failed:', ocrData?.error || 'Unknown OCR save error');
-                successMessage = 'Payment details submitted for admin review, but OCR could not be saved yet.';
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
-        setInlineMessage(messageEl, successMessage, 'success');
-        await loadReservations();
-    } catch (error) {
-        submitBtn?.removeAttribute('disabled');
-        setInlineMessage(messageEl, `Failed to submit payment: ${error.message}`, 'error');
-    }
-}
-
 function activateAccountSection(sectionKey) {
     const normalizedSection = ['profile', 'reservations'].includes(String(sectionKey || '').toLowerCase())
         ? String(sectionKey).toLowerCase()
@@ -2997,7 +2552,7 @@ function wireReservationActions() {
 }
 
 function wirePaymentActions() {
-    paymentsList?.addEventListener('click', async (event) => {
+    paymentsList?.addEventListener('click', (event) => {
         const referenceTab = event.target.closest('[data-payment-panel-tab]');
         if (referenceTab) {
             const shell = referenceTab.closest('.payment-reference-shell');
@@ -3015,47 +2570,9 @@ function wirePaymentActions() {
             return;
         }
 
-        const methodChip = event.target.closest('.res-payment-method');
-        if (methodChip) {
-            const section = methodChip.closest('.payment-composer');
-            section?.querySelectorAll('.res-payment-method').forEach((chip) => chip.classList.remove('active'));
-            methodChip.classList.add('active');
-            syncPaymentComposerState(section);
-            return;
-        }
-
-        const typeChip = event.target.closest('.res-payment-type');
-        if (typeChip) {
-            const section = typeChip.closest('.payment-composer');
-            section?.querySelectorAll('.res-payment-type').forEach((chip) => chip.classList.remove('active'));
-            typeChip.classList.add('active');
-            syncPaymentComposerState(section);
-            return;
-        }
-
         const receiptBtn = event.target.closest('.view-receipt-btn');
         if (receiptBtn) {
             openReceiptModal(receiptBtn.dataset.paymentId, receiptBtn.dataset.reservationId);
-            return;
-        }
-
-        const submitBtn = event.target.closest('.submit-payment-btn');
-        if (submitBtn) {
-            const section = submitBtn.closest('.payment-composer');
-            await submitPayment(section, submitBtn.dataset.reservationId);
-        }
-    });
-
-    paymentsList?.addEventListener('change', (event) => {
-        const fileInput = event.target.closest('[data-field="proof_file"]');
-        if (!fileInput) return;
-
-        const section = fileInput.closest('.payment-proof-box');
-        const filenameEl = section?.querySelector('[data-proof-filename]');
-        const file = fileInput.files?.[0];
-
-        if (filenameEl) {
-            filenameEl.textContent = file?.name || 'No file chosen';
         }
     });
 }

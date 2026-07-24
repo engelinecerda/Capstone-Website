@@ -500,11 +500,30 @@ async function fetchContracts(reservationIds) {
     return (data || []).reduce((map, c) => { map[c.reservation_id] = c; return map; }, {});
 }
 
+async function loadPaymentsTodayStat() {
+    const paymentsTodayEl = document.getElementById('paymentsTodayValue');
+    if (!paymentsTodayEl) return;
+    try {
+        const todayKey = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local
+        const { count, error } = await supabase
+            .from('payment')
+            .select('payment_id', { count: 'exact', head: true })
+            .eq('payment_source', 'in_cafe')
+            .eq('actual_payment_date', todayKey);
+        if (error) throw error;
+        paymentsTodayEl.textContent = String(count || 0);
+    } catch (error) {
+        console.error('Failed to load payments-today stat:', error);
+        paymentsTodayEl.textContent = '—';
+    }
+}
+
 async function loadDashboard() {
     setDashboardMessage('Loading reservations...');
     updateStats([]);
     renderReservationsTable([], {});
     renderMonthlyChart([]);
+    loadPaymentsTodayStat();
 
     let reservationsCount = 0;
     let hasError = false;

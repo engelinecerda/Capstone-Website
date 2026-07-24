@@ -195,8 +195,42 @@ export function getReservationLocationLabel(reservation) {
         : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
 }
 
-export function getCancellationFee(reservation) {
-    return String(reservation?.location_type || '').toLowerCase() === 'offsite' ? 2000 : 500;
+export function getCancellationFee(reservation, paymentRules) {
+    const isOffsite = String(reservation?.location_type || '').toLowerCase() === 'offsite';
+    const key = isOffsite ? 'cancellation_fee_offsite' : 'cancellation_fee_onsite';
+    const configured = Number(paymentRules?.[key]);
+    if (paymentRules && Number.isFinite(configured) && configured >= 0) {
+        return configured;
+    }
+    return isOffsite ? 2000 : 500;
+}
+
+// The one place Unpaid/Partially paid/Paid in full/Overpaid labels and pill
+// colors are decided, fed by reservation_payment_summary's computed_status.
+// Deliberately reuses the existing .status-pill.pending/.approved classes
+// (identical colors already established for those states elsewhere) rather
+// than inventing new tokens — only "overpaid" needs its own class.
+export function getPaymentStatusPillMeta(computedStatus) {
+    const map = {
+        unpaid: { key: 'pending', label: 'Unpaid' },
+        partially_paid: { key: 'pending', label: 'Partially paid' },
+        paid_in_full: { key: 'approved', label: 'Paid in full' },
+        overpaid: { key: 'overpaid', label: 'Overpaid' }
+    };
+    return map[String(computedStatus || '').toLowerCase()] || map.unpaid;
+}
+
+// Resolves whether a payment row's method is one the customer submits
+// evidence for (reference number + proof) or one the café issues the
+// receipt for (cash/card, confirmed by a manager). Looks up the method via
+// payment_method_id when present; falls back to the legacy free-text
+// payment_method value for older rows recorded before that FK existed
+// (same shape as resolveLegacyModeKey elsewhere) — cash/card still meant
+// cafe_issued before evidence_source existed as a column.
+export function resolvePaymentEvidenceSource(payment, paymentMethodMap = {}) {
+    const method = paymentMethodMap[payment?.payment_method_id];
+    if (method) return method.evidence_source;
+    return ['cash', 'card'].includes(payment?.payment_method) ? 'cafe_issued' : 'customer_submitted';
 }
 
 // Pure contract-meta computation — takes the raw contract row directly

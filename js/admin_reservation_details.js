@@ -5,6 +5,9 @@ import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { fetchDateAvailability, getBookingScope as getSharedBookingScope } from './reservation_availability.js';
+import { getPaymentStatusPillMeta } from './reservation_shared.js';
+import { recordInCafePayment, uploadPaymentReceipt, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
+import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -65,8 +68,43 @@ const approvalPromptMeta = document.getElementById('approvalPromptMeta');
 const approvalPromptLaterBtn = document.getElementById('approvalPromptLaterBtn');
 const approvalPromptAssignBtn = document.getElementById('approvalPromptAssignBtn');
 
+const recordPaymentBtn = document.getElementById('recordPaymentBtn');
+const paymentHistoryBody = document.getElementById('paymentHistoryBody');
+
+const recordPaymentModal = document.getElementById('recordPaymentModal');
+const recordPaymentModalClose = document.getElementById('recordPaymentModalClose');
+const recordPaymentCancelBtn = document.getElementById('recordPaymentCancelBtn');
+const recordPaymentSaveBtn = document.getElementById('recordPaymentSaveBtn');
+const recordPaymentMessage = document.getElementById('recordPaymentMessage');
+const recordPaymentContextName = document.getElementById('recordPaymentContextName');
+const recordPaymentContextDate = document.getElementById('recordPaymentContextDate');
+const recordPaymentContextBalance = document.getElementById('recordPaymentContextBalance');
+const recordPaymentMethodSelect = document.getElementById('recordPaymentMethodSelect');
+const recordPaymentMethodIcon = document.getElementById('recordPaymentMethodIcon');
+const recordPaymentAmountInput = document.getElementById('recordPaymentAmountInput');
+const recordPaymentAmountWarning = document.getElementById('recordPaymentAmountWarning');
+const recordPaymentDateInput = document.getElementById('recordPaymentDateInput');
+const recordPaymentPlannedNote = document.getElementById('recordPaymentPlannedNote');
+const recordPaymentReferenceInput = document.getElementById('recordPaymentReferenceInput');
+const recordPaymentFileInput = document.getElementById('recordPaymentFileInput');
+const recordPaymentFilePreviewWrap = document.getElementById('recordPaymentFilePreviewWrap');
+const recordPaymentFilePreviewImg = document.getElementById('recordPaymentFilePreviewImg');
+const recordPaymentFileName = document.getElementById('recordPaymentFileName');
+const recordPaymentFileRemoveBtn = document.getElementById('recordPaymentFileRemoveBtn');
+const recordPaymentNotesInput = document.getElementById('recordPaymentNotesInput');
+
+const receiptViewerModal = document.getElementById('receiptViewerModal');
+const receiptViewerClose = document.getElementById('receiptViewerClose');
+const receiptViewerBody = document.getElementById('receiptViewerBody');
+const receiptViewerActions = document.getElementById('receiptViewerActions');
+
 const PAYMENT_METHOD_LABELS = {
-  card: 'Card',
+  gcash: 'GCash',
+  maya: 'Maya',
+  bpi: 'BPI',
+  card: 'Card (POS)',
+  bank: 'Bank Transfer',
+  ewallet: 'E-Wallet',
   bancnet: 'BancNet',
   gcash_maya: 'GCash/Maya',
   cash: 'Cash'
@@ -75,10 +113,10 @@ const PAYMENT_TYPE_LABELS = {
   reservation_fee: 'Reservation Fee',
   down_payment: 'Down Payment',
   full_payment: 'Full Payment',
+  partial_payment: 'Custom Amount',
   reschedule_fee: 'Reschedule Fee',
   cancellation_fee: 'Cancellation Fee'
 };
-const PAYMENT_BALANCE_DUE_DAYS = 7;
 const CAPACITY_BLOCKING_STATUSES = new Set([
   'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
   'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
@@ -87,12 +125,16 @@ const CAPACITY_BLOCKING_STATUSES = new Set([
 let adminSession = null;
 let currentRole = null;
 let currentReservation = null;
+let currentPaymentSummary = null;
 let staffDirectory = [];
 let assignedStaffForReservation = [];
 let assignmentFeatureReady = true;
 let assignmentFeatureMessage = '';
 let assignmentSelection = new Set();
 let assignmentSearchTerm = '';
+let recordPaymentMethods = [];
+let recordPaymentFile = null;
+let receiptViewerZoom = 100;
 
 /* ---------------------------------------------------------------- */
 /* Formatters (mirrors js/admin_reservations.js)                     */
@@ -271,39 +313,6 @@ function getReservationRescheduleRequests(reservation) {
   return reservation.reschedule_requests || [];
 }
 
-function getApprovedBasePaymentsTotal(reservation) {
-  return getReservationPayments(reservation)
-    .filter((payment) => !payment.reschedule_request_id && String(payment.payment_status || '').toLowerCase() === 'approved')
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-}
-
-function getReservationBalanceSummary(reservation) {
-  const totalAmount = Number(reservation?.total_price || 0);
-  const approvedTotal = getApprovedBasePaymentsTotal(reservation);
-  const remainingBalance = Math.max(totalAmount - approvedTotal, 0);
-  const eventDateKey = formatDateKey(reservation?.event_date);
-
-  let dueDateKey = '';
-  let dueDateLabel = 'No due date';
-  if (eventDateKey) {
-    const dueDate = new Date(`${eventDateKey}T00:00:00`);
-    if (!Number.isNaN(dueDate.getTime())) {
-      dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
-      dueDateKey = buildLocalDateKey(dueDate);
-      dueDateLabel = formatReservationDate(dueDateKey);
-    }
-  }
-
-  const isPastDue = Boolean(remainingBalance > 0 && dueDateKey && getTodayDateKey() > dueDateKey);
-  const hasPartialPayment = approvedTotal > 0 && remainingBalance > 0;
-
-  return {
-    totalAmount, approvedTotal, remainingBalance, dueDateKey, dueDateLabel, isPastDue, hasPartialPayment,
-    toneKey: remainingBalance <= 0 ? 'approved' : isPastDue ? 'unpaid' : 'pending',
-    statusLabel: remainingBalance <= 0 ? 'Paid in Full' : isPastDue ? 'Overdue' : hasPartialPayment ? 'Partially Paid' : 'Initial Payment'
-  };
-}
-
 function getPaymentTypeLabel(type) {
   return PAYMENT_TYPE_LABELS[type] || type || 'Payment';
 }
@@ -312,52 +321,25 @@ function getPaymentMethodLabel(method) {
   return PAYMENT_METHOD_LABELS[method] || method || 'Method';
 }
 
-function getPendingPayment(reservation) {
-  return getReservationPayments(reservation)
-    .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
-    .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
-}
-
 function getLatestOpenRescheduleRequest(reservation) {
   return getReservationRescheduleRequests(reservation)
     .find((request) => ['pending', 'approved_pending_payment'].includes(String(request.status || '').toLowerCase())) || null;
 }
 
-function getLatestPaymentEntry(reservation) {
-  return getReservationPayments(reservation)
-    .slice()
-    .sort((left, right) => new Date(right.submitted_at || right.verified_at || 0) - new Date(left.submitted_at || left.verified_at || 0))[0] || null;
-}
-
-function paymentStatus(res) {
-  const balance = getReservationBalanceSummary(res);
-  const pendingPayment = getPendingPayment(res);
-  if (pendingPayment) {
-    return {
-      label: 'Pending Review',
-      key: 'pending',
-      sublabel: `${getPaymentTypeLabel(pendingPayment.payment_type)} / ${formatCurrency(balance.remainingBalance)} remaining`
-    };
-  }
-  if (balance.remainingBalance <= 0) {
-    return { label: 'Paid', key: 'approved', sublabel: 'Paid in full' };
-  }
-  if (balance.hasPartialPayment) {
-    return {
-      label: balance.isPastDue ? 'Overdue' : 'Partially Paid',
-      key: balance.toneKey,
-      sublabel: `Remaining ${formatCurrency(balance.remainingBalance)} / Pay by ${balance.dueDateLabel}`
-    };
-  }
-  const rescheduleRequest = getLatestOpenRescheduleRequest(res);
-  if (rescheduleRequest && String(rescheduleRequest.status || '').toLowerCase() === 'approved_pending_payment') {
-    return { label: 'Pending', key: 'pending', sublabel: 'Reschedule fee' };
-  }
-  return {
-    label: balance.isPastDue ? 'Overdue' : 'Unpaid',
-    key: balance.isPastDue ? 'unpaid' : 'pending',
-    sublabel: balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'No payment yet'
-  };
+// The customer's chosen pay-at-café arrival date lives on the payment row
+// itself (cash_payment_date on a pending online cash/card submission), not
+// on the reservation — and is never touched by recording an in-café
+// payment, since that always inserts a new row rather than updating this
+// one.
+function getPlannedArrivalDate(reservation) {
+  const pending = getReservationPayments(reservation)
+    .filter((payment) => (
+      ['cash', 'card'].includes(payment.payment_method)
+      && String(payment.payment_status || '').toLowerCase() === 'pending_review'
+      && payment.cash_payment_date
+    ))
+    .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0];
+  return pending ? pending.cash_payment_date : null;
 }
 
 function getContractReviewMeta(reservation) {
@@ -524,7 +506,7 @@ async function fetchReservationDetail(idParam) {
     fetchReservationContracts([data.reservation_id]),
     supabase
       .from('payment')
-      .select('payment_id, reservation_id, reschedule_request_id, payment_type, payment_method, amount, payment_status, reference_number, payment_date, notes, proof_url, cash_payment_date, submitted_at, verified_at')
+      .select('payment_id, reservation_id, reschedule_request_id, payment_type, payment_method, payment_method_id, payment_method_label, amount, payment_status, reference_number, payment_date, notes, proof_url, cash_payment_date, submitted_at, verified_at, payment_source, actual_payment_date, actual_payment_time, recorded_by')
       .eq('reservation_id', data.reservation_id)
       .order('submitted_at', { ascending: false }),
     supabase
@@ -543,6 +525,20 @@ async function fetchReservationDetail(idParam) {
     payments: paymentsRes.data || [],
     reschedule_requests: requestsRes.data || []
   };
+}
+
+// reservation_payment_summary is a Postgres view — the one place total_paid/
+// outstanding_balance/computed_status are calculated, excluding
+// cancellation_fee/reschedule_fee from the paid-toward-total sum. Every
+// surface that shows payment status reads from this same view.
+async function fetchPaymentSummary(reservationId) {
+  const { data, error } = await supabase
+    .from('reservation_payment_summary')
+    .select('reservation_total, total_paid, outstanding_balance, latest_payment_date, computed_status')
+    .eq('reservation_id', reservationId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
 /* ---------------------------------------------------------------- */
@@ -703,24 +699,377 @@ function renderBookingDetails() {
 
 function renderPayment() {
   const reservation = currentReservation;
-  const status = paymentStatus(reservation);
-  const balance = getReservationBalanceSummary(reservation);
-  const latestPayment = getLatestPaymentEntry(reservation);
+  const summary = currentPaymentSummary || {
+    reservation_total: Number(reservation.total_price || 0),
+    total_paid: 0,
+    outstanding_balance: Number(reservation.total_price || 0),
+    latest_payment_date: null,
+    computed_status: 'unpaid'
+  };
+  const statusMeta = getPaymentStatusPillMeta(summary.computed_status);
 
-  paymentStatusPill.textContent = status.label;
-  paymentStatusPill.className = `status-pill ${escapeHtml(status.key)}`;
+  paymentStatusPill.textContent = statusMeta.label;
+  paymentStatusPill.className = `status-pill ${escapeHtml(statusMeta.key)}`;
   openPaymentsLink.href = `/admin/payments.html?reservation=${encodeURIComponent(reservation.reservation_id)}`;
 
   paymentDetailsGrid.innerHTML = [
-    dlRow('Total amount', formatCurrency(balance.totalAmount)),
-    dlRow('Paid so far', formatCurrency(balance.approvedTotal)),
-    dlRow('Remaining balance', balance.remainingBalance <= 0 ? 'Paid in full' : formatCurrency(balance.remainingBalance)),
-    dlRow('Pay by', balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel)
+    dlRow('Reservation total', formatCurrency(summary.reservation_total)),
+    dlRow('Total paid', formatCurrency(summary.total_paid)),
+    dlRow('Outstanding balance', Number(summary.outstanding_balance) <= 0 ? 'None' : formatCurrency(summary.outstanding_balance)),
+    dlRow('Latest payment date', summary.latest_payment_date ? formatReservationDate(summary.latest_payment_date) : 'No payments yet')
   ].join('');
 
-  paymentDetailsRows.innerHTML = latestPayment
-    ? dlRow('Latest submission', `${getPaymentTypeLabel(latestPayment.payment_type)} · ${getPaymentMethodLabel(latestPayment.payment_method)} · ${formatCurrency(latestPayment.amount)} · ${formatDateTime(latestPayment.submitted_at)}`)
-    : '';
+  const extraRows = [];
+  const plannedArrival = getPlannedArrivalDate(reservation);
+  if (plannedArrival) {
+    extraRows.push(dlRow('Planned arrival date', formatReservationDate(plannedArrival)));
+  }
+  if (String(summary.computed_status).toLowerCase() === 'overpaid') {
+    extraRows.push('<p class="payment-overpaid-note">Paid amount exceeds the reservation total — please review.</p>');
+  }
+  paymentDetailsRows.innerHTML = extraRows.join('');
+
+  renderPaymentHistory();
+  renderRecordPaymentAvailability();
+}
+
+/* ---------------------------------------------------------------- */
+/* Payment history                                                    */
+/* ---------------------------------------------------------------- */
+
+function getPaymentChronoValue(payment) {
+  const dateKey = payment.actual_payment_date || formatDateKey(payment.payment_date || payment.cash_payment_date || payment.submitted_at);
+  const timeValue = payment.actual_payment_time || '00:00:00';
+  const parsed = new Date(`${dateKey}T${timeValue}`);
+  if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+  return new Date(payment.submitted_at || 0).getTime();
+}
+
+function renderPaymentHistory() {
+  if (!paymentHistoryBody) return;
+  const reservation = currentReservation;
+  const rows = getReservationPayments(reservation)
+    .slice()
+    .sort((left, right) => getPaymentChronoValue(left) - getPaymentChronoValue(right));
+
+  if (!rows.length) {
+    paymentHistoryBody.innerHTML = '<tr class="payment-history-empty-row"><td colspan="7">No payments recorded yet</td></tr>';
+    return;
+  }
+
+  paymentHistoryBody.innerHTML = rows.map((payment) => {
+    const statusMeta = formatStatusPill(payment.payment_status);
+    const dateLabel = formatReservationDate(payment.actual_payment_date || payment.payment_date || payment.cash_payment_date || payment.submitted_at);
+    const methodLabel = payment.payment_method_label || getPaymentMethodLabel(payment.payment_method);
+    const recordedBy = payment.recorded_by ? 'Manager' : 'Customer';
+    const receiptCell = payment.proof_url
+      ? `<a href="#" class="payment-history-view-link" data-receipt-url="${escapeHtml(payment.proof_url)}">View</a>`
+      : '<span class="payment-history-no-receipt">&mdash;</span>';
+
+    return `
+      <tr>
+        <td class="payment-history-date">${escapeHtml(dateLabel)}</td>
+        <td>${escapeHtml(methodLabel)}</td>
+        <td class="payment-history-amount">${escapeHtml(formatCurrency(payment.amount))}</td>
+        <td>${escapeHtml(payment.reference_number || '—')}</td>
+        <td>${escapeHtml(recordedBy)}</td>
+        <td><span class="status-pill ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span></td>
+        <td>${receiptCell}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/* ---------------------------------------------------------------- */
+/* Receipt viewer — reuses the same zoom-capable image pattern as the  */
+/* Payments module's proof viewer; PDFs open via "Open original" only  */
+/* (no embedded PDF viewer exists anywhere in this codebase).          */
+/* ---------------------------------------------------------------- */
+
+function isPdfReceiptUrl(url) {
+  return /\.pdf(\?|$)/i.test(String(url || ''));
+}
+
+function renderReceiptViewerImage(url) {
+  receiptViewerBody.innerHTML = `
+    <div class="proof-preview-stage ${receiptViewerZoom > 100 ? 'zoomed' : ''}">
+      <div class="proof-preview-canvas">
+        <img class="proof-preview-image" src="${escapeHtml(url)}" alt="Receipt preview" style="width: ${receiptViewerZoom}%;">
+      </div>
+    </div>
+  `;
+  receiptViewerActions.innerHTML = `
+    <button type="button" class="modal-btn modal-btn-secondary" data-action="receipt-zoom-out" ${receiptViewerZoom <= 50 ? 'disabled' : ''}>-</button>
+    <span class="proof-zoom-indicator">${receiptViewerZoom}%</span>
+    <button type="button" class="modal-btn modal-btn-secondary" data-action="receipt-zoom-in" ${receiptViewerZoom >= 300 ? 'disabled' : ''}>+</button>
+    <button type="button" class="modal-btn modal-btn-secondary" data-action="receipt-zoom-reset" ${receiptViewerZoom === 100 ? 'disabled' : ''}>Fit</button>
+    <a class="modal-btn modal-btn-secondary proof-link-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open original</a>
+  `;
+}
+
+function openReceiptViewer(url) {
+  receiptViewerZoom = 100;
+  if (isPdfReceiptUrl(url)) {
+    receiptViewerBody.innerHTML = '<div class="proof-empty">PDF receipts open in a new tab.</div>';
+    receiptViewerActions.innerHTML = `<a class="modal-btn modal-btn-secondary proof-link-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open original</a>`;
+  } else {
+    renderReceiptViewerImage(url);
+  }
+  receiptViewerModal?.classList.remove('hidden');
+  receiptViewerModal?.setAttribute('aria-hidden', 'false');
+}
+
+function closeReceiptViewer() {
+  receiptViewerModal?.classList.add('hidden');
+  receiptViewerModal?.setAttribute('aria-hidden', 'true');
+}
+
+function wireReceiptViewer() {
+  paymentHistoryBody?.addEventListener('click', (event) => {
+    const link = event.target.closest('.payment-history-view-link');
+    if (!link) return;
+    event.preventDefault();
+    openReceiptViewer(link.dataset.receiptUrl);
+  });
+  receiptViewerClose?.addEventListener('click', closeReceiptViewer);
+  receiptViewerModal?.addEventListener('click', (event) => {
+    if (event.target === receiptViewerModal) closeReceiptViewer();
+  });
+  receiptViewerActions?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-action]');
+    if (!btn) return;
+    const currentImg = receiptViewerBody.querySelector('.proof-preview-image');
+    const url = currentImg?.getAttribute('src');
+    if (btn.dataset.action === 'receipt-zoom-in') receiptViewerZoom = Math.min(300, receiptViewerZoom + 25);
+    else if (btn.dataset.action === 'receipt-zoom-out') receiptViewerZoom = Math.max(50, receiptViewerZoom - 25);
+    else if (btn.dataset.action === 'receipt-zoom-reset') receiptViewerZoom = 100;
+    if (url) renderReceiptViewerImage(url);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !receiptViewerModal.classList.contains('hidden')) closeReceiptViewer();
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Record payment modal                                               */
+/* ---------------------------------------------------------------- */
+
+function renderRecordPaymentAvailability() {
+  if (!recordPaymentBtn) return;
+  if (currentRole === 'admin') {
+    recordPaymentBtn.classList.add('hidden');
+    return;
+  }
+  recordPaymentBtn.classList.remove('hidden');
+  const isSettled = currentPaymentSummary && ['paid_in_full', 'overpaid'].includes(String(currentPaymentSummary.computed_status).toLowerCase());
+  recordPaymentBtn.toggleAttribute('disabled', Boolean(isSettled));
+  recordPaymentBtn.title = isSettled ? 'This reservation is already fully paid.' : '';
+}
+
+function setRecordPaymentMessage(message, isError = false) {
+  if (!recordPaymentMessage) return;
+  recordPaymentMessage.textContent = message || '';
+  recordPaymentMessage.classList.toggle('error', isError);
+}
+
+function renderRecordPaymentMethodOptions() {
+  if (!recordPaymentMethodSelect) return;
+  if (!recordPaymentMethods.length) {
+    recordPaymentMethodSelect.innerHTML = '<option value="">No active café methods configured</option>';
+    if (recordPaymentMethodIcon) recordPaymentMethodIcon.innerHTML = '';
+    return;
+  }
+  recordPaymentMethodSelect.innerHTML = recordPaymentMethods.map((method) => `
+    <option value="${escapeHtml(method.payment_method_id)}">${escapeHtml(method.label)}</option>
+  `).join('');
+  recordPaymentMethodSelect.value = recordPaymentMethods[0].payment_method_id;
+  updateRecordPaymentMethodIcon();
+}
+
+function updateRecordPaymentMethodIcon() {
+  if (!recordPaymentMethodIcon) return;
+  const method = recordPaymentMethods.find((m) => String(m.payment_method_id) === String(recordPaymentMethodSelect?.value));
+  recordPaymentMethodIcon.innerHTML = method ? paymentMethodIconSvg(method.icon_key) : '';
+}
+
+function clearRecordPaymentFile() {
+  recordPaymentFile = null;
+  if (recordPaymentFileInput) recordPaymentFileInput.value = '';
+  recordPaymentFilePreviewWrap?.classList.add('hidden');
+  if (recordPaymentFilePreviewImg) {
+    recordPaymentFilePreviewImg.src = '';
+    recordPaymentFilePreviewImg.classList.remove('hidden');
+  }
+  if (recordPaymentFileName) recordPaymentFileName.textContent = '';
+}
+
+function handleRecordPaymentFileChange(event) {
+  const file = event.target.files?.[0] || null;
+  setRecordPaymentMessage('');
+  if (!file) {
+    clearRecordPaymentFile();
+    return;
+  }
+
+  const maxSize = 5 * 1024 * 1024;
+  const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
+  const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.pdf']);
+  const mimeType = String(file.type || '').toLowerCase();
+  const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+
+  if (file.size > maxSize) {
+    setRecordPaymentMessage('Receipt file must be 5MB or smaller.', true);
+    clearRecordPaymentFile();
+    return;
+  }
+  if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+    setRecordPaymentMessage('Please upload the receipt as a JPG, JPEG, PNG, or PDF file.', true);
+    clearRecordPaymentFile();
+    return;
+  }
+
+  recordPaymentFile = file;
+  if (recordPaymentFileName) recordPaymentFileName.textContent = file.name;
+  recordPaymentFilePreviewWrap?.classList.remove('hidden');
+
+  const isPdf = mimeType === 'application/pdf' || extension === '.pdf';
+  if (isPdf || !recordPaymentFilePreviewImg) {
+    recordPaymentFilePreviewImg?.classList.add('hidden');
+  } else {
+    recordPaymentFilePreviewImg.classList.remove('hidden');
+    const reader = new FileReader();
+    reader.onload = () => { recordPaymentFilePreviewImg.src = reader.result; };
+    reader.readAsDataURL(file);
+  }
+}
+
+function checkRecordPaymentAmountWarning() {
+  if (!recordPaymentAmountWarning) return;
+  const amount = Number(recordPaymentAmountInput?.value || 0);
+  const outstanding = Number(currentPaymentSummary?.outstanding_balance ?? currentReservation?.total_price ?? 0);
+  if (amount > 0 && outstanding > 0 && amount > outstanding) {
+    recordPaymentAmountWarning.textContent = `This is more than the outstanding balance of ${formatCurrency(outstanding)}`;
+    recordPaymentAmountWarning.classList.remove('hidden');
+  } else {
+    recordPaymentAmountWarning.classList.add('hidden');
+  }
+}
+
+// This page's modal always INSERTs a brand-new payment (an "unplanned"
+// payment the customer never pre-submitted) — there's no queue-row context
+// here, unlike the Payments module's modal, which only ever confirms an
+// existing pending row.
+async function openRecordPaymentModal() {
+  if (currentRole === 'admin') return;
+  const reservation = currentReservation;
+
+  if (recordPaymentAmountInput) recordPaymentAmountInput.value = '';
+  if (recordPaymentDateInput) {
+    const todayKey = getTodayDateKey();
+    recordPaymentDateInput.value = todayKey;
+    recordPaymentDateInput.max = todayKey;
+  }
+  if (recordPaymentReferenceInput) recordPaymentReferenceInput.value = '';
+  if (recordPaymentNotesInput) recordPaymentNotesInput.value = '';
+  clearRecordPaymentFile();
+  recordPaymentAmountWarning?.classList.add('hidden');
+  setRecordPaymentMessage('');
+
+  const outstanding = Number(currentPaymentSummary?.outstanding_balance ?? reservation.total_price ?? 0);
+  if (recordPaymentContextName) {
+    recordPaymentContextName.textContent = `${reservation.contact_name || 'Customer'} · ${reservation.package?.package_name || 'Reservation'}`;
+  }
+  if (recordPaymentContextDate) {
+    recordPaymentContextDate.textContent = `${formatReservationDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
+  }
+  if (recordPaymentContextBalance) {
+    recordPaymentContextBalance.textContent = formatCurrency(outstanding);
+  }
+  if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? outstanding : '';
+
+  const plannedArrival = getPlannedArrivalDate(reservation);
+  if (plannedArrival && recordPaymentPlannedNote) {
+    recordPaymentPlannedNote.textContent = `Customer planned to arrive ${formatReservationDate(plannedArrival)} — the planned date is kept on the reservation.`;
+    recordPaymentPlannedNote.classList.remove('hidden');
+  } else {
+    recordPaymentPlannedNote?.classList.add('hidden');
+  }
+
+  setRecordPaymentMessage('Loading payment methods...');
+  try {
+    recordPaymentMethods = await fetchCafeIssuedPaymentMethods(supabase);
+    renderRecordPaymentMethodOptions();
+    setRecordPaymentMessage(recordPaymentMethods.length ? '' : 'No active café payment methods are configured — add one in Payment Options first.', !recordPaymentMethods.length);
+  } catch (error) {
+    setRecordPaymentMessage(`Failed to load payment methods: ${error.message}`, true);
+  }
+
+  recordPaymentModal?.classList.remove('hidden');
+  recordPaymentModal?.setAttribute('aria-hidden', 'false');
+}
+
+function closeRecordPaymentModal() {
+  recordPaymentModal?.classList.add('hidden');
+  recordPaymentModal?.setAttribute('aria-hidden', 'true');
+  recordPaymentSaveBtn?.removeAttribute('disabled');
+}
+
+async function saveRecordPayment() {
+  if (currentRole === 'admin') return;
+  const reservation = currentReservation;
+
+  const selectedMethod = recordPaymentMethods.find((m) => String(m.payment_method_id) === String(recordPaymentMethodSelect?.value));
+  if (!selectedMethod) {
+    setRecordPaymentMessage('Select a payment method.', true);
+    return;
+  }
+
+  recordPaymentSaveBtn?.setAttribute('disabled', 'true');
+  setRecordPaymentMessage('Saving payment...');
+
+  try {
+    let receiptUrl = '';
+    if (recordPaymentFile) {
+      setRecordPaymentMessage('Uploading receipt...');
+      receiptUrl = await uploadPaymentReceipt(recordPaymentFile);
+    }
+
+    await recordInCafePayment(supabase, {
+      reservationId: reservation.reservation_id,
+      amount: recordPaymentAmountInput?.value,
+      paymentMethodId: selectedMethod.payment_method_id,
+      paymentMethodLabel: selectedMethod.label,
+      paymentMethodType: selectedMethod.type,
+      actualPaymentDate: recordPaymentDateInput?.value,
+      referenceNumber: recordPaymentReferenceInput?.value.trim(),
+      notes: recordPaymentNotesInput?.value.trim(),
+      receiptUrl,
+      recordedByUserId: adminSession?.user?.id
+    });
+
+    closeRecordPaymentModal();
+    await reloadPaymentSection('Payment recorded.');
+  } catch (error) {
+    recordPaymentSaveBtn?.removeAttribute('disabled');
+    setRecordPaymentMessage(error.message || 'Failed to record payment.', true);
+  }
+}
+
+function wireRecordPaymentModal() {
+  recordPaymentBtn?.addEventListener('click', openRecordPaymentModal);
+  recordPaymentModalClose?.addEventListener('click', closeRecordPaymentModal);
+  recordPaymentCancelBtn?.addEventListener('click', closeRecordPaymentModal);
+  recordPaymentSaveBtn?.addEventListener('click', saveRecordPayment);
+  recordPaymentModal?.addEventListener('click', (event) => {
+    if (event.target === recordPaymentModal) closeRecordPaymentModal();
+  });
+  recordPaymentMethodSelect?.addEventListener('change', updateRecordPaymentMethodIcon);
+  recordPaymentAmountInput?.addEventListener('input', checkRecordPaymentAmountWarning);
+  recordPaymentFileInput?.addEventListener('change', handleRecordPaymentFileChange);
+  recordPaymentFileRemoveBtn?.addEventListener('click', clearRecordPaymentFile);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !recordPaymentModal.classList.contains('hidden')) closeRecordPaymentModal();
+  });
 }
 
 function renderSignatureCheckPanel(contract) {
@@ -861,9 +1210,21 @@ async function reloadAndRender(flashText, isError = false) {
     return;
   }
   currentReservation = reservation;
+  currentPaymentSummary = await fetchPaymentSummary(reservation.reservation_id).catch(() => null);
   await loadStaffData();
   renderAll();
   setFlashMessage(flashText || '', isError);
+}
+
+// Lighter-weight refresh for the Record payment flow — only the Payment
+// card + history need updating, not staff assignment data.
+async function reloadPaymentSection(flashText) {
+  const reservation = await fetchReservationDetail(currentReservation.reservation_id);
+  if (!reservation) return;
+  currentReservation = reservation;
+  currentPaymentSummary = await fetchPaymentSummary(reservation.reservation_id).catch(() => null);
+  renderPayment();
+  setFlashMessage(flashText || '', false);
 }
 
 async function loadStaffData() {
@@ -1234,6 +1595,7 @@ async function init() {
       return;
     }
     currentReservation = reservation;
+    currentPaymentSummary = await fetchPaymentSummary(reservation.reservation_id).catch(() => null);
     await loadStaffData();
     renderAll();
     showContent();
@@ -1246,6 +1608,8 @@ wireHeaderActions();
 wireRescheduleReviewPanel();
 wireAssignmentModal();
 wireApprovalPrompt();
+wireReceiptViewer();
+wireRecordPaymentModal();
 wireStickyHeaderScroll();
 wireBreadcrumb();
 wireLogoutButton();

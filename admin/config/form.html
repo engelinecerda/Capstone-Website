@@ -7,8 +7,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_reservation_form.css">
   <link rel="stylesheet" href="/css/admin_sidebar.css">
-  <link rel="stylesheet" href="/css/admin_placeholder.css">
 </head>
 <body>
 
@@ -45,26 +45,156 @@
   <!-- ── MAIN ── -->
   <main class="main">
     <section class="page-shell">
+
       <div class="page-header">
         <div>
-          <h1 class="page-title" id="placeholderTitle">Reservation form</h1>
-          <p class="page-sub">Configuration</p>
+          <h1 class="page-title">Reservation Form <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Configure the fields, legal text, and event types customers see when booking.</p>
         </div>
       </div>
 
-      <div class="card placeholder-card">
-        <p class="placeholder-marker">Not yet implemented</p>
-        <p class="placeholder-desc" id="placeholderDesc"></p>
+      <div class="settings-tabs" role="tablist">
+        <button type="button" class="settings-tab-btn active" data-tab="required-fields" role="tab">Required Fields</button>
+        <button type="button" class="settings-tab-btn" data-tab="legal" role="tab">Terms &amp; Legal</button>
+        <button type="button" class="settings-tab-btn" data-tab="event-types" role="tab">Event Types</button>
       </div>
+
+      <!-- ══ TAB: REQUIRED FIELDS ══ -->
+      <div class="settings-panel active" id="panel-required-fields" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Required Fields</p>
+          <p class="settings-card-sub">Most fields on the booking form (package, guest count, event date) drive pricing and availability and can't be made optional. These are the only fields that can be toggled.</p>
+
+          <div class="rf-field-row">
+            <div>
+              <div class="rf-field-label">Phone number required</div>
+              <div class="rf-field-desc">If off, customers can submit a reservation with just an email address.</div>
+            </div>
+            <label class="pm2-toggle">
+              <input type="checkbox" id="rf-contact-phone-required" checked>
+              <span class="pm2-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="rf-field-row">
+            <div>
+              <div class="rf-field-label">Special requests required</div>
+              <div class="rf-field-desc">If on, customers must write something in the Special Requests field before continuing.</div>
+            </div>
+            <label class="pm2-toggle">
+              <input type="checkbox" id="rf-special-requests-required">
+              <span class="pm2-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="rf-legal-actions">
+            <span class="rf-legal-hint" id="rf-fields-message"></span>
+            <button type="button" class="btn-primary" id="rf-fields-save">Save changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: TERMS & LEGAL ══ -->
+      <div class="settings-panel" id="panel-legal" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Terms &amp; Legal</p>
+          <p class="settings-card-sub">Shown to customers on the booking page before they sign their contract. Blank-line-separated paragraphs; a short line with no ending period becomes a heading, and lines starting with "- " become a bullet list.</p>
+
+          <div class="rf-legal-tabs">
+            <button type="button" class="rf-legal-tab-btn active" data-legal-tab="terms">Terms &amp; Conditions</button>
+            <button type="button" class="rf-legal-tab-btn" data-legal-tab="privacy">Data Privacy Policy</button>
+          </div>
+
+          <div class="rf-legal-panel active" id="rf-legal-panel-terms">
+            <textarea class="rf-legal-textarea" id="rf-terms-body" placeholder="Loading..."></textarea>
+          </div>
+          <div class="rf-legal-panel" id="rf-legal-panel-privacy">
+            <textarea class="rf-legal-textarea" id="rf-privacy-body" placeholder="Loading..."></textarea>
+          </div>
+
+          <div class="rf-legal-actions">
+            <span class="rf-legal-hint" id="rf-legal-message"></span>
+            <div style="display:flex;gap:10px;">
+              <button type="button" class="et-action-btn" id="rf-legal-preview">Preview</button>
+              <button type="button" class="btn-primary" id="rf-legal-save">Save changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: EVENT TYPES ══ -->
+      <div class="settings-panel" id="panel-event-types" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Event Types</p>
+          <p class="settings-card-sub">Manage the categories of events that customers can select when making a reservation.</p>
+
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+            <button type="button" class="btn-primary" id="et-add-btn">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Event Type
+            </button>
+          </div>
+
+          <p class="rf-legal-hint" id="et-message"></p>
+
+          <table class="et-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="et-body">
+              <tr><td colspan="4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </section>
   </main>
+
+  <!-- ── Add/Edit Event Type modal ── -->
+  <div class="rf-preview-backdrop hidden" id="et-modal-backdrop">
+    <div class="rf-preview-card" style="max-width:440px;">
+      <p class="rf-preview-title" id="et-modal-title">Add event type</p>
+      <div class="rf-preview-body" style="overflow:visible;">
+        <label class="field-label" for="et-name-input" style="display:block;margin-bottom:6px;">Name</label>
+        <input type="text" id="et-name-input" class="res-input" style="width:100%;margin-bottom:14px;" placeholder="e.g., Baby Shower" maxlength="80">
+
+        <label class="field-label" for="et-desc-input" style="display:block;margin-bottom:6px;">Description (optional)</label>
+        <textarea id="et-desc-input" class="res-input" style="width:100%;min-height:80px;margin-bottom:14px;" maxlength="240" placeholder="Shown to admins only, not customers"></textarea>
+
+        <label class="field-label" style="display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" id="et-active-input" checked>
+          Active (visible to customers)
+        </label>
+        <p class="rf-legal-hint" id="et-modal-message" style="margin-top:12px;"></p>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button type="button" class="et-action-btn" id="et-modal-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="et-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Preview modal (reuses customer-facing policy styling shape) ── -->
+  <div class="rf-preview-backdrop hidden" id="rf-preview-backdrop">
+    <div class="rf-preview-card">
+      <p class="rf-preview-title" id="rf-preview-title">Preview</p>
+      <div class="rf-preview-body" id="rf-preview-body"></div>
+      <button type="button" class="rf-preview-close" id="rf-preview-close">Close</button>
+    </div>
+  </div>
 
   <script type="module">
     import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
     import { setupInactivityLogout } from '/js/super_admin_inactivity.js';
     import { getPortalInitials } from '/js/admin_auth.js';
     import { initAdminNav } from '/js/admin_nav.js';
-    import { initPlaceholder } from '/js/admin_placeholder.js';
+    import { initReservationFormConfig } from '/js/admin_reservation_form_config.js';
 
     async function init() {
       const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
@@ -79,16 +209,15 @@
       if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
       const roleBottomEl = document.getElementById('sidebarRoleBottom');
       if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+      const adminBadge = document.getElementById('adminBadge');
+      if (adminBadge) adminBadge.textContent = 'Admin';
 
       watchAuthState();
       wireLogoutButton();
       setupInactivityLogout();
       initAdminNav({ role: result.profile.role });
 
-      initPlaceholder({
-        title: 'Reservation form',
-        description: 'Configure the fields customers fill out when booking an event — this will let you add, reorder, and require custom questions beyond the built-in package and date fields.'
-      });
+      initReservationFormConfig();
     }
 
     init();

@@ -49,14 +49,14 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Payment Options <span class="admin-badge" id="adminBadge">Loading...</span></h1>
-          <p class="page-sub">Bank, e-wallet, and cash options customers see at checkout, plus installment and refund rules.</p>
+          <p class="page-sub">Bank, e-wallet, cash, and card options customers see at checkout, plus installment and refund rules.</p>
         </div>
       </div>
 
       <!-- Methods -->
       <div class="card">
         <p class="card-title">Payment Methods</p>
-        <p class="card-sub">Bank, e-wallet, and cash options customers see at checkout. Deactivating a method hides it from customers without deleting its history.</p>
+        <p class="card-sub">Bank, e-wallet, cash, and card options customers see at checkout. Deactivating a method hides it from customers without deleting its history.</p>
 
         <div class="card-header-row">
           <button type="button" class="btn-primary" id="pm2AddBtn">
@@ -83,6 +83,79 @@
               <tr><td colspan="6">Loading…</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Types -->
+      <div class="card">
+        <p class="card-title">Payment Types</p>
+        <p class="card-sub">What customers are paying for, and how each amount is calculated. The four types are fixed — deactivate one to hide it from the customer form instead of deleting it.</p>
+
+        <p class="form-message" id="pt-message"></p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-desc">Flat fee to confirm an onsite reservation. Offsite reservations use a separate fixed ₱5,000 fee, unaffected by this setting.</p>
+          </div>
+          <div class="pr-row-control pt-row-control">
+            <input type="text" class="field-input pt-label-input" id="pt-reservation_fee-label" placeholder="Label">
+            <span class="field-note">₱</span>
+            <input type="number" class="pr-input-inline" id="pt-reservation_fee-flat" min="0" step="1">
+            <label class="pm2-toggle">
+              <input type="checkbox" id="pt-reservation_fee-active">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <button type="button" class="action-btn view pt-save-btn" data-code="reservation_fee">Save</button>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-desc">Percentage of the reservation total due as a deposit. Subtracts what's already been paid, capped at the remaining balance.</p>
+          </div>
+          <div class="pr-row-control pt-row-control">
+            <input type="text" class="field-input pt-label-input" id="pt-down_payment-label" placeholder="Label">
+            <input type="number" class="pr-input-inline" id="pt-down_payment-percent" min="0" max="100" step="1">
+            <span class="field-note">%</span>
+            <label class="pm2-toggle">
+              <input type="checkbox" id="pt-down_payment-active">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <button type="button" class="action-btn view pt-save-btn" data-code="down_payment">Save</button>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-desc">Settles the entire remaining balance in one payment. No separate amount to configure.</p>
+          </div>
+          <div class="pr-row-control pt-row-control">
+            <input type="text" class="field-input pt-label-input" id="pt-full_payment-label" placeholder="Label">
+            <label class="pm2-toggle">
+              <input type="checkbox" id="pt-full_payment-active">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <button type="button" class="action-btn view pt-save-btn" data-code="full_payment">Save</button>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-desc">Lets a customer enter their own amount. Minimum is the greater of the percentage below or the peso floor, capped at the remaining balance so a final small balance is always payable.</p>
+          </div>
+          <div class="pr-row-control pt-row-control">
+            <input type="text" class="field-input pt-label-input" id="pt-partial_payment-label" placeholder="Label">
+            <input type="number" class="pr-input-inline" id="pt-partial_payment-percent" min="0" max="100" step="1">
+            <span class="field-note">% min,</span>
+            <span class="field-note">₱</span>
+            <input type="number" class="pr-input-inline" id="pt-partial_payment-floor" min="0" step="1" placeholder="0">
+            <span class="field-note">floor</span>
+            <label class="pm2-toggle">
+              <input type="checkbox" id="pt-partial_payment-active">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <button type="button" class="action-btn view pt-save-btn" data-code="partial_payment">Save</button>
+          </div>
         </div>
       </div>
 
@@ -122,6 +195,28 @@
           <div class="pr-row-control">
             <input type="number" class="pr-input-inline" id="pr-refund-window" min="0" value="14">
             <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Cancellation fee — onsite</p>
+            <p class="pr-row-desc">Flat fee charged when a customer cancels an onsite reservation.</p>
+          </div>
+          <div class="pr-row-control">
+            <span class="field-note" style="margin:0;">₱</span>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-fee-onsite" min="0" value="500">
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Cancellation fee — offsite</p>
+            <p class="pr-row-desc">Flat fee charged when a customer cancels an offsite reservation.</p>
+          </div>
+          <div class="pr-row-control">
+            <span class="field-note" style="margin:0;">₱</span>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-fee-offsite" min="0" value="2000">
           </div>
         </div>
 
@@ -172,12 +267,24 @@
             <option value="bank">Bank</option>
             <option value="ewallet">E-wallet</option>
             <option value="cash">Cash</option>
+            <option value="card">Card</option>
           </select>
         </div>
         <div class="field">
           <label class="field-label">Label</label>
           <input type="text" class="field-input" id="pm2Label" placeholder="e.g. GCash – Personal">
           <span class="field-note">Shown to customers as the method name.</span>
+        </div>
+        <div class="field">
+          <label class="field-label">Icon</label>
+          <select class="field-input" id="pm2IconKey">
+            <option value="cash">Cash</option>
+            <option value="credit-card">Card</option>
+            <option value="building-bank">Bank</option>
+            <option value="wallet">Wallet</option>
+            <option value="receipt">Receipt (generic)</option>
+          </select>
+          <span class="field-note">Shown next to this method wherever it's listed.</span>
         </div>
 
         <!-- Bank + E-wallet: account name -->
