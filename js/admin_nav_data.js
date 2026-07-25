@@ -2,9 +2,12 @@
 // Single source of truth for the admin sidebar. Edit this file, not any
 // individual page, to change nav structure, order, labels, or routes.
 //
-// Several Configuration items point at the same physical page
-// (super_admin_settings.html) with a different #hash — each hash opens a
-// specific tab there (see the hash-routing added in js/super_admin_settings.js).
+// Several Configuration items point at the same physical page with a
+// different #hash, which opens a specific tab/section there — see the
+// hash-routing in js/admin_reservation_form_config.js (Reservation Form)
+// and the anchor scroll targets in css/admin_payment_options.css (Payment
+// Options). super_admin_settings.html is single-purpose (Operating Hours
+// only) and needs no hash.
 //
 // An item with a `children` array renders as an expandable group instead of
 // a direct link — see initAdminNav in admin_nav.js. Each child still needs
@@ -43,8 +46,7 @@ export const ADMIN_NAV = [
           { label: 'Venues',     href: '/admin/super%20admin/super_admin_packages.html?view=venues' },
         ]
       },
-      { label: 'Availability and scheduling',  href: '/admin/super%20admin/super_admin_settings.html#operating-hours',  iconKey: 'clock' },
-      { label: 'Reservation rules',            href: '/admin/super%20admin/super_admin_settings.html#reservation-rules', iconKey: 'adjustments' },
+      { label: 'Availability and scheduling',  href: '/admin/super%20admin/super_admin_settings.html',  iconKey: 'clock' },
       {
         label: 'Reservation Form', iconKey: 'forms',
         children: [

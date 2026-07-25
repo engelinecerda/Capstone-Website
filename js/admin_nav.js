@@ -77,17 +77,23 @@ function resolveActiveHref(leaves) {
 
 let groupSeq = 0;
 
-function buildLink(item, activeHref) {
+// `isChild` distinguishes a group's sub-item from a top-level link — a
+// sub-item still carries aria-current="page" when active, so assistive tech
+// lands on the exact active page, but its visual active styling is a thin
+// left rail (`.active-child`, see admin_sidebar.css), not the filled
+// `.active` pill flat items use — group toggles never show that pill at
+// all (see buildGroup), so this is the only active indicator inside a group.
+function buildLink(item, activeHref, isChild = false) {
   const isActive = item.href === activeHref;
+  const activeClass = isActive ? (isChild ? ' active-child' : ' active') : '';
   // Child links under a group carry no iconKey — skip the icon slot
-  // entirely rather than rendering it empty, so the group's left border
-  // is the only indentation cue (an empty 16px+gap icon slot would read
-  // as a second, redundant indent).
+  // entirely rather than rendering it empty, so indentation reads clean
+  // (an empty 16px+gap icon slot would read as a second, redundant indent).
   const iconHtml = item.iconKey ? `<span class="nav-icon">${iconSvg(item.iconKey)}</span>` : '';
   return `
     <li>
       <a href="${item.href}"
-         class="nav-item${isActive ? ' active' : ''}"
+         class="nav-item${activeClass}"
          ${isActive ? 'aria-current="page"' : ''}
          data-tooltip="${item.label}"
          aria-label="${item.label}">
@@ -100,10 +106,23 @@ function buildLink(item, activeHref) {
 // Renders an expandable group: a disclosure button (WAI-ARIA disclosure
 // pattern — aria-expanded + aria-controls, no menubar/arrow-key semantics
 // needed for a sidebar) followed by its children as plain nav links.
+//
+// The toggle button never carries the filled `.active` pill flat items get
+// (Dashboard, Reports, etc.) — a group row must look structurally identical
+// to a flat row, distinguished only by its trailing chevron. When a child is
+// the active page, the group still auto-expands (aria-expanded) and that
+// child shows its own thin-rail `.active-child` highlight (see buildLink) —
+// the toggle itself just stays a plain row regardless. aria-current is
+// deliberately omitted here for the same reason: the child link already
+// carries aria-current="page", and this button doesn't visually represent
+// "current" so it shouldn't claim it for assistive tech either.
+// None of today's groups have a page of their own, so the whole button is
+// the toggle target; if a future group needs its own landing page, this
+// button would need to split into a link + a separate chevron toggle.
 function buildGroup(item, activeHref) {
   const submenuId = `navGroup${groupSeq++}`;
   const hasActiveChild = item.children.some((child) => child.href === activeHref);
-  const childRows = item.children.map((child) => buildLink(child, activeHref)).join('');
+  const childRows = item.children.map((child) => buildLink(child, activeHref, true)).join('');
 
   return `
     <li class="nav-group${hasActiveChild ? ' has-active' : ''}">
@@ -118,7 +137,7 @@ function buildGroup(item, activeHref) {
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
         </span>
       </button>
-      <ul class="sidebar-nav-list nav-group-children" id="${submenuId}" ${hasActiveChild ? '' : 'hidden'}>
+      <ul class="sidebar-nav-list nav-group-children" id="${submenuId}" aria-label="${item.label}" ${hasActiveChild ? '' : 'hidden'}>
         ${childRows}
       </ul>
     </li>`;

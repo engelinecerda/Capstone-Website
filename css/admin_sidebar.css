@@ -132,6 +132,19 @@ body.sidebar-open .sidebar-overlay { display: block; }
 
 /* ── COLLAPSIBLE NAV GROUPS (Bookable Inventory / Reservation Form /
    Payment Options — see admin_nav_data.js `children`) ───────────── */
+/* The toggle is a native <button>, unlike every other .nav-item (an <a>) —
+   browsers put a default border/box-shadow on buttons. manager-theme.css
+   resets that with `.nav-item { border: none }`, but pages that don't load
+   manager-theme.css (dashboard.html, reports.html, and anything importing
+   the legacy admin_homepage.css nav-item rule) never got that reset, so the
+   toggle fell back to the browser's default button chrome — a visible
+   bordered box around just these three rows. Reset here instead, since this
+   file loads last on every admin page regardless of which page-specific
+   stylesheet is active, so it always wins. */
+.nav-group-toggle {
+  border: none;
+  box-shadow: none;
+}
 .nav-group-chevron {
   display: inline-flex;
   align-items: center;
@@ -144,19 +157,40 @@ body.sidebar-open .sidebar-overlay { display: block; }
   transform: rotate(180deg);
 }
 
+/* Plain indent only — no border/box. A group's own row always looks
+   identical to a flat item (both are `.nav-item`) — the toggle button
+   never receives the shared `.active` filled-pill class (see buildGroup in
+   admin_nav.js), even while one of its children is the current page — so
+   the chevron stays the only thing marking it expandable. */
 .nav-group-children {
   margin-top: 2px;
   padding-left: 22px;
-  border-left: 1px solid var(--sidebar-line, #4A2C17);
   margin-left: 22px;
 }
 .nav-group-children .nav-item {
   padding-top: 8px;
   padding-bottom: 8px;
+  padding-left: 15px;
   font-size: 12.5px;
+  position: relative;
 }
-.nav-group.has-active > .nav-group-toggle {
+
+/* Active sub-item: thin crema rail + brighter text, never a filled
+   background — the fill belongs to the parent (one highlight at a time). */
+.nav-group-children .nav-item.active-child {
   color: var(--sidebar-cream, #F5EBDD);
+  font-weight: 500;
+  background: transparent;
+}
+.nav-group-children .nav-item.active-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--sidebar-cream, #F5EBDD);
 }
 
 /* ── COLLAPSE (desktop/tablet rail — never applies below the mobile

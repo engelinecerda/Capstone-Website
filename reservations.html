@@ -640,8 +640,34 @@
         closedDateReasons: new Map(),
         selectedDateAvailability: null,
         timeStatusOverride: '',
-        availableStartTimes: []
+        availableStartTimes: [],
+        // Booking window (min/max days from today) — from system_settings.reservation_rules,
+        // the same admin-editable value shown on the Reservation Rules tab. Previously loaded
+        // nowhere in this file; only a bare "not in the past" check applied.
+        minAdvanceDays: 14,
+        maxAdvanceDays: 365
     };
+
+    async function loadReservationRules() {
+        try {
+            const { data, error } = await supabase
+                .from('system_settings')
+                .select('setting_value')
+                .eq('setting_key', 'reservation_rules')
+                .maybeSingle();
+            if (error || !data) return;
+            const parsed = JSON.parse(data.setting_value);
+            if (Number.isFinite(Number(parsed.min_advance_days))) availabilityState.minAdvanceDays = Number(parsed.min_advance_days);
+            if (Number.isFinite(Number(parsed.max_advance_days))) availabilityState.maxAdvanceDays = Number(parsed.max_advance_days);
+        } catch {
+            // Keep defaults — the calendar still works, just with the fallback window.
+        }
+    }
+
+    function isOutsideBookingWindow(date, today) {
+        const diffDays = Math.round((date - today) / 86400000);
+        return diffDays < availabilityState.minAdvanceDays || diffDays > availabilityState.maxAdvanceDays;
+    }
 
     // ── Default contract body (used when a package has no active template) ─
     // Mirrors the fallback text in supabase/functions/generate-signed-contract —
@@ -1354,7 +1380,7 @@ By signing below, the Client confirms that the reservation details above are acc
             date.setDate(gridStart.getDate() + i);
             const dateKey = toDateKey(date);
             const isCurrentMonth = date.getMonth() === availabilityState.month.getMonth();
-            const isPast = date < today;
+            const isPast = date < today || isOutsideBookingWindow(date, today);
             const isBooked = isDateUnavailableForScope(dateKey, selectedScope) && !availabilityState.closedDates.has(dateKey);
             const isClosed = availabilityState.closedDates.has(dateKey);
             const isSelected = eventDateInput?.value === dateKey;
@@ -1540,7 +1566,7 @@ By signing below, the Client confirms that the reservation details above are acc
         packagesLoadState = 'loading';
         const { data: pkgs, error } = await supabase
             .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, package_category(is_active)')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category(is_active)')
             .eq('is_active', true)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false });
@@ -1552,12 +1578,61 @@ By signing below, the Client confirms that the reservation details above are acc
             return;
         }
 
+        // Venue-mapping counts + photo existence — the same "bookable"
+        // definition the admin health strip already enforces
+        // (js/super_admin_packages.js computeHealthIssues()): an onsite (or
+        // "both") package needs at least one mapped venue; every package
+        // needs at least one photo. Two batch queries, not one per package.
+        const packageIds = pkgs.map(p => p.package_id);
+        const [{ data: venueMaps }, { data: photoRows }] = packageIds.length
+            ? await Promise.all([
+                supabase.from('package_venue').select('package_id').in('package_id', packageIds),
+                supabase.from('package_photo').select('package_id').in('package_id', packageIds)
+            ])
+            : [{ data: [] }, { data: [] }];
+
+        const venueCounts = new Map();
+        (venueMaps || []).forEach(row => venueCounts.set(row.package_id, (venueCounts.get(row.package_id) || 0) + 1));
+        const hasGalleryPhoto = new Set((photoRows || []).map(row => row.package_id));
+
         const visible = pkgs.filter(p => p.package_category?.is_active !== false);
         MINI = []; SNACK = []; OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
 
         visible.forEach(p => {
             const desc = (p.description || '').trim();
+            // Price 0 is legitimate for offsite "contact for quote" packages
+            // as long as there's a real description — only drop packages
+            // with neither (basically blank, never finished in admin).
             if (p.price === 0 && (desc === '' || desc === '.')) return;
+
+            // Photo: the new gallery (package_photo) OR the legacy single
+            // package_image column, so packages never re-saved through the
+            // new photo editor aren't wrongly excluded.
+            const hasPhoto = hasGalleryPhoto.has(p.package_id) || !!p.package_image;
+            // Inclusions: the new structured array OR a real description —
+            // most existing packages still carry inclusions as free text in
+            // description and were never migrated to the structured column
+            // (20260725_bookable_inventory.sql's inclusions column is
+            // additive, no backfill, by design).
+            const hasInclusions = (Array.isArray(p.inclusions) && p.inclusions.length > 0) || desc !== '';
+            if (!hasPhoto || !hasInclusions) return;
+
+            const loc = p.location_type;
+            const venueCount = venueCounts.get(p.package_id) || 0;
+            // location_type can be 'onsite', 'offsite', or 'both' (Bookable
+            // Inventory's Service Mode field) — the previous version of this
+            // function only handled 'onsite'/'offsite' explicitly, so any
+            // 'both' package silently matched neither branch and vanished
+            // from the form entirely despite being active. That was the
+            // actual cause of "All-In" packages going missing: they're
+            // configured as Service Mode "Both". An onsite-eligible package
+            // (onsite or both) additionally needs at least one mapped venue —
+            // enforced here for the first time; previously this form showed
+            // onsite packages with zero venues too, which isn't bookable
+            // either.
+            const isOnsiteEligible = (loc === 'onsite' || loc === 'both') && venueCount > 0;
+            const isOffsiteEligible = (loc === 'offsite' || loc === 'both');
+            if (!isOnsiteEligible && !isOffsiteEligible) return;
 
             const base = {
                 id: p.package_id,
@@ -1571,14 +1646,14 @@ By signing below, the Client confirms that the reservation details above are acc
             };
             const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
 
-            if (p.location_type === 'onsite') {
+            if (isOnsiteEligible) {
                 if (isAddon) SNACK.push(base);
                 else MINI.push(base);
-            } else if (p.location_type === 'offsite') {
+            }
+            if (isOffsiteEligible) {
                 const name = p.package_name.toLowerCase();
                 if (name.includes('coffee'))                            OFFSITE_PKGS.coffee.push(base);
                 else if (name.includes('snack') || name.includes('biscuit')) OFFSITE_PKGS.snack.push(base);
-                else if (name.includes('catering'))                     OFFSITE_PKGS.catering.push(base);
                 else                                                    OFFSITE_PKGS.catering.push(base);
             }
         });
@@ -2616,6 +2691,7 @@ By signing below, the Client confirms that the reservation details above are acc
 
     // ── Initialize ─────────────────────────────────────────────────────────
     syncSelectedDate('');
+    await loadReservationRules();
     await loadEventTypes();
     await loadPackages();
 

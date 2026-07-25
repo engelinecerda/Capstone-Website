@@ -198,144 +198,6 @@ body { background: var(--cream); }
 /* Hover only on inactive cards */
 .pkg-cat-card:not(.active):hover .pkg-cat-icon { color: var(--brown-primary); }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   SECTION 2 · CATEGORY OVERVIEW
-   ══════════════════════════════════════════════════════════════════════════ */
-.pkg-overview-section {
-  background: var(--cream-dark);
-  border-bottom: 1px solid var(--border);
-  padding: 56px 0;
-}
-
-/* Two-column layout — both cards stretch to the same row height */
-.pkg-overview-layout {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 16px;
-  align-items: stretch;
-}
-
-/* Shared card shell — flex column so inner sections can anchor at bottom */
-.pkg-ov-card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 2px 12px rgba(44,20,6,.04);
-  display: flex;
-  flex-direction: column;
-}
-
-/* Left card ─────────────────────────────────────────────────────────── */
-.pkg-ov-name {
-  font-family: var(--font-display);
-  font-size: clamp(24px, 3vw, 34px);
-  font-weight: 400;
-  color: var(--text-dark);
-  line-height: 1.15;
-  margin-bottom: 10px;
-}
-.pkg-ov-desc {
-  font-size: 14px;
-  color: var(--text-mid);
-  line-height: 1.8;
-  margin-bottom: 0;
-}
-.pkg-ov-incl-wrap {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-.pkg-ov-incl-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--text-light);
-  margin-bottom: 14px;
-}
-/* Right card — body fills leftover height so divider + bottom row anchor low */
-.pkg-ov-card--right {}
-#ovInfoCardBody {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-/* Scoped to the info card body: push divider (and the row below it) to the bottom */
-#ovInfoCardBody .pkg-svc-divider {
-  margin-top: auto;
-}
-.pkg-ov-card-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--text-light);
-  margin-bottom: 18px;
-}
-
-/* Service detail rows */
-.pkg-svc-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 0;
-}
-.pkg-svc-row:first-of-type { padding-top: 0; }
-.pkg-svc-row i {
-  font-size: 17px;
-  color: var(--brown-primary);
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.pkg-svc-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--text-light);
-  margin-bottom: 3px;
-}
-.pkg-svc-value {
-  font-size: 12.5px;
-  color: var(--text-dark);
-  line-height: 1.5;
-}
-.pkg-svc-divider {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 4px 0 8px;
-}
-
-/* ── Overview "What's included" — compact icon-row list ────────────── */
-/* Two columns so the card stays scannable; no box chrome to compete
-   with the white card background or the cream-dark page behind it.   */
-.pkg-ov-incl-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 20px;
-}
-.pkg-ov-incl-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 13px;
-  color: var(--text-mid);
-  line-height: 1.4;
-  padding: 4px 0;
-}
-.pkg-ov-incl-row i {
-  font-size: 16px;
-  color: var(--brown-primary);
-  flex-shrink: 0;
-}
-.pkg-ov-incl-more {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--text-light);
-  font-style: italic;
-}
-
 /* ── Detail panel Inclusions tab — full tile grid ────────────────── */
 .pkg-incl-grid {
   display: grid;
@@ -896,15 +758,12 @@ body { background: var(--cream); }
 
 @media (max-width: 1024px) {
   .pkg-wrap { padding: 0 32px; }
-  .pkg-overview-layout { grid-template-columns: 1.5fr 1fr; }
   .pkg-detail-head { padding: 28px 28px 24px; gap: 24px; }
   .pkg-tabs { padding: 0 28px; }
   .pkg-tab-panels { padding: 28px; }
 }
 
 @media (max-width: 900px) {
-  .pkg-overview-layout { grid-template-columns: 1fr; }
-  .pkg-ov-card--right { max-width: 480px; }
   .pkg-detail-head { grid-template-columns: 1fr; gap: 20px; }
   .pkg-detail-head-right { flex-direction: row; align-items: center; justify-content: space-between; }
   .pkg-detail-price { text-align: left; }
@@ -921,11 +780,6 @@ body { background: var(--cream); }
   .pkg-cat-icon { font-size: 20px; }
   .pkg-cat-name { font-size: 12px; }
   .pkg-cat-count { display: none; }
-
-  .pkg-overview-section { padding: 36px 0; }
-  .pkg-ov-card { padding: 22px; }
-  .pkg-ov-name { font-size: 24px; }
-  .pkg-ov-incl-list { grid-template-columns: 1fr; }
 
   .pkg-options-section { padding: 40px 0; }
   /* 3-column grid collapses to 2 at 640px — 3 cards at 604px usable

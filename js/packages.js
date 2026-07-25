@@ -17,7 +17,6 @@ let allPackagesCache   = [];
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const sectionCategories = document.getElementById('section-categories');
-const sectionOverview   = document.getElementById('section-overview');
 const sectionOptions    = document.getElementById('section-options');
 const sectionDetail     = document.getElementById('section-detail');
 
@@ -27,13 +26,6 @@ const pkgCatErrorMsg = document.getElementById('pkgCatErrorMsg');
 const pkgCatEmpty    = document.getElementById('pkgCatEmpty');
 const pkgCatGrid     = document.getElementById('pkgCatGrid');
 const pkgRetryBtn    = document.getElementById('pkgRetryBtn');
-
-const ovName         = document.getElementById('ovName');
-const ovDesc         = document.getElementById('ovDesc');
-const ovInclSection  = document.getElementById('ovInclSection');
-const ovHighlights   = document.getElementById('ovHighlights');
-const ovInfoCardWrap = document.getElementById('ovInfoCardWrap');
-const ovInfoCardBody = document.getElementById('ovInfoCardBody');
 
 const optTitle        = document.getElementById('optTitle');
 const pkgOptLoading   = document.getElementById('pkgOptLoading');
@@ -123,24 +115,6 @@ function parseItemList(text) {
     if (byComma.length > 1 && byComma.every(s => s.length < 60)) items = byComma;
   }
   return items.map(s => s.replace(/^[-•*·]\s*/, '').trim()).filter(s => s.length > 0);
-}
-
-// Compact icon-row list for the category overview "What's included" summary.
-// Max 6 items; shows a "+N more" label if the category has additional inclusions.
-// Two-column layout so the card doesn't become a wall of tiles.
-function buildOverviewInclList(items) {
-  if (!items.length) return '';
-  const visible = items.slice(0, 6);
-  const overflow = items.length - visible.length;
-  const rows = visible.map(item => `
-    <div class="pkg-ov-incl-row">
-      <i class="ti ${esc(getInclusionIcon(item))}"></i>
-      <span>${esc(item)}</span>
-    </div>`).join('');
-  const more = overflow > 0
-    ? `<p class="pkg-ov-incl-more">+${overflow} more included — see package details</p>`
-    : '';
-  return `<div class="pkg-ov-incl-list">${rows}</div>${more}`;
 }
 
 // Icon tile grid — used in the detail panel Inclusions tab (full, browsable view)
@@ -264,95 +238,19 @@ function selectCategory(cat, { scroll = true } = {}) {
   pkgCatGrid.querySelectorAll('.pkg-cat-card').forEach(el =>
     el.classList.toggle('active', el.dataset.catId === selectedCategoryId));
 
-  // Left card: name + description + inclusions icon grid
-  ovName.textContent = cat.category_name || '';
-  ovDesc.textContent = cat.description  || '';
-
-  const inclItems = parseItemList(cat.package_category_inclusions || '');
-  if (inclItems.length) {
-    ovHighlights.innerHTML = buildOverviewInclList(inclItems);
-    show(ovInclSection);
-  } else {
-    ovHighlights.innerHTML = '';
-    hide(ovInclSection);
-  }
-
-  show(sectionOverview);
+  // Category overview card (name/description/What's included) was removed —
+  // redundant with the package cards below and each package's own detail
+  // page. Selecting a category now goes straight to the pricing cards.
   show(sectionOptions);
   hide(sectionDetail);
 
   optTitle.textContent = `${cat.category_name || ''} packages`;
 
-  if (scroll) smoothScrollTo(sectionOverview, 88);
+  if (scroll) smoothScrollTo(sectionOptions, 88);
 
   loadPackages(cat.package_category_id, cat.category_name || '');
 }
 
-// Right card — always shown; bottom row adapts to onsite vs offsite vs mixed.
-// Onsite: venue address. Offsite: area coverage. Mixed: area coverage (travel is the key detail).
-function buildInfoCard(pkgs) {
-  const locationTypes = [...new Set(pkgs.map(p => p.location_type).filter(Boolean))];
-  const hasOffsite    = locationTypes.includes('offsite');
-  const hasOnsite     = locationTypes.includes('onsite');
-
-  const durations  = pkgs.map(p => Number(p.duration_hours)).filter(d => d > 0);
-  const minDur     = durations.length ? Math.min(...durations) : null;
-  const maxDur     = durations.length ? Math.max(...durations) : null;
-  const capacities = pkgs.map(p => Number(p.guest_capacity)).filter(c => c > 0);
-  const maxCap     = capacities.length ? Math.max(...capacities) : null;
-
-  let locationLabel = '';
-  if (hasOnsite && hasOffsite) locationLabel = 'Onsite &amp; Offsite';
-  else if (hasOffsite)          locationLabel = 'Offsite — we come to you';
-  else if (hasOnsite)           locationLabel = 'At our venue';
-
-  let html = '';
-
-  if (locationLabel) {
-    html += `<div class="pkg-svc-row">
-      <i class="ti ti-map-pin"></i>
-      <div><p class="pkg-svc-label">Location</p><p class="pkg-svc-value">${locationLabel}</p></div>
-    </div>`;
-  }
-
-  if (minDur !== null) {
-    const durLabel = minDur === maxDur
-      ? `${minDur} hour${minDur !== 1 ? 's' : ''}`
-      : `${minDur}–${maxDur} hours`;
-    html += `<div class="pkg-svc-row">
-      <i class="ti ti-clock"></i>
-      <div><p class="pkg-svc-label">Duration</p><p class="pkg-svc-value">${durLabel}</p></div>
-    </div>`;
-  }
-
-  if (maxCap !== null) {
-    html += `<div class="pkg-svc-row">
-      <i class="ti ti-users"></i>
-      <div><p class="pkg-svc-label">Guest capacity</p><p class="pkg-svc-value">Up to ${maxCap} guests</p></div>
-    </div>`;
-  }
-
-  html += `<hr class="pkg-svc-divider" />`;
-
-  if (hasOffsite) {
-    // Offsite or mixed: official distance zones from ELI Coffee Binangonan
-    html += `<div class="pkg-svc-row">
-      <i class="ti ti-map-2"></i>
-      <div><p class="pkg-svc-label">Area coverage</p>
-      <p class="pkg-svc-value">Rizal Area — within 10km<br>Out of Town — 11km and above</p></div>
-    </div>`;
-  } else {
-    // Onsite-only: show the venue so customers know where they're going
-    html += `<div class="pkg-svc-row">
-      <i class="ti ti-building"></i>
-      <div><p class="pkg-svc-label">Our venue</p>
-      <p class="pkg-svc-value">ELI Coffee Events Cafe<br>Binangonan, Rizal &amp; Antipolo City</p></div>
-    </div>`;
-  }
-
-  ovInfoCardBody.innerHTML = html;
-  show(ovInfoCardWrap);
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3 — PACKAGE PRICING CARDS
@@ -438,7 +336,6 @@ async function loadPackages(categoryId, categoryName) {
       show(pkgAddonSection);
     }
 
-    buildInfoCard(pkgs);
     wirePackageCards();
     hide(pkgOptLoading);
 

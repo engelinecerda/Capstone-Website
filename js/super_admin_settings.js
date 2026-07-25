@@ -1,112 +1,17 @@
-// super_admin_settings.js
+// super_admin_settings.js — Operating Hours page.
+// Map Scope and Reservation Rules used to live here too (removed along
+// with their tabs — see super_admin_settings.html). Their underlying
+// system_settings rows (venue_map_scope, reservation_rules) are untouched
+// in the database; this file just no longer has UI to edit them.
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { logAudit } from './audit_logger.js';
 
-const RIZAL_DEFAULTS = {
-  center_lat: 14.5794,
-  center_lng: 121.1878,
-  sw_lat:     14.26,
-  sw_lng:     120.95,
-  ne_lat:     14.82,
-  ne_lng:     121.62,
-};
-
-// ── Map scope fields ────────────────────────────────────────────────────────
-const mapFields = {
-  center_lat: () => document.getElementById('map-center-lat'),
-  center_lng: () => document.getElementById('map-center-lng'),
-  sw_lat:     () => document.getElementById('map-sw-lat'),
-  sw_lng:     () => document.getElementById('map-sw-lng'),
-  ne_lat:     () => document.getElementById('map-ne-lat'),
-  ne_lng:     () => document.getElementById('map-ne-lng'),
-};
-
-function setMapMsg(msg, isError = false) {
-  const el = document.getElementById('map-settings-msg');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.color = isError ? '#c0392b' : '#27ae60';
-}
-
-function populateMapFields(config) {
-  for (const [key, getEl] of Object.entries(mapFields)) {
-    const el = getEl();
-    if (el) el.value = config[key] ?? '';
-  }
-}
-
-function readMapFields() {
-  const result = {};
-  for (const [key, getEl] of Object.entries(mapFields)) {
-    const el = getEl();
-    result[key] = el ? parseFloat(el.value) : null;
-  }
-  return result;
-}
-
-function validateMapConfig(config) {
-  for (const [key, val] of Object.entries(config)) {
-    if (val === null || isNaN(val)) return `"${key}" is not a valid number.`;
-  }
-  if (config.sw_lat >= config.ne_lat) return 'SW latitude must be less than NE latitude.';
-  if (config.sw_lng >= config.ne_lng) return 'SW longitude must be less than NE longitude.';
-  if (config.center_lat < config.sw_lat || config.center_lat > config.ne_lat)
-    return 'Center latitude must be within the SW–NE bounds.';
-  if (config.center_lng < config.sw_lng || config.center_lng > config.ne_lng)
-    return 'Center longitude must be within the SW–NE bounds.';
-  return null;
-}
-
-async function loadMapScope() {
-  const { data, error } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'venue_map_scope')
-    .maybeSingle();
-
-  if (error || !data) {
-    populateMapFields(RIZAL_DEFAULTS);
-    return;
-  }
-  populateMapFields({ ...RIZAL_DEFAULTS, ...JSON.parse(data.setting_value) });
-}
-
-async function saveMapScope() {
-  const config = readMapFields();
-  const validationError = validateMapConfig(config);
-  if (validationError) { setMapMsg(validationError, true); return; }
-
-  const { data: current } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'venue_map_scope')
-    .maybeSingle();
-  const oldConfig = current ? { ...RIZAL_DEFAULTS, ...JSON.parse(current.setting_value) } : RIZAL_DEFAULTS;
-
-  showSettingsConfirm(
-    'Change Venue Map Scope',
-    `Center ${oldConfig.center_lat}, ${oldConfig.center_lng}`,
-    `Center ${config.center_lat}, ${config.center_lng}`,
-    async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from('system_settings')
-        .upsert(
-          { setting_key: 'venue_map_scope', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-          { onConflict: 'setting_key' }
-        );
-
-      if (error) { setMapMsg('Failed to save: ' + error.message, true); return; }
-      setMapMsg('Map scope saved successfully.');
-    }
-  );
-}
-
-// ── Confirm modal (Map Scope / Operating Hours) ──────────────────────────────
+// ── Confirm modal (Operating Hours) ───────────────────────────────────────
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
   const modal = document.getElementById('settingsConfirmModal');
   if (!modal) { onConfirm(); return; }
@@ -158,8 +63,11 @@ async function loadVisionUsage() {
   fill.className = 'usage-bar-fill' + (tier ? ` ${tier}` : '');
 }
 
-// ── Operating hours ──────────────────────────────────────────────────────────
-const DEFAULT_OPERATING_HOURS = { open_time: '13:00', close_time: '22:00' };
+// ── Operating hours (per-weekday) ───────────────────────────────────────────
+const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DEFAULT_DAY_HOURS = { is_open: true, open_time: '13:00', close_time: '22:00' };
+
+let hoursCache = []; // [{ weekday, is_open, open_time, close_time }]
 
 function setHoursMsg(msg, isError = false) {
   const el = document.getElementById('hours-settings-msg');
@@ -168,161 +76,211 @@ function setHoursMsg(msg, isError = false) {
   el.style.color = isError ? '#c0392b' : '#27ae60';
 }
 
-function populateHoursFields(config) {
-  const openEl = document.getElementById('field-open-time');
-  const closeEl = document.getElementById('field-close-time');
-  if (openEl) openEl.value = config.open_time ?? '';
-  if (closeEl) closeEl.value = config.close_time ?? '';
+function renderHoursTable() {
+  const body = document.getElementById('hoursTableBody');
+  if (!body) return;
+  body.innerHTML = hoursCache.map((day) => `
+    <tr data-weekday="${day.weekday}">
+      <td>${WEEKDAY_LABELS[day.weekday]}</td>
+      <td>
+        <label class="pm2-toggle">
+          <input type="checkbox" data-field="is_open" ${day.is_open ? 'checked' : ''}>
+          <span class="pm2-toggle-track"></span>
+        </label>
+      </td>
+      <td><input type="time" data-field="open_time" value="${day.open_time || ''}" ${day.is_open ? '' : 'disabled'}></td>
+      <td><input type="time" data-field="close_time" value="${day.close_time || ''}" ${day.is_open ? '' : 'disabled'}></td>
+    </tr>
+  `).join('');
 }
+
+document.addEventListener('change', (e) => {
+  const row = e.target.closest('#hoursTableBody tr[data-weekday]');
+  if (!row) return;
+  const weekday = Number(row.dataset.weekday);
+  const day = hoursCache.find((d) => d.weekday === weekday);
+  if (!day) return;
+
+  if (e.target.dataset.field === 'is_open') {
+    day.is_open = e.target.checked;
+    row.querySelectorAll('input[type="time"]').forEach((el) => { el.disabled = !day.is_open; });
+  } else if (e.target.dataset.field === 'open_time') {
+    day.open_time = e.target.value;
+  } else if (e.target.dataset.field === 'close_time') {
+    day.close_time = e.target.value;
+  }
+});
 
 async function loadOperatingHours() {
   const { data, error } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'booking_operating_hours')
-    .maybeSingle();
+    .from('operating_hours')
+    .select('weekday, is_open, open_time, close_time')
+    .order('weekday', { ascending: true });
 
-  if (error || !data) {
-    populateHoursFields(DEFAULT_OPERATING_HOURS);
-    return;
+  if (error || !data || !data.length) {
+    hoursCache = WEEKDAY_LABELS.map((_, weekday) => ({ weekday, ...DEFAULT_DAY_HOURS }));
+  } else {
+    hoursCache = data.map((d) => ({
+      weekday: d.weekday,
+      is_open: d.is_open,
+      open_time: (d.open_time || '').slice(0, 5),
+      close_time: (d.close_time || '').slice(0, 5),
+    }));
   }
-  populateHoursFields({ ...DEFAULT_OPERATING_HOURS, ...JSON.parse(data.setting_value) });
+  renderHoursTable();
 }
 
 async function saveOperatingHours() {
-  const openTime = document.getElementById('field-open-time')?.value;
-  const closeTime = document.getElementById('field-close-time')?.value;
-
-  if (!openTime || !closeTime) { setHoursMsg('Both opening and closing times are required.', true); return; }
-  if (openTime >= closeTime) { setHoursMsg('Closing time must be after opening time.', true); return; }
-
-  const config = { open_time: openTime, close_time: closeTime };
-
-  const { data: current } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'booking_operating_hours')
-    .maybeSingle();
-  const oldConfig = current ? { ...DEFAULT_OPERATING_HOURS, ...JSON.parse(current.setting_value) } : DEFAULT_OPERATING_HOURS;
+  for (const day of hoursCache) {
+    if (day.is_open && (!day.open_time || !day.close_time)) {
+      setHoursMsg(`${WEEKDAY_LABELS[day.weekday]}: both opening and closing times are required for an open day.`, true);
+      return;
+    }
+    if (day.is_open && day.open_time >= day.close_time) {
+      setHoursMsg(`${WEEKDAY_LABELS[day.weekday]}: closing time must be after opening time.`, true);
+      return;
+    }
+  }
 
   showSettingsConfirm(
-    'Change Booking Operating Hours',
-    `${oldConfig.open_time} – ${oldConfig.close_time}`,
-    `${openTime} – ${closeTime}`,
+    'Change Operating Hours',
+    'Previous per-day hours',
+    'Updated per-day hours',
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from('system_settings')
-        .upsert(
-          { setting_key: 'booking_operating_hours', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-          { onConflict: 'setting_key' }
-        );
+      const rows = hoursCache.map((day) => ({
+        weekday: day.weekday,
+        is_open: day.is_open,
+        open_time: day.is_open ? day.open_time : null,
+        close_time: day.is_open ? day.close_time : null,
+      }));
+      const { error } = await supabase.from('operating_hours').upsert(rows, { onConflict: 'weekday' });
 
       if (error) { setHoursMsg('Failed to save: ' + error.message, true); return; }
+      await logAudit({ action: 'Updated Operating Hours', category: 'scheduling_config', details: JSON.stringify(rows) });
       setHoursMsg('Operating hours saved successfully.');
     }
   );
 }
 
-// ── Reservation rules ─────────────────────────────────────────────────────
-// auto_cancel_days drives the overdue grace deadline shown on the customer
-// payment page and used by the auto_cancel_overdue_reservations() scheduled
-// job. See js/customer_payments.js RESERVATION_RULES_DEFAULTS for the
-// matching customer-side fallback (kept in sync manually — this file
-// intentionally doesn't import the customer-facing module).
-//
-// deposit_pct used to live here and double as the Custom Amount minimum.
-// It's now payment_type.percent_of_total (code='partial_payment'), edited
-// on the Payment Options page — the single writable source, so it isn't
-// duplicated here.
-const DEFAULT_RESERVATION_RULES = {
-  min_advance_days: 14,
-  max_advance_days: 365,
-  min_pax: 20,
-  max_pax: 150,
-  full_payment_days: 7,
-  auto_cancel_days: 5,
-  contract_resubmission_days: 3
-};
+// ── Buffer & capacity (global) ──────────────────────────────────────────────
+const DEFAULT_SCHEDULING_SETTINGS = { buffer_minutes: 30, default_slot_capacity: 2 };
 
-const rulesFields = {
-  min_advance_days: () => document.getElementById('field-min-advance'),
-  max_advance_days: () => document.getElementById('field-max-advance'),
-  min_pax: () => document.getElementById('field-min-pax'),
-  max_pax: () => document.getElementById('field-max-pax'),
-  full_payment_days: () => document.getElementById('field-full-payment-days'),
-  auto_cancel_days: () => document.getElementById('field-auto-cancel-days'),
-  contract_resubmission_days: () => document.getElementById('field-contract-days')
-};
-
-function setRulesMsg(msg, isError = false) {
-  const el = document.getElementById('rules-settings-msg');
+function setCapacityMsg(msg, isError = false) {
+  const el = document.getElementById('capacity-settings-msg');
   if (!el) return;
   el.textContent = msg;
   el.style.color = isError ? '#c0392b' : '#27ae60';
 }
 
-function populateRulesFields(config) {
-  for (const [key, getEl] of Object.entries(rulesFields)) {
-    const el = getEl();
-    if (el) el.value = config[key] ?? '';
-  }
-}
-
-function readRulesFields() {
-  const result = {};
-  for (const [key, getEl] of Object.entries(rulesFields)) {
-    const el = getEl();
-    result[key] = el ? Number(el.value) : null;
-  }
-  return result;
-}
-
-function validateReservationRules(config) {
-  for (const [key, val] of Object.entries(config)) {
-    if (val === null || Number.isNaN(val) || val < 0) return `"${key}" must be a non-negative number.`;
-  }
-  if (config.min_advance_days >= config.max_advance_days) return 'Minimum advance booking must be less than maximum advance booking.';
-  if (config.min_pax >= config.max_pax) return 'Minimum pax must be less than maximum pax.';
-  return null;
-}
-
-async function loadReservationRulesSettings() {
-  const { data, error } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'reservation_rules')
+async function loadSchedulingSettings() {
+  const { data } = await supabase
+    .from('scheduling_settings')
+    .select('buffer_minutes, default_slot_capacity')
+    .eq('id', true)
     .maybeSingle();
 
-  if (error || !data) {
-    populateRulesFields(DEFAULT_RESERVATION_RULES);
-    return;
-  }
-  populateRulesFields({ ...DEFAULT_RESERVATION_RULES, ...JSON.parse(data.setting_value) });
+  const config = { ...DEFAULT_SCHEDULING_SETTINGS, ...(data || {}) };
+  const bufferEl = document.getElementById('field-buffer-minutes');
+  const capacityEl = document.getElementById('field-default-capacity');
+  if (bufferEl) bufferEl.value = config.buffer_minutes;
+  if (capacityEl) capacityEl.value = config.default_slot_capacity;
 }
 
-// Note: unlike Map Scope / Operating Hours, this panel already has its own
-// purpose-built confirm modal (#confirmModal / #confirmSave) wired in the
-// inline <script> at the bottom of super_admin_settings.html — that script
-// owns the dirty-tracking dots/banner and resets them on confirm. This
-// function only adds the actual persistence, invoked from a second listener
-// on #confirmSave (see init() below) rather than routing through
-// showSettingsConfirm(), which would pop a second, redundant dialog.
-async function saveReservationRulesSettings() {
-  const config = readRulesFields();
-  const validationError = validateReservationRules(config);
-  if (validationError) { setRulesMsg(validationError, true); return; }
+async function saveSchedulingSettings() {
+  const bufferMinutes = Number(document.getElementById('field-buffer-minutes')?.value);
+  const defaultCapacity = Number(document.getElementById('field-default-capacity')?.value);
+
+  if (!Number.isFinite(bufferMinutes) || bufferMinutes < 0) { setCapacityMsg('Buffer time must be zero or more minutes.', true); return; }
+  if (!Number.isFinite(defaultCapacity) || defaultCapacity < 1) { setCapacityMsg('Default slot capacity must be at least 1.', true); return; }
 
   const { data: { user } } = await supabase.auth.getUser();
   const { error } = await supabase
-    .from('system_settings')
-    .upsert(
-      { setting_key: 'reservation_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-      { onConflict: 'setting_key' }
-    );
+    .from('scheduling_settings')
+    .update({ buffer_minutes: bufferMinutes, default_slot_capacity: defaultCapacity, updated_at: new Date().toISOString(), updated_by: user?.id ?? null })
+    .eq('id', true);
 
-  if (error) { setRulesMsg('Failed to save: ' + error.message, true); return; }
-  setRulesMsg('Reservation rules saved successfully.');
+  if (error) { setCapacityMsg('Failed to save: ' + error.message, true); return; }
+  await logAudit({ action: 'Updated Buffer & Capacity', category: 'scheduling_config', details: `buffer=${bufferMinutes}min, default_capacity=${defaultCapacity}` });
+  setCapacityMsg('Buffer & capacity saved successfully.');
+  renderScopeCapacityTable(); // refresh "effective" column, which falls back to this default
+}
+
+// ── Per-scope capacity override ─────────────────────────────────────────────
+const SCOPES = [
+  { scope: 'onsite_vip', label: 'Onsite — VIP' },
+  { scope: 'onsite_main_hall', label: 'Onsite — Main Hall' },
+  { scope: 'offsite', label: 'Offsite' },
+];
+
+let scopeCapacityCache = {}; // { scope: capacity|null }
+let defaultCapacityForDisplay = DEFAULT_SCHEDULING_SETTINGS.default_slot_capacity;
+
+function setScopeCapacityMsg(msg, isError = false) {
+  const el = document.getElementById('scope-capacity-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+function renderScopeCapacityTable() {
+  const body = document.getElementById('scopeCapacityBody');
+  if (!body) return;
+  const globalDefaultEl = document.getElementById('field-default-capacity');
+  const globalDefault = Number(globalDefaultEl?.value) || defaultCapacityForDisplay;
+
+  body.innerHTML = SCOPES.map(({ scope, label }) => {
+    const override = scopeCapacityCache[scope];
+    const effective = override ?? globalDefault;
+    return `
+      <tr data-scope="${scope}">
+        <td>${label}</td>
+        <td><input type="number" min="1" step="1" data-scope-capacity value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
+        <td>${effective}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.matches('[data-scope-capacity]')) {
+    const row = e.target.closest('tr[data-scope]');
+    if (!row) return;
+    const scope = row.dataset.scope;
+    const raw = e.target.value.trim();
+    scopeCapacityCache[scope] = raw === '' ? null : Number(raw);
+    renderScopeCapacityTable();
+    // Re-render moves focus off the input that triggered it — restore it.
+    document.querySelector(`tr[data-scope="${scope}"] [data-scope-capacity]`)?.focus();
+  }
+});
+
+async function loadScopeCapacity() {
+  const { data } = await supabase.from('scope_capacity').select('scope, capacity');
+  scopeCapacityCache = {};
+  (data || []).forEach((row) => { scopeCapacityCache[row.scope] = row.capacity; });
+  renderScopeCapacityTable();
+}
+
+async function saveScopeCapacity() {
+  for (const { scope } of SCOPES) {
+    const val = scopeCapacityCache[scope];
+    if (val !== null && val !== undefined && (!Number.isFinite(val) || val < 1)) {
+      setScopeCapacityMsg('Capacity overrides must be at least 1, or left blank to use the default.', true);
+      return;
+    }
+  }
+
+  const rows = SCOPES.map(({ scope }) => ({
+    scope,
+    capacity: scopeCapacityCache[scope] ?? null,
+    updated_at: new Date().toISOString(),
+  }));
+  const { error } = await supabase.from('scope_capacity').upsert(rows, { onConflict: 'scope' });
+
+  if (error) { setScopeCapacityMsg('Failed to save: ' + error.message, true); return; }
+  await logAudit({ action: 'Updated Per-Scope Capacity', category: 'scheduling_config', details: JSON.stringify(rows) });
+  setScopeCapacityMsg('Per-scope overrides saved successfully.');
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
@@ -346,30 +304,14 @@ async function init() {
   initAdminSidebarBadges(supabase);
   initAdminNav({ role: result.profile.role });
 
-  await loadMapScope();
   await loadVisionUsage();
   await loadOperatingHours();
-  await loadReservationRulesSettings();
-
-  document.getElementById('saveMapScopeBtn')?.addEventListener('click', saveMapScope);
-
-  document.getElementById('resetMapScopeBtn')?.addEventListener('click', () => {
-    populateMapFields(RIZAL_DEFAULTS);
-    setMapMsg('');
-  });
+  await loadSchedulingSettings();
+  await loadScopeCapacity();
 
   document.getElementById('saveHoursBtn')?.addEventListener('click', saveOperatingHours);
-
-  document.getElementById('resetHoursBtn')?.addEventListener('click', () => {
-    populateHoursFields(DEFAULT_OPERATING_HOURS);
-    setHoursMsg('');
-  });
-
-  // saveRulesBtn/saveRulesConfirmBtn and discardRulesBtn/discardRulesBtn2
-  // already have their dirty-tracking/confirm-modal behavior wired by the
-  // inline <script> in super_admin_settings.html — this only adds the
-  // actual database write on top of that existing confirm step.
-  document.getElementById('confirmSave')?.addEventListener('click', saveReservationRulesSettings);
+  document.getElementById('saveCapacityBtn')?.addEventListener('click', saveSchedulingSettings);
+  document.getElementById('saveScopeCapacityBtn')?.addEventListener('click', saveScopeCapacity);
 }
 
 init();

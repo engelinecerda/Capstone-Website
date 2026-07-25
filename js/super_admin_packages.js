@@ -444,20 +444,32 @@ async function loadInventory() {
       { data: cats, error: catErr },
       { data: pkgs, error: pkgErr },
       { data: venueMaps, error: vmErr },
-      { data: tiers, error: tierErr }
+      { data: tiers, error: tierErr },
+      { data: venues, error: venueErr }
     ] = await Promise.all([
       supabase.from(CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from('package').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from(PACKAGE_VENUE_TABLE).select('package_id'),
       supabase.from(TIER_TABLE).select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+      // Bug fix: allVenues used to be populated only by loadVenues(), which
+      // only runs when the admin opens the separate Venues screen. Editing
+      // a package's venue mappings never triggered that fetch, so
+      // renderPkgVenuesList() saw an empty allVenues and rendered "No
+      // active venues yet" even though venues existed — silently blocking
+      // save for any onsite Main package edited without visiting Venues
+      // first. Loading it here means it's always populated before the
+      // package modal can open.
+      supabase.from(VENUE_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
     ]);
     if (catErr) throw catErr;
     if (pkgErr) throw pkgErr;
     if (vmErr) throw vmErr;
     if (tierErr) throw tierErr;
+    if (venueErr) throw venueErr;
 
     allCategories = cats || [];
     allPackages   = pkgs || [];
+    allVenues     = venues || [];
 
     allPackageVenueCounts = new Map();
     (venueMaps || []).forEach(row => {
@@ -1625,7 +1637,14 @@ function validatePackageForm() {
     return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
   if (pkgType.value === 'main') {
     const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
-    if (isOnsite && pkgVenueIds.size === 0) return 'Onsite packages need at least one venue mapping to activate, though you can save as draft.';
+    // Bug fix: this used to block save unconditionally, even though the
+    // message itself says draft saves are allowed — pkgActiveToggle was
+    // never actually checked. Only require a venue when the package is
+    // being saved active; an inactive/draft package can be saved without
+    // one and have its venue added later.
+    if (isOnsite && pkgVenueIds.size === 0 && pkgActiveToggle.checked) {
+      return 'Onsite packages need at least one venue mapping to activate. Turn off "Active" to save as a draft without one.';
+    }
   }
   return null;
 }

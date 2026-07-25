@@ -546,9 +546,11 @@ async function ptSaveType(code) {
 }
 
 // ── Payment rules ────────────────────────────────────────────────────────────
-// deposit_pct / full_payment_days already live under system_settings.
-// reservation_rules (Settings → Reservation Rules tab) — deliberately not
-// duplicated here to avoid two editable sources of truth for the same number.
+// deposit_pct is set on this page under Payment Types > Custom Amount
+// (percent_of_total), not duplicated here. full_payment_days still lives in
+// system_settings.reservation_rules, but that settings tab was removed
+// (see super_admin_settings.html) — it's DB-only until a UI need for it
+// comes back.
 const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,

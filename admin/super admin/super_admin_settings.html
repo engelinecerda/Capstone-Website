@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System Settings - ELI Coffee Events</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Operating Hours - ELI Coffee Events</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
-  <link rel="stylesheet" href="/css/admin_sidebar.css">
   <link rel="stylesheet" href="/css/super_admin_settings.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
 </head>
 <body>
 
@@ -48,8 +48,8 @@
 
       <div class="page-header">
         <div>
-          <h1 class="page-title">System Settings <span class="admin-badge" id="adminBadge">Loading...</span></h1>
-          <p class="page-sub">Manage reservation rules, fee structures, event types, and payment options.</p>
+          <h1 class="page-title">Operating Hours <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Business hours, booking buffers, and per-scope capacity limits.</p>
         </div>
       </div>
 
@@ -65,312 +65,89 @@
         <p class="usage-card-sub" id="usageCardSub">Used for contract signature verification and payment receipt OCR. Google Cloud Vision's free tier covers 1,000 units/month.</p>
       </div>
 
-      <!-- Tab Strip -->
-      <div class="settings-tabs" role="tablist">
-        <button type="button" class="settings-tab-btn" data-tab="cancellation" role="tab">Cancellation Rules</button>
-        <button type="button" class="settings-tab-btn" data-tab="rescheduling" role="tab">Rescheduling Rules</button>
-        <button type="button" class="settings-tab-btn active" data-tab="reservation-rules" role="tab">Reservation Rules</button>
-        <button type="button" class="settings-tab-btn" data-tab="venue-map" role="tab">Venue Map</button>
-        <button type="button" class="settings-tab-btn" data-tab="operating-hours" role="tab">Operating Hours</button>
-      </div>
+      <!-- ── OPERATING HOURS ── -->
+      <div class="card">
+        <p class="card-title">Operating Hours</p>
+        <p class="card-sub">Per-weekday hours bound which start times customers can select — the last valid start time always leaves room for the full package duration before closing. A closed day offers no bookable times at all. Changes affect new bookings only.</p>
 
-      <!-- ══ TAB: CANCELLATION FEE ══ -->
-      <div class="settings-panel" id="panel-cancellation" role="tabpanel">
-        <div class="settings-card">
-          <p class="settings-card-title">Cancellation Fee</p>
-          <p class="settings-card-sub">Set the fee structure applied when a customer cancels a confirmed reservation.</p>
+        <div class="table-wrap">
+          <table class="et-table" id="hoursTable">
+            <thead>
+              <tr><th>Day</th><th>Open</th><th>Opening Time</th><th>Closing Time</th></tr>
+            </thead>
+            <tbody id="hoursTableBody">
+              <tr><td colspan="4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
 
-          <div class="seg-control" id="cancel-seg">
-            <button type="button" class="seg-btn active" data-mode="flat">Flat</button>
-            <button type="button" class="seg-btn" data-mode="tiered">Tiered</button>
-          </div>
+        <p class="form-message" id="hours-settings-msg"></p>
 
-          <div id="cancel-flat">
-            <div class="form-grid" style="max-width:420px;">
-              <div class="form-group">
-                <label class="form-label">Fee Amount (₱)</label>
-                <input type="number" class="form-input" value="500" min="0">
-                <span class="form-hint">Charged on any cancellation regardless of timing.</span>
-              </div>
-            </div>
-          </div>
-
-          <div id="cancel-tiered" style="display:none;">
-            <table class="tier-table">
-              <thead>
-                <tr>
-                  <th>Lead Time</th>
-                  <th>Fee (%)</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><input type="text" class="form-input" value="≥ 7 days"></td>
-                  <td><input type="number" class="form-input" value="50" min="0" max="100"></td>
-                  <td>
-                    <button type="button" class="tier-delete-btn" title="Remove tier">
-                      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td><input type="text" class="form-input" value="&lt; 7 days"></td>
-                  <td><input type="number" class="form-input" value="100" min="0" max="100"></td>
-                  <td>
-                    <button type="button" class="tier-delete-btn" title="Remove tier">
-                      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <button type="button" class="add-row-btn">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Tier
-            </button>
-          </div>
-
-          <div class="form-grid" style="max-width:420px; margin-top:20px;">
-            <div class="form-group">
-              <label class="form-label">Grace Period (hours)</label>
-              <input type="number" class="form-input" value="24" min="0">
-              <span class="form-hint">Fee is waived if cancelled within this window after booking.</span>
-            </div>
-          </div>
-
-          <div class="action-bar">
-            <button type="button" class="btn-secondary">Discard</button>
-            <button type="button" class="btn-primary">Save Cancellation Fee</button>
-          </div>
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveHoursBtn">Save Operating Hours</button>
         </div>
       </div>
 
-      <!-- ══ TAB: RESCHEDULING FEE ══ -->
-      <div class="settings-panel" id="panel-rescheduling" role="tabpanel">
-        <div class="settings-card">
-          <p class="settings-card-title">Rescheduling Fee</p>
-          <p class="settings-card-sub">Configure fees applied when a customer requests to move their reservation to a different date.</p>
+      <!-- ── BUFFER & CAPACITY ── -->
+      <div class="card">
+        <p class="card-title">Buffer &amp; Capacity</p>
+        <p class="card-sub">Global defaults applied to every booking scope (Onsite VIP / Onsite Main Hall / Offsite) unless overridden below.</p>
 
-          <div class="seg-control" id="resched-seg">
-            <button type="button" class="seg-btn active" data-mode="flat">Flat</button>
-            <button type="button" class="seg-btn" data-mode="tiered">Tiered</button>
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Buffer time (minutes)</p>
+            <p class="pr-row-desc">Turnaround between events in the same scope.</p>
           </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="field-buffer-minutes" min="0" step="5">
+          </div>
+        </div>
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Default slot capacity</p>
+            <p class="pr-row-desc">Concurrent bookings a scope accepts unless overridden below.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="field-default-capacity" min="1" step="1">
+          </div>
+        </div>
 
-          <div id="resched-flat">
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Fee Amount (₱)</label>
-                <input type="number" class="form-input" value="300" min="0">
-                <span class="form-hint">Applied per approved reschedule request.</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Max Reschedules Allowed</label>
-                <input type="number" class="form-input" value="2" min="0">
-                <span class="form-hint">Further requests are rejected beyond this limit.</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Minimum Notice (days)</label>
-                <input type="number" class="form-input" value="7" min="0">
-                <span class="form-hint">Requests inside this window are automatically declined.</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Fee Waived on First Reschedule</label>
-                <select class="form-input">
-                  <option>Yes</option>
-                  <option>No</option>
-                </select>
-                <span class="form-hint">If Yes, the first reschedule per reservation is free.</span>
-              </div>
-            </div>
-          </div>
+        <p class="form-message" id="capacity-settings-msg"></p>
 
-          <div id="resched-tiered" style="display:none;">
-            <table class="tier-table">
-              <thead>
-                <tr>
-                  <th>Reschedule #</th>
-                  <th>Fee (₱)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><input type="text" class="form-input" value="1st reschedule"></td>
-                  <td><input type="number" class="form-input" value="0"></td>
-                </tr>
-                <tr>
-                  <td><input type="text" class="form-input" value="2nd reschedule"></td>
-                  <td><input type="number" class="form-input" value="300"></td>
-                </tr>
-                <tr>
-                  <td><input type="text" class="form-input" value="3rd+"></td>
-                  <td><input type="number" class="form-input" value="600"></td>
-                </tr>
-              </tbody>
-            </table>
-            <button type="button" class="add-row-btn">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Tier
-            </button>
-          </div>
-
-          <div class="action-bar">
-            <button type="button" class="btn-secondary">Discard</button>
-            <button type="button" class="btn-primary">Save Rescheduling Fee</button>
-          </div>
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveCapacityBtn">Save Buffer &amp; Capacity</button>
         </div>
       </div>
 
-      <!-- ══ TAB: RESERVATION RULES ══ -->
-      <div class="settings-panel active" id="panel-reservation-rules" role="tabpanel">
+      <!-- ── PER-SCOPE CAPACITY OVERRIDE ── -->
+      <div class="card">
+        <p class="card-title">Per-Scope Capacity Override</p>
+        <p class="card-sub">Leave blank to use the global default above.</p>
 
-        <div class="dirty-banner" id="dirty-banner">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          You have unsaved changes.
-          <div class="dirty-banner-actions">
-            <button type="button" class="btn-secondary" id="discardRulesBtn" style="padding:6px 14px;font-size:12.5px;">Discard</button>
-            <button type="button" class="btn-primary" id="saveRulesBtn" style="padding:6px 14px;font-size:12.5px;">Save Now</button>
-          </div>
+        <div class="table-wrap">
+          <table class="et-table" id="scopeCapacityTable">
+            <thead><tr><th>Scope</th><th>Capacity override</th><th>Effective</th></tr></thead>
+            <tbody id="scopeCapacityBody">
+              <tr><td colspan="3">Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
 
-        <div class="settings-card">
-          <p class="settings-card-title">Reservation Rules</p>
-          <p class="settings-card-sub">Control booking windows and guest limits across all packages. Down payment and custom-amount deposit percentages are on the <a href="/admin/config/payment-options.html" style="color:var(--primary);font-weight:600;">Payment Options</a> page.</p>
+        <p class="form-message" id="scope-capacity-msg"></p>
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">
-                Minimum Days Advance Booking
-                <span class="dirty-dot" id="dot-min-advance"></span>
-              </label>
-              <input type="number" class="form-input" id="field-min-advance" value="14" min="0">
-              <span class="form-hint">Customers cannot book events fewer than this many days away.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Maximum Days Advance Booking</label>
-              <input type="number" class="form-input" id="field-max-advance" value="365" min="0">
-              <span class="form-hint">Bookings beyond this window are not accepted.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Minimum Pax</label>
-              <input type="number" class="form-input" id="field-min-pax" value="20" min="1">
-              <span class="form-hint">Smallest guest count the venue will accommodate.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Maximum Pax</label>
-              <input type="number" class="form-input" id="field-max-pax" value="150" min="1">
-              <span class="form-hint">Hard cap on guests; packages above this are blocked.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Full Payment Deadline (days before event)</label>
-              <input type="number" class="form-input" id="field-full-payment-days" value="7" min="0">
-              <span class="form-hint">Remaining balance must be settled this many days before the event date.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Auto-Cancel Unpaid Reservations After (days)</label>
-              <input type="number" class="form-input" id="field-auto-cancel-days" value="5" min="0">
-              <span class="form-hint">Pending reservations with no down payment are cancelled automatically.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Contract Resubmission Deadline (days)</label>
-              <input type="number" class="form-input" id="field-contract-days" value="3" min="0">
-              <span class="form-hint">When admin requests resubmission, customer must upload a corrected contract within this period or the reservation is flagged.</span>
-            </div>
-          </div>
-
-          <p class="map-settings-msg" id="rules-settings-msg"></p>
-
-          <div class="action-bar">
-            <button type="button" class="btn-secondary" id="discardRulesBtn2">Discard Changes</button>
-            <button type="button" class="btn-primary" id="saveRulesConfirmBtn">Save Reservation Rules</button>
-          </div>
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveScopeCapacityBtn">Save Overrides</button>
         </div>
       </div>
 
-      <!-- ══ TAB: VENUE MAP ══ -->
-      <div class="settings-panel" id="panel-venue-map" role="tabpanel">
-        <div class="settings-card">
-          <p class="settings-card-title">Venue Map Scope</p>
-          <p class="settings-card-sub">Configure the geographic area shown on the booking map when customers select an offsite package. The map will be restricted to these bounds.</p>
-
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Map Center — Latitude</label>
-              <input type="number" class="form-input" id="map-center-lat" step="0.0001" placeholder="e.g. 14.5794">
-              <span class="form-hint">Vertical center point of the map when it first opens.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Map Center — Longitude</label>
-              <input type="number" class="form-input" id="map-center-lng" step="0.0001" placeholder="e.g. 121.1878">
-              <span class="form-hint">Horizontal center point of the map when it first opens.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">South-West Bound — Latitude</label>
-              <input type="number" class="form-input" id="map-sw-lat" step="0.0001" placeholder="e.g. 14.26">
-              <span class="form-hint">Southern edge of the allowed map area.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">South-West Bound — Longitude</label>
-              <input type="number" class="form-input" id="map-sw-lng" step="0.0001" placeholder="e.g. 120.95">
-              <span class="form-hint">Western edge of the allowed map area.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">North-East Bound — Latitude</label>
-              <input type="number" class="form-input" id="map-ne-lat" step="0.0001" placeholder="e.g. 14.82">
-              <span class="form-hint">Northern edge of the allowed map area.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">North-East Bound — Longitude</label>
-              <input type="number" class="form-input" id="map-ne-lng" step="0.0001" placeholder="e.g. 121.62">
-              <span class="form-hint">Eastern edge of the allowed map area.</span>
-            </div>
-          </div>
-
-          <p class="form-hint" style="margin-top:4px;">
-            <strong>Rizal province defaults:</strong> Center 14.5794, 121.1878 &nbsp;|&nbsp; SW 14.26, 120.95 &nbsp;|&nbsp; NE 14.82, 121.62
-          </p>
-
-          <p class="map-settings-msg" id="map-settings-msg"></p>
-
-          <div class="action-bar">
-            <button type="button" class="btn-secondary" id="resetMapScopeBtn">Reset to Rizal Defaults</button>
-            <button type="button" class="btn-primary" id="saveMapScopeBtn">Save Map Scope</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ══ TAB: OPERATING HOURS ══ -->
-      <div class="settings-panel" id="panel-operating-hours" role="tabpanel">
-        <div class="settings-card">
-          <p class="settings-card-title">Booking Operating Hours</p>
-          <p class="settings-card-sub">Controls the earliest and latest times customers can select as a reservation start time. The last valid start time will always leave room for the full package duration before closing.</p>
-
-          <div class="form-grid" style="max-width:420px;">
-            <div class="form-group">
-              <label class="form-label">Opening Time</label>
-              <input type="time" class="form-input" id="field-open-time">
-              <span class="form-hint">Earliest bookable start time.</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Closing Time</label>
-              <input type="time" class="form-input" id="field-close-time">
-              <span class="form-hint">Reservations cannot run past this time.</span>
-            </div>
-          </div>
-
-          <p class="map-settings-msg" id="hours-settings-msg"></p>
-
-          <div class="action-bar">
-            <button type="button" class="btn-secondary" id="resetHoursBtn">Reset to Default (1:00 PM – 10:00 PM)</button>
-            <button type="button" class="btn-primary" id="saveHoursBtn">Save Operating Hours</button>
-          </div>
-        </div>
+      <div class="settings-note">
+        <p>Closures and maintenance dates are set by the Manager in the <a href="/admin/availability-calendar.html">Availability Calendar</a> — not here.</p>
       </div>
 
     </section>
   </main>
 
-  <!-- ── CONFIRM MODAL (Map Scope / Operating Hours) ── -->
+  <!-- ── CONFIRM MODAL (Operating Hours) ── -->
   <div class="modal-backdrop hidden" id="settingsConfirmModal">
     <div class="modal-card">
       <p class="modal-eyebrow">Confirm Changes</p>
@@ -383,105 +160,6 @@
     </div>
   </div>
 
-  <!-- ── CONFIRM MODAL (Reservation Rules) ── -->
-  <div class="modal-backdrop hidden" id="confirmModal">
-    <div class="modal-card">
-      <p class="modal-eyebrow">Confirm Changes</p>
-      <h2 class="modal-title">Confirm changes</h2>
-      <p class="modal-copy">You are about to update Reservation Rules. This change will be recorded in the Audit Trail. Continue?</p>
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="confirmCancel">Cancel</button>
-        <button type="button" class="btn-primary" id="confirmSave">Confirm</button>
-      </div>
-    </div>
-  </div>
-
   <script type="module" src="/js/super_admin_settings.js"></script>
-  <script>
-    /* ── Tab switching ── */
-    const tabs = document.querySelectorAll('.settings-tab-btn');
-    const panels = document.querySelectorAll('.settings-panel');
-
-    function activateTab(tabName) {
-      tabs.forEach(t => t.classList.remove('active'));
-      panels.forEach(p => p.classList.remove('active'));
-      const tab = Array.from(tabs).find(t => t.dataset.tab === tabName);
-      if (tab) tab.classList.add('active');
-      document.getElementById('panel-' + tabName)?.classList.add('active');
-    }
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => activateTab(tab.dataset.tab));
-    });
-
-    /* ── Hash deep-linking (sidebar items link here as #tab-name) ── */
-    const validTabs = Array.from(tabs).map(t => t.dataset.tab);
-    function activateTabFromHash() {
-      const requested = location.hash.slice(1);
-      if (requested && validTabs.includes(requested)) activateTab(requested);
-    }
-    activateTabFromHash();
-    window.addEventListener('hashchange', activateTabFromHash);
-
-    /* ── Segmented controls ── */
-    function wireSegControl(segId, flatId, tieredId) {
-      const seg = document.getElementById(segId);
-      if (!seg) return;
-      seg.querySelectorAll('.seg-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          seg.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          const mode = btn.dataset.mode;
-          document.getElementById(flatId).style.display   = mode === 'flat'   ? '' : 'none';
-          document.getElementById(tieredId).style.display = mode === 'tiered' ? '' : 'none';
-        });
-      });
-    }
-    wireSegControl('cancel-seg', 'cancel-flat', 'cancel-tiered');
-    wireSegControl('resched-seg', 'resched-flat', 'resched-tiered');
-
-    /* ── Dirty state (Reservation Rules) ── */
-    const ruleInputs = document.querySelectorAll('#panel-reservation-rules .form-input');
-    const originalValues = {};
-    ruleInputs.forEach(input => { originalValues[input.id] = input.dataset.original ?? input.value; });
-
-    function checkDirty() {
-      let dirty = false;
-      ruleInputs.forEach(input => {
-        if (input.value !== originalValues[input.id]) {
-          dirty = true;
-          input.classList.add('dirty');
-          const dot = document.getElementById('dot-' + input.id.replace('field-', ''));
-          if (dot) dot.classList.add('visible');
-        } else {
-          input.classList.remove('dirty');
-          const dot = document.getElementById('dot-' + input.id.replace('field-', ''));
-          if (dot) dot.classList.remove('visible');
-        }
-      });
-      document.getElementById('dirty-banner').classList.toggle('visible', dirty);
-    }
-    ruleInputs.forEach(input => input.addEventListener('input', checkDirty));
-    checkDirty();
-
-    function discardRules() {
-      ruleInputs.forEach(input => { input.value = originalValues[input.id]; });
-      checkDirty();
-    }
-    document.getElementById('discardRulesBtn').addEventListener('click', discardRules);
-    document.getElementById('discardRulesBtn2').addEventListener('click', discardRules);
-
-    /* ── Confirm modal ── */
-    const confirmModal = document.getElementById('confirmModal');
-    document.getElementById('saveRulesBtn').addEventListener('click', () => confirmModal.classList.remove('hidden'));
-    document.getElementById('saveRulesConfirmBtn').addEventListener('click', () => confirmModal.classList.remove('hidden'));
-    document.getElementById('confirmCancel').addEventListener('click', () => confirmModal.classList.add('hidden'));
-    document.getElementById('confirmSave').addEventListener('click', () => {
-      ruleInputs.forEach(input => { originalValues[input.id] = input.value; });
-      checkDirty();
-      confirmModal.classList.add('hidden');
-    });
-    confirmModal.addEventListener('click', e => { if (e.target === confirmModal) confirmModal.classList.add('hidden'); });
-  </script>
 </body>
 </html>
