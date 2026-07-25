@@ -205,6 +205,14 @@ export function getCancellationFee(reservation, paymentRules) {
     return isOffsite ? 2000 : 500;
 }
 
+export function getRescheduleFee(paymentRules) {
+    const configured = Number(paymentRules?.reschedule_fee);
+    if (paymentRules && Number.isFinite(configured) && configured >= 0) {
+        return configured;
+    }
+    return 3000;
+}
+
 // The one place Unpaid/Partially paid/Paid in full/Overpaid labels and pill
 // colors are decided, fed by reservation_payment_summary's computed_status.
 // Deliberately reuses the existing .status-pill.pending/.approved classes

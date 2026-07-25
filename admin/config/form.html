@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reservation Form - ELI Coffee Events</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/admin_reservation_form.css">
@@ -56,6 +56,7 @@
       <div class="settings-tabs" role="tablist">
         <button type="button" class="settings-tab-btn active" data-tab="required-fields" role="tab">Required Fields</button>
         <button type="button" class="settings-tab-btn" data-tab="legal" role="tab">Terms &amp; Legal</button>
+        <button type="button" class="settings-tab-btn" data-tab="contract-template" role="tab">Contract Template</button>
         <button type="button" class="settings-tab-btn" data-tab="event-types" role="tab">Event Types</button>
       </div>
 
@@ -100,6 +101,11 @@
           <p class="settings-card-title">Terms &amp; Legal</p>
           <p class="settings-card-sub">Shown to customers on the booking page before they sign their contract. Blank-line-separated paragraphs; a short line with no ending period becomes a heading, and lines starting with "- " become a bullet list.</p>
 
+          <div class="rf-cross-link">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>This text also feeds the contract via the <code>{{terms_and_conditions}}</code> and <code>{{data_privacy_policy}}</code> tokens on the Contract Template tab — editing it here updates any clause that references those tokens too.</span>
+          </div>
+
           <div class="rf-legal-tabs">
             <button type="button" class="rf-legal-tab-btn active" data-legal-tab="terms">Terms &amp; Conditions</button>
             <button type="button" class="rf-legal-tab-btn" data-legal-tab="privacy">Data Privacy Policy</button>
@@ -118,6 +124,63 @@
               <button type="button" class="et-action-btn" id="rf-legal-preview">Preview</button>
               <button type="button" class="btn-primary" id="rf-legal-save">Save changes</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: CONTRACT TEMPLATE ══ -->
+      <div class="settings-panel" id="panel-contract-template" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Contract Template</p>
+          <p class="settings-card-sub">The Event Reservation Agreement generated and signed for each booking. Templates are per package — pick one below to edit it.</p>
+
+          <div class="ct-banner">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Editing the template changes contracts signed from now on. Already-signed contracts keep the exact terms they were signed under.</span>
+          </div>
+
+          <div class="ct-picker-row">
+            <label class="field-label" for="ct-package-select">Package</label>
+            <select id="ct-package-select" class="res-input"></select>
+          </div>
+
+          <p class="rf-legal-hint" id="ct-message"></p>
+
+          <div id="ct-editor" class="ct-editor hidden">
+
+            <div class="ct-section">
+              <p class="ct-section-title">Document Fields</p>
+              <p class="ct-section-sub">Reservation Summary rows shown on every contract. Package and Venue details come from this template's clauses below, not fixed fields.</p>
+              <div id="ct-fields-list" class="ct-fields-list"></div>
+              <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+                <button type="button" class="btn-primary" id="ct-fields-save">Save fields</button>
+              </div>
+            </div>
+
+            <div class="ct-section">
+              <p class="ct-section-title">Clauses</p>
+              <p class="ct-section-sub">The prose the café controls. Locked clauses are shared legal boilerplate and require an explicit unlock to edit.</p>
+
+              <div class="ct-token-ref">
+                <p class="ct-token-ref-title">Available tokens</p>
+                <div class="ct-token-ref-list" id="ct-token-ref-list"></div>
+              </div>
+
+              <div id="ct-clauses-list" class="ct-clauses-list"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                <button type="button" class="et-action-btn" id="ct-add-clause-btn">+ Add clause</button>
+                <button type="button" class="btn-primary" id="ct-clauses-save">Save clauses</button>
+              </div>
+            </div>
+
+            <div class="ct-section">
+              <div class="ct-section-head">
+                <p class="ct-section-title">Live Preview</p>
+                <button type="button" class="et-action-btn" id="ct-preview-btn">Preview</button>
+              </div>
+              <p class="ct-section-sub">Preview uses sample booking data. Real contracts fill from the customer's reservation.</p>
+            </div>
+
           </div>
         </div>
       </div>
@@ -195,6 +258,7 @@
     import { getPortalInitials } from '/js/admin_auth.js';
     import { initAdminNav } from '/js/admin_nav.js';
     import { initReservationFormConfig } from '/js/admin_reservation_form_config.js';
+    import { initContractTemplateTab } from '/js/admin_contract_template.js';
 
     async function init() {
       const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
@@ -218,6 +282,7 @@
       initAdminNav({ role: result.profile.role });
 
       initReservationFormConfig();
+      initContractTemplateTab();
     }
 
     init();

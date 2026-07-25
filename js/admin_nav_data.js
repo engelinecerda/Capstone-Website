@@ -6,6 +6,14 @@
 // (super_admin_settings.html) with a different #hash — each hash opens a
 // specific tab there (see the hash-routing added in js/super_admin_settings.js).
 //
+// An item with a `children` array renders as an expandable group instead of
+// a direct link — see initAdminNav in admin_nav.js. Each child still needs
+// its own real `href`; group items themselves are never links. Packages and
+// Categories intentionally share one href — js/super_admin_packages.js
+// unifies both into a single Inventory view (category rail + package grid),
+// a deliberate consolidation (see 20260725_bookable_inventory.sql), so
+// there's no separate "Categories" page to link to.
+//
 // Operations items are Manager-first (Manager owns operational mutations —
 // see 20260714_admin_manager_separation_of_duties.sql), so their base label
 // describes what Manager sees. Items whose label should read differently
@@ -27,12 +35,33 @@ export const ADMIN_NAV = [
   {
     section: 'Configuration',
     items: [
-      { label: 'Event types',                 href: '/admin/super%20admin/super_admin_settings.html#event-types',      iconKey: 'tags' },
-      { label: 'Bookable inventory',           href: '/admin/super%20admin/super_admin_packages.html',                  iconKey: 'package' },
+      {
+        label: 'Bookable Inventory', iconKey: 'package',
+        children: [
+          { label: 'Packages',   href: '/admin/super%20admin/super_admin_packages.html' },
+          { label: 'Categories', href: '/admin/super%20admin/super_admin_packages.html' },
+          { label: 'Venues',     href: '/admin/super%20admin/super_admin_packages.html?view=venues' },
+        ]
+      },
       { label: 'Availability and scheduling',  href: '/admin/super%20admin/super_admin_settings.html#operating-hours',  iconKey: 'clock' },
       { label: 'Reservation rules',            href: '/admin/super%20admin/super_admin_settings.html#reservation-rules', iconKey: 'adjustments' },
-      { label: 'Reservation form',             href: '/admin/config/form.html',                                        iconKey: 'forms' },
-      { label: 'Payment options',              href: '/admin/config/payment-options.html',                            iconKey: 'credit-card' },
+      {
+        label: 'Reservation Form', iconKey: 'forms',
+        children: [
+          { label: 'Required Fields',    href: '/admin/config/form.html#required-fields' },
+          { label: 'Terms & Conditions', href: '/admin/config/form.html#legal' },
+          { label: 'Contract Template',  href: '/admin/config/form.html#contract-template' },
+          { label: 'Event Types',        href: '/admin/config/form.html#event-types' },
+        ]
+      },
+      {
+        label: 'Payment Options', iconKey: 'credit-card',
+        children: [
+          { label: 'Payment Methods', href: '/admin/config/payment-options.html#payment-methods' },
+          { label: 'Payment Types',   href: '/admin/config/payment-options.html#payment-types' },
+          { label: 'Payment Rules',   href: '/admin/config/payment-options.html#payment-rules' },
+        ]
+      },
       { label: 'Notifications',                href: '/admin/config/notifications.html',                              iconKey: 'bell' },
     ]
   },

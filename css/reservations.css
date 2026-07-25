@@ -1870,6 +1870,17 @@
     margin: 0;
 }
 
+.pkg-empty-state {
+    grid-column: 1 / -1;
+    padding: 20px 16px;
+    text-align: center;
+    font-size: 13.5px;
+    color: #8a7a6c;
+    background: #F7F3EC;
+    border: 1px dashed #E2D6C6;
+    border-radius: 10px;
+}
+
 /* ── Summary divider + section title ───────────────────────────────────────── */
 .summary-divider {
     border: none;

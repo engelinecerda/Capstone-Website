@@ -7,6 +7,11 @@
 /* ── Section spacing ─────────────────────────────────────────────────────── */
 .card + .card { margin-top: 20px; }
 
+/* Anchor targets for the sidebar's Payment Options sub-links
+   (admin_nav_data.js) — keeps the section clear of the viewport edge when
+   the browser jumps to #payment-methods / #payment-types / #payment-rules. */
+#payment-methods, #payment-types, #payment-rules { scroll-margin-top: 24px; }
+
 .card-header-row {
   display: flex;
   justify-content: flex-end;

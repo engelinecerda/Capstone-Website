@@ -555,7 +555,8 @@ const DEFAULT_PAYMENT_RULES = {
   refund_window_days: 14,
   currency: 'PHP',
   cancellation_fee_onsite: 500,
-  cancellation_fee_offsite: 2000
+  cancellation_fee_offsite: 2000,
+  reschedule_fee: 3000
 };
 
 function populatePaymentRulesFields(config) {
@@ -565,12 +566,14 @@ function populatePaymentRulesFields(config) {
   const currency = document.getElementById('pr-currency');
   const cancelOnsite = document.getElementById('pr-cancellation-fee-onsite');
   const cancelOffsite = document.getElementById('pr-cancellation-fee-offsite');
+  const rescheduleFee = document.getElementById('pr-reschedule-fee');
   if (maxInst) maxInst.value = config.max_installments ?? '';
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
   if (refundWindow) refundWindow.value = config.refund_window_days ?? '';
   if (currency) currency.value = config.currency ?? 'PHP';
   if (cancelOnsite) cancelOnsite.value = config.cancellation_fee_onsite ?? '';
   if (cancelOffsite) cancelOffsite.value = config.cancellation_fee_offsite ?? '';
+  if (rescheduleFee) rescheduleFee.value = config.reschedule_fee ?? '';
 }
 
 function readPaymentRulesFields() {
@@ -580,7 +583,8 @@ function readPaymentRulesFields() {
     refund_window_days: Number(document.getElementById('pr-refund-window')?.value),
     currency: 'PHP',
     cancellation_fee_onsite: Number(document.getElementById('pr-cancellation-fee-onsite')?.value),
-    cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value)
+    cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value),
+    reschedule_fee: Number(document.getElementById('pr-reschedule-fee')?.value)
   };
 }
 
@@ -589,6 +593,7 @@ function validatePaymentRules(config) {
   if (!Number.isFinite(config.refund_window_days) || config.refund_window_days < 0) return 'Refund window must be zero or more days.';
   if (!Number.isFinite(config.cancellation_fee_onsite) || config.cancellation_fee_onsite < 0) return 'Onsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.cancellation_fee_offsite) || config.cancellation_fee_offsite < 0) return 'Offsite cancellation fee must be zero or more.';
+  if (!Number.isFinite(config.reschedule_fee) || config.reschedule_fee < 0) return 'Reschedule fee must be zero or more.';
   return null;
 }
 
@@ -627,8 +632,8 @@ async function savePaymentRules() {
 
   showSettingsConfirm(
     'Change Payment Rules',
-    `${oldConfig.max_installments} installments, ${oldConfig.refund_window_days}d refund window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${oldConfig.cancellation_fee_onsite}/₱${oldConfig.cancellation_fee_offsite}`,
-    `${config.max_installments} installments, ${config.refund_window_days}d refund window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${config.cancellation_fee_onsite}/₱${config.cancellation_fee_offsite}`,
+    `${oldConfig.max_installments} installments, ${oldConfig.refund_window_days}d refund window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${oldConfig.cancellation_fee_onsite}/₱${oldConfig.cancellation_fee_offsite}, reschedule fee ₱${oldConfig.reschedule_fee}`,
+    `${config.max_installments} installments, ${config.refund_window_days}d refund window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${config.cancellation_fee_onsite}/₱${config.cancellation_fee_offsite}, reschedule fee ₱${config.reschedule_fee}`,
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase

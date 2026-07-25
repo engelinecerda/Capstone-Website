@@ -54,7 +54,7 @@
       </div>
 
       <!-- Methods -->
-      <div class="card">
+      <div class="card" id="payment-methods">
         <p class="card-title">Payment Methods</p>
         <p class="card-sub">Bank, e-wallet, cash, and card options customers see at checkout. Deactivating a method hides it from customers without deleting its history.</p>
 
@@ -87,7 +87,7 @@
       </div>
 
       <!-- Types -->
-      <div class="card">
+      <div class="card" id="payment-types">
         <p class="card-title">Payment Types</p>
         <p class="card-sub">What customers are paying for, and how each amount is calculated. The four types are fixed — deactivate one to hide it from the customer form instead of deleting it.</p>
 
@@ -160,7 +160,7 @@
       </div>
 
       <!-- Rules -->
-      <div class="card">
+      <div class="card" id="payment-rules">
         <p class="card-title">Payment Rules</p>
         <p class="card-sub">Installments, holds, and refunds. Deposit percentage and balance-due timing are managed in the <a href="/admin/super%20admin/super_admin_settings.html#reservation-rules" style="color:var(--active-bg);font-weight:600;">Reservation Rules</a> tab.</p>
 
@@ -217,6 +217,17 @@
           <div class="pr-row-control">
             <span class="field-note" style="margin:0;">₱</span>
             <input type="number" class="pr-input-inline" id="pr-cancellation-fee-offsite" min="0" value="2000">
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Reschedule fee</p>
+            <p class="pr-row-desc">Flat fee charged when a customer reschedules a confirmed reservation. Also fills the {{reschedule_fee}} token in the contract template.</p>
+          </div>
+          <div class="pr-row-control">
+            <span class="field-note" style="margin:0;">₱</span>
+            <input type="number" class="pr-input-inline" id="pr-reschedule-fee" min="0" value="3000">
           </div>
         </div>
 

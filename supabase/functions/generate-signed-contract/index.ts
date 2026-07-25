@@ -67,6 +67,37 @@ function mergeTemplate(template: string, data: Record<string, string>): string {
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key) => data[key] ?? '');
 }
 
+// Fallback Reservation Summary rows — used only if the contract_field table
+// is empty/unreachable. Mirrors the seed data in
+// 20260730_contract_template_structure.sql exactly.
+const DEFAULT_SUMMARY_FIELDS: { token: string; label: string }[] = [
+  { token: 'reservation_number', label: 'Reservation Number' },
+  { token: 'customer_name', label: 'Client Name' },
+  { token: 'event_type', label: 'Event Type' },
+  { token: 'venue', label: 'Venue' },
+  { token: 'package_name', label: 'Package' },
+  { token: 'event_date', label: 'Event Date' },
+  { token: 'event_time', label: 'Event Time' },
+  { token: 'guest_count', label: 'Guests' },
+  { token: 'total_price', label: 'Total Amount' },
+];
+
+// Fallback Layer 3 text — used only if contract_locked_clause is empty/
+// unreachable. Exact wording this file already hardcoded before Layer 3
+// moved into the database (kept here as a last-resort safety net, same
+// pattern as DEFAULT_TEMPLATE_BODY above).
+const DEFAULT_ACKNOWLEDGEMENT_BODY =
+  'By signing below, the Client acknowledges having read and understood this Agreement in full and agrees to be bound by its terms.';
+const DEFAULT_ELECTRONIC_SIGNATURE_CLAUSE = {
+  heading: 'Electronic Signature',
+  body:
+    'The Client acknowledges that this Agreement is being signed electronically, and agrees that such electronic ' +
+    'signature is legally binding to the same extent as a handwritten signature, consistent with the Philippine ' +
+    "Electronic Commerce Act (Republic Act No. 8792). By signing below, the Client confirms that the reservation " +
+    "details above are accurate and agrees to the terms of this Agreement and the Venue's Terms and Conditions and " +
+    'Data Privacy Policy.',
+};
+
 // pdf-lib's Standard 14 fonts (Helvetica) use WinAnsiEncoding (Windows-1252).
 // That encoding has no peso sign, but it DOES support common "smart"
 // punctuation whose Unicode code points happen to be above 0xFF — em/en
@@ -499,9 +530,10 @@ async function drawSignatureSection(
   signerName: string,
   signedDateLabel: string,
   signedTimeLabel: string,
+  acknowledgementText: string,
 ) {
   drawSectionHeading(ctx, 'Client Acknowledgement');
-  drawParagraph(ctx, 'By signing below, the Client acknowledges having read and understood this Agreement in full and agrees to be bound by its terms.');
+  drawParagraph(ctx, acknowledgementText);
   moveDown(ctx, 16);
 
   const sigImage = await ctx.pdfDoc.embedPng(signatureBytes);
@@ -557,9 +589,29 @@ interface ContractData {
   fallbackVenueLabel: string;
 }
 
+interface SummaryField {
+  token: string;
+  label: string;
+  is_visible?: boolean;
+}
+
+interface StructuredClause {
+  heading: string;
+  body: string;
+}
+
+interface LockedClauses {
+  acknowledgement?: StructuredClause;
+  electronic_signature?: StructuredClause;
+}
+
 async function buildContractPdf(
   mergedTemplateBody: string,
   data: ContractData,
+  mergeData: Record<string, string>,
+  summaryFields: SummaryField[],
+  templateClauses: StructuredClause[],
+  lockedClauses: LockedClauses,
   signatureBytes: Uint8Array,
   signerName: string,
 ): Promise<Uint8Array> {
@@ -583,17 +635,16 @@ async function buildContractPdf(
   const venueEntries = venueSections.flatMap((s) => s.bodyLines.map((line) => splitDetailLine(line)));
   const specificVenueName = venueEntries.find((e) => e.label)?.label || data.fallbackVenueLabel;
 
-  drawReservationSummary(ctx, [
-    ['Reservation Number', data.reservationNumber],
-    ['Client Name', data.customerName],
-    ['Event Type', data.eventType],
-    ['Venue', specificVenueName],
-    ['Package', data.packageName],
-    ['Event Date', data.eventDate],
-    ['Event Time', data.eventTime],
-    ['Guests', data.guestCount],
-    ['Total Amount', data.totalPrice],
-  ]);
+  // Layer 1 — Reservation Summary rows, driven by contract_field
+  // (visibility/label/order); falls back to the fixed default list if the
+  // table is empty/unreachable. "venue" is special-cased to the more
+  // specific parsed venue name, matching the pre-existing behavior.
+  const summaryValues: Record<string, string> = { ...mergeData, venue: specificVenueName };
+  const fieldsToRender = summaryFields.length ? summaryFields : DEFAULT_SUMMARY_FIELDS;
+  const summaryRows: [string, string][] = fieldsToRender
+    .filter((f) => f.is_visible !== false)
+    .map((f) => [f.label, summaryValues[f.token] ?? '']);
+  drawReservationSummary(ctx, summaryRows);
 
   const packageSections = sections.filter((s) => classifySection(s.heading) === 'package' && sectionMatchesPackage(s.heading, data.packageName));
   const packageEntries = packageSections.flatMap((s) =>
@@ -603,10 +654,37 @@ async function buildContractPdf(
 
   drawVenueInformation(ctx, venueEntries);
 
-  const termsSections = sections.filter((s) => classifySection(s.heading) === 'terms');
-  drawTermsAndConditions(ctx, termsSections);
+  // Layer 2/3 — Terms and Conditions. A template with structured clauses
+  // (contract_template_clause rows) uses them directly, token-merged, and
+  // always appends the global locked Electronic Signature clause at the end
+  // (structured templates no longer carry it as free text). A template with
+  // no structured clauses yet keeps rendering exactly as today — parsed
+  // straight out of template_body, Electronic Signature included wherever
+  // its free text already puts it — so nothing changes for it.
+  let termsClauses: TemplateSection[];
+  if (templateClauses.length) {
+    termsClauses = templateClauses.map((c) => ({
+      heading: c.heading,
+      bodyLines: mergeTemplate(c.body, mergeData).split('\n').map((l) => l.trim()).filter(Boolean),
+    }));
+    const esClause = lockedClauses.electronic_signature || DEFAULT_ELECTRONIC_SIGNATURE_CLAUSE;
+    termsClauses.push({
+      heading: esClause.heading,
+      bodyLines: mergeTemplate(esClause.body, mergeData).split('\n').map((l) => l.trim()).filter(Boolean),
+    });
+  } else {
+    termsClauses = sections.filter((s) => classifySection(s.heading) === 'terms');
+  }
+  drawTermsAndConditions(ctx, termsClauses);
 
-  await drawSignatureSection(ctx, signatureBytes, signerName, signedDateLabel, signedTimeLabel);
+  // Client Acknowledgement paragraph was never template_body-derived for any
+  // template (structured or not) — switching its source to contract_locked_clause
+  // is a pure refactor, same text either way unless an admin edits it.
+  const acknowledgementText = mergeTemplate(
+    lockedClauses.acknowledgement?.body || DEFAULT_ACKNOWLEDGEMENT_BODY,
+    mergeData,
+  );
+  await drawSignatureSection(ctx, signatureBytes, signerName, signedDateLabel, signedTimeLabel, acknowledgementText);
 
   drawFooters(pdfDoc, font);
 
@@ -697,6 +775,32 @@ Deno.serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
 
+    // NIL_UUID: contract_template_clause.template_id is `not null` — when no
+    // active template exists, query a UUID that can never match a real row
+    // instead of passing null/empty-string (which PostgREST would reject as
+    // an invalid uuid), so this always safely resolves to zero rows.
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
+    const [
+      { data: templateClauseRows },
+      { data: lockedClauseRows },
+      { data: summaryFieldRows },
+      { data: paymentRulesRow },
+      { data: downPaymentTypeRow },
+      { data: termsRow },
+      { data: privacyRow },
+    ] = await Promise.all([
+      supabase.from('contract_template_clause').select('heading, body, sort_order')
+        .eq('template_id', template?.template_id || NIL_UUID).order('sort_order', { ascending: true }),
+      supabase.from('contract_locked_clause').select('key, heading, body'),
+      supabase.from('contract_field').select('token, label, is_visible, sort_order')
+        .eq('section', 'summary').order('sort_order', { ascending: true }),
+      supabase.from('system_settings').select('setting_value').eq('setting_key', 'payment_rules').maybeSingle(),
+      supabase.from('payment_type').select('percent_of_total').eq('code', 'down_payment').maybeSingle(),
+      supabase.from('system_settings').select('setting_value').eq('setting_key', 'terms_and_conditions').maybeSingle(),
+      supabase.from('system_settings').select('setting_value').eq('setting_key', 'data_privacy_policy').maybeSingle(),
+    ]);
+
     const venueLabel = reservation.location_type === 'offsite'
       ? (reservation.venue_location || 'Customer-provided venue')
       : 'ELI Coffee Events Cafe Binangonan (Onsite)';
@@ -707,6 +811,23 @@ Deno.serve(async (req: Request) => {
     });
 
     const packageName = reservation.package?.package_name || 'Selected Package';
+
+    // Fee/terms tokens — same sources the admin-facing config pages read/write
+    // (payment_rules for cancellation/reschedule fees, payment_type for the
+    // down-payment percent, system_settings for the Terms & Legal tab text).
+    let paymentRules: Record<string, unknown> = {};
+    try { paymentRules = paymentRulesRow?.setting_value ? JSON.parse(paymentRulesRow.setting_value) : {}; } catch { /* use default */ }
+    const isOffsite = reservation.location_type === 'offsite';
+    const cancellationFee = Number(
+      paymentRules[isOffsite ? 'cancellation_fee_offsite' : 'cancellation_fee_onsite'] ?? (isOffsite ? 2000 : 500),
+    );
+    const rescheduleFee = Number(paymentRules['reschedule_fee'] ?? 3000);
+    const depositPercent = downPaymentTypeRow?.percent_of_total ?? 50;
+
+    let termsBody = '';
+    try { termsBody = termsRow?.setting_value ? (JSON.parse(termsRow.setting_value).body || '') : ''; } catch { /* leave blank */ }
+    let privacyBody = '';
+    try { privacyBody = privacyRow?.setting_value ? (JSON.parse(privacyRow.setting_value).body || '') : ''; } catch { /* leave blank */ }
 
     const mergeData: Record<string, string> = {
       customer_name: reservation.contact_name || '',
@@ -721,10 +842,22 @@ Deno.serve(async (req: Request) => {
       contact_email: reservation.contact_email || '',
       contact_phone: reservation.contact_phone || '',
       signed_date: signedAtLabel,
+      reschedule_fee: formatCurrency(rescheduleFee),
+      cancellation_fee: formatCurrency(cancellationFee),
+      deposit_percent: String(depositPercent),
+      terms_and_conditions: termsBody,
+      data_privacy_policy: privacyBody,
     };
 
     const templateBody = template?.template_body || DEFAULT_TEMPLATE_BODY;
     const mergedBody = sanitizeForPdf(mergeTemplate(templateBody, mergeData));
+
+    const lockedClauses: LockedClauses = {};
+    (lockedClauseRows || []).forEach((c) => {
+      if (c.key === 'acknowledgement' || c.key === 'electronic_signature') {
+        lockedClauses[c.key as 'acknowledgement' | 'electronic_signature'] = { heading: c.heading, body: c.body };
+      }
+    });
 
     const signatureBytes = base64ToBytes(signature_data_url);
 
@@ -747,6 +880,10 @@ Deno.serve(async (req: Request) => {
         totalPrice: mergeData.total_price,
         fallbackVenueLabel: venueLabel,
       },
+      mergeData,
+      summaryFieldRows || [],
+      templateClauseRows || [],
+      lockedClauses,
       signatureBytes,
       sanitizeForPdf(signer_name),
     );
@@ -765,6 +902,7 @@ Deno.serve(async (req: Request) => {
         template_version_no: template?.version_no || null,
         contract_type: template?.contract_type || 'package_contract',
         contract_url: contractUrl,
+        rendered_body: mergedBody,
         review_status: 'pending_review',
         review_notes: null,
         reviewed_at: null,

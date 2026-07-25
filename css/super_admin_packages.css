@@ -224,6 +224,7 @@
 
 /* ── TABLE (pkg-table sits on top of the shared bare-table rules) ── */
 .table-wrap { overflow-x: auto; }
+.table-wrap.hidden { display: none; }
 
 .pkg-table {
   width: 100%;
@@ -464,6 +465,7 @@
   flex-direction: column;
   gap: 6px;
 }
+.modal-field.hidden { display: none; }
 
 .modal-row {
   display: grid;

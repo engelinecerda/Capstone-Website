@@ -179,7 +179,7 @@
                             <div class="guests-col">
                                 <label class="field-label" for="guest-count">Number of guests</label>
                                 <input class="res-input guest-count-input" type="number" id="guest-count" placeholder="e.g. 50" min="1" inputmode="numeric" disabled>
-                                
+                                <p class="guest-count-hint hidden" id="guest-count-hint"></p>
                             </div>
                             <div class="event-type-col">
                                 <label class="field-label" for="event-type-select">Event type</label>
@@ -496,8 +496,8 @@
         name: '', phone: '', email: '', requests: ''
     };
 
-    // ── Phase 2 feature flag — flip to true once DB has min_guests/max_guests ──
-    const GUEST_COUNT_VALIDATION_ENABLED = false;
+    // Guest count is validated against the selected package's min_guests/max_guests.
+    const GUEST_COUNT_VALIDATION_ENABLED = true;
 
     // ── Event types cache (populated by loadEventTypes) ────────────────────
     let eventTypesCache = [];
@@ -762,7 +762,7 @@ By signing below, the Client confirms that the reservation details above are acc
         return new Date(year, month - 1, day).toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
     }
 
-    // ── Phase 2 guest-count validation stub ───────────────────────────────
+    // ── Guest-count validation, tied to the selected package's capacity ───
     function getSelectedPackageMinGuests() {
         return (S.miniPackage || S.offsitePackage)?.min_guests ?? null;
     }
@@ -777,6 +777,20 @@ By signing below, the Client confirms that the reservation details above are acc
         const max = getSelectedPackageMaxGuests();
         if (min == null || max == null) return true;
         return count >= min && count <= max;
+    }
+
+    function updateGuestCountHint() {
+        const hintEl = document.getElementById('guest-count-hint');
+        if (!hintEl) return;
+        const min = getSelectedPackageMinGuests();
+        const max = getSelectedPackageMaxGuests();
+        if (min == null || max == null) {
+            hintEl.textContent = '';
+            hintEl.classList.add('hidden');
+            return;
+        }
+        hintEl.textContent = `Allowed: ${min}–${max} guests for this package.`;
+        hintEl.classList.remove('hidden');
     }
 
     // ── URL param entry handling ───────────────────────────────────────────
@@ -1520,14 +1534,23 @@ By signing below, the Client confirms that the reservation details above are acc
     });
 
     // ── Load packages from Supabase ────────────────────────────────────────
+    let packagesLoadState = 'loading'; // 'loading' | 'ok' | 'error'
+
     async function loadPackages() {
+        packagesLoadState = 'loading';
         const { data: pkgs, error } = await supabase
             .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, location_type, duration_hours, booking_scope, package_category(is_active)')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, package_category(is_active)')
             .eq('is_active', true)
-            .order('price', { ascending: true });
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: false });
 
-        if (error || !pkgs) { console.error('Failed to load packages:', error); return; }
+        if (error || !pkgs) {
+            console.error('Failed to load packages:', error);
+            packagesLoadState = 'error';
+            MINI = []; SNACK = []; OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+            return;
+        }
 
         const visible = pkgs.filter(p => p.package_category?.is_active !== false);
         MINI = []; SNACK = []; OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
@@ -1542,8 +1565,9 @@ By signing below, the Client confirms that the reservation details above are acc
                 price: p.price,
                 desc: p.description || '',
                 durationHours: Number(p.duration_hours || 0) || null,
-                bookingScope: p.booking_scope || null
-                // Phase 2: min_guests and max_guests will be added here once DB columns exist
+                bookingScope: p.booking_scope || null,
+                min_guests: p.min_guests ?? null,
+                max_guests: p.max_guests ?? null
             };
             const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
 
@@ -1558,6 +1582,15 @@ By signing below, the Client confirms that the reservation details above are acc
                 else                                                    OFFSITE_PKGS.catering.push(base);
             }
         });
+
+        packagesLoadState = 'ok';
+    }
+
+    function packagesEmptyStateHtml() {
+        if (packagesLoadState === 'error') {
+            return '<p class="pkg-empty-state">Couldn\'t load packages — please refresh the page.</p>';
+        }
+        return '<p class="pkg-empty-state">No packages are currently available for booking.</p>';
     }
 
 
@@ -1625,11 +1658,13 @@ By signing below, the Client confirms that the reservation details above are acc
                 S.time        = '';
                 activate(g, c);
                 updateSectionLocks();
+                updateGuestCountHint();
                 buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
+        if (!MINI.length) g.innerHTML = packagesEmptyStateHtml();
     }
 
     function buildSnackGrid() {
@@ -1709,11 +1744,13 @@ By signing below, the Client confirms that the reservation details above are acc
                 S.offsitePackage = p; S.time = '';
                 activate(g, c);
                 updateSectionLocks();
+                updateGuestCountHint();
                 buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
+        if (!(OFFSITE_PKGS[val] || []).length) g.innerHTML = packagesEmptyStateHtml();
     }
 
     // ── Add-on / Venue conditional step ───────────────────────────────────

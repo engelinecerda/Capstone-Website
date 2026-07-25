@@ -1,4 +1,4 @@
-import { getCancellationFee as getSharedCancellationFee } from './reservation_shared.js';
+import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee } from './reservation_shared.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -548,7 +548,8 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             ));
 
             if (!hasExistingRescheduleFee) {
-                optionsList.push(buildPaymentOption(reservation, 'reschedule_fee', 3000, paymentsByReservationId, {
+                const rescheduleFeeAmount = getSharedRescheduleFee(options.paymentRules);
+                optionsList.push(buildPaymentOption(reservation, 'reschedule_fee', rescheduleFeeAmount, paymentsByReservationId, {
                     ...options,
                     displayDescription: `${PAYMENT_TYPE_META.reschedule_fee.description} for ${safeFormatDate(options.formatDate, request.requested_date)}`,
                     rescheduleRequestId: request.reschedule_request_id

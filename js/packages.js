@@ -6,6 +6,7 @@ import { customerSupabase as supabase } from './supabase.js';
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
 const TIER_TABLE     = 'package_tier';
+const PHOTO_TABLE    = 'package_photo';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let allCategories      = [];
@@ -173,7 +174,8 @@ async function loadCategories() {
       .from(CATEGORY_TABLE)
       .select('*')
       .eq('is_active', true)
-      .order('created_at', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
     if (catErr) throw catErr;
 
     if (!cats || cats.length === 0) {
@@ -369,7 +371,8 @@ async function loadPackages(categoryId, categoryName) {
       .select('*')
       .eq('package_category_id', categoryId)
       .eq('is_active', true)
-      .order('price', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
     if (pkgErr) throw pkgErr;
 
     if (!pkgs || pkgs.length === 0) {
@@ -394,7 +397,28 @@ async function loadPackages(categoryId, categoryName) {
       });
     } catch { /* tiers optional */ }
 
-    pkgs.forEach(p => { p._tiers = tierMap[p.package_id] || []; });
+    // Batch-fetch photos — admin manages up to 8 photos per package with one
+    // marked cover (js/super_admin_packages.js); this is the only place that
+    // reads them back for customers. Non-fatal if it fails: cards/detail
+    // panel just render without an image, same as before this existed.
+    let photoMap = {};
+    try {
+      const { data: photos } = await supabase
+        .from(PHOTO_TABLE)
+        .select('package_id, image_url, alt_text, is_cover, sort_order')
+        .in('package_id', packageIds)
+        .order('sort_order', { ascending: true });
+      (photos || []).forEach(ph => {
+        if (!photoMap[ph.package_id]) photoMap[ph.package_id] = [];
+        photoMap[ph.package_id].push(ph);
+      });
+    } catch { /* photos optional */ }
+
+    pkgs.forEach(p => {
+      p._tiers = tierMap[p.package_id] || [];
+      p._photos = photoMap[p.package_id] || [];
+      p._coverPhoto = p._photos.find(ph => ph.is_cover) || p._photos[0] || null;
+    });
     allPackagesCache = pkgs;
 
     const mainPkgs  = pkgs.filter(p => p.package_type !== 'add on');
@@ -456,9 +480,14 @@ function buildPackageCard(pkg, categoryName, isBest = false) {
     : `<p class="pkg-card-price pkg-card-price--contact">Contact for quote</p>
        <p class="pkg-card-price-note">Custom pricing</p>`;
 
+  const coverPhotoHtml = pkg._coverPhoto
+    ? `<img class="pkg-card-photo" src="${esc(pkg._coverPhoto.image_url)}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
+    : '';
+
   return `
     <div class="pkg-card${isBest ? ' pkg-card--best' : ''}" data-pkg-id="${esc(pkg.package_id)}" data-cat-name="${esc(categoryName || '')}">
       ${bestBadge}
+      ${coverPhotoHtml}
       <div class="pkg-card-body">
         <div class="pkg-card-top-row">
           ${locBadge}
@@ -547,8 +576,21 @@ function selectPackage(pkg, catName) {
 }
 
 // ─── Panel builders ───────────────────────────────────────────────────────────
+function buildPhotoGallery(pkg) {
+  const photos = pkg._photos || [];
+  if (!photos.length) return '';
+  return `
+    <div class="pkg-gallery">
+      ${photos.map(ph => `
+        <img class="pkg-gallery-img" src="${esc(ph.image_url)}" alt="${esc(ph.alt_text || pkg.package_name || '')}" loading="lazy">
+      `).join('')}
+    </div>`;
+}
+
 function buildOverviewPanel(pkg) {
   let html = '<div class="pkg-overview-content">';
+
+  html += buildPhotoGallery(pkg);
 
   if (pkg.description && pkg.description.trim()) {
     pkg.description.split('\n').map(s => s.trim()).filter(Boolean).forEach(line => {

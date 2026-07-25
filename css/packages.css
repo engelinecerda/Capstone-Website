@@ -478,6 +478,16 @@ body { background: var(--cream); }
   user-select: none;
 }
 
+/* Edge-to-edge cover photo — only rendered when the package has one, so
+   packages without a photo yet keep today's card layout unchanged. */
+.pkg-card-photo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-light, #f2ede6);
+}
+
 .pkg-card-body {
   padding: 20px 20px 22px;
   flex: 1;
@@ -785,6 +795,21 @@ body { background: var(--cream); }
 .pkg-tab-panel  {}
 
 .pkg-overview-content { max-width: 760px; }
+
+.pkg-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.pkg-gallery-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
 .pkg-overview-para {
   font-size: 14.5px;
   color: var(--text-mid);

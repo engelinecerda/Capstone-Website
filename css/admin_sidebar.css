@@ -130,6 +130,35 @@ body.sidebar-open .sidebar-overlay { display: block; }
   outline-offset: -2px;
 }
 
+/* ── COLLAPSIBLE NAV GROUPS (Bookable Inventory / Reservation Form /
+   Payment Options — see admin_nav_data.js `children`) ───────────── */
+.nav-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+.nav-group-toggle[aria-expanded="true"] .nav-group-chevron {
+  transform: rotate(180deg);
+}
+
+.nav-group-children {
+  margin-top: 2px;
+  padding-left: 22px;
+  border-left: 1px solid var(--sidebar-line, #4A2C17);
+  margin-left: 22px;
+}
+.nav-group-children .nav-item {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 12.5px;
+}
+.nav-group.has-active > .nav-group-toggle {
+  color: var(--sidebar-cream, #F5EBDD);
+}
+
 /* ── COLLAPSE (desktop/tablet rail — never applies below the mobile
    breakpoint, so the rail and the drawer can't both be active) ── */
 .sidebar-collapse-btn {
@@ -182,6 +211,14 @@ body.sidebar-open .sidebar-overlay { display: block; }
   }
 
   .sidebar.collapsed .nav-item { justify-content: center; }
+
+  /* Rail mode: no room for a submenu, so groups collapse to a plain icon
+     (tooltip on hover, same as any other collapsed nav item) rather than
+     an expandable control. */
+  .sidebar.collapsed .nav-group-chevron,
+  .sidebar.collapsed .nav-group-children {
+    display: none;
+  }
 
   body.sidebar-collapsed .main {
     margin-left: 64px !important;

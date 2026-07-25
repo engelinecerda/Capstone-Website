@@ -33,7 +33,6 @@ let allPackages           = [];
 let editingCategoryId     = null;
 let editingPackageId      = null;
 let pendingAction         = null;
-let catPendingImageFile   = null;
 let allTiers              = [];
 let editingTierId         = null;
 let tierForPackageId      = null;
@@ -95,11 +94,6 @@ const catModalMessage    = document.getElementById('catModalMessage');
 const catNameInput       = document.getElementById('catNameInput');
 const catDescriptionInput = document.getElementById('catDescriptionInput');
 const catInclusionsInput  = document.getElementById('catInclusionsInput');
-const catImageInput      = document.getElementById('catImageInput');
-const catImagePreview    = document.getElementById('catImagePreview');
-const catImagePlaceholder= document.getElementById('catImagePlaceholder');
-const catFileName        = document.getElementById('catFileName');
-const catRemoveImageBtn  = document.getElementById('catRemoveImageBtn');
 
 // ─── DOM: Package Modal ───────────────────────────────────────────────────────
 const packageModal       = document.getElementById('packageModal');
@@ -563,6 +557,9 @@ function renderCategoryRail() {
          <div class="card-menu-divider"></div>
          <button type="button" class="card-menu-item destructive" data-cat-action="delete" data-id="${cat.package_category_id}">Delete</button>`
       : `<button type="button" class="card-menu-item" data-cat-action="edit" data-id="${cat.package_category_id}">Edit</button>
+         <button type="button" class="card-menu-item" data-cat-action="move-up" data-id="${cat.package_category_id}">Move up</button>
+         <button type="button" class="card-menu-item" data-cat-action="move-down" data-id="${cat.package_category_id}">Move down</button>
+         <div class="card-menu-divider"></div>
          <button type="button" class="card-menu-item" data-cat-action="archive" data-id="${cat.package_category_id}">Archive</button>
          <div class="card-menu-divider"></div>
          <button type="button" class="card-menu-item destructive" data-cat-action="delete" data-id="${cat.package_category_id}">Delete</button>`;
@@ -643,6 +640,9 @@ function buildCardMenu(pkg) {
     : [
         { action: 'duplicate', label: 'Duplicate' },
         ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }]),
+        { divider: true },
+        { action: 'move-up', label: 'Move up' },
+        { action: 'move-down', label: 'Move down' },
         { divider: true },
         { action: 'archive', label: 'Archive' },
         { action: 'delete', label: 'Delete', destructive: true },
@@ -898,16 +898,12 @@ inventorySearchInput.addEventListener('input', () => { healthFilterActive = fals
 // ═══════════════════════════════════════════════════════════════════════════════
 function openAddCategoryModal() {
   editingCategoryId   = null;
-  catPendingImageFile = null;
   catModalTitle.textContent     = 'Add New Category';
   catModalSub.textContent       = 'Create a new package category';
   catModalSaveLabel.textContent = 'Add Category';
   catNameInput.value = '';
   catDescriptionInput.value = '';
   catInclusionsInput.value  = '';
-  catImageInput.value = '';
-  clearImageUI(catImagePreview, catImagePlaceholder, catFileName, catImageInput);
-  catRemoveImageBtn.classList.add('hidden');
   setModalMsg(catModalMessage, '');
   openModal(categoryModal);
 }
@@ -917,7 +913,6 @@ function openEditCategoryModal(catId) {
   if (!cat) return;
 
   editingCategoryId   = catId;
-  catPendingImageFile = null;
   catModalTitle.textContent     = 'Edit Category';
   catModalSub.textContent       = 'Update category details';
   catModalSaveLabel.textContent = 'Save Changes';
@@ -925,40 +920,9 @@ function openEditCategoryModal(catId) {
   catDescriptionInput.value = cat.description || '';
   catInclusionsInput.value  = cat.package_category_inclusions || '';
 
-  if (cat.category_image) {
-    catImagePreview.src = cat.category_image;
-    catImagePreview.classList.remove('hidden');
-    catImagePlaceholder.style.display = 'none';
-    catFileName.textContent = 'Current image loaded';
-    catRemoveImageBtn.classList.remove('hidden');
-  } else {
-    clearImageUI(catImagePreview, catImagePlaceholder, catFileName, catImageInput);
-    catRemoveImageBtn.classList.add('hidden');
-  }
-
   setModalMsg(catModalMessage, '');
   openModal(categoryModal);
 }
-
-// Category image input
-catImageInput.addEventListener('change', () => {
-  const file = catImageInput.files[0];
-  if (!file) return;
-  const err = validateImageFile(file);
-  if (err) { setModalMsg(catModalMessage, err); catImageInput.value = ''; return; }
-  catPendingImageFile = file;
-  setModalMsg(catModalMessage, '');
-  previewImageFile(file, catImagePreview, catImagePlaceholder, catFileName);
-  catRemoveImageBtn.classList.remove('hidden');
-});
-
-catRemoveImageBtn.addEventListener('click', () => {
-  catPendingImageFile = null;
-  clearImageUI(catImagePreview, catImagePlaceholder, catFileName, catImageInput);
-  catRemoveImageBtn.classList.add('hidden');
-  // Mark removal so we clear it in DB on save
-  catRemoveImageBtn.dataset.removeExisting = 'true';
-});
 
 // Category save
 catModalSave.addEventListener('click', async () => {
@@ -973,22 +937,11 @@ catModalSave.addEventListener('click', async () => {
   setModalMsg(catModalMessage, '');
 
   try {
-    let imageUrl = undefined; // undefined = don't change
-
-    if (catPendingImageFile) {
-      setModalMsg(catModalMessage, 'Uploading image…', 'success');
-      imageUrl = await uploadToCloudinary(catPendingImageFile, 'eli_coffee_categories');
-      setModalMsg(catModalMessage, '');
-    } else if (catRemoveImageBtn.dataset.removeExisting === 'true') {
-      imageUrl = null; // explicitly clear
-    }
-
     const payload = {
       category_name: name,
       description: description,
       package_category_inclusions: inclusions
     };
-    if (imageUrl !== undefined) payload.category_image = imageUrl;
 
     if (editingCategoryId) {
       const { data, error } = await supabase
@@ -1034,8 +987,6 @@ catModalSave.addEventListener('click', async () => {
   } finally {
     catModalSave.disabled = false;
     catModalSaveLabel.textContent = editingCategoryId ? 'Save Changes' : 'Add Category';
-    catRemoveImageBtn.dataset.removeExisting = '';
-    catPendingImageFile = null;
   }
 });
 
@@ -1115,14 +1066,56 @@ async function openConfirmDeleteCategory(catId) {
   openModal(deleteModal);
 }
 
+// Categories, unlike packages, aren't scoped to anything narrower than "all
+// active categories" — so reordering just works against the full active list.
+function getActiveCategoriesSorted() {
+  return allCategories
+    .filter(c => c.is_active)
+    .sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
+}
+
+async function moveCategory(categoryId, direction) {
+  const cat = allCategories.find(c => c.package_category_id === categoryId);
+  if (!cat || !cat.is_active) return;
+
+  const list = getActiveCategoriesSorted();
+  const index = list.findIndex(c => c.package_category_id === categoryId);
+  const targetIndex = index + direction;
+  if (index === -1 || targetIndex < 0 || targetIndex >= list.length) return;
+
+  [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
+
+  setMessage(inventoryPageMessage, 'Reordering…');
+  try {
+    await Promise.all(list.map((c, i) => {
+      if (c.sort_order === i) return Promise.resolve();
+      c.sort_order = i;
+      return supabase.from(CATEGORY_TABLE).update({ sort_order: i }).eq('package_category_id', c.package_category_id);
+    }));
+    await logAudit({
+      action: 'Reordered Categories',
+      category: 'package',
+      details: `Moved "${cat.category_name}" ${direction < 0 ? 'up' : 'down'}`,
+      entityId: categoryId
+    });
+    setMessage(inventoryPageMessage, 'Order updated.', 'success');
+    renderCategoryRail();
+    renderInventory();
+  } catch (err) {
+    setMessage(inventoryPageMessage, `Failed to reorder: ${err.message}`, 'error');
+  }
+}
+
 function handleCatTableAction(e) {
   const btn = e.target.closest('[data-cat-action]');
   if (!btn) return;
   const { catAction, id } = btn.dataset;
-  if (catAction === 'edit')    openEditCategoryModal(id);
-  if (catAction === 'archive') openConfirmArchiveCategory(id);
-  if (catAction === 'restore') openConfirmRestoreCategory(id);
-  if (catAction === 'delete')  openConfirmDeleteCategory(id);
+  if (catAction === 'edit')      openEditCategoryModal(id);
+  if (catAction === 'archive')   openConfirmArchiveCategory(id);
+  if (catAction === 'restore')   openConfirmRestoreCategory(id);
+  if (catAction === 'delete')    openConfirmDeleteCategory(id);
+  if (catAction === 'move-up')   moveCategory(id, -1);
+  if (catAction === 'move-down') moveCategory(id, 1);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2251,6 +2244,47 @@ tierModalCancel.addEventListener('click', () => closeModal(tierModal));
 tierModal.addEventListener('click', e => { if (e.target === tierModal) closeModal(tierModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE: REORDER (move up/down among active siblings in the same category —
+// this directly drives display order on the customer Packages page)
+// ═══════════════════════════════════════════════════════════════════════════════
+function getCategorySiblings(pkg) {
+  return allPackages
+    .filter(p => p.package_category_id === pkg.package_category_id && p.is_active)
+    .sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
+}
+
+async function movePackage(packageId, direction) {
+  const pkg = allPackages.find(p => p.package_id === packageId);
+  if (!pkg || !pkg.is_active) return;
+
+  const siblings = getCategorySiblings(pkg);
+  const index = siblings.findIndex(p => p.package_id === packageId);
+  const targetIndex = index + direction;
+  if (index === -1 || targetIndex < 0 || targetIndex >= siblings.length) return;
+
+  [siblings[index], siblings[targetIndex]] = [siblings[targetIndex], siblings[index]];
+
+  setMessage(inventoryPageMessage, 'Reordering…');
+  try {
+    await Promise.all(siblings.map((p, i) => {
+      if (p.sort_order === i) return Promise.resolve();
+      p.sort_order = i;
+      return supabase.from('package').update({ sort_order: i }).eq('package_id', p.package_id);
+    }));
+    await logAudit({
+      action: 'Reordered Packages',
+      category: 'package',
+      details: `Moved "${pkg.package_name}" ${direction < 0 ? 'up' : 'down'}`,
+      entityId: packageId
+    });
+    setMessage(inventoryPageMessage, 'Order updated.', 'success');
+    renderInventory();
+  } catch (err) {
+    setMessage(inventoryPageMessage, `Failed to reorder: ${err.message}`, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE ACTION DISPATCH (shared by card kebab, list-row kebab, tier-ladder link)
 // ═══════════════════════════════════════════════════════════════════════════════
 function handlePkgTableAction(e) {
@@ -2263,6 +2297,8 @@ function handlePkgTableAction(e) {
   if (pkgAction === 'tiers')     openTierDrawer(id, name, btn);
   if (pkgAction === 'delete')    openConfirmDeletePackage(id);
   if (pkgAction === 'duplicate') duplicatePackage(id);
+  if (pkgAction === 'move-up')   movePackage(id, -1);
+  if (pkgAction === 'move-down') movePackage(id, 1);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2544,7 +2580,13 @@ function init() {
       const adminBadge = document.getElementById('adminBadge');
       if (adminBadge) adminBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
-      showInventoryView();
+      // Deep link from the sidebar's Bookable Inventory > Venues sub-item
+      // (admin_nav_data.js: ?view=venues).
+      if (new URLSearchParams(window.location.search).get('view') === 'venues') {
+        showVenueView();
+      } else {
+        showInventoryView();
+      }
       loadInventory();
     }
   });

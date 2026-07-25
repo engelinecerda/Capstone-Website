@@ -61,15 +61,32 @@ function renderPolicyBlocks(blocks) {
 }
 
 // ── Tab switching (top-level settings tabs) ──────────────────────────────
+// Mirrors the hash-deep-linking pattern already used on
+// super_admin_settings.html, so sidebar links (admin_nav_data.js) can jump
+// straight to a specific tab, e.g. /admin/config/form.html#event-types.
+function activateMainTab(tabName) {
+  const tabs = document.querySelectorAll('.settings-tab-btn');
+  const tab = Array.from(tabs).find((t) => t.dataset.tab === tabName);
+  if (!tab) return;
+  tabs.forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.settings-panel').forEach((p) => p.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById(`panel-${tabName}`)?.classList.add('active');
+}
+
 function wireMainTabs() {
-  document.querySelectorAll('.settings-tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.settings-tab-btn').forEach((b) => b.classList.remove('active'));
-      document.querySelectorAll('.settings-panel').forEach((p) => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(`panel-${btn.dataset.tab}`)?.classList.add('active');
-    });
+  const tabs = document.querySelectorAll('.settings-tab-btn');
+  tabs.forEach((btn) => {
+    btn.addEventListener('click', () => activateMainTab(btn.dataset.tab));
   });
+
+  const validTabs = Array.from(tabs).map((t) => t.dataset.tab);
+  function activateTabFromHash() {
+    const requested = location.hash.slice(1);
+    if (requested && validTabs.includes(requested)) activateMainTab(requested);
+  }
+  activateTabFromHash();
+  window.addEventListener('hashchange', activateTabFromHash);
 }
 
 // ── Required Fields tab ───────────────────────────────────────────────────

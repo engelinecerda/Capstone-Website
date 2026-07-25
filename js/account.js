@@ -40,6 +40,7 @@ import {
     getReservationAddOnName,
     getReservationLocationLabel,
     getCancellationFee,
+    getRescheduleFee,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel
@@ -574,7 +575,8 @@ function getAvailablePaymentOptions(reservation) {
             ));
 
             if (!hasExistingRescheduleFee) {
-                options.push(buildPaymentOption(reservation, 'reschedule_fee', 3000, {
+                const rescheduleFeeAmount = getRescheduleFee(state.paymentRules);
+                options.push(buildPaymentOption(reservation, 'reschedule_fee', rescheduleFeeAmount, {
                     displayDescription: `${PAYMENT_TYPE_META.reschedule_fee.description} for ${formatDate(request.requested_date)}`,
                     rescheduleRequestId: request.reschedule_request_id
                 }));

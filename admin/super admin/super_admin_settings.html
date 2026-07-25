@@ -70,7 +70,6 @@
         <button type="button" class="settings-tab-btn" data-tab="cancellation" role="tab">Cancellation Rules</button>
         <button type="button" class="settings-tab-btn" data-tab="rescheduling" role="tab">Rescheduling Rules</button>
         <button type="button" class="settings-tab-btn active" data-tab="reservation-rules" role="tab">Reservation Rules</button>
-        <button type="button" class="settings-tab-btn" data-tab="event-types" role="tab">Event Types</button>
         <button type="button" class="settings-tab-btn" data-tab="venue-map" role="tab">Venue Map</button>
         <button type="button" class="settings-tab-btn" data-tab="operating-hours" role="tab">Operating Hours</button>
       </div>
@@ -285,106 +284,6 @@
             <button type="button" class="btn-secondary" id="discardRulesBtn2">Discard Changes</button>
             <button type="button" class="btn-primary" id="saveRulesConfirmBtn">Save Reservation Rules</button>
           </div>
-        </div>
-      </div>
-
-      <!-- ══ TAB: EVENT TYPES ══ -->
-      <div class="settings-panel" id="panel-event-types" role="tabpanel">
-        <div class="settings-card">
-          <p class="settings-card-title">Event Types</p>
-          <p class="settings-card-sub">Manage the categories of events that customers can select when making a reservation.</p>
-
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-            <button type="button" class="btn-primary">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Event Type
-            </button>
-          </div>
-
-          <table class="et-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-weight:600;">Birthday Party</td>
-                <td style="color:var(--muted);">Celebrations for birthdays of all ages</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Debut</td>
-                <td style="color:var(--muted);">18th birthday celebration (cotillion)</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Wedding Reception</td>
-                <td style="color:var(--muted);">Post-ceremony reception and dinner</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Corporate Event</td>
-                <td style="color:var(--muted);">Team-building, seminar, or company celebration</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Graduation Party</td>
-                <td style="color:var(--muted);">Celebration of academic milestones</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Christening / Baptism</td>
-                <td style="color:var(--muted);">Religious and family gathering</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Anniversary</td>
-                <td style="color:var(--muted);">Milestone couple or business anniversary</td>
-                <td><span class="status-pill active">Active</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn archive">Archive</button>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:600;">Reunion</td>
-                <td style="color:var(--muted);">Family or class reunion gatherings</td>
-                <td><span class="status-pill archived">Archived</span></td>
-                <td style="display:flex;gap:8px;">
-                  <button type="button" class="et-action-btn">Edit</button>
-                  <button type="button" class="et-action-btn" style="color:var(--primary);">Restore</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
 
