@@ -7,6 +7,7 @@
 // js/reservation_form_config.js).
 import { portalSupabase as supabase } from './supabase.js';
 import { logAudit } from './audit_logger.js';
+import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -19,45 +20,6 @@ function setMessage(elId, msg, isError = false) {
   if (!el) return;
   el.textContent = msg;
   el.style.color = isError ? '#c0392b' : '#27ae60';
-}
-
-// Mirrors the parser used on the customer-facing side (see
-// renderPolicyPreview in js/reservation_form_config.js) so what the admin
-// previews here is exactly what the customer will see.
-function parsePolicyBody(text) {
-  const blocks = String(text || '').split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-  return blocks.map((block) => {
-    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-    const isHeading = lines.length > 0 && lines[0].length < 80 && !lines[0].endsWith('.') && lines.length <= 1;
-    if (isHeading) return { type: 'heading', text: lines[0] };
-
-    const bulletLines = lines.filter((l) => l.startsWith('- '));
-    if (bulletLines.length === lines.length && bulletLines.length > 0) {
-      return { type: 'list', items: bulletLines.map((l) => l.slice(2).trim()) };
-    }
-
-    // Mixed block: first non-bullet line as heading if short, rest as paragraph + bullets
-    const heading = lines[0].length < 80 && !lines[0].endsWith('.') ? lines.shift() : null;
-    const paragraphLines = [];
-    const items = [];
-    lines.forEach((l) => {
-      if (l.startsWith('- ')) items.push(l.slice(2).trim());
-      else paragraphLines.push(l);
-    });
-    return { type: 'mixed', heading, paragraph: paragraphLines.join(' '), items };
-  });
-}
-
-function renderPolicyBlocks(blocks) {
-  return blocks.map((block) => {
-    if (block.type === 'heading') return `<h4>${escHtml(block.text)}</h4>`;
-    if (block.type === 'list') return `<ul>${block.items.map((i) => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
-    return `
-      ${block.heading ? `<h4>${escHtml(block.heading)}</h4>` : ''}
-      ${block.paragraph ? `<p>${escHtml(block.paragraph)}</p>` : ''}
-      ${block.items.length ? `<ul>${block.items.map((i) => `<li>${escHtml(i)}</li>`).join('')}</ul>` : ''}
-    `;
-  }).join('');
 }
 
 // ── Tab switching (top-level settings tabs) ──────────────────────────────

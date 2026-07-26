@@ -13,11 +13,8 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
+import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 
-// ─── Cloudinary config ────────────────────────────────────────────────────────
-const CLOUDINARY_UPLOAD_URL    = 'https://api.cloudinary.com/v1_1/dgneg418t/image/upload';
-const CLOUDINARY_UPLOAD_PRESET = 'eli_coffee_packages';
-const MAX_PHOTO_EDGE = 1600;
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
 // ─── Supabase tables ────────────────────────────────────────────────────────
@@ -26,6 +23,8 @@ const TIER_TABLE = 'package_tier';
 const VENUE_TABLE = 'venue';
 const PACKAGE_VENUE_TABLE = 'package_venue';
 const PACKAGE_PHOTO_TABLE = 'package_photo';
+const BADGE_TABLE = 'badge';
+const PACKAGE_BADGE_TABLE = 'package_badge';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allCategories         = [];
@@ -56,6 +55,13 @@ let openCardMenuEl          = null;  // currently-open kebab popover element
 let allPackageVenueCounts   = new Map(); // package_id -> mapped venue count
 let allTiersByPackage       = new Map(); // package_id -> active tier[]
 const archivedRefCountCache = new Map(); // package_id -> reservation reference count (lazy)
+
+// Badges
+let allBadgeDefs          = [];          // full badge table (admin sees all, incl. inactive)
+let packageBadgeMap       = new Map();   // package_id -> Set(badge_id)  [admin-assigned]
+let bestSellerByCategory  = new Map();   // package_category_id -> package_id  [derived]
+let badgeModalPackageId   = null;
+let editingBadgeTypeId    = null;        // badge_id being edited in the Badge Types view, null = add mode
 
 // Package-modal dirty-tracking
 let pkgFormSnapshot   = null;
@@ -146,6 +152,14 @@ const confirmCancel  = document.getElementById('confirmCancel');
 const confirmOk      = document.getElementById('confirmOk');
 const confirmMessage = document.getElementById('confirmMessage');
 
+// ─── DOM: Badge Modal ─────────────────────────────────────────────────────────
+const badgeModal          = document.getElementById('badgeModal');
+const badgeModalClose     = document.getElementById('badgeModalClose');
+const badgeModalDone      = document.getElementById('badgeModalDone');
+const badgeModalMessage   = document.getElementById('badgeModalMessage');
+const badgeBestSellerRow  = document.getElementById('badgeBestSellerRow');
+const badgeChipList       = document.getElementById('badgeChipList');
+
 // ─── DOM: Delete/Reassign Modal ───────────────────────────────────────────────
 const deleteModal          = document.getElementById('deleteModal');
 const deleteModalTitle     = document.getElementById('deleteModalTitle');
@@ -204,6 +218,30 @@ const venueSortOrder      = document.getElementById('venueSortOrder');
 const venueMappedPackagesField = document.getElementById('venueMappedPackagesField');
 const venueMappedPackagesList  = document.getElementById('venueMappedPackagesList');
 
+// ─── DOM: Badge Types View + Modal ─────────────────────────────────────────────
+const badgeTypesView                 = document.getElementById('badgeTypesView');
+const openBadgeTypesBtn              = document.getElementById('openBadgeTypesBtn');
+const backToCategoriesFromBadgeTypesBtn = document.getElementById('backToCategoriesFromBadgeTypesBtn');
+const addBadgeTypeBtn                = document.getElementById('addBadgeTypeBtn');
+const badgeTypesPageMessage          = document.getElementById('badgeTypesPageMessage');
+const activeBadgeTypesSection        = document.getElementById('activeBadgeTypesSection');
+const archivedBadgeTypesSection      = document.getElementById('archivedBadgeTypesSection');
+const activeBadgeTypesBody           = document.getElementById('activeBadgeTypesBody');
+const archivedBadgeTypesBody         = document.getElementById('archivedBadgeTypesBody');
+
+const badgeTypeModal          = document.getElementById('badgeTypeModal');
+const badgeTypeModalTitle     = document.getElementById('badgeTypeModalTitle');
+const badgeTypeModalSub       = document.getElementById('badgeTypeModalSub');
+const badgeTypeModalClose     = document.getElementById('badgeTypeModalClose');
+const badgeTypeModalCancel    = document.getElementById('badgeTypeModalCancel');
+const badgeTypeModalSave      = document.getElementById('badgeTypeModalSave');
+const badgeTypeModalSaveLabel = document.getElementById('badgeTypeModalSaveLabel');
+const badgeTypeModalMessage   = document.getElementById('badgeTypeModalMessage');
+const badgeTypeLabelInput     = document.getElementById('badgeTypeLabelInput');
+const badgeTypeVariantSelect  = document.getElementById('badgeTypeVariantSelect');
+const badgeTypeScopeSelect    = document.getElementById('badgeTypeScopeSelect');
+const badgeTypeSortOrder      = document.getElementById('badgeTypeSortOrder');
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -247,92 +285,6 @@ function normalizeTierInclusions(raw) {
     .map(item => item.trim()) // trim each item
     .filter(Boolean)          // remove empty strings
     .join('\n');               // store as newline-separated
-}
-
-// ─── Cloudinary upload / cleanup ──────────────────────────────────────────────
-async function uploadToCloudinary(file, folder = 'eli_coffee_packages') {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-  form.append('folder', folder);
-
-  const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: form });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message || `Image upload failed (HTTP ${res.status})`);
-  }
-  const data = await res.json();
-  return data.secure_url;
-}
-
-// Best-effort — a failed Cloudinary cleanup should never block a DB delete
-// the admin is waiting on (mirrors the payment-methods delete pattern).
-async function destroyCloudinaryImage(imageUrl) {
-  if (!imageUrl) return;
-  try {
-    await supabase.functions.invoke('delete-cloudinary-image', { body: { image_url: imageUrl } });
-  } catch (err) {
-    console.warn('[Packages] Cloudinary cleanup failed (non-blocking):', err?.message || err);
-  }
-}
-
-function validateImageFile(file) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    return 'Only JPG, PNG, or WEBP images are allowed.';
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    return 'Image must be under 5 MB.';
-  }
-  return null;
-}
-
-// Caps the long edge at MAX_PHOTO_EDGE before upload — unresized phone
-// photos make the customer catalogue unusable on mobile data.
-function resizeImageFile(file, maxEdge = MAX_PHOTO_EDGE) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width <= maxEdge && height <= maxEdge) { resolve(file); return; }
-        const scale = maxEdge / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          resolve(blob ? new File([blob], file.name, { type: file.type }) : file);
-        }, file.type, 0.9);
-      };
-      img.onerror = () => resolve(file);
-      img.src = e.target.result;
-    };
-    reader.onerror = () => resolve(file);
-    reader.readAsDataURL(file);
-  });
-}
-
-function previewImageFile(file, previewEl, placeholderEl, fileNameEl) {
-  fileNameEl.textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = e => {
-    previewEl.src = e.target.result;
-    previewEl.classList.remove('hidden');
-    placeholderEl.style.display = 'none';
-  };
-  reader.readAsDataURL(file);
-}
-
-function clearImageUI(previewEl, placeholderEl, fileNameEl, inputEl) {
-  previewEl.src = '';
-  previewEl.classList.add('hidden');
-  placeholderEl.style.display = '';
-  fileNameEl.textContent = 'No file chosen';
-  if (inputEl) inputEl.value = '';
 }
 
 // ─── Reference counting (delete-vs-archive, mirrors the payment-methods pattern) ─
@@ -398,8 +350,9 @@ async function ensureArchivedRefCounts(ids) {
 // VIEW SWITCHING
 // ═══════════════════════════════════════════════════════════════════════════════
 function hideAllViews() {
-  inventoryView.style.display = 'none';
-  venueView.style.display     = 'none';
+  inventoryView.style.display   = 'none';
+  venueView.style.display       = 'none';
+  badgeTypesView.style.display  = 'none';
 }
 
 function showInventoryView() {
@@ -413,8 +366,16 @@ async function showVenueView() {
   await loadVenues();
 }
 
+function showBadgeTypesView() {
+  hideAllViews();
+  badgeTypesView.style.display = '';
+  renderBadgeTypesTables();
+}
+
 openVenuesBtn.addEventListener('click', showVenueView);
 backToCategoriesFromVenuesBtn.addEventListener('click', showInventoryView);
+openBadgeTypesBtn.addEventListener('click', showBadgeTypesView);
+backToCategoriesFromBadgeTypesBtn.addEventListener('click', showInventoryView);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INVENTORY: LOAD (all categories + all packages, batched venue/tier counts)
@@ -445,7 +406,10 @@ async function loadInventory() {
       { data: pkgs, error: pkgErr },
       { data: venueMaps, error: vmErr },
       { data: tiers, error: tierErr },
-      { data: venues, error: venueErr }
+      { data: venues, error: venueErr },
+      { data: badgeDefs, error: badgeErr },
+      { data: packageBadgeRows, error: pkgBadgeErr },
+      { data: bestSellerRows, error: bestSellerErr }
     ] = await Promise.all([
       supabase.from(CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from('package').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
@@ -460,16 +424,25 @@ async function loadInventory() {
       // first. Loading it here means it's always populated before the
       // package modal can open.
       supabase.from(VENUE_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+      supabase.from(BADGE_TABLE).select('*').order('sort_order', { ascending: true }),
+      supabase.from(PACKAGE_BADGE_TABLE).select('package_id, badge_id'),
+      // No p_category_id — the admin view loads every category up front, so
+      // resolve every category's derived Best Seller in one call.
+      supabase.rpc('get_best_seller_package_ids'),
     ]);
     if (catErr) throw catErr;
     if (pkgErr) throw pkgErr;
     if (vmErr) throw vmErr;
     if (tierErr) throw tierErr;
     if (venueErr) throw venueErr;
+    if (badgeErr) throw badgeErr;
+    if (pkgBadgeErr) throw pkgBadgeErr;
+    if (bestSellerErr) throw bestSellerErr;
 
     allCategories = cats || [];
     allPackages   = pkgs || [];
     allVenues     = venues || [];
+    allBadgeDefs  = badgeDefs || [];
 
     allPackageVenueCounts = new Map();
     (venueMaps || []).forEach(row => {
@@ -481,6 +454,15 @@ async function loadInventory() {
       if (!allTiersByPackage.has(t.package_id)) allTiersByPackage.set(t.package_id, []);
       allTiersByPackage.get(t.package_id).push(t);
     });
+
+    packageBadgeMap = new Map();
+    (packageBadgeRows || []).forEach(r => {
+      if (!packageBadgeMap.has(r.package_id)) packageBadgeMap.set(r.package_id, new Set());
+      packageBadgeMap.get(r.package_id).add(r.badge_id);
+    });
+
+    bestSellerByCategory = new Map();
+    (bestSellerRows || []).forEach(r => bestSellerByCategory.set(r.package_category_id, r.package_id));
 
     await loadCoverPhotosForAllPackages();
 
@@ -651,7 +633,7 @@ function buildCardMenu(pkg) {
       ]
     : [
         { action: 'duplicate', label: 'Duplicate' },
-        ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }]),
+        ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }, { action: 'badges', label: 'Badges' }]),
         { divider: true },
         { action: 'move-up', label: 'Move up' },
         { action: 'move-down', label: 'Move down' },
@@ -724,6 +706,36 @@ function buildTierLadder(pkg) {
   return `<p class="tier-ladder"><span class="tier-ladder-bars">${bars}</span>&nbsp;${tiers.length} tier${tiers.length === 1 ? '' : 's'} · <button type="button" class="tier-ladder-link" data-pkg-action="tiers" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">Manage</button></p>`;
 }
 
+// Assigned badges (package_badge) + Best Seller for this category — add-ons
+// never carry badges (matches the precedent of the hardcode this replaces,
+// which only ever computed "best value" over main packages). Best Seller is
+// mode-aware: automatic (is_assignable=false) overlays the derived winner
+// from bestSellerByCategory; manual (is_assignable=true) treats it like any
+// other assigned badge, so it only appears once an admin has toggled it on
+// for a specific package via the badge modal.
+function getPkgBadges(pkg) {
+  if (pkg.package_type === 'add on') return [];
+  const assignedIds = packageBadgeMap.get(pkg.package_id) || new Set();
+  const bs = allBadgeDefs.find(b => b.badge_key === 'best_seller');
+  const candidates = allBadgeDefs.filter(b => b.badge_key !== 'best_seller' && assignedIds.has(b.badge_id));
+  if (bs) {
+    if (bs.is_assignable) {
+      if (assignedIds.has(bs.badge_id)) candidates.push(bs);
+    } else if (bestSellerByCategory.get(pkg.package_category_id) === pkg.package_id) {
+      candidates.push(bs);
+    }
+  }
+  return candidates.sort((a, b) => a.sort_order - b.sort_order).slice(0, 2);
+}
+
+function buildBadgeChipsHtml(pkg) {
+  const badges = getPkgBadges(pkg);
+  if (!badges.length) return '';
+  return `<div class="pkg-badges-row">${badges.map(b =>
+    `<span class="pkg-badge-chip pkg-badge-chip--${escapeHtml(b.variant)}">${escapeHtml(b.label)}</span>`
+  ).join('')}</div>`;
+}
+
 function archivedReasonLine(pkg) {
   const count = archivedRefCountCache.get(pkg.package_id);
   if (count === undefined) return `<p class="tier-ladder">Archived</p>`;
@@ -771,6 +783,7 @@ function buildPkgCard(pkg) {
       </div>
       <div class="pkg-card-body">
         <div class="pkg-card-name">${escapeHtml(pkg.package_name)}</div>
+        ${buildBadgeChipsHtml(pkg)}
         <p class="pkg-card-meta">${escapeHtml(catLabel)} · ${escapeHtml(modeLabel)}</p>
         <div class="pkg-spec-line">
           <span class="pkg-spec-price">${formatCurrency(pkg.price)}</span>
@@ -803,6 +816,7 @@ function buildPkgListRow(pkg) {
             ${isArchived ? '<span class="status-pill archived">Archived</span>' : ''}
             ${needsVenue ? '<span class="pkg-flag flag-warn">Needs venue</span>' : ''}
           </div>
+          ${buildBadgeChipsHtml(pkg)}
         </div>
       </div>
     </td>
@@ -1730,7 +1744,7 @@ pkgModalSave.addEventListener('click', async () => {
     for (const old of (existingPhotos || [])) {
       if (!keptIds.has(old.photo_id)) {
         await supabase.from(PACKAGE_PHOTO_TABLE).delete().eq('photo_id', old.photo_id);
-        await destroyCloudinaryImage(old.image_url);
+        await destroyCloudinaryImage(supabase, old.image_url);
       }
     }
     for (let i = 0; i < pkgPhotos.length; i++) {
@@ -1878,8 +1892,8 @@ deleteModalOk.addEventListener('click', async () => {
         setMessage(inventoryPageMessage, 'Package archived.', 'success');
       } else {
         const { data: photos } = await supabase.from(PACKAGE_PHOTO_TABLE).select('image_url').eq('package_id', id);
-        for (const photo of (photos || [])) { await destroyCloudinaryImage(photo.image_url); }
-        if (pkg?.package_image) await destroyCloudinaryImage(pkg.package_image);
+        for (const photo of (photos || [])) { await destroyCloudinaryImage(supabase, photo.image_url); }
+        if (pkg?.package_image) await destroyCloudinaryImage(supabase, pkg.package_image);
         const { error } = await supabase.from('package').delete().eq('package_id', id);
         if (error) throw error;
         await logAudit({ action: 'Deleted Package', category: 'package', details: `Deleted package: ${pkg?.package_name}`, entityId: id });
@@ -1897,6 +1911,25 @@ deleteModalOk.addEventListener('click', async () => {
       await logAudit({ action: 'Deleted Venue', category: 'package', details: `Deleted venue: ${venue?.name}`, entityId: id });
       renderVenueTables();
       setMessage(venuePageMessage, 'Venue deleted.', 'success');
+
+    } else if (scope === 'badge-type') {
+      const badge = allBadgeDefs.find(b => b.badge_id === id);
+      if (mode === 'archive') {
+        const { error } = await supabase.from(BADGE_TABLE).update({ is_active: false }).eq('badge_id', id);
+        if (error) throw error;
+        const idx = allBadgeDefs.findIndex(b => b.badge_id === id);
+        if (idx !== -1) allBadgeDefs[idx] = { ...allBadgeDefs[idx], is_active: false };
+        await logAudit({ action: 'Archived Badge Type', category: 'package', details: `Archived (in use): ${badge?.label}`, entityId: id });
+        setMessage(badgeTypesPageMessage, 'Badge type archived.', 'success');
+      } else {
+        const { error } = await supabase.from(BADGE_TABLE).delete().eq('badge_id', id);
+        if (error) throw error;
+        allBadgeDefs = allBadgeDefs.filter(b => b.badge_id !== id);
+        await logAudit({ action: 'Deleted Badge Type', category: 'package', details: `Deleted badge type: ${badge?.label}`, entityId: id });
+        setMessage(badgeTypesPageMessage, 'Badge type deleted.', 'success');
+      }
+      renderBadgeTypesTables();
+      renderInventory();
     }
 
     closeModal(deleteModal);
@@ -1917,7 +1950,7 @@ deleteModal.addEventListener('click', e => { if (e.target === deleteModal) close
 // ═══════════════════════════════════════════════════════════════════════════════
 confirmOk.addEventListener('click', async () => {
   if (!pendingAction) return;
-  const { scope, type, id } = pendingAction;
+  const { scope, type, id, payload } = pendingAction;
   confirmOk.disabled = true;
 
   try {
@@ -2009,6 +2042,56 @@ confirmOk.addEventListener('click', async () => {
       setMessage(venuePageMessage, type === 'archive' ? 'Venue archived.' : 'Venue restored.', 'success');
     }
 
+    if (scope === 'badge-type') {
+      const badge = allBadgeDefs.find(b => b.badge_id === id);
+      const { error, count } = await supabase
+        .from(BADGE_TABLE)
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('badge_id', id);
+      if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
+      const idx = allBadgeDefs.findIndex(b => b.badge_id === id);
+      if (idx !== -1) allBadgeDefs[idx] = { ...allBadgeDefs[idx], is_active: isActive };
+      await logAudit({
+        action:   type === 'archive' ? 'Archived Badge Type' : 'Restored Badge Type',
+        category: 'package',
+        details:  `Badge type ${type === 'archive' ? 'archived' : 'restored'}: ${badge?.label}`,
+        entityId: id
+      });
+      renderBadgeTypesTables();
+      renderInventory();
+      setMessage(badgeTypesPageMessage, type === 'archive' ? 'Badge type archived.' : 'Badge type restored.', 'success');
+    }
+
+    if (scope === 'badge-move') {
+      const { badgeId, conflictPackageId, badgeLabel, conflictPackageName } = payload;
+      const { error: delErr } = await supabase.from(PACKAGE_BADGE_TABLE).delete()
+        .eq('package_id', conflictPackageId).eq('badge_id', badgeId);
+      if (delErr) throw delErr;
+      const { error: insErr } = await supabase.from(PACKAGE_BADGE_TABLE).insert({ package_id: id, badge_id: badgeId });
+      if (insErr) throw insErr;
+
+      const pkg = allPackages.find(p => p.package_id === id);
+      await logAudit({
+        action: 'Reassigned Badge',
+        category: 'package',
+        details: `Moved "${badgeLabel}" from "${conflictPackageName}" to "${pkg?.package_name}"`,
+        entityId: id
+      });
+
+      // The moved-from package no longer holds this badge — drop it from the
+      // in-memory map so its card stops showing the chip without a reload.
+      for (const [pkgId, badgeSet] of packageBadgeMap.entries()) {
+        if (pkgId !== id) badgeSet.delete(badgeId);
+      }
+      if (!packageBadgeMap.has(id)) packageBadgeMap.set(id, new Set());
+      packageBadgeMap.get(id).add(badgeId);
+
+      renderInventory();
+      if (badgeModalPackageId === id && pkg) renderBadgeModal(pkg);
+      setMessage(inventoryPageMessage, 'Badge moved.', 'success');
+    }
+
     closeModal(confirmModal);
   } catch (err) {
     setModalMsg(confirmMessage, `Failed: ${err.message}`);
@@ -2021,6 +2104,160 @@ confirmOk.addEventListener('click', async () => {
 confirmClose.addEventListener('click',  () => closeModal(confirmModal));
 confirmCancel.addEventListener('click', () => closeModal(confirmModal));
 confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeModal(confirmModal); });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BADGES (Best Value / Best Seller / promo labels)
+// ═══════════════════════════════════════════════════════════════════════════════
+function openBadgeModal(packageId) {
+  const pkg = allPackages.find(p => p.package_id === packageId);
+  if (!pkg) return;
+  badgeModalPackageId = packageId;
+  setModalMsg(badgeModalMessage, '');
+  renderBadgeModal(pkg);
+  openModal(badgeModal);
+}
+
+function renderBadgeModal(pkg) {
+  const bsDef = allBadgeDefs.find(b => b.badge_key === 'best_seller');
+  if (bsDef && bsDef.is_assignable) {
+    // Manual mode — Best Seller behaves like any other badge (it's already
+    // included in the chip list below); this row is just the mode switch.
+    badgeBestSellerRow.innerHTML = `
+      <div class="badge-mode-row">
+        <span>Best Seller is set manually — choose it below like any other badge.</span>
+        <button type="button" class="badge-mode-toggle" data-toggle-bestseller>Switch to automatic</button>
+      </div>`;
+  } else if (bsDef) {
+    const isBestSeller = bestSellerByCategory.get(pkg.package_category_id) === pkg.package_id;
+    badgeBestSellerRow.innerHTML = `
+      <div class="badge-readonly-row ${isBestSeller ? 'is-active' : ''}">
+        <span>
+          <span>${escapeHtml(bsDef.label)}</span><br>
+          <span style="font-size:11px;opacity:.85">${isBestSeller ? 'Automatically set — most booked in this category' : 'Not automatic yet — based on non-cancelled bookings'}</span>
+        </span>
+        <button type="button" class="badge-mode-toggle" data-toggle-bestseller>Switch to manual</button>
+      </div>`;
+  } else {
+    badgeBestSellerRow.innerHTML = '';
+  }
+
+  const assignedIds = packageBadgeMap.get(pkg.package_id) || new Set();
+  const assignable = allBadgeDefs.filter(b => b.is_assignable && b.is_active);
+  badgeChipList.innerHTML = assignable.map(b => `
+    <button type="button" class="badge-toggle-chip ${assignedIds.has(b.badge_id) ? 'active variant-' + escapeHtml(b.variant) : ''}"
+            data-badge-id="${b.badge_id}">
+      ${escapeHtml(b.label)}
+    </button>`).join('');
+}
+
+// Global switch (not per-package): whether Best Seller is computed
+// automatically from booking counts or hand-assigned like Best Value.
+// Switching to automatic clears any manual assignments so they can't linger
+// alongside — or conflict with — the derived winner.
+async function toggleBestSellerMode() {
+  const bs = allBadgeDefs.find(b => b.badge_key === 'best_seller');
+  if (!bs) return;
+  const goingManual = !bs.is_assignable;
+  const confirmMsg = goingManual
+    ? 'Switch Best Seller to manual? You will choose which package holds it per category, and it will stop updating automatically from bookings.'
+    : 'Switch Best Seller to automatic? Any manually-assigned Best Seller badges will be cleared, and the most-booked package per category will be shown instead.';
+  if (!window.confirm(confirmMsg)) return;
+
+  try {
+    const { error } = await supabase.from(BADGE_TABLE).update({ is_assignable: goingManual }).eq('badge_id', bs.badge_id);
+    if (error) throw error;
+    bs.is_assignable = goingManual;
+
+    if (!goingManual) {
+      const { error: delErr } = await supabase.from(PACKAGE_BADGE_TABLE).delete().eq('badge_id', bs.badge_id);
+      if (delErr) throw delErr;
+      packageBadgeMap.forEach(set => set.delete(bs.badge_id));
+    }
+
+    await logAudit({
+      action: 'Changed Best Seller Mode',
+      category: 'package',
+      details: `Best Seller is now ${goingManual ? 'manually assigned' : 'automatic (most booked)'}`
+    });
+
+    const pkg = allPackages.find(p => p.package_id === badgeModalPackageId);
+    if (pkg) renderBadgeModal(pkg);
+    renderInventory();
+  } catch (err) {
+    setModalMsg(badgeModalMessage, `Failed: ${err.message}`);
+  }
+}
+
+badgeBestSellerRow.addEventListener('click', (e) => {
+  if (e.target.closest('[data-toggle-bestseller]')) toggleBestSellerMode();
+});
+
+badgeChipList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.badge-toggle-chip');
+  if (!btn || !badgeModalPackageId) return;
+  const badgeId = btn.dataset.badgeId;
+  const pkg = allPackages.find(p => p.package_id === badgeModalPackageId);
+  const def = allBadgeDefs.find(b => b.badge_id === badgeId);
+  const isOn = btn.classList.contains('active');
+  if (!pkg || !def) return;
+
+  btn.disabled = true;
+  try {
+    if (isOn) {
+      const { error } = await supabase.from(PACKAGE_BADGE_TABLE).delete()
+        .eq('package_id', badgeModalPackageId).eq('badge_id', badgeId);
+      if (error) throw error;
+      packageBadgeMap.get(badgeModalPackageId)?.delete(badgeId);
+      await logAudit({ action: 'Removed Badge', category: 'package', details: `Removed "${def.label}" from ${pkg.package_name}`, entityId: badgeModalPackageId });
+    } else if (def.unique_scope === 'category') {
+      // Pre-check for an existing holder in the same category so the admin
+      // gets a "move it here?" prompt instead of a raw DB rejection — the
+      // trigger in the migration is just the backstop if this is bypassed.
+      // allPackages/packageBadgeMap are already fully loaded (loadInventory),
+      // so this is a plain in-memory lookup, no extra round trip needed.
+      const conflictPkg = allPackages.find(p =>
+        p.package_id !== pkg.package_id &&
+        p.package_category_id === pkg.package_category_id &&
+        packageBadgeMap.get(p.package_id)?.has(badgeId));
+      if (conflictPkg) {
+        pendingAction = {
+          scope: 'badge-move', id: badgeModalPackageId,
+          payload: { badgeId, conflictPackageId: conflictPkg.package_id, badgeLabel: def.label, conflictPackageName: conflictPkg.package_name }
+        };
+        confirmTitle.textContent = 'Move Badge';
+        confirmCopy.textContent  = `"${def.label}" is currently on "${conflictPkg.package_name}". Move it to "${pkg.package_name}"?`;
+        confirmOk.textContent    = 'Move';
+        confirmOk.className      = 'btn-primary';
+        setModalMsg(confirmMessage, '');
+        openModal(confirmModal);
+        btn.disabled = false;
+        return;
+      }
+      const { error } = await supabase.from(PACKAGE_BADGE_TABLE).insert({ package_id: badgeModalPackageId, badge_id: badgeId });
+      if (error) throw error;
+      if (!packageBadgeMap.has(badgeModalPackageId)) packageBadgeMap.set(badgeModalPackageId, new Set());
+      packageBadgeMap.get(badgeModalPackageId).add(badgeId);
+      await logAudit({ action: 'Assigned Badge', category: 'package', details: `Assigned "${def.label}" to ${pkg.package_name}`, entityId: badgeModalPackageId });
+    } else {
+      // No uniqueness constraint (e.g. a promo label) — assign directly.
+      const { error } = await supabase.from(PACKAGE_BADGE_TABLE).insert({ package_id: badgeModalPackageId, badge_id: badgeId });
+      if (error) throw error;
+      if (!packageBadgeMap.has(badgeModalPackageId)) packageBadgeMap.set(badgeModalPackageId, new Set());
+      packageBadgeMap.get(badgeModalPackageId).add(badgeId);
+      await logAudit({ action: 'Assigned Badge', category: 'package', details: `Assigned "${def.label}" to ${pkg.package_name}`, entityId: badgeModalPackageId });
+    }
+    renderBadgeModal(pkg);
+    renderInventory();
+  } catch (err) {
+    setModalMsg(badgeModalMessage, `Failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+badgeModalClose.addEventListener('click', () => closeModal(badgeModal));
+badgeModalDone.addEventListener('click',  () => closeModal(badgeModal));
+badgeModal.addEventListener('click', e => { if (e.target === badgeModal) closeModal(badgeModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE TIER — right-anchored drawer (replaces the old below-table panel)
@@ -2314,6 +2551,7 @@ function handlePkgTableAction(e) {
   if (pkgAction === 'archive')   openConfirmArchivePackage(id);
   if (pkgAction === 'restore')   openConfirmRestorePackage(id);
   if (pkgAction === 'tiers')     openTierDrawer(id, name, btn);
+  if (pkgAction === 'badges')    openBadgeModal(id);
   if (pkgAction === 'delete')    openConfirmDeletePackage(id);
   if (pkgAction === 'duplicate') duplicatePackage(id);
   if (pkgAction === 'move-up')   movePackage(id, -1);
@@ -2561,6 +2799,222 @@ async function openConfirmDeleteVenue(venueId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// BADGE TYPES (Best Value, Popular, and any admin-defined labels — Best
+// Seller is excluded: it has its own automatic/manual mode switch inside the
+// per-package Badges panel and shouldn't be edited/archived/deleted here)
+// ═══════════════════════════════════════════════════════════════════════════════
+const SCOPE_LABELS = { category: 'One per category', global: 'One overall' };
+
+function slugifyBadgeKey(label) {
+  const base = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'badge';
+  let candidate = base;
+  let n = 2;
+  while (allBadgeDefs.some(b => b.badge_key === candidate)) {
+    candidate = `${base}_${n}`;
+    n++;
+  }
+  return candidate;
+}
+
+// In-memory — packageBadgeMap is already fully loaded by loadInventory, so
+// this needs no extra round trip (mirrors the venue mapped-count pattern).
+function countBadgeTypeUsage(badgeId) {
+  let count = 0;
+  packageBadgeMap.forEach(set => { if (set.has(badgeId)) count++; });
+  return count;
+}
+
+function manageableBadgeTypes() {
+  return allBadgeDefs.filter(b => b.badge_key !== 'best_seller');
+}
+
+function buildBadgeTypeRow(badge) {
+  const isArchived = !badge.is_active;
+  const usage = countBadgeTypeUsage(badge.badge_id);
+  const actions = isArchived
+    ? `<div class="action-cell">
+        <button class="action-btn edit" data-badgetype-action="edit" data-id="${badge.badge_id}">Edit</button>
+        <button class="action-btn restore" data-badgetype-action="restore" data-id="${badge.badge_id}">Restore</button>
+        <button class="action-btn archive" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
+      </div>`
+    : `<div class="action-cell">
+        <button class="action-btn edit" data-badgetype-action="edit" data-id="${badge.badge_id}">Edit</button>
+        <button class="action-btn archive" data-badgetype-action="archive" data-id="${badge.badge_id}">Archive</button>
+        <button class="action-btn archive" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
+      </div>`;
+
+  return `<tr>
+    <td><span class="pkg-badge-chip pkg-badge-chip--${escapeHtml(badge.variant)}">${escapeHtml(badge.label)}</span></td>
+    <td>${SCOPE_LABELS[badge.unique_scope] || 'No limit'}</td>
+    <td><span class="count-pill">${usage} package${usage === 1 ? '' : 's'}</span></td>
+    <td>${badge.sort_order}</td>
+    <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
+    <td>${actions}</td>
+  </tr>`;
+}
+
+function renderBadgeTypesTables() {
+  const manageable = manageableBadgeTypes();
+  const active = manageable.filter(b => b.is_active);
+  const archived = manageable.filter(b => !b.is_active);
+
+  activeBadgeTypesBody.innerHTML = active.length
+    ? active.map(buildBadgeTypeRow).join('')
+    : '<tr class="empty-row"><td colspan="6">No badge types yet. Add one so admins have something to assign.</td></tr>';
+
+  archivedBadgeTypesSection.style.display = archived.length ? '' : 'none';
+  archivedBadgeTypesBody.innerHTML = archived.length
+    ? archived.map(buildBadgeTypeRow).join('')
+    : '';
+}
+
+function handleBadgeTypeTableAction(e) {
+  const btn = e.target.closest('[data-badgetype-action]');
+  if (!btn) return;
+  const { badgetypeAction, id } = btn.dataset;
+  if (badgetypeAction === 'edit')    openEditBadgeTypeModal(id);
+  if (badgetypeAction === 'archive') openConfirmArchiveBadgeType(id);
+  if (badgetypeAction === 'restore') openConfirmRestoreBadgeType(id);
+  if (badgetypeAction === 'delete')  openConfirmDeleteBadgeType(id);
+}
+
+activeBadgeTypesBody.addEventListener('click', handleBadgeTypeTableAction);
+archivedBadgeTypesBody.addEventListener('click', handleBadgeTypeTableAction);
+
+function openAddBadgeTypeModal() {
+  editingBadgeTypeId = null;
+  badgeTypeModalTitle.textContent = 'Add New Badge Type';
+  badgeTypeModalSub.textContent = 'A label admins can assign to any package';
+  badgeTypeModalSaveLabel.textContent = 'Add Badge Type';
+  badgeTypeLabelInput.value = '';
+  badgeTypeVariantSelect.value = 'neutral';
+  badgeTypeScopeSelect.value = '';
+  badgeTypeSortOrder.value = '0';
+  setModalMsg(badgeTypeModalMessage, '');
+  openModal(badgeTypeModal);
+}
+
+function openEditBadgeTypeModal(badgeId) {
+  const badge = allBadgeDefs.find(b => b.badge_id === badgeId);
+  if (!badge) return;
+
+  editingBadgeTypeId = badgeId;
+  badgeTypeModalTitle.textContent = 'Edit Badge Type';
+  badgeTypeModalSub.textContent = 'Update this badge’s label, colour, or rules';
+  badgeTypeModalSaveLabel.textContent = 'Save Changes';
+  badgeTypeLabelInput.value = badge.label || '';
+  badgeTypeVariantSelect.value = badge.variant || 'neutral';
+  badgeTypeScopeSelect.value = badge.unique_scope || '';
+  badgeTypeSortOrder.value = badge.sort_order ?? 0;
+  setModalMsg(badgeTypeModalMessage, '');
+  openModal(badgeTypeModal);
+}
+
+badgeTypeModalSave.addEventListener('click', async () => {
+  const label = badgeTypeLabelInput.value.trim();
+  if (!label) { setModalMsg(badgeTypeModalMessage, 'A label is required.'); return; }
+
+  badgeTypeModalSave.disabled = true;
+  badgeTypeModalSaveLabel.textContent = 'Saving…';
+  setModalMsg(badgeTypeModalMessage, '');
+
+  try {
+    const payload = {
+      label,
+      variant: badgeTypeVariantSelect.value,
+      unique_scope: badgeTypeScopeSelect.value || null,
+      sort_order: parseInt(badgeTypeSortOrder.value, 10) || 0,
+    };
+
+    if (editingBadgeTypeId) {
+      const { data, error } = await supabase.from(BADGE_TABLE).update(payload).eq('badge_id', editingBadgeTypeId).select().single();
+      if (error) throw error;
+      const idx = allBadgeDefs.findIndex(b => b.badge_id === editingBadgeTypeId);
+      if (idx !== -1) allBadgeDefs[idx] = { ...allBadgeDefs[idx], ...data };
+      await logAudit({ action: 'Updated Badge Type', category: 'package', details: `Badge type updated: ${label}`, entityId: editingBadgeTypeId });
+      setMessage(badgeTypesPageMessage, 'Badge type updated successfully.', 'success');
+    } else {
+      payload.badge_key = slugifyBadgeKey(label);
+      payload.is_assignable = true;
+      payload.is_active = true;
+      const { data, error } = await supabase.from(BADGE_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      allBadgeDefs.push(data);
+      await logAudit({ action: 'Added Badge Type', category: 'package', details: `New badge type created: ${label}`, entityId: data.badge_id });
+      setMessage(badgeTypesPageMessage, 'Badge type added successfully.', 'success');
+    }
+
+    renderBadgeTypesTables();
+    renderInventory();
+    closeModal(badgeTypeModal);
+  } catch (err) {
+    setModalMsg(badgeTypeModalMessage, `Failed to save: ${err.message}`);
+  } finally {
+    badgeTypeModalSave.disabled = false;
+    badgeTypeModalSaveLabel.textContent = editingBadgeTypeId ? 'Save Changes' : 'Add Badge Type';
+  }
+});
+
+addBadgeTypeBtn.addEventListener('click', openAddBadgeTypeModal);
+badgeTypeModalClose.addEventListener('click',  () => closeModal(badgeTypeModal));
+badgeTypeModalCancel.addEventListener('click', () => closeModal(badgeTypeModal));
+badgeTypeModal.addEventListener('click', e => { if (e.target === badgeTypeModal) closeModal(badgeTypeModal); });
+
+function openConfirmArchiveBadgeType(badgeId) {
+  const badge = allBadgeDefs.find(b => b.badge_id === badgeId);
+  if (!badge) return;
+  const usage = countBadgeTypeUsage(badgeId);
+  pendingAction = { scope: 'badge-type', type: 'archive', id: badgeId };
+  confirmTitle.textContent = 'Archive Badge Type';
+  confirmCopy.textContent  = usage
+    ? `Archive "${badge.label}"? It's currently on ${usage} package${usage === 1 ? '' : 's'} — they'll keep it, but it can't be assigned to anything new until restored.`
+    : `Archive "${badge.label}"? It will no longer be assignable to packages.`;
+  confirmOk.textContent    = 'Archive';
+  confirmOk.className      = 'btn-danger';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+function openConfirmRestoreBadgeType(badgeId) {
+  const badge = allBadgeDefs.find(b => b.badge_id === badgeId);
+  if (!badge) return;
+  pendingAction = { scope: 'badge-type', type: 'restore', id: badgeId };
+  confirmTitle.textContent = 'Restore Badge Type';
+  confirmCopy.textContent  = `Restore "${badge.label}" and make it assignable again?`;
+  confirmOk.textContent    = 'Restore';
+  confirmOk.className      = 'btn-primary';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+// Badge type delete: package_badge.badge_id is ON DELETE CASCADE, so a raw
+// delete would silently strip the badge off every package holding it —
+// guard with the same reference check used for package delete, offering
+// Archive instead when it's actually in use.
+function openConfirmDeleteBadgeType(badgeId) {
+  const badge = allBadgeDefs.find(b => b.badge_id === badgeId);
+  if (!badge) return;
+  const usage = countBadgeTypeUsage(badgeId);
+
+  deleteReassignField.classList.add('hidden');
+
+  if (usage > 0) {
+    pendingDeleteAction = { scope: 'badge-type', id: badgeId, mode: 'archive' };
+    deleteModalTitle.textContent = 'Archive Instead';
+    deleteModalCopy.textContent  = `${usage} package${usage === 1 ? '' : 's'} currently hold "${badge.label}". Archive it instead — they'll keep it, but it can't be assigned to anything new.`;
+    deleteModalOk.textContent    = 'Archive';
+  } else {
+    pendingDeleteAction = { scope: 'badge-type', id: badgeId, mode: 'delete' };
+    deleteModalTitle.textContent = 'Delete Badge Type';
+    deleteModalCopy.textContent  = `Delete "${badge.label}"? This can't be undone.`;
+    deleteModalOk.textContent    = 'Delete';
+  }
+  deleteModalOk.disabled = false;
+  setModalMsg(deleteModalMessage, '');
+  openModal(deleteModal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // KEYBOARD: Escape closes modals
 // ═══════════════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
@@ -2570,6 +3024,8 @@ document.addEventListener('keydown', e => {
   if (!tierModal.classList.contains('hidden'))     closeModal(tierModal);
   if (!confirmModal.classList.contains('hidden'))  closeModal(confirmModal);
   if (!venueModal.classList.contains('hidden'))    closeModal(venueModal);
+  if (!badgeModal.classList.contains('hidden'))    closeModal(badgeModal);
+  if (!badgeTypeModal.classList.contains('hidden')) closeModal(badgeTypeModal);
   if (!deleteModal.classList.contains('hidden'))   closeModal(deleteModal);
 });
 

@@ -84,12 +84,12 @@
                     <h2>Where will your <em>event</em> happen?</h2>
                     <p>Choose whether to host at ELI Coffee Events Caf&eacute; or have our team come to you.</p>
                     <div class="location-options">
-                        <div class="location-card" data-val="onsite">
+                        <div class="location-card" data-val="onsite" role="button" tabindex="0" aria-pressed="false">
                             <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-store"></i></div>
                             <h4>Onsite</h4>
                             <p>Hold your event at ELI Coffee Events Caf&eacute; Binangonan</p>
                         </div>
-                        <div class="location-card" data-val="offsite">
+                        <div class="location-card" data-val="offsite" role="button" tabindex="0" aria-pressed="false">
                             <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></div>
                             <h4>Offsite</h4>
                             <p>We bring the service to your venue</p>
@@ -97,8 +97,16 @@
                     </div>
                 </div>
 
-                <!-- ── 1B. Package Selection ─────────────────── -->
-                <!-- Locked until 1A is answered; same pattern as Calendar/Time locked states -->
+                <!-- ── 1B. Package Category ────────────────────── -->
+                <!-- Locked until 1A is answered; feeds both onsite and offsite package grids below -->
+                <div class="res-section" id="sub-category">
+                    <h2>Choose a package <em>category</em></h2>
+                    <p id="rs-cat-desc" class="section-status-note">Pick the type of package that fits your event.</p>
+                    <div class="pkg-cat-grid" id="category-grid"></div>
+                </div>
+
+                <!-- ── 1C. Package Selection ─────────────────── -->
+                <!-- Locked until a category is chosen; same pattern as Calendar/Time locked states -->
                 <div class="res-section" id="sub-pkg">
                     <h2>Select your <em>package</em></h2>
                     <p id="rs-pkg-desc" class="section-status-note">Choose a location type first to see available packages.</p>
@@ -109,10 +117,8 @@
                         <div class="cards-grid" id="mini-grid"></div>
                     </div>
 
-                    <!-- Offsite categories + sub-packages + catering builder -->
+                    <!-- Offsite sub-packages + catering builder (category already chosen above) -->
                     <div id="offsite-section" class="hidden">
-                        <div class="cards-grid" id="offsite-cat-grid"></div>
-
                         <div id="offsite-sub" class="hidden">
                             <div class="section-label" id="offsite-sub-label">Choose a Package</div>
                             <div class="cards-grid" id="offsite-sub-grid"></div>
@@ -120,7 +126,7 @@
 
                         <div id="catering-section" class="hidden">
                             <div class="catering-inclusions">
-                                <h4>&#128203; Catering Package Inclusions</h4>
+                                <h4><i class="ti ti-clipboard-list" aria-hidden="true"></i> Catering Package Inclusions</h4>
                                 <ul>
                                     <li>Catering Buffet Set Up (3 Dishes, 1 Pasta, Rice, Dessert &amp; Drink)</li>
                                     <li>Set of Utensils</li>
@@ -132,14 +138,14 @@
                                     <li>Crew meal and transportation fee applies</li>
                                 </ul>
                                 <div class="special-offer">
-                                    &#127873; Special Offer
+                                    <i class="ti ti-gift" aria-hidden="true"></i> Special Offer
                                     <span>FREE Overflowing Coffee &amp; 1 Appetizer/Dessert</span>
                                 </div>
                             </div>
 
                             <div class="progress-tracker" id="catering-progress-tracker"></div>
 
-                            <div class="builder-label">&#127869;&#65039; Choose Your Dishes</div>
+                            <div class="builder-label"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes</div>
                             <p class="builder-hint">Select one dish per category, then pick the pax count for that tray. You need at least 1 main dish, 1 pasta, and 1 dessert.</p>
 
                             <div id="catering-tray-builder"></div>
@@ -148,7 +154,7 @@
                                 <div class="cart-box" id="catering-tray-cart">
                                     <div class="cart-header">
                                         <div class="cart-header-left">
-                                            &#128722; Your Selections
+                                            <i class="ti ti-shopping-cart" aria-hidden="true"></i> Your Selections
                                             <span class="cart-count-badge" id="catering-cart-badge">0</span>
                                         </div>
                                         <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
@@ -161,7 +167,7 @@
                                     </div>
                                 </div>
                                 <div class="validation-notice" id="catering-validation-notice">
-                                    <span class="vn-icon">&#9888;&#65039;</span>
+                                    <span class="vn-icon"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>
                                     <span id="catering-validation-text">Select at least 1 main dish, 1 pasta, and 1 dessert to continue.</span>
                                 </div>
                             </div>
@@ -205,7 +211,7 @@
 
                         <!-- Onsite: optional snack add-on -->
                         <div id="addon-section" class="hidden">
-                            <div class="section-label">&#127850; Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
+                            <div class="section-label"><i class="ti ti-cookie" aria-hidden="true"></i> Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
                             <div class="cards-grid" id="snack-grid"></div>
                         </div>
 
@@ -218,7 +224,7 @@
                             </div>
                             <div id="venue-map" class="venue-map-container"></div>
                             <div class="venue-pinned-row">
-                                <span class="venue-pin-icon">&#128205;</span>
+                                <span class="venue-pin-icon"><i class="ti ti-map-pin" aria-hidden="true"></i></span>
                                 <span id="venue-pinned-label">Click the map or search an address to pin your venue.</span>
                             </div>
                             <input type="hidden" id="venue-location" value="">
@@ -232,7 +238,6 @@
                     <p>Browse open dates below. Choose a location and package to select one for your booking.</p>
 
                     <input type="hidden" id="event-date">
-                    <input class="res-input res-input-readonly" type="text" id="event-date-display" placeholder="Select a date from the availability calendar below *" readonly>
                     <section class="availability-panel" aria-labelledby="availabilityTitle">
                         <div class="availability-head">
                             <div>
@@ -253,6 +258,7 @@
                             <span class="availability-legend-item"><span class="availability-swatch available"></span>Available</span>
                             <span class="availability-legend-item"><span class="availability-swatch booked"></span>Fully Booked</span>
                             <span class="availability-legend-item"><span class="availability-swatch closed"></span>Closed</span>
+                            <span class="availability-legend-item"><span class="availability-swatch past"></span>Too Soon to Book</span>
                         </div>
                         <p class="availability-message" id="availabilityMessage">Loading availability...</p>
                         <div class="availability-closure-note hidden" id="availabilityClosureNote" aria-live="polite">
@@ -266,9 +272,9 @@
                 <div class="res-section" id="sub-time">
                     <h2>Pick a <em>start time</em></h2>
                     <p>Choose the time that works best for your event.</p>
+                    <p class="time-status-note" id="time-status-note"></p>
                     <div class="time-grid" id="time-grid"></div>
                     <p class="time-end-readout hidden" id="time-end-readout"></p>
-                    <p class="time-status-note" id="time-status-note"></p>
                     <div class="time-alt-note">
                         <i class="ti ti-info-circle" aria-hidden="true"></i>
                         <span>Need a different start time? Add a note in the Special Requests field on the next page and our team will reach out to confirm.</span>
@@ -482,6 +488,7 @@
     // ── State ──────────────────────────────────────────────────────────────
     const S = {
         locationType: '',
+        categoryId: '',
         miniPackage: null,
         snackAddon: null,
         offsiteCategory: '',
@@ -502,19 +509,48 @@
     // ── Event types cache (populated by loadEventTypes) ────────────────────
     let eventTypesCache = [];
 
-    // ── Package data (populated by loadPackages) ───────────────────────────
-    let MINI        = [];
-    let SNACK       = [];
-    let OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+    // ── Package + category data (populated by loadPackages) ────────────────
+    // Categories now come from the real package_category table (via the
+    // embedded relation in the package select below) instead of the old
+    // hardcoded OFFSITE_CATS array / name-substring bucketing. MINI/OFFSITE_ALL
+    // stay as flat lists (applyUrlParams needs to search across all packages
+    // regardless of category); the *_BY_CAT maps group them per category id
+    // for the grids.
+    let MINI            = [];
+    let SNACK           = [];
+    let OFFSITE_ALL     = [];
+    let MINI_BY_CAT     = {};
+    let OFFSITE_BY_CAT  = {};
+    let ONSITE_CATEGORIES  = []; // [{ id, name, count }]
+    let OFFSITE_CATEGORIES = []; // [{ id, name, count }]
 
-    const OFFSITE_CATS = [
-        { label:'Eli Coffee Bar',   val:'coffee',   icon:'&#9749;',         desc:'Professional coffee bar service for your event' },
-        { label:'Snack Bar Corner', val:'snack',    icon:'&#127850;',       desc:'Mobile snack bar with chocolate fountain' },
-        { label:'Catering',         val:'catering', icon:'&#127869;&#65039;', desc:'Full catering service with buffet setup, styled tables &amp; more' }
-    ];
+    // Category name → icon (mirrors js/packages.js's getCategoryIcon so the
+    // category chip here matches the public Packages page visually).
+    function getCategoryIcon(name) {
+        const n = (name || '').toLowerCase();
+        if (/coffee.*bar|coffee/i.test(n)) return 'ti-coffee';
+        if (/snack.*bar|snack/i.test(n))   return 'ti-cookie';
+        if (/gather|private/i.test(n))     return 'ti-users';
+        if (/cater/i.test(n))              return 'ti-tools-kitchen-2';
+        if (/all.?in/i.test(n))            return 'ti-stars';
+        if (/grazing/i.test(n))            return 'ti-grape';
+        return 'ti-package';
+    }
+
+    // Catering packages have no fixed per-item price (the dish-builder cart
+    // computes its own total), so this stays a name-based flag derived from
+    // the *category* name, mirroring the same catering detection the
+    // enforce_reservation_capacity() DB trigger uses on the package name.
+    function deriveOffsiteCategoryFlag(categoryName) {
+        return /cater/i.test(categoryName || '') ? 'catering' : 'other';
+    }
 
     // ── Step order ─────────────────────────────────────────────────────────
-    // rs1 = single Event Information page (Location → Package → Guests+Type → Add-ons/Venue → Date → Time)
+    // rs1 = single Event Information page (Location → Category → Package →
+    // Guests+Type → Add-ons/Venue → Date → Time). NOTE: this entire flow —
+    // now 7 conceptual sub-sections — still renders under one "Step 1 of 4".
+    // Flagging for a future revisit (splitting rs1 into multiple real steps)
+    // per product review; no functional change made here.
     const STEP_IDS = ['rs1', 'rs4', 'rs6', 'rs7'];
     const STEP_LABELS = ['Event Information', 'Your Details', 'Review', 'Contract'];
     let cur = 1;
@@ -664,9 +700,42 @@
         }
     }
 
+    // A selected event type can require more (or less) notice than the
+    // site-wide default (system_settings.reservation_rules.min_advance_days) —
+    // configured per event type in event_types.min_advance_days, null means
+    // "use the site-wide default." "Other" and no-selection-yet both fall
+    // back to the site-wide default.
+    function getEffectiveMinAdvanceDays() {
+        const match = eventTypesCache.find(et => et.name === S.eventType);
+        return (match && Number.isFinite(match.minAdvanceDays)) ? match.minAdvanceDays : availabilityState.minAdvanceDays;
+    }
+
     function isOutsideBookingWindow(date, today) {
         const diffDays = Math.round((date - today) / 86400000);
-        return diffDays < availabilityState.minAdvanceDays || diffDays > availabilityState.maxAdvanceDays;
+        return diffDays < getEffectiveMinAdvanceDays() || diffDays > availabilityState.maxAdvanceDays;
+    }
+
+    // Landing a customer on a calendar page that's entirely grey (every date
+    // either past or inside the minimum-advance-notice window — e.g. today
+    // is the 26th with a 14-day minimum, so the rest of this month can never
+    // have a bookable date) reads as broken, even though it's working as
+    // designed. Called once on initial load only — not on manual Prev/Next,
+    // so a customer who deliberately pages back can still see why a month is
+    // empty. Bounded to 24 months so a misconfigured max_advance_days (e.g.
+    // 0) can't spin this forever.
+    function advanceToFirstBookableMonth() {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        for (let guard = 0; guard < 24; guard++) {
+            const monthStart = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth(), 1);
+            const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+            let hasBookableDay = false;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), d);
+                if (!(date < today || isOutsideBookingWindow(date, today))) { hasBookableDay = true; break; }
+            }
+            if (hasBookableDay) return;
+            availabilityState.month = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+        }
     }
 
     // ── Default contract body (used when a package has no active template) ─
@@ -819,6 +888,67 @@ By signing below, the Client confirms that the reservation details above are acc
         hintEl.classList.remove('hidden');
     }
 
+    let guestNoticeTimer = null;
+    function showGuestCountAdjustedNotice() {
+        const hintEl = document.getElementById('guest-count-hint');
+        if (!hintEl) return;
+        hintEl.textContent = "Adjusted to fit this package's guest limit.";
+        hintEl.classList.remove('hidden');
+        hintEl.classList.add('guest-count-hint--notice');
+        clearTimeout(guestNoticeTimer);
+        guestNoticeTimer = setTimeout(() => {
+            hintEl.classList.remove('guest-count-hint--notice');
+            updateGuestCountHint();
+        }, 3000);
+    }
+
+    // Sets the native min/max on the input (covers stepper increment/decrement)
+    // and clamps any already-entered value that's now out of range — called
+    // whenever the selected package changes.
+    function clampGuestCountToSelection() {
+        const gcEl = document.getElementById('guest-count');
+        if (!gcEl) return;
+        const min = getSelectedPackageMinGuests();
+        const max = getSelectedPackageMaxGuests();
+        gcEl.min = min != null ? String(min) : '1';
+        if (max != null) gcEl.setAttribute('max', String(max));
+        else gcEl.removeAttribute('max');
+
+        const raw = gcEl.value.trim();
+        updateGuestCountHint();
+        if (!raw) return;
+        let val = parseInt(raw, 10);
+        if (Number.isNaN(val)) return;
+        let adjusted = false;
+        if (min != null && val < min) { val = min; adjusted = true; }
+        if (max != null && val > max) { val = max; adjusted = true; }
+        if (adjusted) {
+            gcEl.value = String(val);
+            S.guestCount = String(val);
+            showGuestCountAdjustedNotice();
+        }
+    }
+
+    document.getElementById('guest-count')?.addEventListener('input', function () {
+        S.guestCount = this.value.trim();
+    });
+
+    document.getElementById('guest-count')?.addEventListener('blur', function () {
+        const min = getSelectedPackageMinGuests();
+        const max = getSelectedPackageMaxGuests();
+        const raw = this.value.trim();
+        if (!raw) return;
+        let val = parseInt(raw, 10);
+        if (Number.isNaN(val)) return;
+        let adjusted = false;
+        if (val < 1) { val = 1; adjusted = true; }
+        if (min != null && val < min) { val = min; adjusted = true; }
+        if (max != null && val > max) { val = max; adjusted = true; }
+        this.value = String(val);
+        S.guestCount = String(val);
+        if (adjusted) showGuestCountAdjustedNotice();
+    });
+
     // ── URL param entry handling ───────────────────────────────────────────
     function applyUrlParams() {
         const params = new URLSearchParams(window.location.search);
@@ -829,6 +959,7 @@ By signing below, the Client confirms that the reservation details above are acc
         const onsitePkg = MINI.find(p => String(p.id) === pkgId);
         if (onsitePkg) {
             S.locationType = 'onsite';
+            S.categoryId   = onsitePkg.categoryId;
             S.miniPackage  = onsitePkg;
             document.querySelectorAll('.location-card').forEach(c => {
                 c.classList.toggle('active', c.dataset.val === 'onsite');
@@ -836,17 +967,16 @@ By signing below, the Client confirms that the reservation details above are acc
             return true;
         }
 
-        for (const [cat, pkgs] of Object.entries(OFFSITE_PKGS)) {
-            const pkg = pkgs.find(p => String(p.id) === pkgId);
-            if (pkg) {
-                S.locationType    = 'offsite';
-                S.offsiteCategory = cat;
-                S.offsitePackage  = pkg;
-                document.querySelectorAll('.location-card').forEach(c => {
-                    c.classList.toggle('active', c.dataset.val === 'offsite');
-                });
-                return true;
-            }
+        const offsitePkg = OFFSITE_ALL.find(p => String(p.id) === pkgId);
+        if (offsitePkg) {
+            S.locationType    = 'offsite';
+            S.categoryId      = offsitePkg.categoryId;
+            S.offsiteCategory = deriveOffsiteCategoryFlag(offsitePkg.categoryName);
+            S.offsitePackage  = offsitePkg;
+            document.querySelectorAll('.location-card').forEach(c => {
+                c.classList.toggle('active', c.dataset.val === 'offsite');
+            });
+            return true;
         }
 
         // Package not found (archived or invalid ID) — fall back to empty form
@@ -977,7 +1107,7 @@ By signing below, the Client confirms that the reservation details above are acc
 
     function getSelectedContractPackageId() {
         if (S.locationType === 'onsite') return S.miniPackage?.id || null;
-        if (S.offsiteCategory === 'catering') return OFFSITE_PKGS.catering?.[0]?.id || null;
+        if (S.offsiteCategory === 'catering') return OFFSITE_BY_CAT[S.categoryId]?.[0]?.id || null;
         return S.offsitePackage?.id || null;
     }
 
@@ -1311,8 +1441,22 @@ By signing below, the Client confirms that the reservation details above are acc
 
     function getSelectedDurationHours() {
         if (S.locationType === 'onsite') return Number(S.miniPackage?.durationHours || 0) || null;
-        if (S.offsiteCategory === 'catering') return Number(OFFSITE_PKGS.catering?.[0]?.durationHours || 0) || 4;
+        if (S.offsiteCategory === 'catering') return Number(OFFSITE_BY_CAT[S.categoryId]?.[0]?.durationHours || 0) || 4;
         return Number(S.offsitePackage?.durationHours || 0) || null;
+    }
+
+    // The actual selected package/category name — used in time-slot messaging
+    // instead of getScopeLabel()'s coarse VIP/Main Hall/Off-site bucket, which
+    // previously produced a generic or outright wrong label (e.g. always
+    // "VIP" for any onsite scope) regardless of which package was chosen.
+    function getSelectedPackageOrCategoryLabel() {
+        if (S.locationType === 'onsite' && S.miniPackage) return S.miniPackage.label;
+        if (S.offsiteCategory === 'catering') {
+            const cat = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
+            return cat ? cat.name : 'Catering';
+        }
+        if (S.offsitePackage) return S.offsitePackage.label;
+        return null;
     }
 
     function getScopeSelectionPrompt() {
@@ -1517,8 +1661,11 @@ By signing below, the Client confirms that the reservation details above are acc
 
         eventTypesCache = data
             .filter(et => !(et.status && et.status !== 'Active') && et.is_active !== false)
-            .map(et => et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1])
-            .filter(Boolean);
+            .map(et => ({
+                name: et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1],
+                minAdvanceDays: Number.isFinite(Number(et.min_advance_days)) ? Number(et.min_advance_days) : null
+            }))
+            .filter(et => Boolean(et.name));
 
         buildEventTypeSelect();
     }
@@ -1527,7 +1674,7 @@ By signing below, the Client confirms that the reservation details above are acc
         const sel = document.getElementById('event-type-select');
         if (!sel) return;
         sel.innerHTML = '<option value="">Select event type…</option>';
-        [...eventTypesCache, 'Other'].forEach(label => {
+        [...eventTypesCache.map(et => et.name), 'Other'].forEach(label => {
             const opt = document.createElement('option');
             opt.value = label;
             opt.textContent = label;
@@ -1557,6 +1704,19 @@ By signing below, the Client confirms that the reservation details above are acc
             const otherInput = document.getElementById('event-type-other');
             if (otherInput) otherInput.value = '';
         }
+
+        // This event type may carry its own minimum-notice override, so the
+        // bookable window (and which dates read as "too soon") can change —
+        // re-check whether the displayed month still has any bookable date,
+        // and only refetch from Supabase if we actually had to page forward.
+        const prevMonthKey = availabilityState.month.getFullYear() + '-' + availabilityState.month.getMonth();
+        advanceToFirstBookableMonth();
+        const newMonthKey = availabilityState.month.getFullYear() + '-' + availabilityState.month.getMonth();
+        if (prevMonthKey !== newMonthKey) {
+            loadAvailabilityCalendar();
+        } else {
+            renderAvailabilityCalendar();
+        }
     });
 
     // ── Load packages from Supabase ────────────────────────────────────────
@@ -1566,7 +1726,7 @@ By signing below, the Client confirms that the reservation details above are acc
         packagesLoadState = 'loading';
         const { data: pkgs, error } = await supabase
             .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category(is_active)')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, package_category(category_name, is_active, sort_order)')
             .eq('is_active', true)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false });
@@ -1574,7 +1734,9 @@ By signing below, the Client confirms that the reservation details above are acc
         if (error || !pkgs) {
             console.error('Failed to load packages:', error);
             packagesLoadState = 'error';
-            MINI = []; SNACK = []; OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+            MINI = []; SNACK = []; OFFSITE_ALL = [];
+            MINI_BY_CAT = {}; OFFSITE_BY_CAT = {};
+            ONSITE_CATEGORIES = []; OFFSITE_CATEGORIES = [];
             return;
         }
 
@@ -1587,7 +1749,7 @@ By signing below, the Client confirms that the reservation details above are acc
         const [{ data: venueMaps }, { data: photoRows }] = packageIds.length
             ? await Promise.all([
                 supabase.from('package_venue').select('package_id').in('package_id', packageIds),
-                supabase.from('package_photo').select('package_id').in('package_id', packageIds)
+                supabase.from('package_photo').select('package_id, image_url, is_cover, sort_order').in('package_id', packageIds).order('sort_order', { ascending: true })
             ])
             : [{ data: [] }, { data: [] }];
 
@@ -1595,8 +1757,19 @@ By signing below, the Client confirms that the reservation details above are acc
         (venueMaps || []).forEach(row => venueCounts.set(row.package_id, (venueCounts.get(row.package_id) || 0) + 1));
         const hasGalleryPhoto = new Set((photoRows || []).map(row => row.package_id));
 
+        // Cover photo per package — the gallery photo marked is_cover, else
+        // the first uploaded photo (mirrors js/packages.js's _coverPhoto logic).
+        const coverPhotoMap = new Map();
+        (photoRows || []).forEach(row => {
+            const existing = coverPhotoMap.get(row.package_id);
+            if (!existing || row.is_cover) coverPhotoMap.set(row.package_id, row);
+        });
+
         const visible = pkgs.filter(p => p.package_category?.is_active !== false);
-        MINI = []; SNACK = []; OFFSITE_PKGS = { coffee: [], snack: [], catering: [] };
+        MINI = []; SNACK = []; OFFSITE_ALL = [];
+        MINI_BY_CAT = {}; OFFSITE_BY_CAT = {};
+        const onsiteCatMap  = new Map(); // categoryId -> { id, name, sortOrder, count }
+        const offsiteCatMap = new Map();
 
         visible.forEach(p => {
             const desc = (p.description || '').trim();
@@ -1634,6 +1807,15 @@ By signing below, the Client confirms that the reservation details above are acc
             const isOffsiteEligible = (loc === 'offsite' || loc === 'both');
             if (!isOnsiteEligible && !isOffsiteEligible) return;
 
+            // A package with no category assigned can't be placed under the
+            // category-selection step at all — skip it rather than showing
+            // it in an "uncategorized" bucket nothing on this page can filter to.
+            const categoryId = p.package_category_id || null;
+            if (!categoryId) return;
+            const categoryName = p.package_category?.category_name || '';
+            const categorySortOrder = p.package_category?.sort_order ?? 0;
+
+            const cover = coverPhotoMap.get(p.package_id);
             const base = {
                 id: p.package_id,
                 label: p.package_name,
@@ -1642,21 +1824,38 @@ By signing below, the Client confirms that the reservation details above are acc
                 durationHours: Number(p.duration_hours || 0) || null,
                 bookingScope: p.booking_scope || null,
                 min_guests: p.min_guests ?? null,
-                max_guests: p.max_guests ?? null
+                max_guests: p.max_guests ?? null,
+                guestCapacity: p.guest_capacity ?? null,
+                categoryId,
+                categoryName,
+                coverPhotoUrl: cover?.image_url || p.package_image || null
             };
             const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
 
             if (isOnsiteEligible) {
-                if (isAddon) SNACK.push(base);
-                else MINI.push(base);
+                if (isAddon) {
+                    SNACK.push(base);
+                } else {
+                    MINI.push(base);
+                    if (!MINI_BY_CAT[categoryId]) MINI_BY_CAT[categoryId] = [];
+                    MINI_BY_CAT[categoryId].push(base);
+                    const entry = onsiteCatMap.get(categoryId) || { id: categoryId, name: categoryName, sortOrder: categorySortOrder, count: 0 };
+                    entry.count++;
+                    onsiteCatMap.set(categoryId, entry);
+                }
             }
             if (isOffsiteEligible) {
-                const name = p.package_name.toLowerCase();
-                if (name.includes('coffee'))                            OFFSITE_PKGS.coffee.push(base);
-                else if (name.includes('snack') || name.includes('biscuit')) OFFSITE_PKGS.snack.push(base);
-                else                                                    OFFSITE_PKGS.catering.push(base);
+                OFFSITE_ALL.push(base);
+                if (!OFFSITE_BY_CAT[categoryId]) OFFSITE_BY_CAT[categoryId] = [];
+                OFFSITE_BY_CAT[categoryId].push(base);
+                const entry = offsiteCatMap.get(categoryId) || { id: categoryId, name: categoryName, sortOrder: categorySortOrder, count: 0 };
+                entry.count++;
+                offsiteCatMap.set(categoryId, entry);
             }
         });
+
+        ONSITE_CATEGORIES  = [...onsiteCatMap.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+        OFFSITE_CATEGORIES = [...offsiteCatMap.values()].sort((a, b) => a.sortOrder - b.sortOrder);
 
         packagesLoadState = 'ok';
     }
@@ -1669,22 +1868,117 @@ By signing below, the Client confirms that the reservation details above are acc
     }
 
 
-    // ── Package step builder ───────────────────────────────────────────────
+    // ── Category step builder (1B) ─────────────────────────────────────────
+    function getCategoriesForLocation() {
+        if (S.locationType === 'onsite')  return ONSITE_CATEGORIES;
+        if (S.locationType === 'offsite') return OFFSITE_CATEGORIES;
+        return [];
+    }
+
+    function buildCategoryGrid() {
+        const g = document.getElementById('category-grid');
+        const caption = document.getElementById('rs-cat-desc');
+        if (!g) return;
+        g.innerHTML = '';
+
+        if (!S.locationType) {
+            if (caption) caption.textContent = 'Choose a location first to see package categories.';
+            return;
+        }
+
+        const cats = getCategoriesForLocation();
+        if (!cats.length) {
+            g.innerHTML = packagesEmptyStateHtml();
+            if (caption) caption.textContent = '';
+            return;
+        }
+
+        cats.forEach(cat => {
+            const isActive = S.categoryId === cat.id;
+            const el = document.createElement('div');
+            el.className = 'pkg-cat-card' + (isActive ? ' active' : '');
+            el.setAttribute('role', 'button');
+            el.setAttribute('tabindex', '0');
+            el.setAttribute('aria-pressed', String(isActive));
+            el.setAttribute('aria-label', 'View ' + cat.name + ' packages');
+            el.innerHTML =
+                '<div class="pkg-cat-check" aria-hidden="true"><i class="ti ti-check"></i></div>' +
+                '<i class="ti ' + getCategoryIcon(cat.name) + ' pkg-cat-icon" aria-hidden="true"></i>' +
+                '<p class="pkg-cat-name">' + escapeHtml(cat.name) + '</p>' +
+                '<p class="pkg-cat-count">' + cat.count + (cat.count === 1 ? ' package' : ' packages') + '</p>';
+            const choose = () => selectCategory(cat);
+            el.addEventListener('click', choose);
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); }
+            });
+            g.appendChild(el);
+        });
+
+        if (caption) {
+            const activeCat = cats.find(c => c.id === S.categoryId);
+            caption.textContent = activeCat
+                ? `Showing ${activeCat.name} options only.`
+                : 'Pick the type of package that fits your event.';
+        }
+    }
+
+    async function selectCategory(cat) {
+        const prev = S.categoryId;
+        S.categoryId = cat.id;
+        S.offsiteCategory = S.locationType === 'offsite' ? deriveOffsiteCategoryFlag(cat.name) : '';
+        if (prev !== cat.id) {
+            S.miniPackage    = null;
+            S.offsitePackage = null;
+            S.snackAddon     = null;
+            S.cateringCart   = [];
+            S.time           = '';
+            syncSelectedDate('');
+        }
+        buildCategoryGrid();
+        buildPackageStep();
+        updateSectionLocks();
+        buildAddonOrVenueStep();
+        await refreshAvailabilityForSelectedScope();
+    }
+
+    // ── Package step builder (1C) ──────────────────────────────────────────
     function buildPackageStep() {
-        const onEl  = document.getElementById('onsite-section');
-        const offEl = document.getElementById('offsite-section');
+        const onEl   = document.getElementById('onsite-section');
+        const offEl  = document.getElementById('offsite-section');
         const descEl = document.getElementById('rs-pkg-desc');
+        const subEl      = document.getElementById('offsite-sub');
+        const cateringEl = document.getElementById('catering-section');
 
         if (S.locationType === 'onsite') {
             onEl.classList.remove('hidden');
             offEl.classList.add('hidden');
+            if (!S.categoryId) {
+                if (descEl) descEl.textContent = 'Choose a package category above to see available packages.';
+                document.getElementById('mini-grid').innerHTML = '';
+                return;
+            }
             if (descEl) descEl.textContent = 'Select a package for your event at ELI Coffee.';
             buildMiniGrid();
         } else if (S.locationType === 'offsite') {
             onEl.classList.add('hidden');
             offEl.classList.remove('hidden');
-            if (descEl) descEl.textContent = 'Choose your offsite service and package.';
-            buildOffsiteCats();
+            if (!S.categoryId) {
+                if (descEl) descEl.textContent = 'Choose a package category above to see available packages.';
+                subEl.classList.add('hidden');
+                cateringEl.classList.add('hidden');
+                return;
+            }
+            if (descEl) descEl.textContent = 'Choose your offsite package.';
+            if (S.offsiteCategory === 'catering') {
+                subEl.classList.add('hidden');
+                cateringEl.classList.remove('hidden');
+                buildCateringDishBuilder();
+            } else {
+                cateringEl.classList.add('hidden');
+                subEl.classList.remove('hidden');
+                document.getElementById('offsite-sub-label').textContent = 'Choose a Package';
+                buildOffsiteSub(S.categoryId);
+            }
         } else {
             onEl.classList.add('hidden');
             offEl.classList.add('hidden');
@@ -1692,140 +1986,108 @@ By signing below, the Client confirms that the reservation details above are acc
         }
     }
 
-    function truncDesc(text, threshold) {
-        threshold = threshold || 120;
-        if (!text || text.length <= threshold) return text || '';
-        var cut = text.lastIndexOf(' ', threshold - 10);
-        var pivot = cut > 50 ? cut : threshold;
-        return '<span class="pkg-desc-short">' + text.slice(0, pivot) + '&hellip; ' +
-               '<button type="button" class="pkg-desc-toggle" data-mode="expand">View full details</button></span>' +
-               '<span class="pkg-desc-full hidden">' + text + ' ' +
-               '<button type="button" class="pkg-desc-toggle" data-mode="collapse">Show less</button></span>';
+    // ── Unified package card ───────────────────────────────────────────────
+    function buildGuestDurationChips(p) {
+        let chips = '';
+        if (p.min_guests != null && p.max_guests != null) {
+            chips += '<span class="rpkg-chip"><i class="ti ti-users"></i>' + p.min_guests + '–' + p.max_guests + ' guests</span>';
+        } else if (p.guestCapacity) {
+            chips += '<span class="rpkg-chip"><i class="ti ti-users"></i>Up to ' + p.guestCapacity + ' guests</span>';
+        }
+        if (p.durationHours) {
+            chips += '<span class="rpkg-chip"><i class="ti ti-clock"></i>' + p.durationHours + (p.durationHours === 1 ? ' hr' : ' hrs') + '</span>';
+        }
+        return chips;
     }
 
-    document.addEventListener('click', function (e) {
-        var btn = e.target.closest('.pkg-desc-toggle');
-        if (!btn) return;
-        var p = btn.closest('.pkg-desc');
-        if (!p) return;
-        var isExpand = btn.dataset.mode === 'expand';
-        var shortEl = p.querySelector('.pkg-desc-short');
-        var fullEl  = p.querySelector('.pkg-desc-full');
-        if (shortEl) shortEl.classList.toggle('hidden', isExpand);
-        if (fullEl)  fullEl.classList.toggle('hidden', !isExpand);
-    });
+    function buildPkgCardInner(p) {
+        const photoHtml = p.coverPhotoUrl
+            ? '<img class="rpkg-photo" src="' + escapeHtml(p.coverPhotoUrl) + '" alt="' + escapeHtml(p.label) + '" loading="lazy">'
+            : '<div class="rpkg-photo-placeholder" aria-hidden="true"><i class="ti ti-photo"></i></div>';
+        const priceHtml = p.price > 0
+            ? '<div class="rpkg-price">' + fmtPeso(p.price) + '</div>'
+            : '<div class="rpkg-price rpkg-price--contact">Contact for quote</div>';
+        const chips = buildGuestDurationChips(p);
+        return (
+            '<div class="rpkg-media">' + photoHtml +
+                '<div class="rpkg-check" aria-hidden="true"><i class="ti ti-check"></i></div>' +
+            '</div>' +
+            '<div class="rpkg-body">' +
+                '<h4 class="rpkg-name">' + escapeHtml(p.label) + '</h4>' +
+                priceHtml +
+                (p.desc ? '<p class="rpkg-desc">' + escapeHtml(p.desc) + '</p>' : '') +
+                (chips ? '<div class="rpkg-chips">' + chips + '</div>' : '') +
+                '<a class="rpkg-details-link" href="/packages.html?package=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener noreferrer">' +
+                    'View full details <i class="ti ti-arrow-up-right" aria-hidden="true"></i>' +
+                '</a>' +
+            '</div>'
+        );
+    }
 
-    // Phase 1: show name + price + raw description only (no guest range)
     function buildMiniGrid() {
         const g = document.getElementById('mini-grid');
         if (!g) return;
         g.innerHTML = '';
-        MINI.forEach(p => {
-            const c = card(
-                '<h4>' + p.label + '</h4>' +
-                '<div class="pkg-price">&#8369;' + p.price.toLocaleString() + '</div>' +
-                '<p class="pkg-desc">' + truncDesc(p.desc) + '</p>',
-                S.miniPackage && S.miniPackage.label === p.label
-            );
+        const list = MINI_BY_CAT[S.categoryId] || [];
+        list.forEach(p => {
+            const c = card(buildPkgCardInner(p), !!S.miniPackage && S.miniPackage.id === p.id);
             c.onclick = async () => {
                 S.miniPackage = p;
                 S.snackAddon  = null;
                 S.time        = '';
                 activate(g, c);
                 updateSectionLocks();
-                updateGuestCountHint();
+                clampGuestCountToSelection();
                 buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
-        if (!MINI.length) g.innerHTML = packagesEmptyStateHtml();
+        if (!list.length) g.innerHTML = packagesEmptyStateHtml();
     }
 
     function buildSnackGrid() {
         const g = document.getElementById('snack-grid');
         if (!g) return;
         g.innerHTML = '';
-        const none = card('<h4>No Add-on</h4><p class="pkg-desc">Skip the snack bar corner</p>', S.snackAddon === null);
+        // "No Add-on" is an always-available default, not a product — kept
+        // visually distinct (solid tint) rather than the full unified card.
+        const none = document.createElement('div');
+        none.className = 'pkg-card rpkg-noaddon' + (S.snackAddon === null ? ' active' : '');
+        none.innerHTML = '<i class="ti ti-circle-off" aria-hidden="true"></i><h4>No Add-on</h4><p class="rpkg-desc">Skip the snack bar corner</p>';
+        none.setAttribute('role', 'button');
+        none.setAttribute('tabindex', '0');
+        none.setAttribute('aria-pressed', String(S.snackAddon === null));
+        none.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); none.click(); }
+        });
         none.onclick = () => { S.snackAddon = null; activate(g, none); };
         g.appendChild(none);
         SNACK.forEach(p => {
-            const c = card(
-                '<h4>' + p.label + '</h4>' +
-                '<div class="pkg-price">&#8369;' + p.price.toLocaleString() + '</div>' +
-                '<p class="pkg-desc">' + truncDesc(p.desc) + '</p>',
-                S.snackAddon && S.snackAddon.label === p.label
-            );
+            const c = card(buildPkgCardInner(p), !!S.snackAddon && S.snackAddon.id === p.id);
             c.onclick = () => { S.snackAddon = p; activate(g, c); };
             g.appendChild(c);
         });
     }
 
-    function buildOffsiteCats() {
-        const g = document.getElementById('offsite-cat-grid');
-        if (!g) return;
-        g.innerHTML = '';
-        const serviceIcons = { coffee:'fa-mug-hot', snack:'fa-cookie-bite', catering:'fa-utensils' };
-        OFFSITE_CATS.forEach(p => {
-            const c = card(
-                '<div class="service-card-icon" aria-hidden="true"><i class="fa-solid ' + (serviceIcons[p.val] || 'fa-briefcase') + '"></i></div>' +
-                '<h4>' + p.label + '</h4><p class="pkg-desc">' + p.desc + '</p>',
-                S.offsiteCategory === p.val
-            );
-            c.classList.add('service-card');
-            c.onclick = async () => {
-                S.offsiteCategory = p.val; S.offsitePackage = null; S.cateringCart = []; S.time = '';
-                activate(g, c);
-                const subEl      = document.getElementById('offsite-sub');
-                const cateringEl = document.getElementById('catering-section');
-                if (p.val === 'catering') {
-                    subEl.classList.add('hidden'); cateringEl.classList.remove('hidden');
-                    buildCateringDishBuilder();
-                } else {
-                    cateringEl.classList.add('hidden'); subEl.classList.remove('hidden');
-                    document.getElementById('offsite-sub-label').textContent = 'Choose a ' + p.label + ' Package';
-                    buildOffsiteSub(p.val);
-                }
-                updateSectionLocks();
-                buildAddonOrVenueStep();
-                await refreshAvailabilityForSelectedScope();
-            };
-            g.appendChild(c);
-        });
-
-        if (S.offsiteCategory === 'catering') {
-            document.getElementById('offsite-sub').classList.add('hidden');
-            document.getElementById('catering-section').classList.remove('hidden');
-            buildCateringDishBuilder();
-        } else if (S.offsiteCategory && S.offsiteCategory !== 'catering') {
-            document.getElementById('catering-section').classList.add('hidden');
-            document.getElementById('offsite-sub').classList.remove('hidden');
-            buildOffsiteSub(S.offsiteCategory);
-        }
-    }
-
-    function buildOffsiteSub(val) {
+    function buildOffsiteSub(categoryId) {
         const g = document.getElementById('offsite-sub-grid');
         if (!g) return;
         g.innerHTML = '';
-        (OFFSITE_PKGS[val] || []).forEach(p => {
-            const c = card(
-                '<h4>' + p.label + '</h4>' +
-                '<div class="pkg-price">' + (p.price > 0 ? '&#8369;' + p.price.toLocaleString() : 'Contact for quote') + '</div>' +
-                '<p class="pkg-desc">' + truncDesc(p.desc) + '</p>',
-                S.offsitePackage && S.offsitePackage.label === p.label
-            );
+        const list = OFFSITE_BY_CAT[categoryId] || [];
+        list.forEach(p => {
+            const c = card(buildPkgCardInner(p), !!S.offsitePackage && S.offsitePackage.id === p.id);
             c.onclick = async () => {
                 S.offsitePackage = p; S.time = '';
                 activate(g, c);
                 updateSectionLocks();
-                updateGuestCountHint();
+                clampGuestCountToSelection();
                 buildAddonOrVenueStep();
                 await refreshAvailabilityForSelectedScope();
             };
             g.appendChild(c);
         });
-        if (!(OFFSITE_PKGS[val] || []).length) g.innerHTML = packagesEmptyStateHtml();
+        if (!list.length) g.innerHTML = packagesEmptyStateHtml();
     }
 
     // ── Add-on / Venue conditional step ───────────────────────────────────
@@ -2076,13 +2338,14 @@ By signing below, the Client confirms that the reservation details above are acc
         const selectedScope = getSelectedBookingScope();
         const selectedAvail = availabilityState.selectedDateAvailability || { scopeTaken: false };
         const override      = availabilityState.timeStatusOverride || '';
+        const selectedLabel = getSelectedPackageOrCategoryLabel() || (selectedScope ? getScopeLabel(selectedScope) : '');
 
         g.innerHTML = '';
         availabilityState.availableStartTimes = [];
 
         if (!S.eventDate) {
             if (timeStatusNote) timeStatusNote.textContent = override || (selectedScope
-                ? `Choose an available date for the ${getScopeLabel(selectedScope)} booking slot first.`
+                ? `Choose an available date for the ${selectedLabel} booking slot first.`
                 : 'Choose your location and package first, then pick an available date to unlock time slots.');
             renderEndTimeReadout();
             return;
@@ -2129,12 +2392,12 @@ By signing below, the Client confirms that the reservation details above are acc
         }
 
         if (!rows.length) {
-            if (timeStatusNote) timeStatusNote.textContent = `${getScopeLabel(selectedScope)} has no valid start times for this package's duration within operating hours.`;
+            if (timeStatusNote) timeStatusNote.textContent = `${selectedLabel} has no valid start times for this package's duration within operating hours.`;
         } else if (timeStatusNote) {
             const anyBlocked = rows.some(r => !r.isAvailable);
             timeStatusNote.textContent = anyBlocked
-                ? `${getScopeLabel(selectedScope)} is open on this date. Disabled times overlap with an existing reservation.`
-                : `${getScopeLabel(selectedScope)} is open on this date. Choose your event start time below.`;
+                ? `${selectedLabel} is open on this date. Disabled times overlap with an existing reservation.`
+                : `${selectedLabel} is open on this date. Choose your event start time below.`;
         }
 
         rows.forEach(row => {
@@ -2143,7 +2406,7 @@ By signing below, the Client confirms that the reservation details above are acc
             c.className = 'time-card' + (S.time === row.timeLabel ? ' active' : '') + (isDisabled ? ' disabled' : '');
             c.textContent = row.timeLabel;
             c.title = isDisabled
-                ? (row.reason || `${getScopeLabel(selectedScope)} is unavailable at ${row.timeLabel} due to an overlapping reservation.`)
+                ? (row.reason || `${selectedLabel} is unavailable at ${row.timeLabel} due to an overlapping reservation.`)
                 : `Choose ${row.timeLabel} as your start time.`;
 
             c.onclick = () => {
@@ -2177,7 +2440,8 @@ By signing below, the Client confirms that the reservation details above are acc
                 pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
             }
         } else if (S.offsiteCategory === 'catering') {
-            pkgRows += sr('Service', '&#127869;&#65039; Catering');
+            const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
+            pkgRows += sr('Service', catObj ? catObj.name : 'Catering');
             pkgRows += sr('Inclusions', 'Buffet setup, utensils, waiters, styled tables, backdrop, centerpiece, 3–4 hrs');
             pkgRows += sr('Special Offer', 'FREE Overflowing Coffee &amp; 1 Appetizer/Dessert');
             S.cateringCart.filter(i => i && i.pax).forEach(i => {
@@ -2186,9 +2450,9 @@ By signing below, the Client confirms that the reservation details above are acc
             });
             if (total === 0) pkgRows += sr('Price', 'Contact for quote');
         } else if (S.offsitePackage) {
-            const catObj = OFFSITE_CATS.find(c => c.val === S.offsiteCategory);
+            const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
             total = S.offsitePackage.price;
-            pkgRows += sr('Service', catObj ? catObj.label : '');
+            pkgRows += sr('Service', catObj ? catObj.name : '');
             pkgRows += sr('Package', S.offsitePackage.label);
             if (S.offsitePackage.price > 0) pkgRows += sr('Price', '&#8369;' + S.offsitePackage.price.toLocaleString());
         }
@@ -2278,7 +2542,8 @@ By signing below, the Client confirms that the reservation details above are acc
             document.querySelectorAll('.location-card').forEach(c => {
                 c.classList.toggle('active', c.dataset.val === S.locationType);
             });
-            // Build package options based on saved location
+            // Build the category chip grid, then package options based on saved category
+            buildCategoryGrid();
             buildPackageStep();
             // Build event type select (always ready so it renders when unlocked)
             buildEventTypeSelect();
@@ -2478,12 +2743,25 @@ By signing below, the Client confirms that the reservation details above are acc
         const d = document.createElement('div');
         d.className = 'pkg-card' + (isActive ? ' active' : '');
         d.innerHTML = html;
+        d.setAttribute('role', 'button');
+        d.setAttribute('tabindex', '0');
+        d.setAttribute('aria-pressed', String(!!isActive));
+        d.addEventListener('keydown', (e) => {
+            // Let native controls inside the card (e.g. the "View full
+            // details" link) handle their own Enter/Space activation.
+            if (e.target !== d && e.target.closest('a,button')) return;
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); d.click(); }
+        });
         return d;
     }
 
     function activate(container, el) {
-        container.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
+        container.querySelectorAll('.pkg-card').forEach(c => {
+            c.classList.remove('active');
+            c.setAttribute('aria-pressed', 'false');
+        });
         el.classList.add('active');
+        el.setAttribute('aria-pressed', 'true');
     }
 
     // ── Event listeners ────────────────────────────────────────────────────
@@ -2505,13 +2783,21 @@ By signing below, the Client confirms that the reservation details above are acc
     };
 
     document.querySelectorAll('.location-card').forEach(c => {
+        c.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.click(); }
+        });
         c.onclick = () => {
-            document.querySelectorAll('.location-card').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll('.location-card').forEach(x => {
+                x.classList.remove('active');
+                x.setAttribute('aria-pressed', 'false');
+            });
             c.classList.add('active');
+            c.setAttribute('aria-pressed', 'true');
             const prev = S.locationType;
             S.locationType = c.dataset.val;
             // Reset downstream selections when location type changes
             if (prev !== S.locationType) {
+                S.categoryId      = '';
                 S.miniPackage     = null;
                 S.snackAddon      = null;
                 S.offsiteCategory = '';
@@ -2520,6 +2806,7 @@ By signing below, the Client confirms that the reservation details above are acc
                 S.time            = '';
                 syncSelectedDate('');
             }
+            buildCategoryGrid();
             buildPackageStep();
             updateSectionLocks();
             buildAddonOrVenueStep();
@@ -2615,7 +2902,7 @@ By signing below, the Client confirms that the reservation details above are acc
                 addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
                 totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
             } else if (S.offsiteCategory === 'catering') {
-                const cateringPkg = OFFSITE_PKGS.catering[0];
+                const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
                 packageId  = cateringPkg ? cateringPkg.id : null;
                 totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
             } else {
@@ -2710,6 +2997,11 @@ By signing below, the Client confirms that the reservation details above are acc
         if (!draftRestored) cur = 1;
         showStep(cur);
     }
+
+    // Runs after S.eventType is known (URL params / restored draft, above) so
+    // a pre-selected event type's own min-advance override is accounted for
+    // on the very first paint, not just after the user re-picks it.
+    advanceToFirstBookableMonth();
 
     // Prefill contact details for logged-in users (non-blocking)
     prefillReservationContactDetails();

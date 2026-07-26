@@ -57,6 +57,7 @@
           </div>
           <div class="header-btn-group">
             <button type="button" class="btn-cancel" id="openVenuesBtn">Venues</button>
+            <button type="button" class="btn-cancel" id="openBadgeTypesBtn">Badge Types</button>
             <button type="button" class="btn-cancel" id="addCategoryBtn">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New category
@@ -205,6 +206,82 @@
               </thead>
               <tbody id="archivedVenueBody">
                 <tr class="empty-row"><td colspan="6">No archived venues.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================= -->
+      <!-- ========== BADGE TYPES VIEW =================== -->
+      <!-- ============================================= -->
+      <div id="badgeTypesView" style="display:none;">
+        <div class="breadcrumb-bar">
+          <button type="button" class="btn-back" id="backToCategoriesFromBadgeTypesBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            Back to Inventory
+          </button>
+        </div>
+
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Badge Types</h1>
+            <p class="page-sub">Merchandising labels admins can assign to packages, like Best Value. Best Seller is managed separately, from a package's own Badges panel — it doesn't appear here.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addBadgeTypeBtn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add New Badge Type
+          </button>
+        </div>
+
+        <p class="page-message" id="badgeTypesPageMessage"></p>
+
+        <div class="card" id="activeBadgeTypesSection">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Active Badge Types</h2>
+              <p class="section-sub">Selectable from any package's Badges panel.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="pkg-table">
+              <thead>
+                <tr>
+                  <th>Badge</th>
+                  <th>Uniqueness</th>
+                  <th>In use</th>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="activeBadgeTypesBody">
+                <tr class="empty-row"><td colspan="6">Loading badge types...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="archivedBadgeTypesSection" style="display:none;">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Archived Badge Types</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="pkg-table">
+              <thead>
+                <tr>
+                  <th>Badge</th>
+                  <th>Uniqueness</th>
+                  <th>In use</th>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="archivedBadgeTypesBody">
+                <tr class="empty-row"><td colspan="6">No archived badge types.</td></tr>
               </tbody>
             </table>
           </div>
@@ -429,6 +506,32 @@
     </div>
   </div>
 
+  <!-- ── BADGE ASSIGNMENT MODAL ── -->
+  <div class="modal-overlay hidden" id="badgeModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="badgeModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="badgeModalTitle">Badges</h2>
+          <p class="modal-sub">Highlight this package to customers</p>
+        </div>
+        <button type="button" class="modal-close" id="badgeModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="badgeBestSellerRow"></div>
+        <div class="modal-field">
+          <label class="modal-label">Assignable badges</label>
+          <div id="badgeChipList" class="badge-chip-list"></div>
+        </div>
+        <p class="modal-message hidden" id="badgeModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="badgeModalDone">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── TIER ADD / EDIT MODAL ── -->
     <div class="modal-overlay hidden" id="tierModal" aria-hidden="true">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tierModalTitle">
@@ -536,6 +639,58 @@
         <button type="button" class="btn-primary" id="venueModalSave">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span id="venueModalSaveLabel">Add Venue</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BADGE TYPE ADD / EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="badgeTypeModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="badgeTypeModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="badgeTypeModalTitle">Add New Badge Type</h2>
+          <p class="modal-sub" id="badgeTypeModalSub">A label admins can assign to any package</p>
+        </div>
+        <button type="button" class="modal-close" id="badgeTypeModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="badgeTypeLabelInput">Label *</label>
+          <input type="text" id="badgeTypeLabelInput" class="modal-input" placeholder="E.g., Limited Slots">
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="badgeTypeVariantSelect">Colour</label>
+            <select id="badgeTypeVariantSelect" class="modal-input modal-select">
+              <option value="pending">Gold</option>
+              <option value="approved">Green</option>
+              <option value="info">Blue</option>
+              <option value="neutral">Grey</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="badgeTypeSortOrder">Sort Order</label>
+            <input type="number" id="badgeTypeSortOrder" class="modal-input" value="0" min="0">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="badgeTypeScopeSelect">Uniqueness</label>
+          <select id="badgeTypeScopeSelect" class="modal-input modal-select">
+            <option value="">No limit — can appear on many packages</option>
+            <option value="category">One per category</option>
+            <option value="global">One overall, across the whole catalogue</option>
+          </select>
+        </div>
+        <p class="modal-message hidden" id="badgeTypeModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="badgeTypeModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="badgeTypeModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="badgeTypeModalSaveLabel">Add Badge Type</span>
         </button>
       </div>
     </div>

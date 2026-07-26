@@ -978,6 +978,60 @@
 .pkg-flag.flag-neutral { background: var(--neutral); color: var(--neutral-txt); }
 .pkg-flag.flag-archived { background: rgba(0,0,0,.55); color: #fff; }
 
+/* ── Package badges (Best Value / Best Seller / promo) ─────────────── */
+.pkg-badges-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.pkg-badge-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pkg-badge-chip--pending  { background: var(--pending);  color: var(--pending-txt); }
+.pkg-badge-chip--approved { background: var(--approved); color: var(--approved-txt); }
+.pkg-badge-chip--info     { background: var(--info);     color: var(--info-txt); }
+.pkg-badge-chip--neutral  { background: var(--neutral);  color: var(--neutral-txt); }
+
+.badge-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.badge-toggle-chip {
+  border: 1px solid var(--btn-secondary-border, #D8CCBD);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.badge-toggle-chip.active { border-color: transparent; }
+.badge-toggle-chip.active.variant-pending  { background: var(--pending);  color: var(--pending-txt); }
+.badge-toggle-chip.active.variant-approved { background: var(--approved); color: var(--approved-txt); }
+.badge-toggle-chip.active.variant-info     { background: var(--info);     color: var(--info-txt); }
+.badge-toggle-chip.active.variant-neutral  { background: var(--neutral); color: var(--neutral-txt); }
+
+.badge-readonly-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;
+  background: var(--neutral); color: var(--neutral-txt); font-size: 13px;
+}
+.badge-readonly-row.is-active { background: var(--approved); color: var(--approved-txt); }
+
+.badge-mode-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;
+  background: var(--neutral); color: var(--neutral-txt); font-size: 13px;
+}
+.badge-mode-toggle {
+  border: none;
+  background: none;
+  color: var(--input-focus, #3D1A0A);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0;
+}
+
 .pkg-card-actions {
   position: absolute;
   top: 8px;

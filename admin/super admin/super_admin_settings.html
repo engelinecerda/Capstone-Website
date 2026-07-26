@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Operating Hours - ELI Coffee Events</title>
+  <title>Availability and Scheduling - ELI Coffee Events</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
@@ -48,8 +48,8 @@
 
       <div class="page-header">
         <div>
-          <h1 class="page-title">Operating Hours <span class="admin-badge" id="adminBadge">Loading...</span></h1>
-          <p class="page-sub">Business hours, booking buffers, and per-scope capacity limits.</p>
+          <h1 class="page-title">Availability and Scheduling <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Business hours, booking notice window, and per-scope capacity limits — jump to a section from the sidebar or scroll through all five below.</p>
         </div>
       </div>
 
@@ -66,7 +66,7 @@
       </div>
 
       <!-- ── OPERATING HOURS ── -->
-      <div class="card">
+      <div class="card" id="hours">
         <p class="card-title">Operating Hours</p>
         <p class="card-sub">Per-weekday hours bound which start times customers can select — the last valid start time always leaves room for the full package duration before closing. A closed day offers no bookable times at all. Changes affect new bookings only.</p>
 
@@ -88,8 +88,61 @@
         </div>
       </div>
 
+      <!-- ── BOOKING NOTICE WINDOW ── -->
+      <div class="card" id="notice">
+        <p class="card-title">Booking Notice Window</p>
+        <p class="card-sub">How soon and how far ahead a reservation can be made. The minimum applies to every event type unless a specific type has its own override below; the maximum is the outer limit no override may exceed.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Site-wide minimum notice (days)</p>
+            <p class="pr-row-desc">Used for any event type with no override, and for "Other."</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="field-min-advance-days" min="0" step="1">
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Maximum advance booking (days)</p>
+            <p class="pr-row-desc">How far into the future the calendar opens up. Also caps every per-event-type override below — e.g. set to 180 to allow the 5-month lead time weddings need.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="field-max-advance-days" min="1" step="1">
+          </div>
+        </div>
+
+        <p class="form-message" id="min-advance-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveMinAdvanceBtn">Save Notice Window</button>
+        </div>
+      </div>
+
+      <!-- ── PER-EVENT-TYPE BOOKING NOTICE OVERRIDE ── -->
+      <div class="card" id="notice-overrides">
+        <p class="card-title">Per-Event-Type Notice Override</p>
+        <p class="card-sub">Leave blank to use the site-wide minimum above — e.g. a Wedding Reception might need 150 days' notice while a Birthday Party only needs 14. Capped at the maximum advance booking window set above. Manage the event type list itself on the Reservation Form page.</p>
+
+        <div class="table-wrap">
+          <table class="et-table" id="eventTypeAdvanceTable">
+            <thead><tr><th>Event Type</th><th>Notice override (days)</th><th>Effective</th></tr></thead>
+            <tbody id="eventTypeAdvanceBody">
+              <tr><td colspan="3">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="form-message" id="event-type-advance-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveEventTypeAdvanceBtn">Save Overrides</button>
+        </div>
+      </div>
+
       <!-- ── BUFFER & CAPACITY ── -->
-      <div class="card">
+      <div class="card" id="buffer-capacity">
         <p class="card-title">Buffer &amp; Capacity</p>
         <p class="card-sub">Global defaults applied to every booking scope (Onsite VIP / Onsite Main Hall / Offsite) unless overridden below.</p>
 
@@ -104,8 +157,8 @@
         </div>
         <div class="pr-row">
           <div class="pr-row-copy">
-            <p class="pr-row-label">Default slot capacity</p>
-            <p class="pr-row-desc">Concurrent bookings a scope accepts unless overridden below.</p>
+            <p class="pr-row-label">Default daily bookings per scope</p>
+            <p class="pr-row-desc">How many separate events a scope can host across one day, unless overridden below. A booked time is always exclusive — this only limits how many different times in the same day a scope can be booked, not how many can overlap.</p>
           </div>
           <div class="pr-row-control">
             <input type="number" class="pr-input-inline" id="field-default-capacity" min="1" step="1">
@@ -120,7 +173,7 @@
       </div>
 
       <!-- ── PER-SCOPE CAPACITY OVERRIDE ── -->
-      <div class="card">
+      <div class="card" id="capacity-overrides">
         <p class="card-title">Per-Scope Capacity Override</p>
         <p class="card-sub">Leave blank to use the global default above.</p>
 

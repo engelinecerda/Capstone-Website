@@ -1,8 +1,13 @@
-// super_admin_settings.js — Operating Hours page.
-// Map Scope and Reservation Rules used to live here too (removed along
-// with their tabs — see super_admin_settings.html). Their underlying
-// system_settings rows (venue_map_scope, reservation_rules) are untouched
-// in the database; this file just no longer has UI to edit them.
+// super_admin_settings.js — Availability and Scheduling page.
+// Five sections on one scrolling page (Operating Hours, Booking Notice
+// Window, Per-Event-Type Notice Override, Buffer & Capacity, Per-Scope
+// Capacity Override), each addressable via #hash from the sidebar's
+// expandable "Availability and scheduling" group (admin_nav_data.js) —
+// same anchor-scroll pattern as admin/config/payment-options.html, not
+// hide/show tabs, so no tab-switching JS is needed here.
+// Map Scope used to live here too (removed along with its tab). Its
+// underlying system_settings row (venue_map_scope) is untouched in the
+// database; this file just no longer has UI to edit it.
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -163,6 +168,188 @@ async function saveOperatingHours() {
   );
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// ── Booking notice window (min default + max window + per-event override) ──
+// Both fields live inside system_settings.reservation_rules — the same
+// object the customer booking page already reads (see loadReservationRules
+// in reservations.html) — so saving here only touches those two fields via
+// read-merge-write; every other field still stored in that JSON blob
+// (min_pax, etc.) is preserved as-is. Those lost their own admin UI when the
+// old Reservation Rules tab was removed and are DB-only for now (see the
+// comment in js/admin_payment_options.js).
+//
+// max_advance_days doubles as the ceiling for every per-event-type override
+// below (renderEventTypeAdvanceTable/saveEventTypeAdvanceOverrides) — a
+// per-event minimum notice longer than the booking window itself would make
+// that event type unbookable. Per the manager, the longest lead time needed
+// today is ~5 months (weddings), so the default of 180 days leaves headroom
+// above that without being so wide it stops catching fat-finger entries.
+const DEFAULT_MIN_ADVANCE_DAYS = 14;
+const DEFAULT_MAX_ADVANCE_DAYS = 180;
+
+function setMinAdvanceMsg(msg, isError = false) {
+  const el = document.getElementById('min-advance-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+function getMaxAdvanceDaysFieldValue() {
+  const value = Number(document.getElementById('field-max-advance-days')?.value);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_ADVANCE_DAYS;
+}
+
+async function loadMinAdvanceDays() {
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'reservation_rules')
+    .maybeSingle();
+
+  const parsed = data ? JSON.parse(data.setting_value) : {};
+  const minValue = Number.isFinite(Number(parsed.min_advance_days)) ? Number(parsed.min_advance_days) : DEFAULT_MIN_ADVANCE_DAYS;
+  const maxValue = Number.isFinite(Number(parsed.max_advance_days)) ? Number(parsed.max_advance_days) : DEFAULT_MAX_ADVANCE_DAYS;
+  const minEl = document.getElementById('field-min-advance-days');
+  const maxEl = document.getElementById('field-max-advance-days');
+  if (minEl) { minEl.value = minValue; minEl.max = maxValue; }
+  if (maxEl) maxEl.value = maxValue;
+}
+
+async function saveMinAdvanceDays() {
+  const minValue = Number(document.getElementById('field-min-advance-days')?.value);
+  const maxValue = Number(document.getElementById('field-max-advance-days')?.value);
+
+  if (!Number.isFinite(minValue) || minValue < 0) { setMinAdvanceMsg('Minimum booking notice must be zero or more days.', true); return; }
+  if (!Number.isFinite(maxValue) || maxValue < 1) { setMinAdvanceMsg('Maximum advance booking must be at least 1 day.', true); return; }
+  if (minValue > maxValue) { setMinAdvanceMsg('Minimum notice cannot be greater than the maximum advance booking window.', true); return; }
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'reservation_rules')
+    .maybeSingle();
+  const existing = current ? JSON.parse(current.setting_value) : {};
+  const merged = { ...existing, min_advance_days: minValue, max_advance_days: maxValue };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      { setting_key: 'reservation_rules', setting_value: JSON.stringify(merged), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
+    );
+
+  if (error) { setMinAdvanceMsg('Failed to save: ' + error.message, true); return; }
+  await logAudit({ action: 'Updated Booking Notice Window', category: 'scheduling_config', details: `min_advance_days=${minValue}, max_advance_days=${maxValue}` });
+  setMinAdvanceMsg('Notice window saved successfully.');
+  document.getElementById('field-min-advance-days').max = maxValue;
+  renderEventTypeAdvanceTable(); // "Effective" column and override cap depend on these
+}
+
+let eventTypesForAdvance = [];  // [{ id, name }]
+let eventTypeAdvanceCache = {}; // { id: overrideDays|null }
+
+function setEventTypeAdvanceMsg(msg, isError = false) {
+  const el = document.getElementById('event-type-advance-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+function renderEventTypeAdvanceTable() {
+  const body = document.getElementById('eventTypeAdvanceBody');
+  if (!body) return;
+  const globalDefault = Number(document.getElementById('field-min-advance-days')?.value) || DEFAULT_MIN_ADVANCE_DAYS;
+  const maxAllowed = getMaxAdvanceDaysFieldValue();
+
+  if (!eventTypesForAdvance.length) {
+    body.innerHTML = '<tr><td colspan="3">No active event types yet — add one on the Reservation Form page.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = eventTypesForAdvance.map(({ id, name }) => {
+    const override = eventTypeAdvanceCache[id];
+    const effective = override ?? globalDefault;
+    return `
+      <tr data-event-type-id="${id}">
+        <td>${escapeHtml(name)}</td>
+        <td><input type="number" min="0" max="${maxAllowed}" step="1" data-event-type-advance value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
+        <td>${effective}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.matches('[data-event-type-advance]')) {
+    const row = e.target.closest('tr[data-event-type-id]');
+    if (!row) return;
+    const id = row.dataset.eventTypeId;
+    const raw = e.target.value.trim();
+    eventTypeAdvanceCache[id] = raw === '' ? null : Number(raw);
+    // Update just the "Effective" cell in place — rebuilding the whole table
+    // (via renderEventTypeAdvanceTable) on every keystroke replaces this
+    // input with a new DOM node, which drops the caret back to position 0.
+    // The next digit then gets inserted at the start instead of the end, so
+    // typing "150" renders as "051" -> "51" once the leading zero is
+    // stripped on next render. Leave the input alone; only its sibling cell
+    // needs to react live.
+    const globalDefault = Number(document.getElementById('field-min-advance-days')?.value) || DEFAULT_MIN_ADVANCE_DAYS;
+    const effectiveCell = row.children[2];
+    if (effectiveCell) effectiveCell.textContent = eventTypeAdvanceCache[id] ?? globalDefault;
+  }
+});
+
+async function loadEventTypeAdvanceOverrides() {
+  const { data, error } = await supabase
+    .from('event_types')
+    .select('id, name, min_advance_days')
+    .eq('status', 'Active')
+    .order('name', { ascending: true });
+
+  if (error || !data) { eventTypesForAdvance = []; renderEventTypeAdvanceTable(); return; }
+
+  eventTypesForAdvance = data.map(({ id, name }) => ({ id, name }));
+  eventTypeAdvanceCache = {};
+  data.forEach((et) => { eventTypeAdvanceCache[et.id] = et.min_advance_days ?? null; });
+  renderEventTypeAdvanceTable();
+}
+
+async function saveEventTypeAdvanceOverrides() {
+  const maxAllowed = getMaxAdvanceDaysFieldValue();
+  for (const { id, name } of eventTypesForAdvance) {
+    const val = eventTypeAdvanceCache[id];
+    if (val === null || val === undefined) continue;
+    if (!Number.isFinite(val) || val < 0) {
+      setEventTypeAdvanceMsg('Overrides must be zero or more days, or left blank to use the default.', true);
+      return;
+    }
+    if (val > maxAllowed) {
+      setEventTypeAdvanceMsg(`"${name}"'s override (${val} days) exceeds the maximum advance booking window (${maxAllowed} days). Raise the maximum above first if this event type genuinely needs more notice.`, true);
+      return;
+    }
+  }
+
+  try {
+    await Promise.all(eventTypesForAdvance.map(({ id }) =>
+      supabase.from('event_types').update({ min_advance_days: eventTypeAdvanceCache[id] ?? null }).eq('id', id)
+    ));
+    await logAudit({
+      action: 'Updated Per-Event-Type Booking Notice',
+      category: 'scheduling_config',
+      details: JSON.stringify(eventTypeAdvanceCache)
+    });
+    setEventTypeAdvanceMsg('Overrides saved successfully.');
+  } catch (err) {
+    setEventTypeAdvanceMsg('Failed to save: ' + err.message, true);
+  }
+}
+
 // ── Buffer & capacity (global) ──────────────────────────────────────────────
 const DEFAULT_SCHEDULING_SETTINGS = { buffer_minutes: 30, default_slot_capacity: 2 };
 
@@ -306,10 +493,14 @@ async function init() {
 
   await loadVisionUsage();
   await loadOperatingHours();
+  await loadMinAdvanceDays();
+  await loadEventTypeAdvanceOverrides();
   await loadSchedulingSettings();
   await loadScopeCapacity();
 
   document.getElementById('saveHoursBtn')?.addEventListener('click', saveOperatingHours);
+  document.getElementById('saveMinAdvanceBtn')?.addEventListener('click', saveMinAdvanceDays);
+  document.getElementById('saveEventTypeAdvanceBtn')?.addEventListener('click', saveEventTypeAdvanceOverrides);
   document.getElementById('saveCapacityBtn')?.addEventListener('click', saveSchedulingSettings);
   document.getElementById('saveScopeCapacityBtn')?.addEventListener('click', saveScopeCapacity);
 }

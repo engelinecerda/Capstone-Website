@@ -3,10 +3,13 @@
 
 import { customerSupabase as supabase } from './supabase.js';
 
-const CATEGORY_TABLE = 'package_category';
-const PACKAGE_TABLE  = 'package';
-const TIER_TABLE     = 'package_tier';
-const PHOTO_TABLE    = 'package_photo';
+const CATEGORY_TABLE      = 'package_category';
+const PACKAGE_TABLE       = 'package';
+const TIER_TABLE          = 'package_tier';
+const PHOTO_TABLE         = 'package_photo';
+const BADGE_TABLE         = 'badge';
+const PACKAGE_BADGE_TABLE = 'package_badge';
+const VENUE_MAP_TABLE     = 'package_venue';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let allCategories      = [];
@@ -14,6 +17,7 @@ let packageCountMap    = {};
 let selectedCategoryId = null;
 let selectedPackageId  = null;
 let allPackagesCache   = [];
+let badgeDefsById      = {}; // badge_id -> {badge_key,label,variant,sort_order}
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const sectionCategories = document.getElementById('section-categories');
@@ -55,6 +59,10 @@ function esc(str) {
 
 function show(el) { if (el) el.classList.remove('hidden'); }
 function hide(el) { if (el) el.classList.add('hidden'); }
+
+function badgeDefByKey(key) {
+  return Object.values(badgeDefsById).find(b => b.badge_key === key);
+}
 
 function smoothScrollTo(el, offset = 80) {
   if (!el) return;
@@ -144,6 +152,13 @@ async function loadCategories() {
   hide(pkgCatGrid);
 
   try {
+    if (!Object.keys(badgeDefsById).length) {
+      try {
+        const { data: badges } = await supabase.from(BADGE_TABLE).select('*').eq('is_active', true);
+        (badges || []).forEach(b => { badgeDefsById[b.badge_id] = b; });
+      } catch { /* badges optional — catalogue still works without them */ }
+    }
+
     const { data: cats, error: catErr } = await supabase
       .from(CATEGORY_TABLE)
       .select('*')
@@ -186,8 +201,30 @@ async function loadCategories() {
     hide(pkgCatLoading);
     show(pkgCatGrid);
 
-    // Auto-select first category without scrolling (data loads immediately on page open)
-    selectCategory(visibleCats[0], { scroll: false });
+    // Deep link from reservations.html's "View full details" — jump straight
+    // to the linked package's category and open its detail panel, instead of
+    // the default first-category auto-select.
+    const targetPackageId = new URLSearchParams(window.location.search).get('package');
+    let targetCat = visibleCats[0];
+    if (targetPackageId) {
+      try {
+        const { data: pkg } = await supabase
+          .from(PACKAGE_TABLE)
+          .select('package_id, package_category_id')
+          .eq('package_id', targetPackageId)
+          .eq('is_active', true)
+          .maybeSingle();
+        const foundCat = pkg && visibleCats.find(c => c.package_category_id === pkg.package_category_id);
+        if (foundCat) targetCat = foundCat;
+      } catch { /* fall back to first category */ }
+    }
+
+    await selectCategory(targetCat, { scroll: !!targetPackageId });
+
+    if (targetPackageId) {
+      const pkg = allPackagesCache.find(p => p.package_id === targetPackageId);
+      if (pkg) selectPackage(pkg, targetCat.category_name || '');
+    }
 
   } catch (err) {
     console.error('loadCategories:', err);
@@ -231,7 +268,7 @@ function renderCategoryGrid(cats) {
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 2 — CATEGORY OVERVIEW
 // ══════════════════════════════════════════════════════════════════════════════
-function selectCategory(cat, { scroll = true } = {}) {
+async function selectCategory(cat, { scroll = true } = {}) {
   selectedCategoryId = cat.package_category_id;
   selectedPackageId  = null;
 
@@ -248,7 +285,7 @@ function selectCategory(cat, { scroll = true } = {}) {
 
   if (scroll) smoothScrollTo(sectionOptions, 88);
 
-  loadPackages(cat.package_category_id, cat.category_name || '');
+  await loadPackages(cat.package_category_id, cat.category_name || '');
 }
 
 
@@ -312,23 +349,71 @@ async function loadPackages(categoryId, categoryName) {
       });
     } catch { /* photos optional */ }
 
+    // Venue-mapping counts — an onsite/both package with no mapped venue
+    // isn't actually bookable yet (mirrors reservations.html's loadPackages()
+    // customer-bookable definition), so it must never wear a badge.
+    let venueCountMap = {};
+    try {
+      const { data: venueMaps } = await supabase
+        .from(VENUE_MAP_TABLE)
+        .select('package_id')
+        .in('package_id', packageIds);
+      (venueMaps || []).forEach(r => { venueCountMap[r.package_id] = (venueCountMap[r.package_id] || 0) + 1; });
+    } catch { /* treat as unmapped — badge just won't show */ }
+
+    // Badges: admin-assigned (package_badge) + derived Best Seller (RPC,
+    // scoped to this category — matches this function's existing
+    // per-category batch-fetch pattern for tiers/photos above).
+    let badgeMap = {};
+    try {
+      const { data: assignedRows } = await supabase
+        .from(PACKAGE_BADGE_TABLE)
+        .select('package_id, badge_id')
+        .in('package_id', packageIds);
+      (assignedRows || []).forEach(row => {
+        const def = badgeDefsById[row.badge_id];
+        if (!def) return;
+        if (!badgeMap[row.package_id]) badgeMap[row.package_id] = [];
+        badgeMap[row.package_id].push(def);
+      });
+
+      // Best Seller is mode-aware: in manual mode it's just another row in
+      // package_badge (already merged above); only overlay the derived
+      // winner while it's still in automatic mode (admin-toggleable in
+      // js/super_admin_packages.js's badge modal).
+      const bestSellerDef = badgeDefByKey('best_seller');
+      if (bestSellerDef && !bestSellerDef.is_assignable) {
+        const { data: bestSellerRows } = await supabase.rpc('get_best_seller_package_ids', { p_category_id: categoryId });
+        (bestSellerRows || []).forEach(row => {
+          if (!badgeMap[row.package_id]) badgeMap[row.package_id] = [];
+          badgeMap[row.package_id].push(bestSellerDef);
+        });
+      }
+    } catch { /* badges optional — never block the catalogue */ }
+
+    function isCustomerBookable(p) {
+      const hasPhoto = !!((p._photos && p._photos.length) || p.package_image);
+      const hasInclusions = (Array.isArray(p.inclusions) && p.inclusions.length > 0) || !!(p.description || '').trim();
+      const loc = p.location_type;
+      const onsiteOk = (loc === 'onsite' || loc === 'both') ? (venueCountMap[p.package_id] || 0) > 0 : true;
+      return p.is_active && hasPhoto && hasInclusions && onsiteOk;
+    }
+
     pkgs.forEach(p => {
       p._tiers = tierMap[p.package_id] || [];
       p._photos = photoMap[p.package_id] || [];
       p._coverPhoto = p._photos.find(ph => ph.is_cover) || p._photos[0] || null;
+      p._badges = (p.package_type !== 'add on' && isCustomerBookable(p))
+        ? (badgeMap[p.package_id] || []).slice().sort((a, b) => a.sort_order - b.sort_order).slice(0, 2)
+        : [];
     });
     allPackagesCache = pkgs;
 
     const mainPkgs  = pkgs.filter(p => p.package_type !== 'add on');
     const addonPkgs = pkgs.filter(p => p.package_type === 'add on');
 
-    // Identify the highest-priced main package for the "Best value" badge.
-    // Excludes contact-for-quote packages (price = 0) so the badge is only
-    // shown when there's an actual price to justify the tier recommendation.
-    const displayPkgs   = mainPkgs.length ? mainPkgs : pkgs;
-    const highestPrice  = Math.max(...displayPkgs.map(p => Number(p.price) || 0));
-    pkgMainGrid.innerHTML = displayPkgs
-      .map(p => buildPackageCard(p, categoryName, highestPrice > 0 && Number(p.price) === highestPrice))
+    pkgMainGrid.innerHTML = mainPkgs
+      .map(p => buildPackageCard(p, categoryName))
       .join('');
 
     if (addonPkgs.length > 0) {
@@ -346,7 +431,7 @@ async function loadPackages(categoryId, categoryName) {
   }
 }
 
-function buildPackageCard(pkg, categoryName, isBest = false) {
+function buildPackageCard(pkg, categoryName) {
   const name     = pkg.package_name || 'Package';
   const price    = Number(pkg.price || 0);
   const loc      = (pkg.location_type || '').toLowerCase();
@@ -356,10 +441,15 @@ function buildPackageCard(pkg, categoryName, isBest = false) {
     ? `<span class="pkg-card-loc-badge pkg-card-loc-badge--${loc}">${esc(locLabel)}</span>`
     : `<span></span>`;
 
-  // "Best value" badge — positioned absolutely at top-right of card, sits in
-  // the card's top padding area so it doesn't displace any content below it.
-  const bestBadge = isBest
-    ? `<span class="pkg-card-best-badge" aria-label="Best value package">Best value</span>`
+  // Assigned + derived badges (Best Value / Best Seller / promo labels) —
+  // positioned absolutely at top-right of card, sitting in the card's top
+  // padding area so they don't displace any content below them. Capped at 2
+  // (see loadPackages), stacked top to bottom.
+  const badges = pkg._badges || [];
+  const badgesHtml = badges.length
+    ? `<div class="pkg-card-badges">${badges.map(b =>
+        `<span class="pkg-card-badge pkg-card-badge--${esc(b.variant)}">${esc(b.label)}</span>`
+      ).join('')}</div>`
     : '';
 
   const pills = [];
@@ -382,8 +472,8 @@ function buildPackageCard(pkg, categoryName, isBest = false) {
     : '';
 
   return `
-    <div class="pkg-card${isBest ? ' pkg-card--best' : ''}" data-pkg-id="${esc(pkg.package_id)}" data-cat-name="${esc(categoryName || '')}">
-      ${bestBadge}
+    <div class="pkg-card${badges.length ? ' pkg-card--badged' : ''}" data-pkg-id="${esc(pkg.package_id)}" data-cat-name="${esc(categoryName || '')}">
+      ${badgesHtml}
       ${coverPhotoHtml}
       <div class="pkg-card-body">
         <div class="pkg-card-top-row">

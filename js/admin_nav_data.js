@@ -4,10 +4,10 @@
 //
 // Several Configuration items point at the same physical page with a
 // different #hash, which opens a specific tab/section there — see the
-// hash-routing in js/admin_reservation_form_config.js (Reservation Form)
-// and the anchor scroll targets in css/admin_payment_options.css (Payment
-// Options). super_admin_settings.html is single-purpose (Operating Hours
-// only) and needs no hash.
+// hash-routing in js/admin_reservation_form_config.js (Reservation Form),
+// the anchor scroll targets in css/admin_payment_options.css (Payment
+// Options), and the matching tab logic in js/super_admin_settings.js
+// (Availability and scheduling).
 //
 // An item with a `children` array renders as an expandable group instead of
 // a direct link — see initAdminNav in admin_nav.js. Each child still needs
@@ -46,7 +46,16 @@ export const ADMIN_NAV = [
           { label: 'Venues',     href: '/admin/super%20admin/super_admin_packages.html?view=venues' },
         ]
       },
-      { label: 'Availability and scheduling',  href: '/admin/super%20admin/super_admin_settings.html',  iconKey: 'clock' },
+      {
+        label: 'Availability and scheduling', iconKey: 'clock',
+        children: [
+          { label: 'Operating Hours',               href: '/admin/super%20admin/super_admin_settings.html#hours' },
+          { label: 'Booking Notice Window',          href: '/admin/super%20admin/super_admin_settings.html#notice' },
+          { label: 'Per-Event-Type Notice Override', href: '/admin/super%20admin/super_admin_settings.html#notice-overrides' },
+          { label: 'Buffer & Capacity',              href: '/admin/super%20admin/super_admin_settings.html#buffer-capacity' },
+          { label: 'Per-Scope Capacity Override',    href: '/admin/super%20admin/super_admin_settings.html#capacity-overrides' },
+        ]
+      },
       {
         label: 'Reservation Form', iconKey: 'forms',
         children: [

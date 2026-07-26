@@ -12,6 +12,13 @@
    shared component classes instead of redeclaring them. */
 @import url('./admin_payment_options.css');
 
+/* Keeps the jumped-to section clear of the viewport edge when the sidebar's
+   Availability and scheduling sub-links (admin_nav_data.js) land on
+   #hours / #notice / #notice-overrides / #buffer-capacity /
+   #capacity-overrides — same fix as #payment-methods etc. in
+   admin_payment_options.css. */
+#hours, #notice, #notice-overrides, #buffer-capacity, #capacity-overrides { scroll-margin-top: 24px; }
+
 /* ── Vision API usage widget (the one piece with no existing equivalent) ── */
 .usage-card {
   background: var(--card-bg);

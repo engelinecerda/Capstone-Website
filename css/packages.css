@@ -311,23 +311,30 @@ body { background: var(--cream); }
   box-shadow: 0 0 0 3px rgba(61,26,10,.10);
 }
 
-/* ── Best-value tier highlight ──────────────────────────────────────── */
+/* ── Badge highlight (Best Value / Best Seller / promo — any assigned or
+   derived badge, admin-controlled via js/super_admin_packages.js) ───── */
 /* Replaces the 1.5px neutral border with a 2px golden border on all
    sides; the 4px top accent is preserved to stay consistent with the
    card family, but the colour shifts to the golden highlight tone.   */
-.pkg-card--best {
+.pkg-card--badged {
   border: 2px solid #C98A4B;
   border-top: 4px solid #C98A4B;
 }
-/* Small downward-pointing tab that sits in the card's top padding area
-   so it overlaps no content — the 20px body padding-top is taller than
-   the badge's ~18px height.                                            */
-.pkg-card-best-badge {
+/* Small downward-pointing tabs that sit in the card's top padding area
+   so they overlap no content — the 20px body padding-top is taller than
+   a badge's ~18px height. Stacked top to bottom, capped at 2. */
+.pkg-card-badges {
   position: absolute;
   top: 0;
   right: 16px;
-  background: #FAEEDA;
-  color: #854F0B;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+}
+.pkg-card-badge {
+  display: inline-block;
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 10px;
   font-weight: 700;
@@ -336,9 +343,12 @@ body { background: var(--cream); }
   line-height: 1;
   padding: 5px 10px 4px;
   border-radius: 0 0 7px 7px;
-  pointer-events: none;
   user-select: none;
 }
+.pkg-card-badge--pending  { background: #FAEEDA; color: #854F0B; }
+.pkg-card-badge--approved { background: #EAF3DE; color: #3B6D11; }
+.pkg-card-badge--info     { background: #E3EEFB; color: #2C5A99; }
+.pkg-card-badge--neutral  { background: #F1EFE8; color: #5F5E5A; }
 
 /* Edge-to-edge cover photo — only rendered when the package has one, so
    packages without a photo yet keep today's card layout unchanged. */

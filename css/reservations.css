@@ -358,16 +358,6 @@
             display: block; box-sizing: border-box; font-family: inherit;
         }
         .res-input:focus { outline: none; border-color: #6B3A1F; }
-        .res-input-readonly {
-            cursor: default;
-            background: #fffdf9;
-            color: #6B3A1F;
-            font-weight: 600;
-        }
-        .res-input-readonly::placeholder {
-            color: #9b8a7d;
-            font-weight: 500;
-        }
         textarea.res-input { height: 100px; resize: vertical; }
         .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -566,6 +556,7 @@
         .availability-swatch.available { background: #73b96b; }
         .availability-swatch.booked { background: #ef6b6b; }
         .availability-swatch.closed { background: #b08968; }
+        .availability-swatch.past { background: #c3b5a7; }
         .availability-message {
             margin-top: 14px;
             font-size: 12px;
@@ -630,40 +621,11 @@
         .location-card h4 { font-size: 16px; font-weight: 700; color: #2A1408; margin-bottom: 8px; }
         .location-card p  { font-size: 13px; color: #777; margin: 0; line-height: 1.6; max-width: 250px; text-align: center; }
 
-        /* Package Cards */
+        /* Package Cards — base grid; the unified card's own visual design
+           (image, chips, price, details link) lives in the dedicated
+           "Unified package card + category chips" section appended at the
+           end of this file. */
         .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 6px; }
-        .pkg-card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; cursor: pointer; transition: all 0.2s; background: #fff; }
-        .pkg-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .pkg-card.active { border-color: #6B3A1F; background: #FFEDE0; }
-        .pkg-card h4         { font-size: 14px; font-weight: 700; color: #2A1408; margin: 0 0 5px; }
-        .pkg-card .pkg-price { font-size: 15px; font-weight: 700; color: #6B3A1F; margin: 4px 0; }
-        .pkg-card .pkg-desc  { font-size: 12px; color: #777; margin: 0; line-height: 1.5; }
-        .service-card {
-            min-height: 132px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .service-card-icon {
-            width: 40px;
-            height: 40px;
-            margin-bottom: 12px;
-            border-radius: 12px;
-            background: #fff8f0;
-            border: 1px solid #ead8ca;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6B3A1F;
-            font-size: 17px;
-        }
-        .service-card h4 {
-            margin-bottom: 10px;
-        }
-        .service-card .pkg-desc {
-            font-size: 13px;
-            line-height: 1.7;
-        }
 
         /* Section Label */
         .section-label {
@@ -1799,15 +1761,6 @@
     margin-top: 1px;
 }
 
-/* ── Service card icon (offsite category grid) ──────────────────────────────── */
-.service-card { text-align: center; }
-
-.service-card-icon {
-    font-size: 28px;
-    margin-bottom: 8px;
-    color: var(--brown-mid, #6B3820);
-}
-
 /* ── Venue map ──────────────────────────────────────────────────────────────── */
 .venue-search-row {
     display: flex;
@@ -1852,22 +1805,6 @@
     color: #777;
     margin-bottom: 14px;
     line-height: 1.55;
-}
-
-/* ── Pkg card Phase 1 display ───────────────────────────────────────────────── */
-.pkg-price {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--brown-primary, #3D1A0A);
-    margin: 6px 0 4px;
-    font-family: 'Inter', sans-serif;
-}
-
-.pkg-desc {
-    font-size: 13px;
-    color: #777;
-    line-height: 1.55;
-    margin: 0;
 }
 
 .pkg-empty-state {
@@ -2033,22 +1970,276 @@
     }
 }
 
-/* ── Package description truncation — expand/collapse ───────────────────────── */
-.pkg-desc-toggle {
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--brown, #8B5E3C);
-    font-size: inherit;
-    font-family: inherit;
-    font-style: italic;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    display: inline;
-    line-height: inherit;
+/* ══════════════════════════════════════════════════════════════════════════
+   Unified package card + category chips
+   (Step 1 rework — category-selection step, one shared package card
+   component across onsite / offsite / add-on grids, guest-count clamp
+   notice.) Scoped design tokens match the palette already used on
+   account.css / reservation_details.css elsewhere in this project.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+    --acc-espresso:      #4A2C17;
+    --acc-espresso-dark: #3A2110;
+    --acc-cream:         #FAF6F0;
+    --acc-cream-alt:     #FFFDFA;
+    --acc-border-tan:    #E5DBCC;
+    --acc-border-hair:   #EEE5D8;
+    --acc-text:          #3E2418;
+    --acc-text-muted:    #8A7965;
+    --acc-terracotta:    #A34F2E;
 }
 
-.pkg-desc-toggle:hover {
-    color: var(--dark-brown, #5c3d1e);
+/* ── Category chips (mirrors packages.html's .pkg-cat-card visually) ────── */
+.pkg-cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.pkg-cat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 22px 16px 18px;
+    background: var(--acc-cream-alt);
+    border: 0.5px solid var(--acc-border-tan);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .15s, background .15s, color .15s;
+    outline: none;
+}
+.pkg-cat-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--acc-terracotta);
+    box-shadow: 0 6px 20px rgba(74,44,23,.08);
+}
+.pkg-cat-card:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 2px;
+}
+.pkg-cat-card.active {
+    background: var(--acc-espresso);
+    border-color: var(--acc-espresso);
+    box-shadow: 0 6px 24px rgba(74,44,23,.22);
+    transform: none;
+}
+.pkg-cat-check {
+    position: absolute;
+    top: -9px;
+    right: 10px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--acc-cream-alt);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity .15s, transform .15s;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.pkg-cat-check i { font-size: 11px; color: var(--acc-espresso); font-weight: 700; }
+.pkg-cat-card.active .pkg-cat-check { opacity: 1; transform: scale(1); }
+.pkg-cat-icon { font-size: 22px; color: var(--acc-espresso); transition: color .15s; }
+.pkg-cat-card.active .pkg-cat-icon { color: var(--acc-cream); }
+.pkg-cat-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--acc-text);
+    line-height: 1.3;
+    transition: color .15s;
+}
+.pkg-cat-card.active .pkg-cat-name { color: var(--acc-cream); }
+.pkg-cat-count { font-size: 11.5px; color: var(--acc-text-muted); transition: color .15s; }
+.pkg-cat-card.active .pkg-cat-count { color: rgba(250,246,240,.75); }
+
+/* ── Unified package card ────────────────────────────────────────────────
+   Redefines .pkg-card (the shared wrapper the card()/activate() JS helpers
+   emit) into the full image + price + chips + details-link layout used by
+   every package grid on this page (onsite, offsite, add-ons). */
+.pkg-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--acc-cream-alt);
+    border: 2px solid var(--acc-border-tan);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .15s;
+    padding: 0;
+}
+.pkg-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(74,44,23,.10);
+}
+.pkg-card:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 2px;
+}
+.pkg-card.active {
+    border-color: var(--acc-espresso);
+    box-shadow: 0 0 0 3px rgba(74,44,23,.10);
+    background: var(--acc-cream-alt);
+}
+
+.rpkg-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--acc-border-hair);
+}
+.rpkg-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rpkg-photo-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--acc-text-muted);
+    font-size: 26px;
+    background: var(--acc-border-hair);
+}
+.rpkg-check {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--acc-espresso);
+    color: var(--acc-cream);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity .15s, transform .15s;
+    box-shadow: 0 1px 6px rgba(0,0,0,.25);
+}
+.pkg-card.active .rpkg-check { opacity: 1; transform: scale(1); }
+
+.rpkg-body {
+    padding: 16px 16px 18px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.rpkg-name {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--acc-text);
+    line-height: 1.3;
+    margin: 0 0 6px;
+}
+.rpkg-price {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--acc-espresso);
+    letter-spacing: -.01em;
+    margin-bottom: 8px;
+}
+.rpkg-price--contact {
+    font-size: 13px;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--acc-text-muted);
+}
+.rpkg-desc {
+    font-size: 12px;
+    color: var(--acc-text-muted);
+    line-height: 1.55;
+    margin: 0 0 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.rpkg-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.rpkg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--acc-text-muted);
+    background: var(--acc-cream);
+    border: 0.5px solid var(--acc-border-tan);
+    border-radius: 100px;
+    padding: 3px 9px;
+}
+.rpkg-chip i { font-size: 11px; color: var(--acc-terracotta); }
+.rpkg-details-link {
+    margin-top: auto;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--acc-terracotta);
+    text-decoration: none;
+    min-height: 24px;
+}
+.rpkg-details-link:hover { text-decoration: underline; }
+.rpkg-details-link:focus-visible { outline: 2px solid var(--acc-terracotta); outline-offset: 2px; }
+.rpkg-details-link i { font-size: 11px; }
+
+/* "No Add-on" — distinct solid-tint default, not a product card */
+.rpkg-noaddon {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+    min-height: 132px;
+    background: var(--acc-cream-alt);
+}
+.rpkg-noaddon i { font-size: 20px; color: var(--acc-text-muted); }
+.rpkg-noaddon h4 { font-size: 14px; font-weight: 700; color: var(--acc-text); margin: 0; }
+.rpkg-noaddon .rpkg-desc { -webkit-line-clamp: unset; margin: 0; }
+.rpkg-noaddon.active {
+    background: var(--acc-espresso);
+    border-color: var(--acc-espresso);
+}
+.rpkg-noaddon.active i,
+.rpkg-noaddon.active h4,
+.rpkg-noaddon.active .rpkg-desc { color: var(--acc-cream); }
+
+/* ── Guest-count "adjusted" notice — distinct from the plain range hint ──── */
+.guest-count-hint--notice {
+    color: var(--acc-terracotta);
+    font-weight: 600;
+}
+
+/* ── Focus-visible for location cards (native divs, tabindex-enabled) ───── */
+.location-card:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 2px;
+}
+
+/* ── Responsive: 375px and up ────────────────────────────────────────────
+   .cards-grid already collapses to 1fr at ≤600px (see rule near the top of
+   this file); the category grid needs its own narrow-viewport treatment
+   since auto-fit(150px) can overflow a 375px viewport at 2-up. */
+@media (max-width: 480px) {
+    .pkg-cat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .pkg-cat-card { padding: 16px 10px 14px; }
+    .pkg-cat-name { font-size: 12px; }
+    .rpkg-body { padding: 14px; }
+    .rpkg-name { font-size: 13.5px; }
+    .rpkg-price { font-size: 17px; }
 }
