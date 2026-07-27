@@ -83,6 +83,21 @@ export async function loadMenuSections(supabase) {
   }
 }
 
+export async function loadAboutValues(supabase) {
+  try {
+    const { data, error } = await supabase
+      .from('about_value')
+      .select('id, label, description, icon')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) return [];
+    return data || [];
+  } catch (err) {
+    console.warn('[page_content] loadAboutValues failed:', err?.message || err);
+    return [];
+  }
+}
+
 export async function loadMenuBanner(supabase) {
   try {
     const { data, error } = await supabase

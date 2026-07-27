@@ -210,6 +210,41 @@
 .menu-section-admin-alt { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .menu-section-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
+/* ── OUR VALUES admin list ── */
+.value-admin-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.value-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.value-admin-row {
+  display: flex; align-items: center; gap: 12px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.value-admin-row.is-inactive { opacity: .55; }
+.value-admin-reorder { display: flex; flex-direction: column; gap: 2px; }
+.value-admin-icon {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 0.5px solid var(--border); color: var(--text); font-size: 17px;
+}
+.value-admin-body { flex: 1; min-width: 0; }
+.value-admin-label { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.value-admin-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.value-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* Icon picker — a small grid of buttons rather than a native <select>, since
+   <option> elements can't reliably render icon-font glyphs across browsers.
+   Every button is natively focusable/activatable (Tab + Enter/Space), so
+   this needs no extra keyboard wiring. */
+.icon-picker-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.icon-pick-btn {
+  width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
+  font-size: 17px; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.icon-pick-btn:hover { background: var(--btn-secondary-hover); }
+.icon-pick-btn.active {
+  background: var(--btn-primary-bg); border-color: var(--btn-primary-bg); color: var(--btn-primary-text);
+}
+
 /* ── ELITE CARD BANNER (singleton — plain fields directly in the card, no
    list/modal needed since there's only ever one row) ── */
 .card-actions { display: flex; justify-content: flex-end; margin-top: 14px; }

@@ -34,6 +34,28 @@ function parsePolicyBody(text) {
   });
 }
 
+// Canonical loader for the standalone /terms-and-conditions.html page. The
+// booking-flow agreement modal above uses loadReservationFormConfig (which
+// silently falls back to POLICY_CONTENT on any failure — appropriate mid-
+// booking, where the flow must never block). This page is meant to be
+// authoritative and bookmarkable, so it needs to tell "not configured yet"
+// apart from "failed to load": returns null when the row is simply missing
+// (caller can show its own default copy) but *throws* on a real fetch/DB
+// error so the caller can show a retry state instead of silently serving
+// possibly-stale text.
+export async function loadTermsDocument(supabase) {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('setting_value, updated_at')
+    .eq('setting_key', 'terms_and_conditions')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const parsed = JSON.parse(data.setting_value);
+  return { body: parsed.body || '', updatedAt: data.updated_at };
+}
+
 export async function loadReservationFormConfig(supabase) {
   const result = { fieldRules: { ...DEFAULT_FIELD_RULES }, policyOverrides: {} };
 

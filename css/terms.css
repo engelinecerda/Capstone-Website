@@ -1,0 +1,159 @@
+/* terms.css — standalone Terms & Conditions page (terms-and-conditions.html).
+   Navbar/footer chrome comes from home.css (same as about.html/menu.html);
+   this file only styles the page's own content. Token names/values mirror
+   the --acc-* set already established in account.css/reservations.css
+   ("Redesign tokens") — kept as its own small local :root, the same
+   aligned-but-separate pattern account.css itself uses, rather than
+   pulling in either of those large page-specific stylesheets. */
+:root {
+  --acc-espresso:      #4A2C17;
+  --acc-espresso-dark: #3A2110;
+  --acc-cream:         #FAF6F0;
+  --acc-cream-alt:     #FFFDFA;
+  --acc-border-tan:    #E5DBCC;
+  --acc-text:          #3E2418;
+  --acc-text-muted:    #8A7965;
+  --acc-terracotta:    #A34F2E;
+}
+
+.terms-page {
+  background: var(--acc-cream);
+  padding: 48px 24px 96px;
+}
+
+.terms-page-inner {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* ── Go Back ── */
+.terms-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  margin-bottom: 28px;
+  background: transparent;
+  border: 1px solid var(--acc-terracotta);
+  border-radius: 8px;
+  color: var(--acc-terracotta);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.terms-back-btn:hover,
+.terms-back-btn:focus-visible {
+  background: var(--acc-espresso);
+  border-color: var(--acc-espresso);
+  color: #fff;
+  outline: none;
+}
+
+.terms-back-btn i { font-size: 12px; }
+
+/* ── Card ── */
+.terms-card {
+  background: var(--acc-cream-alt);
+  border: 0.5px solid var(--acc-border-tan);
+  border-radius: 12px;
+  padding: 48px 56px 56px;
+}
+
+.terms-head { text-align: center; margin-bottom: 40px; }
+
+.terms-title {
+  font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+  font-size: clamp(30px, 4vw, 42px);
+  font-weight: 500;
+  color: var(--acc-text);
+  margin: 0 0 10px;
+}
+
+.terms-updated {
+  font-size: 13px;
+  color: var(--acc-text-muted);
+  margin: 0;
+}
+
+/* ── Content column ── the outer column is centered on the page; body
+   copy inside it stays left-aligned, since a fully centered legal
+   paragraph reads poorly at length. */
+.terms-body {
+  max-width: 70ch;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.terms-body h2 {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--acc-text);
+  margin: 32px 0 10px;
+}
+.terms-body h2:first-child { margin-top: 0; }
+
+.terms-body p {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--acc-text-muted);
+  margin: 0 0 14px;
+}
+
+.terms-body ul {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.terms-body li {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--acc-text-muted);
+  margin-bottom: 4px;
+}
+
+/* ── Loading / retry states ── */
+.terms-status {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--acc-text-muted);
+  font-size: 14px;
+}
+
+.terms-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 18px;
+  margin-top: 14px;
+  background: var(--acc-espresso);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.terms-retry-btn:hover,
+.terms-retry-btn:focus-visible {
+  background: var(--acc-espresso-dark);
+  outline: none;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .terms-card { padding: 36px 24px 40px; }
+}
+
+@media (max-width: 480px) {
+  .terms-page { padding: 32px 16px 64px; }
+  .terms-card { padding: 28px 18px 32px; border-radius: 10px; }
+  .terms-title { font-size: 28px; }
+}

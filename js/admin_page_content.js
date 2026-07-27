@@ -13,6 +13,23 @@ import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 
 const PAGE_LABELS = { home: 'Home', packages: 'Packages', about: 'About', faqs: 'FAQs', menu: 'Menu' };
 
+// Curated set only — mirrors the DB check constraint in
+// 20260809_about_values.sql (about_value.icon). Never freeform text: a
+// dropdown/grid restricted to this list is what keeps a bad icon name from
+// silently rendering nothing on the customer page.
+const VALUE_ICONS = [
+  { id: 'ti-coffee',       label: 'Coffee' },
+  { id: 'ti-heart',        label: 'Heart' },
+  { id: 'ti-award',        label: 'Award' },
+  { id: 'ti-users',        label: 'Users' },
+  { id: 'ti-leaf',         label: 'Leaf' },
+  { id: 'ti-sparkles',     label: 'Sparkles' },
+  { id: 'ti-shield-check', label: 'Shield Check' },
+  { id: 'ti-clock',        label: 'Clock' },
+  { id: 'ti-circle-check', label: 'Circle Check' },
+];
+const DEFAULT_VALUE_ICON = 'ti-circle-check';
+
 // ── STATE ────────────────────────────────────────────────────────
 let pageHeaders   = [];
 let galleryImages = [];
@@ -21,6 +38,7 @@ let faqs          = [];
 let services      = [];
 let menuSections  = [];
 let menuBanner    = null;
+let values        = [];
 
 let editingHeaderKey   = null;
 let headerPendingFile  = null;   // resized File chosen but not yet uploaded/saved
@@ -30,6 +48,8 @@ let servicePendingFile = null;
 let editingMenuSectionId   = null;
 let menuSectionPendingFile = null;
 let menuBannerPendingFile  = null;
+let editingValueId  = null;
+let valueModalIcon  = DEFAULT_VALUE_ICON;
 let pendingConfirmAction = null;
 
 // ── DOM refs ─────────────────────────────────────────────────────
@@ -45,6 +65,8 @@ const serviceMsg     = document.getElementById('serviceMsg');
 const menuSectionList = document.getElementById('menuSectionList');
 const menuSectionMsg  = document.getElementById('menuSectionMsg');
 const menuBannerMsg   = document.getElementById('menuBannerMsg');
+const valueList       = document.getElementById('valueList');
+const valueMsg        = document.getElementById('valueMsg');
 
 const headerModal        = document.getElementById('headerModal');
 const headerModalTitle   = document.getElementById('headerModalTitle');
@@ -128,6 +150,15 @@ const menuBannerAltInput     = document.getElementById('menuBannerAltInput');
 const menuBannerActiveInput  = document.getElementById('menuBannerActiveInput');
 const saveMenuBannerBtn      = document.getElementById('saveMenuBannerBtn');
 
+const valueModal        = document.getElementById('valueModal');
+const valueModalTitle   = document.getElementById('valueModalTitle');
+const valueModalMessage = document.getElementById('valueModalMessage');
+const valueLabelInput   = document.getElementById('valueLabelInput');
+const valueDescInput    = document.getElementById('valueDescInput');
+const valueIconPicker   = document.getElementById('valueIconPicker');
+const valueModalSave    = document.getElementById('valueModalSave');
+const valueModalSaveLabel = document.getElementById('valueModalSaveLabel');
+
 // ── UTILITIES ────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m =>
@@ -147,7 +178,7 @@ function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('
 
 // ── LOAD ─────────────────────────────────────────────────────────
 async function loadAll() {
-  const [{ data: headers }, { data: gallery }, { data: about }, { data: faqRows }, { data: serviceRows }, { data: menuSectionRows }, { data: bannerRow }] = await Promise.all([
+  const [{ data: headers }, { data: gallery }, { data: about }, { data: faqRows }, { data: serviceRows }, { data: menuSectionRows }, { data: bannerRow }, { data: valueRows }] = await Promise.all([
     supabase.from('page_header').select('*'),
     supabase.from('gallery_image').select('*').order('sort_order', { ascending: true }),
     supabase.from('about_section').select('*').order('sort_order', { ascending: true }),
@@ -155,6 +186,7 @@ async function loadAll() {
     supabase.from('landing_service').select('*').order('sort_order', { ascending: true }),
     supabase.from('menu_section').select('*').order('sort_order', { ascending: true }),
     supabase.from('menu_banner').select('*').eq('id', true).maybeSingle(),
+    supabase.from('about_value').select('*').order('sort_order', { ascending: true }),
   ]);
 
   pageHeaders   = headers || [];
@@ -164,6 +196,7 @@ async function loadAll() {
   services      = serviceRows || [];
   menuSections  = menuSectionRows || [];
   menuBanner    = bannerRow || null;
+  values        = valueRows || [];
 
   renderPageHeaders();
   renderGallery();
@@ -172,6 +205,7 @@ async function loadAll() {
   renderServices();
   renderMenuSections();
   renderMenuBanner();
+  renderValues();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -475,7 +509,10 @@ function openConfirmRemoveGallery(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ABOUT
 // ═══════════════════════════════════════════════════════════════════════════
-const ABOUT_ORDER = ['home_teaser', 'who_we_are', 'values', 'mission'];
+// 'values' intentionally excluded — "What We Stand For" moved from a
+// freeform about_section body (rendered as plain text) to the structured
+// about_value repeatable list below, which is now the only editor for it.
+const ABOUT_ORDER = ['home_teaser', 'who_we_are', 'mission'];
 
 function renderAboutSections() {
   if (!aboutSections.length) {
@@ -1136,6 +1173,163 @@ saveMenuBannerBtn.addEventListener('click', async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// OUR VALUES ("What We Stand For" icon cards)
+// ═══════════════════════════════════════════════════════════════════════════
+function iconLabel(iconId) {
+  return VALUE_ICONS.find(i => i.id === iconId)?.label || iconId;
+}
+
+function renderValues() {
+  if (!values.length) {
+    valueList.innerHTML = '<p class="value-empty">No values yet. Add the principles shown on the About page.</p>';
+    return;
+  }
+  valueList.innerHTML = values.map((v, i) => `
+    <div class="value-admin-row ${v.is_active ? '' : 'is-inactive'}" data-id="${v.id}">
+      <div class="value-admin-reorder">
+        <button type="button" class="btn-icon-xs" data-move-value="up" data-id="${v.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(v.label)} up">↑</button>
+        <button type="button" class="btn-icon-xs" data-move-value="down" data-id="${v.id}" ${i === values.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(v.label)} down">↓</button>
+      </div>
+      <div class="value-admin-icon"><i class="ti ${escapeHtml(v.icon || DEFAULT_VALUE_ICON)}" aria-hidden="true"></i></div>
+      <div class="value-admin-body">
+        <div class="value-admin-label">${escapeHtml(v.label)}</div>
+        <div class="value-admin-desc">${escapeHtml(v.description)}</div>
+      </div>
+      <div class="value-admin-actions">
+        <button type="button" class="btn-outline-sm" data-edit-value="${v.id}">Edit</button>
+        <button type="button" class="btn-icon-xs" data-toggle-value="${v.id}" aria-label="${v.is_active ? 'Deactivate' : 'Activate'} ${escapeHtml(v.label)}">${v.is_active ? '●' : '○'}</button>
+        <button type="button" class="btn-icon-xs" data-remove-value="${v.id}" aria-label="Remove ${escapeHtml(v.label)}">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+valueList.addEventListener('click', e => {
+  const moveBtn = e.target.closest('[data-move-value]');
+  if (moveBtn) { moveValue(moveBtn.dataset.id, moveBtn.dataset.moveValue); return; }
+  const editBtn = e.target.closest('[data-edit-value]');
+  if (editBtn) { openValueModal(editBtn.dataset.editValue); return; }
+  const toggleBtn = e.target.closest('[data-toggle-value]');
+  if (toggleBtn) { toggleValueActive(toggleBtn.dataset.toggleValue); return; }
+  const removeBtn = e.target.closest('[data-remove-value]');
+  if (removeBtn) { openConfirmRemoveValue(removeBtn.dataset.removeValue); return; }
+});
+
+document.getElementById('addValueBtn').addEventListener('click', () => openValueModal(null));
+
+function renderValueIconPicker() {
+  valueIconPicker.innerHTML = VALUE_ICONS.map(icon => `
+    <button type="button" class="icon-pick-btn ${icon.id === valueModalIcon ? 'active' : ''}"
+            data-pick-icon="${icon.id}" aria-pressed="${icon.id === valueModalIcon}" aria-label="${icon.label} icon">
+      <i class="ti ${icon.id}" aria-hidden="true"></i>
+    </button>`).join('');
+}
+
+valueIconPicker.addEventListener('click', e => {
+  const btn = e.target.closest('[data-pick-icon]');
+  if (!btn) return;
+  valueModalIcon = btn.dataset.pickIcon;
+  renderValueIconPicker();
+});
+
+function openValueModal(id) {
+  editingValueId = id;
+  const value = id ? values.find(v => v.id === id) : null;
+
+  valueModalTitle.textContent = value ? 'Edit Value' : 'Add Value';
+  valueModalSaveLabel.textContent = value ? 'Save Changes' : 'Add Value';
+  valueLabelInput.value = value?.label || '';
+  valueDescInput.value = value?.description || '';
+  valueModalIcon = value?.icon || DEFAULT_VALUE_ICON;
+  renderValueIconPicker();
+
+  setModalMsg(valueModalMessage, '');
+  openModal(valueModal);
+}
+
+valueModalSave.addEventListener('click', async () => {
+  const label = valueLabelInput.value.trim();
+  const description = valueDescInput.value.trim();
+  if (!label) { setModalMsg(valueModalMessage, 'Label is required.'); return; }
+  if (!description) { setModalMsg(valueModalMessage, 'Description is required.'); return; }
+  if (!VALUE_ICONS.some(i => i.id === valueModalIcon)) { setModalMsg(valueModalMessage, 'Choose an icon from the list.'); return; }
+
+  valueModalSave.disabled = true;
+  try {
+    const payload = { label, description, icon: valueModalIcon, updated_at: new Date().toISOString() };
+    const { data: { user } } = await supabase.auth.getUser();
+    payload.updated_by = user?.id ?? null;
+
+    if (editingValueId) {
+      const { error } = await supabase.from('about_value').update(payload).eq('id', editingValueId);
+      if (error) throw error;
+      Object.assign(values.find(v => v.id === editingValueId), payload);
+      await logAudit({ action: 'Updated Value', category: 'page_content', details: `Updated: ${label}`, entityId: editingValueId });
+    } else {
+      const nextSort = values.length ? Math.max(...values.map(v => v.sort_order)) + 1 : 0;
+      const { data, error } = await supabase.from('about_value').insert({ ...payload, sort_order: nextSort }).select().single();
+      if (error) throw error;
+      values.push(data);
+      await logAudit({ action: 'Added Value', category: 'page_content', details: `Added: ${label}`, entityId: data.id });
+    }
+    renderValues();
+    closeModal(valueModal);
+  } catch (err) {
+    setModalMsg(valueModalMessage, `Failed to save: ${err.message}`);
+  } finally {
+    valueModalSave.disabled = false;
+  }
+});
+
+document.getElementById('valueModalClose').addEventListener('click', () => closeModal(valueModal));
+document.getElementById('valueModalCancel').addEventListener('click', () => closeModal(valueModal));
+valueModal.addEventListener('click', e => { if (e.target === valueModal) closeModal(valueModal); });
+
+async function toggleValueActive(id) {
+  const value = values.find(v => v.id === id);
+  if (!value) return;
+  const nextActive = !value.is_active;
+  const { error } = await supabase.from('about_value').update({ is_active: nextActive }).eq('id', id);
+  if (error) { setMsg(valueMsg, `Failed: ${error.message}`, 'error'); return; }
+  value.is_active = nextActive;
+  renderValues();
+}
+
+async function moveValue(id, direction) {
+  const idx = values.findIndex(v => v.id === id);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (idx === -1 || swapIdx < 0 || swapIdx >= values.length) return;
+
+  const a = values[idx];
+  const b = values[swapIdx];
+  const [aOrder, bOrder] = [a.sort_order, b.sort_order];
+
+  try {
+    await Promise.all([
+      supabase.from('about_value').update({ sort_order: bOrder }).eq('id', a.id),
+      supabase.from('about_value').update({ sort_order: aOrder }).eq('id', b.id)
+    ]);
+  } catch (err) {
+    setMsg(valueMsg, `Failed to reorder: ${err.message}`, 'error');
+    return;
+  }
+
+  a.sort_order = bOrder;
+  b.sort_order = aOrder;
+  values.sort((x, y) => x.sort_order - y.sort_order);
+  renderValues();
+}
+
+function openConfirmRemoveValue(id) {
+  const value = values.find(v => v.id === id);
+  if (!value) return;
+  pendingConfirmAction = { type: 'remove-value', id };
+  confirmTitle.textContent = 'Remove Value';
+  confirmCopy.textContent = `Remove "${value.label}" from the About page? This can't be undone.`;
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SHARED CONFIRM MODAL
 // ═══════════════════════════════════════════════════════════════════════════
 confirmOk.addEventListener('click', async () => {
@@ -1173,6 +1367,13 @@ confirmOk.addEventListener('click', async () => {
       menuSections = menuSections.filter(m => m.id !== pendingConfirmAction.id);
       await logAudit({ action: 'Removed Menu Image', category: 'page_content', details: `Removed: ${section?.heading}`, entityId: pendingConfirmAction.id });
       renderMenuSections();
+    } else if (pendingConfirmAction.type === 'remove-value') {
+      const value = values.find(v => v.id === pendingConfirmAction.id);
+      const { error } = await supabase.from('about_value').delete().eq('id', pendingConfirmAction.id);
+      if (error) throw error;
+      values = values.filter(v => v.id !== pendingConfirmAction.id);
+      await logAudit({ action: 'Removed Value', category: 'page_content', details: `Removed: ${value?.label}`, entityId: pendingConfirmAction.id });
+      renderValues();
     }
     closeModal(confirmModal);
   } catch (err) {
@@ -1189,7 +1390,7 @@ confirmModal.addEventListener('click', e => { if (e.target === confirmModal) clo
 // ── KEYBOARD: Escape closes modals ──────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  [headerModal, galleryEditModal, aboutPreviewModal, faqModal, serviceModal, menuSectionModal, confirmModal].forEach(m => {
+  [headerModal, galleryEditModal, aboutPreviewModal, faqModal, serviceModal, menuSectionModal, valueModal, confirmModal].forEach(m => {
     if (!m.classList.contains('hidden')) closeModal(m);
   });
 });

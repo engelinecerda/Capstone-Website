@@ -762,6 +762,20 @@ body { background: var(--cream); }
 .pkg-policy-item strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
 .pkg-policy-item p { font-size: 13px; color: var(--text-mid); line-height: 1.7; margin: 0; }
 
+.pkg-policy-terms-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brown-primary);
+  text-decoration: none;
+}
+.pkg-policy-terms-link:hover { text-decoration: underline; }
+.pkg-policy-terms-link i { font-size: 14px; }
+
 /* ══════════════════════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════════════════════ */

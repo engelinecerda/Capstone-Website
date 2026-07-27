@@ -72,13 +72,8 @@
                     <p class="about-story-para">Founded with passion by Glorie Gotis, ELI Coffee has grown into a hub for events, performances, and gatherings. Whether it's an intimate open mic night, a cozy book club, or a full-scale celebration, our café transforms into the perfect venue to bring people together.</p>
                 </div>
                 <div class="about-founder">
-                    <div class="about-founder-avatar">
-                        <i class="fa-solid fa-user" aria-hidden="true"></i>
-                    </div>
-                    <div>
-                        <p class="about-founder-name">Glorie Gotis</p>
-                        <p class="about-founder-title">Founder, ELI Coffee Events Cafe</p>
-                    </div>
+                    <p class="about-founder-name">Glorie Gotis</p>
+                    <p class="about-founder-title">Founder, ELI Coffee Events Cafe</p>
                 </div>
             </div>
         </div>
@@ -92,11 +87,14 @@
                 <h2 class="h2">What We <em>Stand For</em></h2>
                 <p class="about-values-desc">Every cup we brew and every event we host is guided by these core principles.</p>
             </div>
+            <!-- Fallback shown until/unless js/about_content.js's loadAboutValues()
+                 replaces this with the admin-configured list (Page Content > Our
+                 Values) — kept in sync with that table's seeded defaults. -->
             <div class="values-grid" id="aboutValuesGrid">
 
                 <div class="value-card">
                     <div class="value-card-icon">
-                        <i class="fa-solid fa-mug-hot" aria-hidden="true"></i>
+                        <i class="ti ti-coffee" aria-hidden="true"></i>
                     </div>
                     <h3>Quality Coffee</h3>
                     <p>We source and brew only the finest coffee beans to ensure every cup is exceptional.</p>
@@ -104,7 +102,7 @@
 
                 <div class="value-card">
                     <div class="value-card-icon">
-                        <i class="fa-solid fa-heart" aria-hidden="true"></i>
+                        <i class="ti ti-heart" aria-hidden="true"></i>
                     </div>
                     <h3>Memorable Moments</h3>
                     <p>We're passionate about creating beautiful memories for you and your guests.</p>
@@ -112,7 +110,7 @@
 
                 <div class="value-card">
                     <div class="value-card-icon">
-                        <i class="fa-solid fa-handshake-angle" aria-hidden="true"></i>
+                        <i class="ti ti-award" aria-hidden="true"></i>
                     </div>
                     <h3>Professional Service</h3>
                     <p>Our experienced team delivers top-tier service for every event, big or small.</p>
@@ -120,41 +118,13 @@
 
                 <div class="value-card">
                     <div class="value-card-icon">
-                        <i class="fa-solid fa-users" aria-hidden="true"></i>
+                        <i class="ti ti-users" aria-hidden="true"></i>
                     </div>
                     <h3>Community Focus</h3>
                     <p>We're proud to serve the Binangonan community and surrounding areas.</p>
                 </div>
 
             </div>
-        </div>
-    </section>
-
-    <!-- MISSION -->
-    <section class="about-mission">
-        <div class="about-mission-inner">
-            <div class="about-mission-mark">
-                <i class="fa-solid fa-quote-left" aria-hidden="true"></i>
-            </div>
-            <p class="eyebrow about-mission-eyebrow">Our Purpose</p>
-            <h2 class="about-mission-title">Our <em>Mission</em></h2>
-            <div class="about-mission-body" id="aboutMissionBody">To create a welcoming space where people can come together to enjoy great coffee, connect with others, and celebrate life's moments — one cup, one gathering, one memory at a time.</div>
-            <div class="about-mission-divider"></div>
-            <p class="about-mission-locations">
-                <span><i class="ti ti-map-pin"></i> Binangonan, Rizal</span>
-                <span><i class="ti ti-map-pin"></i> Antipolo City</span>
-            </p>
-        </div>
-    </section>
-
-    <!-- CTA STRIP -->
-    <section class="about-cta-strip">
-        <p class="eyebrow about-cta-eyebrow">Ready to celebrate?</p>
-        <h2 class="about-cta-title">Plan your next <em>event with us</em></h2>
-        <p class="about-cta-desc">Browse our event packages or secure your date — we'd love to host your next gathering.</p>
-        <div class="about-cta-actions">
-            <a href="/reservations.html" class="btn-primary">Make a Reservation</a>
-            <a href="/packages.html" class="btn-ghost">View Packages</a>
         </div>
     </section>
 
@@ -184,6 +154,7 @@
                     <li><a href="/reviews.html">Reviews</a></li>
                     <li><a href="/faqs.html">FAQs</a></li>
                     <li><a href="/about.html">About</a></li>
+                    <li><a href="/terms-and-conditions.html">Terms &amp; Conditions</a></li>
                 </ul>
             </div>
 

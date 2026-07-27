@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/admin_page_content.css">
   <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <!-- Values icon picker previews the same Tabler glyphs the public About
+       page renders (about_value.icon stores raw "ti-*" class names) — the
+       rest of the admin portal uses inline SVGs instead of this webfont,
+       so it's loaded here only, matching the customer pages that already do. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 </head>
 <body>
 
@@ -168,6 +173,24 @@
         <p class="card-sub">Long-form text shown on the About page and the Home page's Our Story teaser. One per line or blank-line-separated paragraphs; short lines with no ending period become headings, lines starting with "- " become bullets.</p>
         <p class="form-message" id="aboutMsg"></p>
         <div id="aboutSections">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── OUR VALUES ("What We Stand For" icon cards) ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Our Values</p>
+            <p class="card-sub">The "What We Stand For" icon cards on the About page. Each needs a label, a short description, and an icon from the approved set.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addValueBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Value
+          </button>
+        </div>
+        <p class="form-message" id="valueMsg"></p>
+        <div id="valueList" class="value-admin-list">
           <p class="pc-loading">Loading…</p>
         </div>
       </div>
@@ -423,7 +446,41 @@
     </div>
   </div>
 
-  <!-- ── CONFIRM MODAL (remove gallery photo / remove FAQ / remove service / remove menu image) ── -->
+  <!-- ── VALUE EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="valueModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="valueModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="valueModalTitle">Add Value</h2>
+        <button type="button" class="modal-close" id="valueModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="valueLabelInput">Label *</label>
+          <input type="text" id="valueLabelInput" class="modal-input" placeholder="E.g., Quality Coffee">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="valueDescInput">Description *</label>
+          <textarea id="valueDescInput" class="modal-textarea" rows="3" placeholder="A short sentence about this value"></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" id="valueIconPickerLabel">Icon *</label>
+          <div class="icon-picker-grid" id="valueIconPicker" role="group" aria-labelledby="valueIconPickerLabel"></div>
+        </div>
+        <p class="modal-message hidden" id="valueModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="valueModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="valueModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="valueModalSaveLabel">Add Value</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIRM MODAL (remove gallery photo / remove FAQ / remove service / remove menu image / remove value) ── -->
   <div class="modal-overlay hidden" id="confirmModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-modal="true">
       <div class="modal-header">

@@ -71,13 +71,13 @@ async function loadAll() {
 // ═══════════════════════════════════════════════════════════════════════════
 function renderTriggerList() {
   triggerList.innerHTML = triggers.map(t => {
-    const tpl = templates[t.trigger_code];
+    const tpl = templates[t.code];
     if (!tpl) return '';
     const locked = !t.is_disableable;
     return `
-      <div class="trigger-row ${tpl.is_enabled ? '' : 'is-disabled'}" data-code="${escapeHtml(t.trigger_code)}">
+      <div class="trigger-row ${tpl.is_enabled ? '' : 'is-disabled'}" data-code="${escapeHtml(t.code)}">
         <label class="pm2-toggle" title="${locked ? 'This notification is required and cannot be turned off' : (tpl.is_enabled ? 'Turn off' : 'Turn on')}">
-          <input type="checkbox" data-trigger-toggle="${escapeHtml(t.trigger_code)}" ${tpl.is_enabled ? 'checked' : ''} ${locked ? 'disabled' : ''} aria-label="${tpl.is_enabled ? 'Deactivate' : 'Activate'} ${escapeHtml(t.label)}">
+          <input type="checkbox" data-trigger-toggle="${escapeHtml(t.code)}" ${tpl.is_enabled ? 'checked' : ''} ${locked ? 'disabled' : ''} aria-label="${tpl.is_enabled ? 'Deactivate' : 'Activate'} ${escapeHtml(t.label)}">
           <span class="pm2-toggle-track"></span>
         </label>
         <div class="trigger-body">
@@ -92,7 +92,7 @@ function renderTriggerList() {
           <span class="channel-pill ${tpl.send_email ? 'is-on' : ''}">Email</span>
         </div>
         <div class="trigger-actions">
-          <button type="button" class="btn-outline-sm" data-edit-trigger="${escapeHtml(t.trigger_code)}">Edit message</button>
+          <button type="button" class="btn-outline-sm" data-edit-trigger="${escapeHtml(t.code)}">Edit message</button>
         </div>
       </div>`;
   }).join('');
@@ -312,7 +312,7 @@ async function init() {
 
   watchAuthState();
   wireLogoutButton();
-  setupInactivityLogout();
+  setupInactivityLogout(result.profile.role);
   initAdminSidebarBadges(supabase);
   initAdminNav({ role: result.profile.role });
   loadAll();

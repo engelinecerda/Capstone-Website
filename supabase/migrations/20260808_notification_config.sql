@@ -81,7 +81,11 @@ alter table public.payment add column if not exists rejection_reason text;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 2. RLS — notification_trigger has NO write policy at all (never
 --    user-editable, not even by admin); notification_template is
---    admin read/write. notifications' existing 3 policies are untouched.
+--    admin read/write. notifications' existing 3 policies are kept as-is,
+--    plus one new admin-read-all policy (additive — RLS SELECT policies
+--    are OR'd, so this only ADDS visibility, it doesn't touch what a
+--    non-admin can already see of their own rows) so the Delivery Log can
+--    actually show notifications addressed to other users.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 alter table public.notification_trigger enable row level security;
@@ -94,6 +98,10 @@ create policy "Admin read templates" on public.notification_template for select 
 drop policy if exists "Admin manage templates" on public.notification_template;
 create policy "Admin manage templates" on public.notification_template
   for all using (get_my_role() = 'admin') with check (get_my_role() = 'admin');
+
+drop policy if exists "Admin read all notifications" on public.notifications;
+create policy "Admin read all notifications" on public.notifications for select
+  using (get_my_role() = 'admin');
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 3. HELPER FUNCTIONS
@@ -152,7 +160,7 @@ begin
     'event_date', coalesce(to_char(r.event_date, 'FMMonth FMDD, YYYY'), 'TBD'),
     'event_time', coalesce(r.event_time, 'TBD'),
     'venue', case
-      when r.location_type = 'offsite' then coalesce(r.venue_location, '')
+      when r.location_type = 'offsite' then coalesce(r.venue_location, 'Customer-provided venue')
       else 'ELI Coffee Events Cafe Binangonan (Onsite)'
     end,
     'reservation_number', coalesce(r.reservation_number, ''),
