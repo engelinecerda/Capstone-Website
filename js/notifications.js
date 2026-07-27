@@ -124,6 +124,7 @@ async function fetchAndRender(supabase, userId, listEl, badgeEl) {
       .from('notifications')
       .select('id, type, title, body, link, is_read, created_at')
       .eq('user_id', userId)
+      .eq('channel', 'in_app')
       .order('created_at', { ascending: false })
       .limit(20);
     const notifs = data || [];
@@ -265,6 +266,7 @@ export async function initAdminNotificationBell(supabase, userId) {
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .eq('channel', 'in_app')
         .eq('is_read', false);
       syncBadge(badgeEl, count ?? 0);
     } catch { /* ignore */ }

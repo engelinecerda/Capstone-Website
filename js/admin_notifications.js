@@ -161,6 +161,7 @@ async function loadNotifs() {
     .from('notifications')
     .select('id, type, title, body, link, is_read, created_at')
     .eq('user_id', userId)
+    .eq('channel', 'in_app')
     .order('created_at', { ascending: false })
     .limit(100);
 

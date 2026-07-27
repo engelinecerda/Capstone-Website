@@ -247,9 +247,27 @@ export function initAdminNav({ role } = {}) {
   if (!container || !sidebar) return;
 
   const allLeaves = flattenLeaves(ADMIN_NAV.flatMap((g) => g.items));
-  const activeHref = resolveActiveHref(allLeaves);
 
-  renderNav(container, activeHref, role);
+  // Re-derives the active link from the current location and re-renders.
+  // Needed for more than the initial load: an expandable group's sub-items
+  // (Reservation Form's tabs, Payment Options' anchors, Availability &
+  // Scheduling's anchors) all point at one physical page with a different
+  // #hash, so moving between them is same-document navigation — no page
+  // load happens, so nothing else re-invokes this module. Without
+  // re-running the match on every hashchange, the sidebar highlight stays
+  // frozen on whichever sub-item matched at initial load.
+  function refresh() {
+    const activeHref = resolveActiveHref(allLeaves);
+    renderNav(container, activeHref, role);
+    // renderNav replaces container's children, so the close-drawer-on-click
+    // listeners wireDrawer attached to the old nodes are gone — reattach to
+    // the new ones. wireDrawer's hamburger/overlay creation is separately
+    // guarded (checks for an existing #sidebarHamburger), so this is safe
+    // to call again rather than only on first load.
+    wireDrawer(container);
+  }
+
+  refresh();
   wireCollapse(sidebar);
-  wireDrawer(container);
+  window.addEventListener('hashchange', refresh);
 }

@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Notifications - ELI Coffee Events</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_notifications_config.css">
   <link rel="stylesheet" href="/css/admin_sidebar.css">
-  <link rel="stylesheet" href="/css/admin_placeholder.css">
 </head>
 <body>
 
@@ -45,53 +44,110 @@
   <!-- ── MAIN ── -->
   <main class="main">
     <section class="page-shell">
+
       <div class="page-header">
         <div>
-          <h1 class="page-title" id="placeholderTitle">Notifications</h1>
-          <p class="page-sub">Configuration</p>
+          <h1 class="page-title">Notifications <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Turn each event-driven notification on or off, choose its channels, and edit what it says.</p>
         </div>
       </div>
 
-      <div class="card placeholder-card">
-        <p class="placeholder-marker">Not yet implemented</p>
-        <p class="placeholder-desc" id="placeholderDesc"></p>
+      <div class="settings-note">
+        <p>Reminder notifications (payment due, balance due, event reminder) are Phase 2 — they need a scheduled job that doesn't exist yet, so they aren't configurable here.</p>
       </div>
+
+      <!-- ── TRIGGER LIST ── -->
+      <div class="card">
+        <p class="card-title">Triggers</p>
+        <p class="card-sub">Each fires from a real system event. This list can't be extended — the catalogue is fixed.</p>
+        <div id="triggerList" class="trigger-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── DELIVERY LOG ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Delivery Log</p>
+            <p class="card-sub">Recent notifications sent by the triggers above. Read-only history, not configuration.</p>
+          </div>
+        </div>
+        <div class="log-toolbar">
+          <select class="modal-input" id="logTriggerFilter">
+            <option value="">All triggers</option>
+          </select>
+          <select class="modal-input" id="logStatusFilter">
+            <option value="">All statuses</option>
+            <option value="sent">Sent</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr><th>Trigger</th><th>Recipient</th><th>Channel</th><th>Sent</th><th>Status</th></tr>
+            </thead>
+            <tbody id="logTableBody">
+              <tr><td colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </section>
   </main>
 
-  <script type="module">
-    import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
-    import { setupInactivityLogout } from '/js/super_admin_inactivity.js';
-    import { getPortalInitials } from '/js/admin_auth.js';
-    import { initAdminNav } from '/js/admin_nav.js';
-    import { initPlaceholder } from '/js/admin_placeholder.js';
+  <!-- ── MESSAGE EDITOR MODAL ── -->
+  <div class="modal-overlay hidden" id="editorModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editorModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="editorModalTitle">Edit Message</h2>
+          <p class="modal-sub" id="editorModalSub"></p>
+        </div>
+        <button type="button" class="modal-close" id="editorModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">Channels</label>
+          <div class="channel-checks">
+            <label class="plain-checkbox-row"><input type="checkbox" id="editorSendInApp"> In-app</label>
+            <label class="plain-checkbox-row"><input type="checkbox" id="editorSendEmail"> Email</label>
+          </div>
+        </div>
+        <div class="modal-field" id="editorSubjectField">
+          <label class="modal-label" for="editorSubjectInput">Email Subject</label>
+          <input type="text" id="editorSubjectInput" class="modal-input" placeholder="Shown only in the email — the in-app title uses the trigger's own label">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="editorBodyInput">Message Body</label>
+          <textarea id="editorBodyInput" class="modal-textarea" rows="6" placeholder="Use {{tokens}} for figures that come from the reservation"></textarea>
+          <p class="modal-hint" id="editorTokenError"></p>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Insert a token</label>
+          <div id="tokenPicker" class="token-picker"></div>
+        </div>
+        <div class="modal-field">
+          <div class="preview-head">
+            <label class="modal-label">Live Preview</label>
+            <span class="modal-hint">Rendered against sample reservation data</span>
+          </div>
+          <div class="notif-preview" id="editorPreview"></div>
+        </div>
+        <p class="modal-message hidden" id="editorModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="editorModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="editorModalSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
 
-    async function init() {
-      const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
-      if (!result) return;
-
-      if (result.profile.role !== 'admin') {
-        window.location.replace('/admin/dashboard.html');
-        return;
-      }
-
-      const avatarEl = document.getElementById('sidebarAvatar');
-      if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
-      const roleBottomEl = document.getElementById('sidebarRoleBottom');
-      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
-
-      watchAuthState();
-      wireLogoutButton();
-      setupInactivityLogout();
-      initAdminNav({ role: result.profile.role });
-
-      initPlaceholder({
-        title: 'Notifications',
-        description: 'Configure which events trigger a customer or staff notification, and edit the message templates they receive — separate from the notification inbox you already see via the bell icon.'
-      });
-    }
-
-    init();
-  </script>
+  <script type="module" src="/js/admin_notifications_config.js"></script>
 </body>
 </html>

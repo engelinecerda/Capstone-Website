@@ -47,30 +47,33 @@
 
   <!-- PAGE HERO -->
   <section class="page-hero">
-    <img class="page-hero-img" src="/images/group-order-4.jpg" alt="ELI Coffee Events Cafe interior" />
+    <img class="page-hero-img" id="menuHeroImg" src="/images/group-order-4.jpg" alt="ELI Coffee Events Cafe interior" />
     <div class="page-hero-overlay"></div>
     <div class="page-hero-body">
       <p class="hero-eyebrow" style="font-size:11px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-bottom:18px;">ELI Coffee Events Cafe</p>
-      <h1 class="page-hero-title">Our <em>Menu</em></h1>
-      <p class="page-hero-sub">Tap any menu to zoom in</p>
+      <h1 class="page-hero-title" id="menuHeroHeading">Our <em>Menu</em></h1>
+      <p class="page-hero-sub" id="menuHeroSub">Tap any menu to zoom in</p>
     </div>
   </section>
 
   <!-- MENU CONTENT -->
   <main class="menu-section">
 
-    <!-- ELITE CARD PROMO BANNER -->
-    <button class="menu-elite-banner" id="eliteCardBtn" aria-label="View Elite Membership Card — tap to zoom">
+    <!-- ELITE CARD PROMO BANNER — text/image below are the fallback shown
+         until/unless js/page_content.js's loadMenuBanner() overwrites them
+         with the admin-configured banner (Page Content > Elite Card Banner). -->
+    <button class="menu-elite-banner" id="eliteCardBtn" aria-label="View Elite Membership Card — tap to zoom" data-lb-src="/images/menu/elite-card.png" data-lb-alt="ELI Coffee Elite Membership Card — 20% off for members">
       <div class="menu-elite-icon"><i class="ti ti-id-badge-2"></i></div>
       <div class="menu-elite-text">
-        <p class="menu-elite-label">Members Only</p>
-        <p class="menu-elite-desc"><strong>Elite Card</strong> — Get 20% off on all orders. Elite price shown on menu sheets is exclusive to card holders.</p>
+        <p class="menu-elite-label" id="menuEliteLabel">Members Only</p>
+        <p class="menu-elite-desc"><strong id="menuEliteHeading">Elite Card</strong> — <span id="menuEliteDesc">Get 20% off on all orders. Elite price shown on menu sheets is exclusive to card holders.</span></p>
       </div>
       <i class="ti ti-chevron-right menu-elite-caret"></i>
     </button>
 
-    <!-- CATEGORY CHIPS -->
-    <nav class="menu-chips" aria-label="Jump to menu section">
+    <!-- CATEGORY CHIPS — fallback below, replaced if loadMenuSections()
+         returns rows (see the module script near the bottom of this file). -->
+    <nav class="menu-chips" id="menuChips" aria-label="Jump to menu section">
       <a href="#sulit-picks"       class="menu-chip">Sulit picks</a>
       <a href="#pizza-appetizers"  class="menu-chip">Pizza &amp; appetizers</a>
       <a href="#mains-sets"        class="menu-chip">Mains &amp; sets</a>
@@ -78,60 +81,69 @@
       <a href="#desserts"          class="menu-chip">Desserts</a>
     </nav>
 
-    <!-- 1. SULIT PICKS -->
-    <section class="menu-img-section" id="sulit-picks">
-      <h2 class="menu-img-section-title">Sulit Picks Meals</h2>
-      <div class="menu-img-wrap" data-lb-src="/images/menu/sulit-picks.jpg" data-lb-alt="ELI Coffee Sulit Picks budget meals menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Sulit Picks Meals menu">
-        <img src="/images/menu/sulit-picks.jpg"
-             alt="ELI Coffee Sulit Picks budget meals menu with prices"
-             loading="eager" />
-        <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-      </div>
-    </section>
+    <!-- MENU IMAGES — fallback below, replaced if loadMenuSections() returns
+         rows. Kept as static markup (not just an empty container) so the
+         page still shows the current 5 menus if the fetch fails or the
+         table is empty, matching js/page_content.js's "hardcoded markup
+         stays on screen" resilience convention. -->
+    <div id="menuSectionsContainer">
 
-    <!-- 2. PIZZA, APPETIZERS & WAFFLES -->
-    <section class="menu-img-section" id="pizza-appetizers">
-      <h2 class="menu-img-section-title">Pizzas / Appetizers / Waffles</h2>
-      <div class="menu-img-wrap" data-lb-src="/images/menu/pizza-appetizers-waffles.jpg" data-lb-alt="ELI Coffee pizza, appetizer, and waffle menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Pizza, Appetizers and Waffles menu">
-        <img src="/images/menu/pizza-appetizers-waffles.jpg"
-             alt="ELI Coffee pizza, appetizer, and waffle menu with prices"
-             loading="lazy" />
-        <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-      </div>
-    </section>
+      <!-- 1. SULIT PICKS -->
+      <section class="menu-img-section" id="sulit-picks">
+        <h2 class="menu-img-section-title">Sulit Picks Meals</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/sulit-picks.jpg" data-lb-alt="ELI Coffee Sulit Picks budget meals menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Sulit Picks Meals menu">
+          <img src="/images/menu/sulit-picks.jpg"
+               alt="ELI Coffee Sulit Picks budget meals menu with prices"
+               loading="eager" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
 
-    <!-- 3. MAINS, PASTAS & SALU-SALO SETS -->
-    <section class="menu-img-section" id="mains-sets">
-      <h2 class="menu-img-section-title">Main Dish / Pastas / Salu-Salo Sets</h2>
-      <div class="menu-img-wrap" data-lb-src="/images/menu/main-pasta-sets.jpg" data-lb-alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Mains, Pastas and Salu-Salo Sets menu">
-        <img src="/images/menu/main-pasta-sets.jpg"
-             alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices"
-             loading="lazy" />
-        <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-      </div>
-    </section>
+      <!-- 2. PIZZA, APPETIZERS & WAFFLES -->
+      <section class="menu-img-section" id="pizza-appetizers">
+        <h2 class="menu-img-section-title">Pizzas / Appetizers / Waffles</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/pizza-appetizers-waffles.jpg" data-lb-alt="ELI Coffee pizza, appetizer, and waffle menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Pizza, Appetizers and Waffles menu">
+          <img src="/images/menu/pizza-appetizers-waffles.jpg"
+               alt="ELI Coffee pizza, appetizer, and waffle menu with prices"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
 
-    <!-- 4. DRINKS -->
-    <section class="menu-img-section" id="drinks">
-      <h2 class="menu-img-section-title">Drinks</h2>
-      <div class="menu-img-wrap" data-lb-src="/images/menu/drinks.png" data-lb-alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades" role="button" tabindex="0" aria-label="Tap to zoom Drinks menu">
-        <img src="/images/menu/drinks.png"
-             alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades"
-             loading="lazy" />
-        <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-      </div>
-    </section>
+      <!-- 3. MAINS, PASTAS & SALU-SALO SETS -->
+      <section class="menu-img-section" id="mains-sets">
+        <h2 class="menu-img-section-title">Main Dish / Pastas / Salu-Salo Sets</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/main-pasta-sets.jpg" data-lb-alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Mains, Pastas and Salu-Salo Sets menu">
+          <img src="/images/menu/main-pasta-sets.jpg"
+               alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
 
-    <!-- 5. TIRAMISU -->
-    <section class="menu-img-section" id="desserts">
-      <h2 class="menu-img-section-title">Tiramisu by ELI Coffee</h2>
-      <div class="menu-img-wrap" data-lb-src="/images/menu/tiramisu.png" data-lb-alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices" role="button" tabindex="0" aria-label="Tap to zoom Tiramisu menu">
-        <img src="/images/menu/tiramisu.png"
-             alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices"
-             loading="lazy" />
-        <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-      </div>
-    </section>
+      <!-- 4. DRINKS -->
+      <section class="menu-img-section" id="drinks">
+        <h2 class="menu-img-section-title">Drinks</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/drinks.png" data-lb-alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades" role="button" tabindex="0" aria-label="Tap to zoom Drinks menu">
+          <img src="/images/menu/drinks.png"
+               alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+      <!-- 5. TIRAMISU -->
+      <section class="menu-img-section" id="desserts">
+        <h2 class="menu-img-section-title">Tiramisu by ELI Coffee</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/tiramisu.png" data-lb-alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices" role="button" tabindex="0" aria-label="Tap to zoom Tiramisu menu">
+          <img src="/images/menu/tiramisu.png"
+               alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+    </div>
 
     <p class="menu-price-note">Prices subject to change without prior notice.</p>
     <div class="menu-cta">
@@ -197,6 +209,65 @@
   <script src="/js/app.js"></script>
   <script type="module" src="/js/navbar.js"></script>
 
+  <script type="module">
+    import { customerSupabase as supabase } from '/js/supabase.js';
+    import { loadPageHeader, loadMenuSections, loadMenuBanner } from '/js/page_content.js';
+
+    loadPageHeader(supabase, 'menu', {
+      imgEl: document.getElementById('menuHeroImg'),
+      headingEl: document.getElementById('menuHeroHeading'),
+      subEl: document.getElementById('menuHeroSub')
+    });
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    // Elite Card banner — the button's markup/dataset already hold the
+    // fallback shown until this resolves. Only overwrite on success.
+    loadMenuBanner(supabase).then((banner) => {
+      if (!banner) return;
+      const btn = document.getElementById('eliteCardBtn');
+      if (banner.is_active === false) {
+        btn.classList.add('hidden');
+        return;
+      }
+      document.getElementById('menuEliteLabel').textContent = banner.label || 'Members Only';
+      document.getElementById('menuEliteHeading').textContent = banner.heading || 'Elite Card';
+      document.getElementById('menuEliteDesc').textContent = banner.description || '';
+      if (banner.image_url) {
+        btn.dataset.lbSrc = banner.image_url;
+        btn.dataset.lbAlt = banner.alt_text || '';
+      }
+    });
+
+    // Menu category images — #menuChips / #menuSectionsContainer already
+    // hold the current 5 menus as a fallback; only rebuild them if the
+    // admin-configured list resolves with at least one active row. The
+    // lightbox trigger and the chip scroll-highlight (the plain inline
+    // script further down this file) are both delegated/re-queried live,
+    // so they pick up this replacement without needing to be re-wired here.
+    loadMenuSections(supabase).then((sections) => {
+      if (!sections.length) return;
+
+      document.getElementById('menuChips').innerHTML = sections.map((s) =>
+        `<a href="#ms-${s.id}" class="menu-chip">${escapeHtml(s.heading)}</a>`
+      ).join('');
+
+      document.getElementById('menuSectionsContainer').innerHTML = sections.map((s, i) => `
+        <section class="menu-img-section" id="ms-${s.id}">
+          <h2 class="menu-img-section-title">${escapeHtml(s.heading)}</h2>
+          <div class="menu-img-wrap" data-lb-src="${escapeHtml(s.image_url)}" data-lb-alt="${escapeHtml(s.alt_text)}" role="button" tabindex="0" aria-label="Tap to zoom ${escapeHtml(s.heading)} menu">
+            <img src="${escapeHtml(s.image_url)}" alt="${escapeHtml(s.alt_text)}" loading="${i === 0 ? 'eager' : 'lazy'}" />
+            <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+          </div>
+        </section>`
+      ).join('');
+    });
+  </script>
+
   <script>
   (function () {
     'use strict';
@@ -205,7 +276,6 @@
     var lbImg     = document.getElementById('menuLbImg');
     var lbClose   = document.getElementById('menuLbClose');
     var viewport  = document.getElementById('menuLbViewport');
-    var eliteBtn  = document.getElementById('eliteCardBtn');
 
     /* ── State ── */
     var scale     = 1;
@@ -257,23 +327,23 @@
       setTimeout(function () { lbImg.src = ''; }, 250);
     }
 
-    /* ── Trigger from image tiles ── */
-    document.querySelectorAll('.menu-img-wrap').forEach(function (wrap) {
-      function trigger() {
-        openLightbox(wrap.dataset.lbSrc, wrap.dataset.lbAlt);
-      }
-      wrap.addEventListener('click', trigger);
-      wrap.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); }
-      });
-    });
-
-    /* ── Elite Card banner ── */
-    if (eliteBtn) {
-      eliteBtn.addEventListener('click', function () {
-        openLightbox('/images/menu/elite-card.png', 'ELI Coffee Elite Membership Card — 20% off for members');
-      });
+    /* ── Trigger from image tiles + Elite Card banner ── delegated on
+       document (not queried once at parse time) because #menuSectionsContainer's
+       .menu-img-wrap tiles may be replaced after this script runs, once
+       js/page_content.js's loadMenuSections() resolves (see the module
+       script above) — a per-element listener wired here would miss them. */
+    function menuLbTrigger(el) {
+      openLightbox(el.dataset.lbSrc, el.dataset.lbAlt);
     }
+    document.addEventListener('click', function (e) {
+      var el = e.target.closest('.menu-img-wrap, #eliteCardBtn');
+      if (el) menuLbTrigger(el);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var el = e.target.closest('.menu-img-wrap');
+      if (el) { e.preventDefault(); menuLbTrigger(el); }
+    });
 
     /* ── Close button ── */
     lbClose.addEventListener('click', closeLightbox);
@@ -412,16 +482,14 @@
       }
     });
 
-    /* ── Chip active state on scroll ── */
-    var sections = [];
-    document.querySelectorAll('.menu-img-section[id]').forEach(function (s) {
-      sections.push(s);
-    });
-    var chips = document.querySelectorAll('.menu-chip');
-
+    /* ── Chip active state on scroll ── queried fresh on every call, not
+       cached once, since #menuSectionsContainer / #menuChips may be
+       replaced after this script runs (see the module script above). */
     function updateActiveChip() {
-      var scrollY = window.scrollY + 120;
-      var active  = null;
+      var sections = document.querySelectorAll('.menu-img-section[id]');
+      var chips    = document.querySelectorAll('.menu-chip');
+      var scrollY  = window.scrollY + 120;
+      var active   = null;
       sections.forEach(function (s) {
         if (s.offsetTop <= scrollY) active = s.id;
       });
@@ -436,6 +504,8 @@
 
   }());
   </script>
+
+  <script type="module" src="/js/footer_content.js"></script>
 
 </body>
 </html>

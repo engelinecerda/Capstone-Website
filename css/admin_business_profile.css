@@ -1,0 +1,143 @@
+/* ============================================================
+   ELI Coffee Events — Business Profile
+   Page-specific additions only — manager-theme.css (already linked
+   before this file) owns :root, sidebar, .main/.page-shell, .card,
+   .btn-primary, status-pill styling. Mirrors css/admin_page_content.css's
+   shell (same modal/button system) — kept as its own file since this is a
+   separate page, not a shared stylesheet.
+   ============================================================ */
+
+.card + .card { margin-top: 20px; }
+
+.card-title-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px;
+}
+.card-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.card-sub   { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.pc-loading { font-size: 12.5px; color: var(--muted); padding: 12px 0; }
+
+.form-message {
+  font-size: 12.5px; color: var(--muted); min-height: 18px; margin: 8px 0;
+}
+.form-message.error   { color: var(--declined-txt); }
+.form-message.success { color: var(--approved-txt); }
+
+/* ── FORM (Contact & Social) ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.action-bar { display: flex; justify-content: flex-end; margin-top: 14px; }
+
+/* ── BUTTONS ── */
+.btn-cancel {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px;
+  border: 0.5px solid var(--btn-secondary-border); background: var(--card-bg); color: var(--text);
+  border-radius: 8px; padding: 0 16px; font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: background .15s ease;
+}
+.btn-cancel:hover { background: var(--btn-secondary-hover); }
+
+.btn-danger {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px;
+  border: none; background: var(--declined-txt, #A32D2D); color: #fff;
+  border-radius: 8px; padding: 0 16px; font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: filter .15s ease;
+}
+.btn-danger:hover { filter: brightness(0.9); }
+
+.btn-outline-sm {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card-bg); color: var(--text); border: 0.5px solid var(--btn-secondary-border);
+  border-radius: 7px; padding: 6px 11px; font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: background .15s;
+}
+.btn-outline-sm:hover { background: var(--btn-secondary-hover); }
+
+.btn-icon-xs {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; border: 0.5px solid var(--btn-secondary-border);
+  background: var(--card-bg); color: var(--muted); cursor: pointer; transition: background .15s, color .15s;
+}
+.btn-icon-xs:hover, .btn-icon-xs:focus-visible { background: var(--btn-secondary-hover); color: var(--text); }
+.btn-icon-xs:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ── LOCATIONS list ── */
+.location-admin-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.location-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.location-admin-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 12px;
+}
+.location-admin-row.is-inactive { opacity: .55; }
+.location-admin-reorder { display: flex; flex-direction: column; gap: 2px; }
+.location-admin-body { flex: 1; min-width: 0; }
+.location-admin-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted);
+}
+.location-admin-name { font-size: 13.5px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.location-admin-address { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.location-admin-hours { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.location-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* ── MODAL (shared shell, matches the established admin modal system) ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(42, 18, 8, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; overflow-y: auto;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
+  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
+}
+.modal-sm { max-width: 420px; }
+.modal-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 20px 22px 16px; gap: 12px; position: sticky; top: 0; background: var(--card-bg);
+  z-index: 1; border-bottom: 0.5px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.modal-sub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.modal-close {
+  background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color .15s, background .15s;
+}
+.modal-close:hover, .modal-close:focus-visible { color: var(--text); background: var(--bg); }
+.modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+.modal-footer {
+  padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 10px;
+  border-top: 0.5px solid var(--border); position: sticky; bottom: 0; background: var(--card-bg);
+}
+.modal-field { display: flex; flex-direction: column; gap: 6px; }
+.modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.modal-input {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none;
+  transition: border-color .15s; width: 100%;
+}
+.modal-input:focus { border-color: var(--input-focus); }
+.modal-textarea {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none; resize: vertical;
+  min-height: 60px; width: 100%; transition: border-color .15s;
+}
+.modal-message {
+  font-size: 12.5px; border-radius: 8px; padding: 9px 12px;
+  background: var(--declined); color: var(--declined-txt); border: 1px solid var(--declined);
+}
+.modal-message.hidden  { display: none; }
+.modal-message.success { background: var(--approved); color: var(--approved-txt); border-color: var(--approved); }
+.confirm-copy { font-size: 13.5px; color: var(--text); line-height: 1.6; }
+
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .modal-row { grid-template-columns: 1fr; }
+  .location-admin-row { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-cancel, .btn-danger, .btn-outline-sm, .btn-icon-xs, .modal-close { transition: none !important; }
+}

@@ -8,16 +8,12 @@ const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // Update to your actual deployed site URL
 const SITE_URL = 'https://elicoffeeevents.com'
 
-// All notification types trigger an email
-const EMAIL_ENABLED_TYPES = new Set([
-  'reservation_status',
-  'contract_rejected',
-  'payment_status',
-  'admin_new_reservation',
-  'admin_cancellation_request',
-  'admin_contract_submitted',
-  'admin_payment_submitted',
-])
+// Notifications Configuration Phase 1: which types get emailed used to be
+// this hardcoded Set — now it's data-driven via notifications.channel,
+// set at insert time by public.dispatch_notification() for the 7 managed
+// triggers (supabase/migrations/20260808_notification_config.sql). Rows
+// from triggers this feature doesn't manage (admin_* alerts, etc.) still
+// default channel='in_app' and are correctly skipped here, same as before.
 
 serve(async (req: Request) => {
   if (req.method !== 'POST') {
@@ -36,20 +32,23 @@ serve(async (req: Request) => {
       )
     }
 
-    if (!EMAIL_ENABLED_TYPES.has(notification.type)) {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+    if (notification.channel !== 'email') {
       return new Response(
-        JSON.stringify({ skipped: true, reason: 'notification type not emailed' }),
+        JSON.stringify({ skipped: true, reason: 'not an email-channel notification' }),
         { status: 200 }
       )
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
     const { data: { user }, error: userError } =
       await supabase.auth.admin.getUserById(notification.user_id)
 
     if (userError || !user?.email) {
       console.error('Could not resolve user email:', userError?.message)
+      await supabase.from('notifications')
+        .update({ status: 'failed', error_message: 'Could not resolve user email' })
+        .eq('id', notification.id)
       return new Response(JSON.stringify({ error: 'user not found' }), { status: 200 })
     }
 
@@ -101,8 +100,15 @@ serve(async (req: Request) => {
     if (!resendRes.ok) {
       const errBody = await resendRes.text()
       console.error('Resend error:', errBody)
+      await supabase.from('notifications')
+        .update({ status: 'failed', error_message: errBody.slice(0, 500) })
+        .eq('id', notification.id)
       return new Response(JSON.stringify({ error: 'email send failed', detail: errBody }), { status: 200 })
     }
+
+    await supabase.from('notifications')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', notification.id)
 
     return new Response(JSON.stringify({ sent: true, to: user.email }), { status: 200 })
 

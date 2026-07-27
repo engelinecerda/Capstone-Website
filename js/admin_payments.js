@@ -97,6 +97,7 @@ let recordPaymentFile = null;
 const reservationFilterParam = new URLSearchParams(window.location.search).get('reservation') || '';
 let activePaymentReviewId = null;
 let paymentReviewFlash = null;
+let rejectReasonPaymentId = null;
 let paymentProofZoomPercent = 100;
 const PAYMENT_PROOF_MIN_ZOOM = 50;
 const PAYMENT_PROOF_MAX_ZOOM = 300;
@@ -689,7 +690,7 @@ function buildOcrPanel(payment) {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-async function handlePaymentReview(paymentId, nextStatus) {
+async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') {
   if (currentRole === 'admin') {
     throw new Error('This action requires the Manager role.');
   }
@@ -701,6 +702,10 @@ async function handlePaymentReview(paymentId, nextStatus) {
     payment_status: nextStatus,
     verified_at: new Date().toISOString()
   };
+
+  if (nextStatus === 'rejected') {
+    updatePayload.rejection_reason = rejectionReason;
+  }
 
   const { error: paymentError } = await supabase
     .from('payment')
@@ -745,6 +750,7 @@ async function handlePaymentReview(paymentId, nextStatus) {
 function closeDetailsModal() {
   activePaymentReviewId = null;
   paymentReviewFlash = null;
+  rejectReasonPaymentId = null;
   paymentProofZoomPercent = 100;
   paymentDetailsModal?.classList.add('hidden');
   paymentDetailsModal?.setAttribute('aria-hidden', 'true');
@@ -839,8 +845,19 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
     // Pending café-issued rows never reach this modal — the queue shows
     // "Record payment" for those instead (see renderTable), so a pending
     // row that gets here for review/approve is always customer_submitted.
-    reviewActions.push(`<button type="button" class="modal-btn modal-btn-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject Payment</button>`);
-    reviewActions.push(`<button type="button" class="modal-btn modal-btn-success" data-action="approve-payment" data-payment-id="${payment.payment_id}">Approve Payment</button>`);
+    if (rejectReasonPaymentId === payment.payment_id) {
+      reviewActions.push(`
+        <div class="reject-reason-inline">
+          <label class="record-payment-field-label" for="rejectReasonInput">Reason for rejection <span class="record-payment-optional">(required)</span></label>
+          <textarea id="rejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Receipt image was unreadable">${escapeHtml(payment.rejection_reason || '')}</textarea>
+        </div>
+        <button type="button" class="modal-btn modal-btn-secondary" data-action="cancel-reject-payment" data-payment-id="${payment.payment_id}">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-danger" data-action="confirm-reject-payment" data-payment-id="${payment.payment_id}">Confirm Rejection</button>
+      `);
+    } else {
+      reviewActions.push(`<button type="button" class="modal-btn modal-btn-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject Payment</button>`);
+      reviewActions.push(`<button type="button" class="modal-btn modal-btn-success" data-action="approve-payment" data-payment-id="${payment.payment_id}">Approve Payment</button>`);
+    }
   } else if (receipt) {
     reviewActions.push(`<button type="button" class="modal-btn modal-btn-secondary" data-action="view-receipt" data-payment-id="${payment.payment_id}">View Receipt</button>`);
   }
@@ -1205,11 +1222,33 @@ function wireModals() {
       return;
     }
 
+    if (action === 'reject-payment') {
+      rejectReasonPaymentId = paymentId;
+      renderPaymentReviewModal(paymentId);
+      return;
+    }
+
+    if (action === 'cancel-reject-payment') {
+      rejectReasonPaymentId = null;
+      renderPaymentReviewModal(paymentId);
+      return;
+    }
+
+    let rejectionReason = '';
+    if (action === 'confirm-reject-payment') {
+      rejectionReason = document.getElementById('rejectReasonInput')?.value.trim() || '';
+      if (!rejectionReason) {
+        setPaymentReviewMessage('Please enter a reason for rejecting this payment.', true);
+        return;
+      }
+    }
+
     (async () => {
       try {
         setPaymentReviewMessage('Updating payment status...');
         if (action === 'approve-payment') await handlePaymentReview(paymentId, 'approved');
-        if (action === 'reject-payment') await handlePaymentReview(paymentId, 'rejected');
+        if (action === 'confirm-reject-payment') await handlePaymentReview(paymentId, 'rejected', rejectionReason);
+        rejectReasonPaymentId = null;
         paymentReviewFlash = { message: 'Payment updated.', isError: false };
         await loadData();
         setMessage(tableMessage, 'Payment updated.');

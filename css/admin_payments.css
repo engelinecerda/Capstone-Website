@@ -368,6 +368,15 @@
   flex-wrap: wrap;
 }
 
+.reject-reason-inline {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.reject-reason-inline .record-payment-textarea {
+  min-height: 56px;
+}
+
 .modal-btn-danger {
   background: #dc4c3f;
   color: #fff;

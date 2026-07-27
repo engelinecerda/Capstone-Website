@@ -106,11 +106,24 @@
     gap: 0;
 }
 
-.about-story-para {
+.about-story-para,
+.about-story-body p {
     font-size: 15px;
     line-height: 1.85;
     color: var(--text-mid, #5A3420);
     margin: 0 0 20px;
+}
+.about-story-body h4 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 19px;
+    color: var(--text-dark, #2A160B);
+    margin: 0 0 8px;
+}
+.about-story-body ul { margin: 0 0 20px; padding-left: 20px; }
+.about-story-body li {
+    font-size: 15px;
+    line-height: 1.85;
+    color: var(--text-mid, #5A3420);
 }
 
 .about-founder {
@@ -179,6 +192,29 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
+}
+
+/* Applied when Our Values is admin-edited free text (js/about_content.js) —
+   the fixed 4-icon-card grid becomes a plain rendered block list instead,
+   since the icons/individual-card layout aren't part of that editable text. */
+.values-grid.values-grid--freeform {
+    display: block;
+    max-width: 640px;
+    margin: 0 auto;
+    text-align: left;
+}
+.values-grid--freeform h4 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    color: var(--text-dark, #2A160B);
+    margin: 20px 0 6px;
+}
+.values-grid--freeform h4:first-child { margin-top: 0; }
+.values-grid--freeform p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-light, #9E7558);
+    margin: 0;
 }
 
 .value-card {

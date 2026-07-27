@@ -81,6 +81,7 @@ export const ADMIN_NAV = [
     items: [
       { label: 'Users and roles',   href: '/admin/super%20admin/super_admin_accounts.html', iconKey: 'user-cog' },
       { label: 'Business profile',  href: '/admin/system/business.html',                    iconKey: 'building-store' },
+      { label: 'Page content',      href: '/admin/system/page-content.html',                iconKey: 'photo' },
       { label: 'Data export',       href: '/admin/system/export.html',                       iconKey: 'download' },
       { label: 'Audit trail',       href: '/admin/super%20admin/super_admin_audit.html',     iconKey: 'history' },
     ]

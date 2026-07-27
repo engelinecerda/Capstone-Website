@@ -2,6 +2,7 @@
 // Inline flow: category tabs → overview → pricing cards → detail panel
 
 import { customerSupabase as supabase } from './supabase.js';
+import { loadPageHeader } from './page_content.js';
 
 const CATEGORY_TABLE      = 'package_category';
 const PACKAGE_TABLE       = 'package';
@@ -690,4 +691,9 @@ pkgDetailClose.addEventListener('click', () => {
 pkgRetryBtn.addEventListener('click', loadCategories);
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+loadPageHeader(supabase, 'packages', {
+  imgEl: document.querySelector('.page-hero-img'),
+  headingEl: document.querySelector('.page-hero-title'),
+  subEl: document.querySelector('.page-hero-sub')
+});
 loadCategories();

@@ -25,6 +25,7 @@ export const ICONS = {
   'building-store': '<path d="M3 21h18"/><path d="M5 21V10"/><path d="M19 21V10"/><path d="M2 10l2-6h16l2 6"/><path d="M9 21v-5a3 3 0 0 1 6 0v5"/>',
   'download': '<path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 19h14"/>',
   'history': '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/>',
+  'photo': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
 };
 
 export function iconSvg(key) {
