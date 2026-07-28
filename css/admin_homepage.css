@@ -660,6 +660,36 @@ body {
   color: var(--text);
 }
 
+.forecast-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.forecast-btn {
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--active-bg);
+  color: var(--active-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.forecast-btn:hover {
+  background: #5C381F;
+}
+
+.forecast-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ── RECENT RESERVATIONS ─────────────────── */
 .recent-section {
   margin-top: 0;
