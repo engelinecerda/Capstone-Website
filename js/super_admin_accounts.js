@@ -301,7 +301,7 @@ function openAddModal() {
   document.getElementById('accountModalTabs').style.display = 'none';
   document.getElementById('addModeExtra').style.display     = 'block';
   document.getElementById('tab-info').classList.add('active');
-  ['tab-access', 'tab-activity'].forEach(id => document.getElementById(id).classList.remove('active'));
+  ['tab-access', 'tab-activity', 'tab-security'].forEach(id => document.getElementById(id).classList.remove('active'));
 
   clearFields(['fieldFirstName', 'fieldMiddleName', 'fieldLastName', 'fieldEmail']);
   document.getElementById('addFieldStaffRole').value = '';
@@ -376,6 +376,16 @@ function openEditModal(a) {
   document.getElementById('viewRole').textContent           = roleLabel(a);
   document.getElementById('viewStaffRole').textContent      = a.staff_role || '—';
 
+  // Reset security tab fields
+  document.getElementById('securityNewPassword').value = '';
+  document.getElementById('securityConfirmPassword').value = '';
+  validatePasswordRequirements();
+  document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+    const input = document.getElementById(btn.dataset.target);
+    if (input) input.type = 'password';
+    btn.classList.remove('showing');
+  });
+
   hideMsg();
   document.getElementById('accountModalSave').onclick = () => handleUpdateAccount(a);
   document.getElementById('accountModalSave').innerHTML =
@@ -442,7 +452,6 @@ async function handleCreateAccount() {
     disableSave(false);
   }
 }
-
 // ── UPDATE ───────────────────────────────────────────────────────
 async function handleUpdateAccount(a) {
   const firstName  = v('fieldFirstName');
@@ -450,10 +459,25 @@ async function handleUpdateAccount(a) {
   const middleName = v('fieldMiddleName');
   const role       = document.getElementById('fieldRole').value;
   const staffRole  = v('fieldStaffRole');
+  const newPassword     = document.getElementById('securityNewPassword').value;
+  const confirmPassword = document.getElementById('securityConfirmPassword').value;
 
   if (!firstName || !lastName) { showMsg('First and last name are required.', 'error'); return; }
 
-  const fields = { firstName, lastName, middleName, role, staffRole };
+  if (newPassword || confirmPassword) {
+    if (newPassword.length < 8) {
+      showMsg('New password must be at least 8 characters.', 'error');
+      switchTab('security');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showMsg('New passwords do not match.', 'error');
+      switchTab('security');
+      return;
+    }
+  }
+
+  const fields = { firstName, lastName, middleName, role, staffRole, newPassword };
 
   if (role !== a.role) {
     if (a.role === 'admin') {
@@ -488,7 +512,7 @@ function formatRoleLabel(role) {
   return role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : role === 'staff' ? 'Staff' : role;
 }
 
-async function saveAccountUpdate(a, { firstName, lastName, middleName, role, staffRole }) {
+async function saveAccountUpdate(a, { firstName, lastName, middleName, role, staffRole, newPassword }) {
   showMsg('Saving changes…', 'info');
   disableSave(true);
 
@@ -503,8 +527,31 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
 
     if (error) throw error;
 
+    if (newPassword) {
+      showMsg('Updating password…', 'info');
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc('super_admin_change_user_password', {
+        target_user_id: a.user_id,
+        new_password: newPassword
+      });
+
+      if (rpcError) {
+        throw new Error('Profile saved but password update failed: ' + rpcError.message);
+      }
+      if (rpcData && rpcData.success === false) {
+        throw new Error('Profile saved but password update failed: ' + (rpcData.error || 'Unknown error'));
+      }
+
+      document.getElementById('securityNewPassword').value = '';
+      document.getElementById('securityConfirmPassword').value = '';
+      validatePasswordRequirements();
+    }
+
     if (role !== a.role) {
       await logAudit({ action: 'Changed Role', category: 'accounts', details: `${displayName(a)}: ${formatRoleLabel(a.role)} → ${formatRoleLabel(role)}`, entityId: a.user_id });
+    }
+    if (newPassword) {
+      await logAudit({ action: 'Changed Password', category: 'accounts', details: `Password changed for ${displayName(a)} (${a.email})`, entityId: a.user_id });
     }
 
     const idx = allAccounts.findIndex(x => x.user_id === a.user_id);
@@ -515,13 +562,11 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
       };
     }
 
-    showMsg('Changes saved successfully.', 'success');
+    showMsg(newPassword ? 'Changes saved and password updated successfully.' : 'Changes saved successfully.', 'success');
     updateStats();
     applyFilters();
 
   } catch (err) {
-    // The last-admin DB trigger surfaces here if the client-side pre-check
-    // was somehow bypassed — same message either way.
     showMsg(err.message || 'Failed to save changes.', 'error');
   } finally {
     disableSave(false);
@@ -529,21 +574,12 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
 }
 
 // ── PASSWORD RESET ───────────────────────────────────────────────
-async function sendPasswordReset(a) {
+/*async function sendPasswordReset(a) {
   if (!a?.email) return;
   const { error } = await supabase.auth.resetPasswordForEmail(a.email);
   if (error) alert('Failed to send: ' + error.message);
   else alert(`Password reset email sent to ${a.email}.`);
-}
-
-document.getElementById('sendPasswordResetBtn').addEventListener('click', async () => {
-  const a = document.getElementById('accountModal')._current;
-  if (!a?.email) return;
-  showMsg('Sending password reset email…', 'info');
-  const { error } = await supabase.auth.resetPasswordForEmail(a.email);
-  if (error) showMsg('Failed: ' + error.message, 'error');
-  else       showMsg(`Password reset email sent to ${a.email}.`, 'success');
-});
+}*/
 
 // ── DEACTIVATE / REACTIVATE ────────────────────────────────────────
 function openLockConfirm(a) {
@@ -700,6 +736,43 @@ document.addEventListener('keydown', e => {
   if (!document.getElementById('accountModal').classList.contains('hidden')) closeAccountModal();
   if (!document.getElementById('confirmModal').classList.contains('hidden')) closeConfirmModal();
 });
+
+// ── PASSWORD TOGGLE ──────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const toggleBtn = e.target.closest('.password-toggle-btn');
+  if (!toggleBtn) return;
+  const input = document.getElementById(toggleBtn.dataset.target);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    toggleBtn.classList.add('showing');
+  } else {
+    input.type = 'password';
+    toggleBtn.classList.remove('showing');
+  }
+});
+
+// ── PASSWORD REQUIREMENTS VALIDATION ─────────────────────────────
+function validatePasswordRequirements() {
+  const pw = document.getElementById('securityNewPassword')?.value || '';
+  const confirm = document.getElementById('securityConfirmPassword')?.value || '';
+  const reqLength = document.getElementById('reqLength');
+  const reqMatch = document.getElementById('reqMatch');
+
+  const lengthMet = pw.length >= 8;
+  const matchMet = pw.length > 0 && pw === confirm;
+
+  if (reqLength) {
+    reqLength.classList.toggle('met', lengthMet);
+    reqLength.querySelector('.req-icon').textContent = lengthMet ? '✓' : '○';
+  }
+  if (reqMatch) {
+    reqMatch.classList.toggle('met', matchMet);
+    reqMatch.querySelector('.req-icon').textContent = matchMet ? '✓' : '○';
+  }
+}
+document.getElementById('securityNewPassword').addEventListener('input', validatePasswordRequirements);
+document.getElementById('securityConfirmPassword').addEventListener('input', validatePasswordRequirements);
 
 // ── SESSION ──────────────────────────────────────────────────────
 async function init() {
