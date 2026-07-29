@@ -84,6 +84,7 @@ export const ADMIN_NAV = [
       { label: 'Page content',      href: '/admin/system/page-content.html',                iconKey: 'photo' },
       { label: 'Data export',       href: '/admin/system/export.html',                       iconKey: 'download' },
       { label: 'Audit trail',       href: '/admin/super%20admin/super_admin_audit.html',     iconKey: 'history' },
+      { label: 'Backup & Restore',  href: '/admin/super%20admin/super_admin_backup.html',    iconKey: 'database-backup' },
     ]
   }
 ];
