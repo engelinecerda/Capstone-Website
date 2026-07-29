@@ -1,12 +1,15 @@
 import { portalSupabase as supabase } from './supabase.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 import {
   formatPortalRoleLabel,
   getPortalDisplayName,
   getPortalInitials,
-  populatePortalIdentity,
-  verifyAdminSession
+  populatePortalIdentity
 } from './admin_auth.js';
-import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { initAdminNav } from './admin_nav.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -23,11 +26,6 @@ const profileForm = document.getElementById('profileForm');
 const profileMessage = document.getElementById('profileMessage');
 const passwordForm = document.getElementById('passwordForm');
 const passwordMessage = document.getElementById('passwordMessage');
-const logoutBtn = document.getElementById('logoutBtn');
-const navReservationCount = document.getElementById('navReservationCount');
-const navContractCount = document.getElementById('navContractCount');
-const navPaymentCount = document.getElementById('navPaymentCount');
-const navReviewCount = document.getElementById('navReviewCount');
 
 const profileFirstName = document.getElementById('profileFirstName');
 const profileMiddleName = document.getElementById('profileMiddleName');
@@ -36,14 +34,22 @@ const profileEmail = document.getElementById('profileEmail');
 const profilePhone = document.getElementById('profilePhone');
 const profileDateRegistered = document.getElementById('profileDateRegistered');
 
+const mfaStatusRow = document.getElementById('mfaStatusRow');
+const mfaStatusChip = document.getElementById('mfaStatusChip');
+const mfaActionArea = document.getElementById('mfaActionArea');
+const mfaMessage = document.getElementById('mfaMessage');
+const mfaEnrollPanel = document.getElementById('mfaEnrollPanel');
+const mfaQrWrap = document.getElementById('mfaQrWrap');
+const mfaEnrollCode = document.getElementById('mfaEnrollCode');
+const mfaEnrollMessage = document.getElementById('mfaEnrollMessage');
+const mfaVerifyBtn = document.getElementById('mfaVerifyBtn');
+const mfaCancelEnrollBtn = document.getElementById('mfaCancelEnrollBtn');
+
 const state = {
   session: null,
-  profile: null
+  profile: null,
+  mfaFactorId: ''
 };
-
-function redirectLogin() {
-  window.location.replace('/admin/index.html');
-}
 
 function setPageMessage(message, isError = false) {
   if (!pageMessage) return;
@@ -70,20 +76,6 @@ function formatDate(value) {
   });
 }
 
-function getFallbackProfile(session) {
-  const user = session?.user;
-  return {
-    user_id: user?.id || '',
-    first_name: user?.user_metadata?.first_name || '',
-    middle_name: user?.user_metadata?.middle_name || '',
-    last_name: user?.user_metadata?.last_name || '',
-    email: user?.email || '',
-    phone_number: user?.user_metadata?.phone_number || '',
-    role: 'admin',
-    date_registered: user?.created_at || ''
-  };
-}
-
 function populateProfileForm() {
   const profile = state.profile;
   if (!profile) return;
@@ -106,8 +98,11 @@ function renderProfileShell() {
     nameEl: sidebarName,
     emailEl: sidebarEmail,
     roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
+    avatarEl: document.getElementById('sidebarAvatar'),
+    fallbackLabel: profile.role === 'admin' ? 'Admin' : 'Manager'
   });
+  const roleBottomEl = document.getElementById('sidebarRoleBottom');
+  if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
 
   if (heroAvatar) heroAvatar.textContent = getPortalInitials(profile, 'A');
   if (heroName) heroName.textContent = identity.displayName;
@@ -117,40 +112,6 @@ function renderProfileShell() {
   if (detailDisplayName) detailDisplayName.textContent = getPortalDisplayName(profile, 'Admin');
   if (detailEmail) detailEmail.textContent = identity.email;
   populateProfileForm();
-}
-
-async function loadAdminProfile() {
-  setPageMessage('Loading your profile...');
-
-  try {
-    const { session, profile } = await verifyAdminSession(supabase);
-    if (!session) {
-      await supabase.auth.signOut();
-      redirectLogin();
-      return;
-    }
-
-    state.session = session;
-    state.profile = profile || getFallbackProfile(session);
-    renderProfileShell();
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
-    setPageMessage('Your admin profile is ready.');
-  } catch (error) {
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
-    setPageMessage(error?.message || 'Unable to load your admin profile right now.', true);
-  }
 }
 
 async function handleProfileSubmit(event) {
@@ -164,7 +125,7 @@ async function handleProfileSubmit(event) {
     last_name: profileLastName.value.trim(),
     email: state.session.user.email || '',
     phone_number: profilePhone.value.trim() || null,
-    role: state.profile?.role || 'admin',
+    role: state.profile?.role || 'manager',
     date_registered: state.profile?.date_registered || state.session.user.created_at || new Date().toISOString()
   };
 
@@ -186,6 +147,10 @@ async function handleProfileSubmit(event) {
       ...state.profile,
       ...payload
     };
+
+    // Keep the cached profile in sync so other pages see the updated info
+    localStorage.setItem('profile', JSON.stringify(state.profile));
+
     renderProfileShell();
     setFormMessage(profileMessage, 'Profile updated successfully.', 'success');
   } catch (error) {
@@ -236,18 +201,163 @@ async function handlePasswordSubmit(event) {
 function bindEvents() {
   profileForm?.addEventListener('submit', handleProfileSubmit);
   passwordForm?.addEventListener('submit', handlePasswordSubmit);
-
-  logoutBtn?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    redirectLogin();
-  });
-
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT') {
-      redirectLogin();
-    }
-  });
 }
 
+// ── MFA ──────────────────────────────────────────────────────────
+function setMfaMsg(message, tone = '') {
+  if (!mfaMessage) return;
+  mfaMessage.textContent = message;
+  mfaMessage.className = 'form-message' + (tone ? ` ${tone}` : '');
+}
+
+function setMfaEnrollMsg(message, tone = '') {
+  if (!mfaEnrollMessage) return;
+  mfaEnrollMessage.textContent = message;
+  mfaEnrollMessage.className = 'form-message' + (tone ? ` ${tone}` : '');
+}
+
+async function loadMfaStatus() {
+  const { data, error } = await supabase.auth.mfa.listFactors();
+  if (error) { setMfaMsg('Could not load 2FA status.', 'error'); return; }
+
+  const totp = data?.totp?.find((f) => f.status === 'verified');
+
+  if (mfaStatusChip) {
+    mfaStatusChip.textContent = totp ? '2FA is enabled' : '2FA is not enabled';
+    mfaStatusChip.className = `mfa-status-chip ${totp ? 'mfa-chip-on' : 'mfa-chip-off'}`;
+  }
+
+  if (mfaActionArea) {
+    if (totp) {
+      mfaActionArea.innerHTML = `<button type="button" class="secondary-btn mfa-remove-btn" id="mfaRemoveBtn" data-factor-id="${totp.id}">Remove 2FA</button>`;
+      document.getElementById('mfaRemoveBtn')?.addEventListener('click', handleUnenrollMfa);
+    } else {
+      mfaActionArea.innerHTML = `<button type="button" class="primary-btn" id="mfaEnableBtn">Enable 2FA</button>`;
+      document.getElementById('mfaEnableBtn')?.addEventListener('click', handleStartEnroll);
+    }
+  }
+
+  if (mfaStatusRow) mfaStatusRow.style.display = '';
+}
+
+async function handleStartEnroll() {
+  setMfaMsg('');
+
+  // Clean up any leftover unverified factors using data.all (catches every factor type/status)
+  const { data: existing } = await supabase.auth.mfa.listFactors();
+  const stalePending = (existing?.all ?? existing?.totp ?? []).filter((f) => f.status !== 'verified');
+  for (const f of stalePending) {
+    const { error: unenrollErr } = await supabase.auth.mfa.unenroll({ factorId: f.id });
+    if (unenrollErr) {
+      setMfaMsg(`Could not remove previous setup attempt: ${unenrollErr.message}`, 'error');
+      return;
+    }
+  }
+
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', issuer: 'ELI Coffee Events' });
+  if (error) { setMfaMsg('Could not start 2FA setup: ' + error.message, 'error'); return; }
+
+  state.mfaFactorId = data.id;
+
+  if (mfaQrWrap) {
+    mfaQrWrap.innerHTML = '';
+
+    const canvasWrap = document.createElement('div');
+    mfaQrWrap.appendChild(canvasWrap);
+
+    if (typeof QRCode !== 'undefined') {
+      new QRCode(canvasWrap, {
+        text: data.totp.uri,
+        width: 200,
+        height: 200,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    } else {
+      canvasWrap.innerHTML = data.totp.qr_code;
+    }
+
+    if (data.totp.secret) {
+      const fallback = document.createElement('div');
+      fallback.className = 'mfa-manual-secret';
+      fallback.innerHTML = `<p class="mfa-manual-label">Can't scan? Enter this key manually in your app:</p><code class="mfa-secret-code">${data.totp.secret}</code>`;
+      mfaQrWrap.appendChild(fallback);
+    }
+  }
+
+  if (mfaEnrollPanel) mfaEnrollPanel.style.display = '';
+  if (mfaStatusRow) mfaStatusRow.style.display = 'none';
+  if (mfaEnrollCode) { mfaEnrollCode.value = ''; mfaEnrollCode.focus(); }
+  setMfaEnrollMsg('');
+}
+
+async function handleVerifyEnroll() {
+  const code = (mfaEnrollCode?.value || '').replace(/\s/g, '');
+  if (!code || code.length !== 6) {
+    setMfaEnrollMsg('Enter the 6-digit code from your authenticator app.', 'error');
+    return;
+  }
+
+  setMfaEnrollMsg('Verifying...');
+  if (mfaVerifyBtn) mfaVerifyBtn.disabled = true;
+
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: state.mfaFactorId, code });
+
+  if (mfaVerifyBtn) mfaVerifyBtn.disabled = false;
+
+  if (error) {
+    setMfaEnrollMsg('Invalid code. Check your authenticator app and try again.', 'error');
+    return;
+  }
+
+  state.mfaFactorId = '';
+  if (mfaEnrollPanel) mfaEnrollPanel.style.display = 'none';
+  await loadMfaStatus();
+  setMfaMsg('Two-factor authentication has been enabled.', 'success');
+}
+
+async function handleUnenrollMfa(event) {
+  const factorId = event.currentTarget.dataset.factorId;
+  if (!factorId) return;
+  if (!confirm('Remove two-factor authentication? You will no longer need a code to sign in.')) return;
+
+  setMfaMsg('Removing 2FA...');
+  const { error } = await supabase.auth.mfa.unenroll({ factorId });
+  if (error) { setMfaMsg('Could not remove 2FA: ' + error.message, 'error'); return; }
+
+  await loadMfaStatus();
+  setMfaMsg('Two-factor authentication has been removed.', 'success');
+}
+
+async function cancelEnroll() {
+  if (state.mfaFactorId) {
+    await supabase.auth.mfa.unenroll({ factorId: state.mfaFactorId }).catch(() => {});
+    state.mfaFactorId = '';
+  }
+  if (mfaQrWrap) mfaQrWrap.innerHTML = '';
+  if (mfaEnrollPanel) mfaEnrollPanel.style.display = 'none';
+  await loadMfaStatus();
+}
+
+mfaVerifyBtn?.addEventListener('click', handleVerifyEnroll);
+mfaCancelEnrollBtn?.addEventListener('click', cancelEnroll);
+
+// ── BOOT ─────────────────────────────────────────────────────────
 bindEvents();
-await loadAdminProfile();
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: ({ session, profile }) => {
+    state.session = session;
+    state.profile = profile;
+    setupInactivityLogout(profile.role);
+    initAdminSidebarBadges(supabase);
+    initAdminNav({ role: profile.role });
+    initManagerNotificationBell(supabase, session.user.id);
+    renderProfileShell();
+    setPageMessage('Your profile is ready.');
+    loadMfaStatus();
+  }
+});

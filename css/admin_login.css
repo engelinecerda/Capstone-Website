@@ -1,13 +1,26 @@
+:root {
+    --brown: #3D1A0A;
+    --brown-hover: #5A2E16;
+    --brown-active: #2E1307;
+    --cream: #FDF6EE;
+    --text-heading: #1A1A1A;
+    --text-subtitle: #6B6B6B;
+    --text-footer: #9B9B9B;
+    --card-border: #EDE4D8;
+    --input-bg: #FBF8F3;
+    --input-border: #E2D8CB;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Kumbh Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
 body {
-    font-family: 'Kumbh Sans', sans-serif;
-    background-color: #FFF8F0;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--cream);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -17,12 +30,13 @@ body {
    Top Bar
 ======================== */
 .top-bar {
-    background-color: #2A1408;
-    color: #fff;
+    background-color: var(--brown);
+    color: var(--cream);
     text-align: center;
-    padding: 10px;
-    font-size: 0.8rem;
-    letter-spacing: 0.5px;
+    padding: 10px 0;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
 }
 
 /* ========================
@@ -33,7 +47,7 @@ body {
     justify-content: center;
     align-items: center;
     flex: 1;
-    padding: 40px 20px;
+    padding: 48px 20px;
 }
 
 .admin-wrapper {
@@ -41,45 +55,49 @@ body {
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 520px;
+    max-width: 400px;
 }
 
 /* ========================
-   Portal Header
+   Brand Mark
 ======================== */
-.portal-header {
-    text-align: center;
-    margin-bottom: 28px;
-}
-
-.portal-icon {
-    width: 72px;
-    height: 72px;
-    background-color: #2A1408;
+.brand-mark {
+    width: 56px;
+    height: 56px;
+    background-color: var(--brown);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 16px;
+    margin: 0 auto 24px;
+    color: var(--cream);
 }
 
-.portal-icon svg {
-    width: 36px;
-    height: 36px;
-    fill: #fff;
+.brand-mark-logo {
+    width: 24px;
+    height: auto;
+    display: block;
 }
 
-.portal-header h1 {
-    font-size: 1.7rem;
-    font-weight: 700;
-    color: #2A1408;
-    margin-bottom: 4px;
+/* ========================
+   Welcome Header
+======================== */
+.welcome-header {
+    text-align: center;
+    margin-bottom: 36px;
 }
 
-.portal-header p {
-    font-size: 0.9rem;
-    color: #6B3A1F;
+.welcome-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin-bottom: 8px;
+}
+
+.welcome-header p {
+    font-size: 14px;
     font-weight: 400;
+    color: var(--text-subtitle);
 }
 
 /* ========================
@@ -87,22 +105,24 @@ body {
 ======================== */
 .admin-card {
     background: #fff;
-    padding: 50px 60px;
-    border-radius: 16px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.09);
+    padding: 40px;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     width: 100%;
 }
 
 .admin-card h2 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #2A1408;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-heading);
     margin-bottom: 4px;
 }
 
 .admin-card .subtitle {
-    font-size: 0.875rem;
-    color: #777;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-subtitle);
     margin-bottom: 28px;
 }
 
@@ -112,59 +132,52 @@ body {
 .form-group {
     display: flex;
     flex-direction: column;
-    margin-bottom: 18px;
+    margin-bottom: 24px;
+}
+
+#adminLoginForm .form-group:last-of-type {
+    margin-bottom: 32px;
 }
 
 .form-group label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #2A1408;
-    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-heading);
+    margin-bottom: 8px;
 }
 
-.form-group input,
-.form-group select {
+.label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.label-row label {
+    margin-bottom: 0;
+}
+
+.form-group input {
     width: 100%;
-    padding: 12px 14px;
-    border: 1px solid #ddd;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid var(--input-border);
     border-radius: 8px;
-    font-size: 14px;
-    font-family: 'Kumbh Sans', sans-serif;
-    color: #2A1408;
-    background-color: #fff;
-    transition: border-color 0.3s ease;
+    font-size: 15px;
+    font-weight: 400;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-heading);
+    background-color: var(--input-bg);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
     appearance: none;
     -webkit-appearance: none;
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.form-group input:focus {
     outline: none;
-    border-color: #6B3A1F;
-}
-
-/* Select wrapper for custom arrow */
-.select-wrapper {
-    position: relative;
-}
-
-.select-wrapper select {
-    width: 100%;
-    cursor: pointer;
-}
-
-.select-wrapper::after {
-    content: '';
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid #6B3A1F;
-    pointer-events: none;
+    border-color: var(--brown);
+    box-shadow: 0 0 0 3px rgba(61, 26, 10, 0.12);
+    background-color: #fff;
 }
 
 /* ========================
@@ -176,13 +189,12 @@ body {
 
 .password-wrapper input {
     padding-right: 44px;
-    font-size: 16px;
-    letter-spacing: 0.08em;
 }
 
-.password-wrapper input::placeholder {
-    font-size: 16px;
-    letter-spacing: 0.08em;
+/* Hide browser-native password reveal button (Edge, IE, Chrome) */
+.password-wrapper input[type="password"]::-ms-reveal,
+.password-wrapper input[type="password"]::-ms-clear {
+    display: none;
 }
 
 .toggle-password {
@@ -193,7 +205,7 @@ body {
     background: none;
     border: none;
     cursor: pointer;
-    color: #999;
+    color: #A99884;
     padding: 0;
     display: flex;
     align-items: center;
@@ -201,7 +213,7 @@ body {
 }
 
 .toggle-password:hover {
-    color: #6B3A1F;
+    color: var(--brown);
 }
 
 .toggle-password svg {
@@ -210,40 +222,17 @@ body {
 }
 
 /* ========================
-   Options Row
+   Forgot Password Link
 ======================== */
-.options {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
-
-.options-forgot-only {
-    justify-content: flex-end;
-}
-
-.options label {
-    font-size: 0.875rem;
-    color: #555;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-}
-
-.options input[type="checkbox"] {
-    width: 15px;
-    height: 15px;
-    accent-color: #6B3A1F;
-    cursor: pointer;
-}
-
 .forgot {
-    font-size: 0.875rem;
-    color: #6B3A1F;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font-size: 13px;
+    color: var(--brown);
     text-decoration: none;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .forgot:hover {
@@ -255,21 +244,26 @@ body {
 ======================== */
 .login-btn {
     width: 100%;
-    padding: 14px;
-    background: #6B3A1F;
-    color: #fff;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--brown);
+    color: var(--cream);
     border: none;
     border-radius: 8px;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
-    font-family: 'Kumbh Sans', sans-serif;
-    transition: background 0.3s ease;
-    letter-spacing: 0.3px;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.15s ease;
+    margin-top: 0;
 }
 
 .login-btn:hover {
-    background: #2A1408;
+    background: var(--brown-hover);
+}
+
+.login-btn:active {
+    background: var(--brown-active);
 }
 
 /* ========================
@@ -277,7 +271,7 @@ body {
 ======================== */
 .form-msg {
     margin-top: 16px;
-    font-size: 0.875rem;
+    font-size: 14px;
     text-align: center;
     min-height: 1.2em;
 }
@@ -294,27 +288,284 @@ body {
     margin: 20px 0;
 }
 
-.security-note {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.78rem;
-    color: #aaa;
-    justify-content: center;
-}
-
-.security-note svg {
-    width: 14px;
-    height: 14px;
-    fill: #bbb;
-    flex-shrink: 0;
+/* ========================
+   Page Footer
+======================== */
+.page-footer {
+    margin-top: 24px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-footer);
+    text-align: center;
 }
 
 /* ========================
    Responsive
 ======================== */
 @media (max-width: 480px) {
+    .admin-wrapper {
+        width: 90%;
+    }
+
     .admin-card {
-        padding: 32px 24px;
+        padding: 24px 20px;
+    }
+}
+
+/* ========================
+   MFA Card
+======================== */
+.mfa-icon {
+    width: 52px;
+    height: 52px;
+    background: #f5efe7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 18px;
+    color: var(--brown);
+}
+
+.mfa-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.mfa-code-input {
+    font-size: 24px !important;
+    letter-spacing: 0.25em;
+    text-align: center;
+    font-weight: 600;
+}
+
+.mfa-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--brown);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    padding: 0;
+}
+
+.mfa-back-link:hover {
+    text-decoration: underline;
+}
+
+/* ========================
+   Forgot Password Modal
+======================== */
+.fp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(61, 26, 10, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.fp-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.fp-modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 36px 40px;
+    max-width: 480px;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transform: translateY(8px);
+    transition: transform 0.2s ease;
+}
+
+.fp-overlay.open .fp-modal {
+    transform: translateY(0);
+}
+
+.fp-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #aaa;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.fp-close:hover {
+    color: var(--brown);
+    background: #f5efe7;
+}
+
+.fp-icon {
+    width: 52px;
+    height: 52px;
+    background: #f5efe7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: var(--brown);
+}
+
+.fp-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.fp-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-heading);
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.fp-intro {
+    font-size: 14px;
+    color: var(--text-subtitle);
+    text-align: center;
+    line-height: 1.65;
+    margin-bottom: 24px;
+}
+
+.fp-section {
+    margin-bottom: 20px;
+}
+
+.fp-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+
+.fp-contact-card {
+    background: #fdf7f2;
+    border: 1px solid #ead9c8;
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fp-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fp-contact-icon {
+    color: var(--brown);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.fp-contact-text {
+    font-size: 14px;
+    color: var(--text-heading);
+}
+
+.fp-contact-link {
+    font-size: 14px;
+    color: var(--brown);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.fp-contact-link:hover {
+    text-decoration: underline;
+}
+
+.fp-checklist {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fp-checklist li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #444;
+}
+
+.fp-checklist li svg {
+    color: var(--brown);
+    flex-shrink: 0;
+}
+
+.fp-response-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #888;
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 11px 14px;
+    margin-bottom: 24px;
+}
+
+.fp-response-note svg {
+    color: var(--brown);
+    flex-shrink: 0;
+}
+
+.fp-response-note strong {
+    color: var(--text-heading);
+}
+
+.fp-back-btn {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--brown);
+    color: var(--cream);
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.15s ease;
+}
+
+.fp-back-btn:hover {
+    background: var(--brown-hover);
+}
+
+.fp-back-btn:active {
+    background: var(--brown-active);
+}
+
+@media (max-width: 520px) {
+    .fp-modal {
+        padding: 28px 22px;
     }
 }

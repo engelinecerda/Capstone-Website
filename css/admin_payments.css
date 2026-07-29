@@ -1,5 +1,7 @@
 @import url('./admin_reservations.css');
 
+/* admin_payments.css */
+
 .payments-table {
   width: 100%;
   border-collapse: collapse;
@@ -39,7 +41,7 @@
 }
 
 .payment-row:hover td {
-  background: #fffdf9;
+  background: #FBF8F3;
 }
 
 .payment-cell-stack {
@@ -63,17 +65,44 @@
   word-break: break-word;
 }
 
-.payment-balance-sub.pending {
-  color: #8a6500;
+.payment-balance-block {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--border);
+  border-radius: 0 4px 4px 0;
 }
 
-.payment-balance-sub.unpaid {
-  color: #991b1b;
+.payment-balance-block.pending {
+  border-left-color: #8a6500;
 }
 
-.payment-balance-sub.approved {
-  color: #166534;
+.payment-balance-block.unpaid {
+  border-left-color: #991b1b;
 }
+
+.payment-balance-block.approved {
+  border-left-color: #166534;
+}
+
+.payment-balance-amount,
+.payment-balance-due {
+  display: block;
+  font-size: 11px;
+}
+
+.payment-balance-amount {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.payment-balance-due {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.payment-balance-block.pending .payment-balance-amount { color: #8a6500; }
+.payment-balance-block.unpaid .payment-balance-amount { color: #991b1b; }
+.payment-balance-block.approved .payment-balance-amount { color: #166534; }
 
 .payment-mode-stack,
 .payment-status-stack {
@@ -98,7 +127,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   background: #fff;
-  border: 1px solid #eadfd5;
+  border: 1px solid #E2D8CB;
   color: #5f5144;
   font-size: 12px;
   font-weight: 700;
@@ -151,7 +180,7 @@
 }
 
 .payment-review-pane {
-  border: 1px solid #eadfd5;
+  border: 1px solid #E2D8CB;
   border-radius: 18px;
   background: #fff;
   padding: 16px;
@@ -183,7 +212,7 @@
   grid-template-columns: 120px minmax(0, 1fr);
   gap: 12px;
   padding: 12px 0;
-  border-top: 1px solid #f1e6da;
+  border-top: 1px solid #FBF8F3;
 }
 
 .review-summary-item:first-child {
@@ -224,7 +253,7 @@
 
 .detail-card {
   background: #fff;
-  border: 1px solid #eadfd5;
+  border: 1px solid #E2D8CB;
   border-radius: 16px;
   padding: 14px 16px;
 }
@@ -263,9 +292,9 @@
 
 .proof-preview-stage {
   min-height: 420px;
-  border: 1px solid #efe5da;
+  border: 1px solid #FBF8F3;
   border-radius: 16px;
-  background: #faf7f2;
+  background: #FBF8F3;
   overflow: auto;
   padding: 14px;
 }
@@ -287,7 +316,7 @@
   max-width: none;
   height: auto;
   border-radius: 12px;
-  border: 1px solid #efe5da;
+  border: 1px solid #FBF8F3;
   background: #fff;
   transition: width 0.18s ease;
 }
@@ -305,7 +334,7 @@
   min-height: 40px;
   padding: 9px 12px;
   border-radius: 12px;
-  border: 1px solid #eadfd5;
+  border: 1px solid #E2D8CB;
   background: #fff;
   display: inline-flex;
   align-items: center;
@@ -317,11 +346,11 @@
 
 .proof-empty {
   min-height: 220px;
-  border: 1px dashed #dfd4c7;
+  border: 1px dashed #E2D8CB;
   border-radius: 16px;
   padding: 16px;
   color: var(--muted);
-  background: #faf7f2;
+  background: #FBF8F3;
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -337,6 +366,15 @@
   margin-top: 18px;
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.reject-reason-inline {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.reject-reason-inline .record-payment-textarea {
+  min-height: 56px;
 }
 
 .modal-btn-danger {
@@ -468,8 +506,8 @@
 /* ── OCR Panel ─────────────────────────────────────────────────────────────── */
 .ocr-panel {
   margin-top: 14px;
-  background: #faf7f3;
-  border: 1px solid #e8ddd3;
+  background: #FBF8F3;
+  border: 1px solid #FBF8F3;
   border-radius: 14px;
   padding: 14px 16px;
 }
@@ -480,7 +518,7 @@
 }
 
 .ocr-panel-none {
-  background: #f7f7f7;
+  background: #FBF8F3;
   border-color: #e4e4e4;
 }
 
@@ -497,7 +535,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #5c3d24;
+  color: #5A2E16;
 }
 
 .ocr-badge {
@@ -514,7 +552,7 @@
 .ocr-badge-medium { background: #fef3c7; color: #92400e; }
 .ocr-badge-low    { background: #fee2e2; color: #991b1b; }
 .ocr-badge-failed { background: #fee2e2; color: #991b1b; }
-.ocr-badge-none   { background: #f0ede9; color: #7d6b5b; }
+.ocr-badge-none   { background: #FBF8F3; color: #7d6b5b; }
 
 .ocr-panel-note {
   font-size: 12px;
@@ -531,7 +569,7 @@
 
 .ocr-field {
   background: #fff;
-  border: 1px solid #ede4da;
+  border: 1px solid #FBF8F3;
   border-radius: 10px;
   padding: 10px 12px;
   display: flex;
@@ -550,7 +588,7 @@
 .ocr-field-value {
   font-size: 14px;
   font-weight: 700;
-  color: #2a1408;
+  color: #2A1208;
   word-break: break-word;
 }
 
@@ -575,21 +613,21 @@
 }
 
 .ocr-raw-details summary:hover {
-  color: #4e3120;
+  color: #3D1A0A;
 }
 
 .ocr-raw-text {
   margin-top: 8px;
   padding: 10px 12px;
   background: #fff;
-  border: 1px solid #e8ddd3;
+  border: 1px solid #FBF8F3;
   border-radius: 8px;
   font-family: 'Courier New', monospace;
   font-size: 11px;
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #3d2010;
+  color: #3D1A0A;
   max-height: 160px;
   overflow-y: auto;
 }
@@ -598,4 +636,223 @@
   .ocr-fields {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   Record payment modal (Payments module)
+   ============================================================ */
+.refresh-btn.hidden {
+  display: none;
+}
+
+.record-payment-modal-card {
+  width: min(100%, 440px);
+}
+
+.record-payment-field-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.record-payment-field-label:first-of-type {
+  margin-top: 0;
+}
+
+.record-payment-optional {
+  font-weight: 400;
+  color: #8A7A6C;
+}
+
+.record-payment-input,
+.record-payment-textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 0.5px solid #E8DFD3;
+  background: #FBF8F3;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.record-payment-input {
+  height: 34px;
+  padding: 0 12px;
+}
+
+.record-payment-textarea {
+  padding: 8px 12px;
+  resize: vertical;
+}
+
+.record-payment-input:focus,
+.record-payment-textarea:focus {
+  border-color: #B98F6A;
+}
+
+.record-payment-inline-warning {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: #854F0B;
+}
+
+.record-payment-inline-warning.hidden {
+  display: none;
+}
+
+.record-payment-context-block {
+  margin-top: 10px;
+  background: #FAF6F0;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+
+.record-payment-context-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8A7A6C;
+}
+
+.record-payment-context-main {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.record-payment-context-date {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: #8A7A6C;
+}
+
+.record-payment-context-balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid #E8DFD3;
+  font-size: 11px;
+  color: #7A6A5C;
+}
+
+.record-payment-context-balance-row span:last-child {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.record-payment-method-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-payment-method-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 0.5px solid #E8DFD3;
+  background: #FBF8F3;
+  color: #6B3F23;
+}
+
+.record-payment-method-row .record-payment-input {
+  flex: 1;
+}
+
+.record-payment-helper {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: #8A7A6C;
+}
+
+.record-payment-planned-note {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: #8A7A6C;
+}
+
+.record-payment-planned-note.hidden {
+  display: none;
+}
+
+.record-payment-file-drop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0.5px dashed #D8CCBD;
+  background: #FBF8F3;
+  color: #7A6A5C;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.record-payment-file-drop:hover {
+  background: #F5EEE4;
+}
+
+.record-payment-file-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.record-payment-file-preview.hidden {
+  display: none;
+}
+
+.record-payment-file-preview img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 0.5px solid #E8DFD3;
+}
+
+.record-payment-file-preview img.hidden {
+  display: none;
+}
+
+.record-payment-file-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-payment-file-remove {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #8A7A6C;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.record-payment-file-remove:hover {
+  color: #A32D2D;
 }

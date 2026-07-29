@@ -1,8 +1,4 @@
-export const BOOKING_LIMITS = {
-    onsite_vip: 1,
-    onsite_main_hall: 1,
-    offsite: 1
-};
+export const DAILY_BOOKING_LIMIT = 2;
 
 export const BLOCKING_RESERVATION_STATUSES = new Set(['pending', 'approved', 'confirmed', 'rescheduled']);
 
@@ -27,18 +23,36 @@ export function buildDateKey(date) {
     ].join('-');
 }
 
-export function getBookingScope(locationTypeOrReservation, packageName = '') {
+export function getBookingScope(locationTypeOrReservation, packageName = '', explicitScope = null) {
     if (locationTypeOrReservation && typeof locationTypeOrReservation === 'object') {
+        const obj = locationTypeOrReservation;
         return getBookingScope(
-            locationTypeOrReservation.location_type,
-            locationTypeOrReservation.package?.package_name || locationTypeOrReservation.package_name || ''
+            obj.location_type,
+            obj.package?.package_name || obj.package_name || '',
+            obj.booking_scope || obj.package?.booking_scope || null
         );
     }
+
+    // package.booking_scope (admin-set, explicit) always wins — see
+    // supabase/migrations/20260706_package_explicit_booking_scope.sql. Name
+    // matching below only runs for packages an admin hasn't configured yet.
+    if (explicitScope) return explicitScope;
 
     const location = String(locationTypeOrReservation || '').toLowerCase();
     const name = String(packageName || '').toLowerCase();
 
-    if (location === 'offsite') return 'offsite';
+    // Legacy fallback, mirrors public.normalize_booking_scope() — these
+    // "all-occasion"/"all in" packages were treated as offsite scope even when
+    // their location_type column is 'onsite' (see 20260414_add_event_package_rows.sql
+    // and 20260419_reservation_flow_rewrite.sql).
+    if (
+        location === 'offsite' ||
+        name.includes('all-occasion') ||
+        name.includes('all occasion') ||
+        name.includes('birthday / baptism all in package')
+    ) {
+        return 'offsite';
+    }
     if (location === 'onsite' && name.includes('main hall')) return 'onsite_main_hall';
     if (location === 'onsite' && name.includes('vip')) return 'onsite_vip';
     return null;
@@ -71,7 +85,7 @@ export function getOccupiedScopesFromReservations(reservations, dateKey, exclude
 
 export function isDateFullyBooked(occupiedScopes) {
     const scopeSet = new Set(occupiedScopes || []);
-    return Object.keys(BOOKING_LIMITS).every((scope) => scopeSet.has(scope));
+    return ['onsite_vip', 'onsite_main_hall', 'offsite'].every((scope) => scopeSet.has(scope));
 }
 
 export function isScopeOccupied(occupiedScopes, scope) {
@@ -80,19 +94,9 @@ export function isScopeOccupied(occupiedScopes, scope) {
 }
 
 export function getAvailabilitySummaryMessage(occupiedScopes, scope = '') {
-    if (isScopeOccupied(occupiedScopes, scope)) {
-        return `${getScopeLabel(scope)} already booked on this date.`;
-    }
-
-    if (isDateFullyBooked(occupiedScopes)) {
+    if ((occupiedScopes || []).length) {
         return 'This date is fully booked.';
     }
-
-    if ((occupiedScopes || []).length) {
-        const labels = (occupiedScopes || []).map((entry) => getScopeLabel(entry));
-        return `${labels.join(', ')} already booked on this date.`;
-    }
-
     return 'This date is available.';
 }
 
@@ -122,6 +126,30 @@ export async function fetchDateAvailability(supabase, { eventDate, scope = '', d
 
     if (error) throw error;
     return normalizeAvailabilityPayload(data, eventDate);
+}
+
+function normalizeStartTimeRow(row) {
+    return {
+        timeLabel: String(row?.time_label || ''),
+        startTime: row?.start_time ?? null,
+        endTime: row?.end_time ?? null,
+        isAvailable: Boolean(row?.is_available),
+        reason: row?.reason || ''
+    };
+}
+
+export async function fetchAvailableStartTimes(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null } = {}) {
+    if (!eventDate) return [];
+
+    const { data, error } = await supabase.rpc('get_available_start_times', {
+        p_event_date: eventDate,
+        p_scope: scope || null,
+        p_duration_hours: Number.isFinite(Number(durationHours)) ? Number(durationHours) : null,
+        p_exclude_reservation_id: excludeReservationId || null
+    });
+
+    if (error) throw error;
+    return (Array.isArray(data) ? data : []).map(normalizeStartTimeRow);
 }
 
 export async function fetchCalendarAvailability(supabase, { fromDate, toDate } = {}) {

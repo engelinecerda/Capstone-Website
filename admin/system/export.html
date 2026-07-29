@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Export - ELI Coffee Events</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <link rel="stylesheet" href="/css/admin_placeholder.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <section class="page-shell">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" id="placeholderTitle">Data export</h1>
+          <p class="page-sub">System</p>
+        </div>
+      </div>
+
+      <div class="card placeholder-card">
+        <p class="placeholder-marker">Not yet implemented</p>
+        <p class="placeholder-desc" id="placeholderDesc"></p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
+    import { setupInactivityLogout } from '/js/super_admin_inactivity.js';
+    import { getPortalInitials } from '/js/admin_auth.js';
+    import { initAdminNav } from '/js/admin_nav.js';
+    import { initPlaceholder } from '/js/admin_placeholder.js';
+
+    async function init() {
+      const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
+      if (!result) return;
+
+      if (result.profile.role !== 'admin') {
+        window.location.replace('/admin/dashboard.html');
+        return;
+      }
+
+      const avatarEl = document.getElementById('sidebarAvatar');
+      if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
+      const roleBottomEl = document.getElementById('sidebarRoleBottom');
+      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+
+      watchAuthState();
+      wireLogoutButton();
+      setupInactivityLogout();
+      initAdminNav({ role: result.profile.role });
+
+      initPlaceholder({
+        title: 'Data export',
+        description: 'Download reservation, payment, and customer records for reporting or backup. Restoring data is handled separately through Supabase point-in-time recovery, not from this page.'
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

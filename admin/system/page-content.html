@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Content - ELI Coffee Events</title>
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_page_content.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <!-- Values icon picker previews the same Tabler glyphs the public About
+       page renders (about_value.icon stores raw "ti-*" class names) — the
+       rest of the admin portal uses inline SVGs instead of this webfont,
+       so it's loaded here only, matching the customer pages that already do. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <section class="page-shell">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Page Content <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Images and text shown on the customer site — header images, gallery, About, and FAQs.</p>
+        </div>
+      </div>
+
+      <!-- ── PAGE HEADERS ── -->
+      <div class="card">
+        <p class="card-title">Page Headers</p>
+        <p class="card-sub">The hero image and heading shown at the top of each customer page.</p>
+        <div id="pageHeaderRows" class="header-rows">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── MENU IMAGES ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Menu Images</p>
+            <p class="card-sub">The scanned menu photos on the Menu page. Each heading doubles as its jump-chip label above the images. Admin can add, reorder, or remove images freely.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addMenuSectionBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Menu Image
+          </button>
+        </div>
+        <p class="form-message" id="menuSectionMsg"></p>
+        <div id="menuSectionList" class="menu-section-admin-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── ELITE CARD BANNER ── -->
+      <div class="card">
+        <p class="card-title">Elite Card Banner</p>
+        <p class="card-sub">The "Members Only" membership banner shown above the menu images. Tapping it zooms into the card image.</p>
+
+        <div class="modal-field">
+          <label class="modal-label">Banner Zoom Image</label>
+          <div class="uploader" id="menuBannerUploader">
+            <img class="uploader-preview hidden" id="menuBannerImgPreview" alt="">
+            <div class="uploader-placeholder" id="menuBannerImgPlaceholder">
+              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Click or drag an image here</span>
+            </div>
+            <input type="file" id="menuBannerFileInput" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <span class="modal-hint" id="menuBannerFileName">No file chosen</span>
+        </div>
+
+        <div class="modal-field">
+          <label class="modal-label" for="menuBannerLabelInput">Eyebrow Label</label>
+          <input type="text" id="menuBannerLabelInput" class="modal-input" placeholder="E.g., Members Only">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="menuBannerHeadingInput">Heading</label>
+          <input type="text" id="menuBannerHeadingInput" class="modal-input" placeholder="E.g., Elite Card">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="menuBannerDescInput">Description</label>
+          <textarea id="menuBannerDescInput" class="modal-textarea" rows="3" placeholder="Shown next to the heading"></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="menuBannerAltInput">Zoom Image Alt Text</label>
+          <input type="text" id="menuBannerAltInput" class="modal-input" placeholder="Describe the image for screen readers">
+        </div>
+        <label class="plain-checkbox-row">
+          <input type="checkbox" id="menuBannerActiveInput" checked>
+          Show this banner on the Menu page
+        </label>
+
+        <p class="form-message" id="menuBannerMsg"></p>
+
+        <div class="card-actions">
+          <button type="button" class="btn-primary" id="saveMenuBannerBtn">Save Banner</button>
+        </div>
+      </div>
+
+      <!-- ── GALLERY ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Gallery</p>
+            <p class="card-sub">Photos shown on the homepage gallery section.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addGalleryBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Photos
+          </button>
+          <input type="file" id="galleryFileInput" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        </div>
+        <p class="form-message" id="galleryMsg"></p>
+        <div id="galleryGrid" class="gallery-admin-grid">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── SERVICES (What We Offer) ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Services (What We Offer)</p>
+            <p class="card-sub">The 3-card "What We Offer" section on the homepage, and the matching Services list in every page's footer.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addServiceBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Service
+          </button>
+        </div>
+        <p class="form-message" id="serviceMsg"></p>
+        <div id="serviceList" class="service-admin-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── ABOUT ── -->
+      <div class="card">
+        <p class="card-title">About Page</p>
+        <p class="card-sub">Long-form text shown on the About page and the Home page's Our Story teaser. One per line or blank-line-separated paragraphs; short lines with no ending period become headings, lines starting with "- " become bullets.</p>
+        <p class="form-message" id="aboutMsg"></p>
+        <div id="aboutSections">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── OUR VALUES ("What We Stand For" icon cards) ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Our Values</p>
+            <p class="card-sub">The "What We Stand For" icon cards on the About page. Each needs a label, a short description, and an icon from the approved set.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addValueBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Value
+          </button>
+        </div>
+        <p class="form-message" id="valueMsg"></p>
+        <div id="valueList" class="value-admin-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── FAQS ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">FAQs</p>
+            <p class="card-sub">Questions and answers shown on the FAQs page.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addFaqBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add FAQ
+          </button>
+        </div>
+        <p class="form-message" id="faqMsg"></p>
+        <div id="faqList" class="faq-admin-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── PAGE HEADER EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="headerModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="headerModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="headerModalTitle">Edit Page Header</h2>
+          <p class="modal-sub" id="headerModalSub"></p>
+        </div>
+        <button type="button" class="modal-close" id="headerModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">Hero Image</label>
+          <div class="uploader" id="headerUploader">
+            <img class="uploader-preview hidden" id="headerImgPreview" alt="">
+            <div class="uploader-placeholder" id="headerImgPlaceholder">
+              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Click or drag an image here</span>
+            </div>
+            <input type="file" id="headerFileInput" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <span class="modal-hint" id="headerFileName">No file chosen</span>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="headerAltInput">Alt Text *</label>
+          <input type="text" id="headerAltInput" class="modal-input" placeholder="Describe the image for screen readers">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="headerHeadingInput">Heading</label>
+          <input type="text" id="headerHeadingInput" class="modal-input" placeholder="E.g., Where every sip tells a story">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="headerSubInput">Subheading</label>
+          <input type="text" id="headerSubInput" class="modal-input" placeholder="A short line under the heading">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Preview</label>
+          <div class="hero-preview" id="heroPreview">
+            <img id="heroPreviewImg" alt="">
+            <div class="hero-preview-overlay"></div>
+            <div class="hero-preview-body">
+              <h3 id="heroPreviewHeading"></h3>
+              <p id="heroPreviewSub"></p>
+            </div>
+          </div>
+        </div>
+        <p class="modal-message hidden" id="headerModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="headerModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="headerModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GALLERY IMAGE EDIT MODAL (caption + alt text after upload) ── -->
+  <div class="modal-overlay hidden" id="galleryEditModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="galleryEditTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="galleryEditTitle">Edit Photo</h2>
+        <button type="button" class="modal-close" id="galleryEditClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <img id="galleryEditPreview" class="gallery-edit-preview" alt="">
+        <div class="modal-field">
+          <label class="modal-label" for="galleryAltInput">Alt Text *</label>
+          <input type="text" id="galleryAltInput" class="modal-input" placeholder="Describe the image for screen readers">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="galleryCaptionInput">Caption</label>
+          <input type="text" id="galleryCaptionInput" class="modal-input" placeholder="Optional caption">
+        </div>
+        <p class="modal-message hidden" id="galleryEditMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="galleryEditCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="galleryEditSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ABOUT SECTION PREVIEW MODAL ── -->
+  <div class="modal-overlay hidden" id="aboutPreviewModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aboutPreviewTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="aboutPreviewTitle">Preview</h2>
+        <button type="button" class="modal-close" id="aboutPreviewClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="about-preview-body" id="aboutPreviewBody"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="aboutPreviewDone">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FAQ EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="faqModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="faqModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="faqModalTitle">Add FAQ</h2>
+        <button type="button" class="modal-close" id="faqModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="faqQuestionInput">Question *</label>
+          <input type="text" id="faqQuestionInput" class="modal-input" placeholder="E.g., Do you accept walk-in reservations?">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="faqAnswerInput">Answer *</label>
+          <textarea id="faqAnswerInput" class="modal-textarea" rows="4" placeholder="Answer shown when this question is expanded"></textarea>
+        </div>
+        <p class="modal-message hidden" id="faqModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="faqModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="faqModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="faqModalSaveLabel">Add FAQ</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SERVICE EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="serviceModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="serviceModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="serviceModalTitle">Add Service</h2>
+        <button type="button" class="modal-close" id="serviceModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">Image</label>
+          <div class="uploader" id="serviceUploader">
+            <img class="uploader-preview hidden" id="serviceImgPreview" alt="">
+            <div class="uploader-placeholder" id="serviceImgPlaceholder">
+              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Click or drag an image here</span>
+            </div>
+            <input type="file" id="serviceFileInput" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <span class="modal-hint" id="serviceFileName">No file chosen</span>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="serviceTitleInput">Title *</label>
+          <input type="text" id="serviceTitleInput" class="modal-input" placeholder="E.g., Cafe & Lounge">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="serviceDescInput">Description</label>
+          <textarea id="serviceDescInput" class="modal-textarea" rows="3" placeholder="A short description of this service"></textarea>
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="serviceLinkUrlInput">Link URL</label>
+            <input type="text" id="serviceLinkUrlInput" class="modal-input" placeholder="/packages.html">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="serviceLinkLabelInput">Link Label</label>
+            <input type="text" id="serviceLinkLabelInput" class="modal-input" placeholder="E.g., View packages">
+          </div>
+        </div>
+        <p class="modal-message hidden" id="serviceModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="serviceModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="serviceModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="serviceModalSaveLabel">Add Service</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MENU IMAGE EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="menuSectionModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="menuSectionModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="menuSectionModalTitle">Add Menu Image</h2>
+        <button type="button" class="modal-close" id="menuSectionModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">Menu Image *</label>
+          <div class="uploader" id="menuSectionUploader">
+            <img class="uploader-preview hidden" id="menuSectionImgPreview" alt="">
+            <div class="uploader-placeholder" id="menuSectionImgPlaceholder">
+              <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Click or drag an image here</span>
+            </div>
+            <input type="file" id="menuSectionFileInput" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+          <span class="modal-hint" id="menuSectionFileName">No file chosen</span>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="menuSectionHeadingInput">Heading *</label>
+          <input type="text" id="menuSectionHeadingInput" class="modal-input" placeholder="E.g., Sulit Picks Meals">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="menuSectionAltInput">Alt Text *</label>
+          <input type="text" id="menuSectionAltInput" class="modal-input" placeholder="Describe the menu image for screen readers">
+        </div>
+        <p class="modal-message hidden" id="menuSectionModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="menuSectionModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="menuSectionModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="menuSectionModalSaveLabel">Add Menu Image</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VALUE EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="valueModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="valueModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="valueModalTitle">Add Value</h2>
+        <button type="button" class="modal-close" id="valueModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="valueLabelInput">Label *</label>
+          <input type="text" id="valueLabelInput" class="modal-input" placeholder="E.g., Quality Coffee">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="valueDescInput">Description *</label>
+          <textarea id="valueDescInput" class="modal-textarea" rows="3" placeholder="A short sentence about this value"></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" id="valueIconPickerLabel">Icon *</label>
+          <div class="icon-picker-grid" id="valueIconPicker" role="group" aria-labelledby="valueIconPickerLabel"></div>
+        </div>
+        <p class="modal-message hidden" id="valueModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="valueModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="valueModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="valueModalSaveLabel">Add Value</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIRM MODAL (remove gallery photo / remove FAQ / remove service / remove menu image / remove value) ── -->
+  <div class="modal-overlay hidden" id="confirmModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="modal-title" id="confirmTitle">Confirm</h2>
+        <button type="button" class="modal-close" id="confirmClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="confirm-copy" id="confirmCopy"></p>
+        <p class="modal-message hidden" id="confirmMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmOk">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin_page_content.js"></script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+/* menu.css — ELI Coffee Events Cafe · Menu page */
+
+body { background: var(--cream, #FAF8F4); }
+
+/* ── PAGE HERO ───────────────────────────────────────────────────────────── */
+.page-hero {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  overflow: hidden;
+}
+.page-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+  display: block;
+}
+.page-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(20,8,2,.28) 0%, rgba(20,8,2,.62) 60%, rgba(20,8,2,.74) 100%);
+}
+.page-hero-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 40px;
+  color: var(--white, #fff);
+}
+.page-hero-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(42px, 6vw, 80px);
+  font-weight: 300;
+  line-height: 1.06;
+  margin-bottom: 14px;
+  letter-spacing: -.01em;
+}
+.page-hero-title em { font-style: italic; }
+.page-hero-sub {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.72);
+}
+
+/* ── MENU SECTION WRAPPER ────────────────────────────────────────────────── */
+.menu-section {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 52px 32px 80px;
+}
+
+/* ── ELITE CARD BANNER ───────────────────────────────────────────────────── */
+.menu-elite-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(105deg, #4B2800 0%, #7C4A1A 100%);
+  color: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 32px;
+  cursor: pointer;
+  transition: opacity .15s;
+  text-decoration: none;
+}
+.menu-elite-banner:hover { opacity: .9; }
+
+.menu-elite-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.menu-elite-icon i { font-size: 22px; color: #FFD88A; }
+
+.menu-elite-text { flex: 1; }
+.menu-elite-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #FFD88A;
+  margin-bottom: 3px;
+}
+.menu-elite-desc {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255,255,255,.92);
+}
+.menu-elite-desc strong { color: #FFD88A; font-weight: 600; }
+.menu-elite-caret {
+  font-size: 20px;
+  color: rgba(255,255,255,.5);
+  flex-shrink: 0;
+}
+
+/* ── CATEGORY CHIPS ──────────────────────────────────────────────────────── */
+.menu-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  margin-bottom: 40px;
+  scrollbar-width: none;
+}
+.menu-chips::-webkit-scrollbar { display: none; }
+
+.menu-chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  background: var(--white, #fff);
+  color: var(--text-mid, #5A3420);
+  border: 1.5px solid rgba(61,26,10,.14);
+  border-radius: 100px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.menu-chip:hover,
+.menu-chip.active {
+  background: var(--brown-primary, #3D1A0A);
+  color: #fff;
+  border-color: var(--brown-primary, #3D1A0A);
+}
+
+/* ── MENU IMAGE SECTIONS ─────────────────────────────────────────────────── */
+.menu-img-section {
+  margin-bottom: 52px;
+  scroll-margin-top: 88px;
+}
+.menu-img-section-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text-dark, #1E0D04);
+  margin-bottom: 14px;
+  letter-spacing: -.01em;
+}
+
+.menu-img-wrap {
+  position: relative;
+  display: block;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--cream-dark, #F2EBE0);
+  box-shadow: 0 2px 16px rgba(30,12,3,.08);
+  transition: box-shadow .2s;
+}
+.menu-img-wrap:hover { box-shadow: 0 6px 28px rgba(30,12,3,.14); }
+
+.menu-img-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.menu-zoom-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(30,12,3,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: none;
+  transition: background .15s;
+}
+.menu-zoom-btn i { font-size: 17px; }
+.menu-img-wrap:hover .menu-zoom-btn { background: rgba(30,12,3,.75); }
+
+/* ── FOOTER NOTE & CTA ───────────────────────────────────────────────────── */
+.menu-price-note {
+  font-size: 12px;
+  color: var(--text-light, #9E7558);
+  text-align: center;
+  margin-bottom: 36px;
+  letter-spacing: .02em;
+}
+
+.menu-cta {
+  text-align: center;
+}
+
+/* ── LIGHTBOX ────────────────────────────────────────────────────────────── */
+.menu-lb-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,4,0,.92);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease;
+}
+.menu-lb-backdrop.lb-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.menu-lb-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10001;
+  transition: background .15s;
+  line-height: 1;
+}
+.menu-lb-close:hover { background: rgba(255,255,255,.22); }
+
+.menu-lb-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.menu-lb-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+  cursor: grab;
+}
+.menu-lb-img.dragging { cursor: grabbing; }
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .page-hero { height: 300px; }
+  .menu-section { padding: 36px 16px 64px; }
+  .menu-elite-banner { padding: 14px 16px; gap: 12px; }
+  .menu-elite-desc { font-size: 13px; }
+  .menu-chips { margin-bottom: 28px; }
+  .menu-chip { font-size: 12.5px; padding: 7px 15px; }
+  .menu-img-section { margin-bottom: 36px; }
+  .menu-img-section-title { font-size: 19px; }
+}

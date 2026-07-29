@@ -1,0 +1,110 @@
+/* super_admin_settings.css — Operating Hours page.
+   Formerly a 5-tab "System Settings" page (Cancellation/Rescheduling Rules
+   were dead mockups with no backing function; Reservation Rules and Venue
+   Map were real but moved out) — trimmed to just Operating Hours, which is
+   what the sidebar's "Availability and scheduling" link actually points to.
+
+   This used to declare its own cream/Kumbh-Sans :root and a full parallel
+   .sidebar/.nav-item system, which silently overrode the shared dark
+   sidebar theme (manager-theme.css/admin_sidebar.css) on this page only —
+   that's why the sidebar looked outdated here specifically. Fixed the same
+   way admin_reservation_form.css already was: no local :root, reuse the
+   shared component classes instead of redeclaring them. */
+@import url('./admin_payment_options.css');
+
+/* Keeps the jumped-to section clear of the viewport edge when the sidebar's
+   Availability and scheduling sub-links (admin_nav_data.js) land on
+   #hours / #notice / #notice-overrides / #buffer-capacity /
+   #capacity-overrides — same fix as #payment-methods etc. in
+   admin_payment_options.css. */
+#hours, #notice, #notice-overrides, #buffer-capacity, #capacity-overrides { scroll-margin-top: 24px; }
+
+/* ── Vision API usage widget (the one piece with no existing equivalent) ── */
+.usage-card {
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(42, 18, 8, 0.04);
+}
+.usage-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.usage-card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.usage-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--approved);
+  color: var(--approved-txt);
+  white-space: nowrap;
+}
+.usage-badge.warn { background: var(--pending); color: var(--pending-txt); }
+.usage-badge.over { background: var(--declined); color: var(--declined-txt); }
+.usage-bar-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  overflow: hidden;
+}
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #3B6D11;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.usage-bar-fill.warn { background: #854F0B; }
+.usage-bar-fill.over { background: #A32D2D; }
+.usage-card-sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+/* ── Data table (Operating Hours / Per-Scope Capacity Override) ── */
+.table-wrap { overflow-x: auto; }
+.et-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.et-table th, .et-table td {
+  text-align: left;
+  padding: 10px 12px 10px 0;
+  vertical-align: middle;
+  border-bottom: 0.5px solid var(--border);
+}
+.et-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.et-table tbody tr:last-child td { border-bottom: none; }
+.et-table tbody tr:hover td { background: var(--btn-secondary-hover); }
+.et-table input[type="time"],
+.et-table input[type="number"] {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+  width: 100%;
+  max-width: 140px;
+}
+.et-table input:disabled { background: var(--bg); color: var(--muted); }
+
+/* ── Closing note ── */
+.settings-note {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+.settings-note p { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0; }
+.settings-note p + p { margin-top: 6px; }
+.settings-note a { color: var(--btn-primary-bg); font-weight: 600; text-decoration: none; }
+.settings-note a:hover { text-decoration: underline; }

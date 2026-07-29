@@ -3,81 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Submissions - Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Payment Verification - Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/admin_payments.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
 </head>
 <body>
   <aside class="sidebar">
-    <div class="sidebar-top">
-      <div class="sidebar-header">
-        <p class="sidebar-title">Admin Panel</p>
-        <p class="sidebar-sub">ELI Coffee Events</p>
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
       </div>
     </div>
-    <div class="sidebar-content">
-      <div class="sidebar-profile">
-        <div class="sidebar-profile-copy">
-          <p class="sidebar-name" id="sidebarName">Loading...</p>
-          <p class="sidebar-email" id="sidebarEmail">Checking session...</p>
-          <span class="sidebar-role-pill" id="sidebarRolePill">Admin</span>
-        </div>
-      </div>
 
-      <nav class="sidebar-nav">
-        <a href="/admin/dashboard.html" class="nav-item">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          </span>
-          <span class="nav-label">Dashboard</span>
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Manager</p>
+          </div>
         </a>
-        <a href="/admin/reservations.html" class="nav-item">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </span>
-          <span class="nav-label">Reservations</span>
-          <span class="nav-badge" id="navReservationCount" hidden>0</span>
-        </a>
-        <a href="/admin/contracts.html" class="nav-item">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </span>
-          <span class="nav-label">Contracts</span>
-          <span class="nav-badge" id="navContractCount" hidden>0</span>
-        </a>
-        <a href="/admin/payments.html" class="nav-item active">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-          </span>
-          <span class="nav-label">Payments</span>
-          <span class="nav-badge" id="navPaymentCount" hidden>0</span>
-        </a>
-        <a href="/admin/reviews.html" class="nav-item">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-          </span>
-          <span class="nav-label">Reviews</span>
-          <span class="nav-badge" id="navReviewCount" hidden>0</span>
-        </a>
-        <a href="/admin/customers.html" class="nav-item">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </span>
-          <span class="nav-label">Customers</span>
-        </a>
-      </nav>
-      <div class="sidebar-bottom-nav">
-        <a href="/admin/profile.html" class="nav-item">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-          </span>
-          <span class="nav-label">Profile</span>
-        </a>
-        <button type="button" class="nav-item nav-item-button logout-btn" id="logoutBtn">
-          <span class="nav-icon">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          </span>
-          <span class="nav-label">Logout</span>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
     </div>
@@ -87,12 +44,20 @@
     <section class="page-shell">
       <header class="page-header">
         <div>
-          <h1 class="page-title">Payment Submissions <span class="admin-badge">Admin</span></h1>
-          <p class="page-sub">Scan payment submissions, remaining balances, and pay-by dates, then review proof and approve from one focused modal.</p>
+          <h1 class="page-title">Payment management<span class="view-only-pill">View only</span></h1>
+          <p class="page-sub">Review payment submissions, balances, and proof of payment.</p>
+        </div>
+        <div class="header-actions">
+          <span id="managerNotifBell"></span>
+          <button type="button" class="refresh-btn" id="refreshBtn">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
+            <span>Refresh</span>
+          </button>
         </div>
       </header>
 
-      <section class="stat-row">
+      <!-- ── Stat row (submissions view) ── -->
+      <section class="stat-row" id="paymentStatRow">
         <div class="stat-card stat-card-pending">
           <p class="stat-label">Pending Review</p>
           <div class="stat-value" id="stat-pending">0</div>
@@ -111,7 +76,8 @@
         </div>
       </section>
 
-      <section class="toolbar-grid">
+      <!-- ── Toolbar (submissions view) ── -->
+      <section class="toolbar-grid" id="paymentToolbarGrid">
         <div class="filters-bar">
           <label class="search-wrap">
             <span class="search-icon">
@@ -129,15 +95,10 @@
             </select>
           </div>
         </div>
-        <div class="toolbar-actions">
-          <button type="button" class="refresh-btn refresh-panel-btn" id="refreshBtn">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
-            <span>Refresh</span>
-          </button>
-        </div>
       </section>
 
-      <section class="card table-card">
+      <!-- ── Submitted payments table card ── -->
+      <section class="card table-card" id="submittedPaymentsCard">
         <div class="table-head">
           <div>
             <h2 class="card-title">Payment Queue</h2>
@@ -160,13 +121,18 @@
             <tbody id="paymentsBody"></tbody>
           </table>
         </div>
+        <div class="pagination-bar" id="paymentsPagination"></div>
       </section>
-    </section>
+
+    </section><!-- /.page-shell -->
   </main>
 
+  <!-- ── Payment Review Modal ── -->
   <div class="modal-backdrop hidden" id="paymentDetailsModal" aria-hidden="true">
     <div class="modal-card payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="paymentDetailsTitle">
-      <button type="button" class="modal-close" id="paymentDetailsClose" aria-label="Close payment details">x</button>
+      <button type="button" class="modal-close" id="paymentDetailsClose" aria-label="Close payment details">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
       <p class="modal-eyebrow">Payment Review</p>
       <h2 class="modal-title" id="paymentDetailsTitle">Review Payment</h2>
       <p class="modal-copy">Review the submission details and proof of payment before taking action.</p>
@@ -183,7 +149,6 @@
           </div>
           <div class="payment-proof-preview" id="paymentProofPreview"></div>
           <div class="proof-preview-actions" id="paymentProofActions"></div>
-          <!-- OCR results populated by admin_payments.js -->
           <div id="paymentOcrPanel"></div>
         </section>
       </div>
@@ -194,9 +159,12 @@
     </div>
   </div>
 
+  <!-- ── Receipt Modal ── -->
   <div class="modal-backdrop hidden" id="receiptModal" aria-hidden="true">
     <div class="modal-card payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="receiptModalTitle">
-      <button type="button" class="modal-close" id="receiptModalClose" aria-label="Close receipt">x</button>
+      <button type="button" class="modal-close" id="receiptModalClose" aria-label="Close receipt">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
       <p class="modal-eyebrow">Receipt</p>
       <h2 class="modal-title" id="receiptModalTitle">Payment Receipt</h2>
       <p class="modal-copy">Issued automatically after an admin-approved payment.</p>
@@ -207,7 +175,70 @@
     </div>
   </div>
 
-  <script type="module" src="/js/admin_payments.js"></script>
+  <!-- ── Record Payment Modal ── -->
+  <div class="modal-backdrop hidden" id="recordPaymentModal" aria-hidden="true">
+    <div class="modal-card record-payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="recordPaymentModalTitle">
+      <button type="button" class="modal-close" id="recordPaymentModalClose" aria-label="Close record payment dialog">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <p class="modal-eyebrow">Manager action</p>
+      <h2 class="modal-title" id="recordPaymentModalTitle">Record payment</h2>
+      <p class="modal-copy">Receipt issued at the café.</p>
+
+      <div class="record-payment-context-block" id="recordPaymentContextBlock">
+        <span class="record-payment-context-label">Reservation</span>
+        <p class="record-payment-context-main" id="recordPaymentContextName"></p>
+        <p class="record-payment-context-date" id="recordPaymentContextDate"></p>
+        <div class="record-payment-context-balance-row">
+          <span>Outstanding balance</span>
+          <span id="recordPaymentContextBalance"></span>
+        </div>
+      </div>
+
+      <div id="recordPaymentFormFields">
+        <label class="record-payment-field-label" for="recordPaymentMethodSelect">Payment method</label>
+        <div class="record-payment-method-row">
+          <span class="record-payment-method-icon" id="recordPaymentMethodIcon"></span>
+          <select id="recordPaymentMethodSelect" class="record-payment-input" required></select>
+        </div>
+        <p class="record-payment-helper">Only methods where the café issues the receipt are listed here.</p>
+
+        <label class="record-payment-field-label" for="recordPaymentAmountInput">Amount received</label>
+        <input id="recordPaymentAmountInput" class="record-payment-input" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+        <p class="record-payment-inline-warning hidden" id="recordPaymentAmountWarning"></p>
+
+        <label class="record-payment-field-label" for="recordPaymentDateInput">Actual payment date</label>
+        <input id="recordPaymentDateInput" class="record-payment-input" type="date" />
+        <p class="record-payment-planned-note hidden" id="recordPaymentPlannedNote"></p>
+
+        <label class="record-payment-field-label" for="recordPaymentReferenceInput">Official receipt no. <span class="record-payment-optional">(optional)</span></label>
+        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" />
+
+        <label class="record-payment-field-label">Receipt photo <span class="record-payment-optional">(optional)</span></label>
+        <label class="record-payment-file-drop" for="recordPaymentFileInput">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Upload JPG, JPEG, PNG, or PDF — max 5MB</span>
+          <input id="recordPaymentFileInput" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" hidden />
+        </label>
+        <div class="record-payment-file-preview hidden" id="recordPaymentFilePreviewWrap">
+          <img id="recordPaymentFilePreviewImg" alt="Receipt preview" />
+          <span class="record-payment-file-name" id="recordPaymentFileName"></span>
+          <button type="button" class="record-payment-file-remove" id="recordPaymentFileRemoveBtn" aria-label="Remove file">&times;</button>
+        </div>
+
+        <label class="record-payment-field-label" for="recordPaymentNotesInput">Notes <span class="record-payment-optional">(optional)</span></label>
+        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks"></textarea>
+      </div>
+
+      <p class="modal-message" id="recordPaymentMessage"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="recordPaymentCancelBtn">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="recordPaymentSaveBtn">Record payment</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../js/admin_payments.js"></script>
 </body>
 </html>
-

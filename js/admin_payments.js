@@ -1,6 +1,14 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
-import { refreshAdminSidebarCounts, setBadgeCount } from './admin_sidebar_counts.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
+import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource } from './reservation_shared.js';
+import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
+import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -11,10 +19,8 @@ const statusDropdown = document.getElementById('statusDropdown');
 const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
-const navReservationCount = document.getElementById('navReservationCount');
-const navPaymentCount = document.getElementById('navPaymentCount');
-const navContractCount = document.getElementById('navContractCount');
-const navReviewCount = document.getElementById('navReviewCount');
+const paymentsPagination = document.getElementById('paymentsPagination');
+
 const paymentDetailsModal = document.getElementById('paymentDetailsModal');
 const paymentDetailsClose = document.getElementById('paymentDetailsClose');
 const paymentDetailsDismiss = document.getElementById('paymentDetailsDismiss');
@@ -27,6 +33,28 @@ const receiptModal = document.getElementById('receiptModal');
 const receiptModalClose = document.getElementById('receiptModalClose');
 const receiptModalDismiss = document.getElementById('receiptModalDismiss');
 const receiptDetailsGrid = document.getElementById('receiptDetailsGrid');
+
+const recordPaymentModal = document.getElementById('recordPaymentModal');
+const recordPaymentModalClose = document.getElementById('recordPaymentModalClose');
+const recordPaymentCancelBtn = document.getElementById('recordPaymentCancelBtn');
+const recordPaymentSaveBtn = document.getElementById('recordPaymentSaveBtn');
+const recordPaymentMessage = document.getElementById('recordPaymentMessage');
+const recordPaymentContextName = document.getElementById('recordPaymentContextName');
+const recordPaymentContextDate = document.getElementById('recordPaymentContextDate');
+const recordPaymentContextBalance = document.getElementById('recordPaymentContextBalance');
+const recordPaymentMethodSelect = document.getElementById('recordPaymentMethodSelect');
+const recordPaymentMethodIcon = document.getElementById('recordPaymentMethodIcon');
+const recordPaymentAmountInput = document.getElementById('recordPaymentAmountInput');
+const recordPaymentAmountWarning = document.getElementById('recordPaymentAmountWarning');
+const recordPaymentDateInput = document.getElementById('recordPaymentDateInput');
+const recordPaymentPlannedNote = document.getElementById('recordPaymentPlannedNote');
+const recordPaymentReferenceInput = document.getElementById('recordPaymentReferenceInput');
+const recordPaymentFileInput = document.getElementById('recordPaymentFileInput');
+const recordPaymentFilePreviewWrap = document.getElementById('recordPaymentFilePreviewWrap');
+const recordPaymentFilePreviewImg = document.getElementById('recordPaymentFilePreviewImg');
+const recordPaymentFileName = document.getElementById('recordPaymentFileName');
+const recordPaymentFileRemoveBtn = document.getElementById('recordPaymentFileRemoveBtn');
+const recordPaymentNotesInput = document.getElementById('recordPaymentNotesInput');
 
 const PAYMENT_METHOD_LABELS = {
   card: 'Debit / Credit Card',
@@ -46,18 +74,30 @@ const PAYMENT_TYPE_LABELS = {
   reservation_fee: 'Reservation Fee',
   down_payment: 'Down Payment',
   full_payment: 'Full Payment',
-  reschedule_fee: 'Reschedule Fee'
+  partial_payment: 'Custom Amount',
+  reschedule_fee: 'Reschedule Fee',
+  cancellation_fee: 'Cancellation Fee'
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 
 let adminSession = null;
+let refreshSidebarBadges = () => {};
+let currentRole = null;
 let paymentsCache = [];
+let paymentsFiltered = [];
+let paymentsCurrentPage = 1;
 let reservationMap = {};
 let receiptMap = {};
 let rescheduleRequestMap = {};
+let paymentSummaryMap = {};
+let paymentMethodMap = {};
+let recordPaymentTargetPayment = null;
+let recordPaymentMethods = [];
+let recordPaymentFile = null;
 const reservationFilterParam = new URLSearchParams(window.location.search).get('reservation') || '';
 let activePaymentReviewId = null;
 let paymentReviewFlash = null;
+let rejectReasonPaymentId = null;
 let paymentProofZoomPercent = 100;
 const PAYMENT_PROOF_MIN_ZOOM = 50;
 const PAYMENT_PROOF_MAX_ZOOM = 300;
@@ -163,16 +203,20 @@ function getPaymentTypeLabel(type) {
 }
 
 function getPaymentInfoSummary(payment) {
-  const methodLabel = getPaymentMethodLabel(payment.payment_method);
+  const methodLabel = payment.payment_method_label || getPaymentMethodLabel(payment.payment_method);
   const channelLabel = getPaymentChannelLabel(payment.payment_method);
-  const infoLabel = payment.payment_method === 'cash' || methodLabel === channelLabel
+  const evidenceSource = resolvePaymentEvidenceSource(payment, paymentMethodMap);
+  const isCafeIssued = evidenceSource === 'cafe_issued';
+  const infoLabel = isCafeIssued || methodLabel === channelLabel
     ? methodLabel
     : `${methodLabel} (${channelLabel})`;
 
+  const arrivalDate = payment.cash_payment_date || payment.actual_payment_date;
+
   return {
     main: infoLabel,
-    sub: payment.payment_method === 'cash'
-      ? `Arrival ${formatCompactDate(payment.cash_payment_date)}`
+    sub: isCafeIssued
+      ? (arrivalDate ? `Arrival ${formatCompactDate(arrivalDate)}` : 'No arrival date set')
       : `Paid ${formatCompactDate(payment.payment_date)}`
   };
 }
@@ -195,21 +239,18 @@ function getReservation(reservationId) {
   return reservationMap[reservationId] || null;
 }
 
-function getApprovedBasePaymentsTotal(reservationId) {
-  return paymentsCache
-    .filter((payment) => (
-      String(payment.reservation_id) === String(reservationId)
-      && !payment.reschedule_request_id
-      && String(payment.payment_status || '').toLowerCase() === 'approved'
-    ))
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-}
-
+// Sourced from reservation_payment_summary (the one server-side computed-
+// status view every surface reads) instead of re-deriving from paymentsCache
+// — that old derivation didn't exclude cancellation_fee/reschedule_fee from
+// the paid-toward-total sum. Due-date/overdue framing is a separate, local
+// concern (proximity to the event date) not part of the ledger's computed
+// status, so it stays computed here.
 function getReservationBalanceSummary(reservationId) {
   const reservation = getReservation(reservationId);
-  const totalAmount = Number(reservation?.total_price || 0);
-  const approvedTotal = getApprovedBasePaymentsTotal(reservationId);
-  const remainingBalance = Math.max(totalAmount - approvedTotal, 0);
+  const summary = paymentSummaryMap[reservationId];
+  const totalAmount = Number(summary?.reservation_total ?? reservation?.total_price ?? 0);
+  const approvedTotal = Number(summary?.total_paid ?? 0);
+  const remainingBalance = Number(summary?.outstanding_balance ?? Math.max(totalAmount - approvedTotal, 0));
   const eventDateKey = formatDateKey(reservation?.event_date);
 
   let dueDateKey = '';
@@ -234,9 +275,23 @@ function getReservationBalanceSummary(reservationId) {
     dueDateLabel,
     isPastDue,
     hasPartialPayment,
+    computedStatus: summary?.computed_status || 'unpaid',
     toneKey: remainingBalance <= 0 ? 'approved' : isPastDue ? 'unpaid' : 'pending',
     statusLabel: remainingBalance <= 0 ? 'Paid in Full' : isPastDue ? 'Overdue' : hasPartialPayment ? 'Remaining Balance' : 'Initial Payment'
   };
+}
+
+async function fetchPaymentSummaries(reservationIds) {
+  if (!reservationIds.length) return {};
+  const { data, error } = await supabase
+    .from('reservation_payment_summary')
+    .select('reservation_id, reservation_total, total_paid, outstanding_balance, latest_payment_date, computed_status')
+    .in('reservation_id', reservationIds);
+  if (error) throw error;
+  return (data || []).reduce((map, row) => {
+    map[row.reservation_id] = row;
+    return map;
+  }, {});
 }
 
 function getReceipt(paymentId) {
@@ -321,7 +376,7 @@ function renderStats(list) {
   document.getElementById('stat-approved').textContent = counts.approved;
   document.getElementById('stat-rejected').textContent = counts.rejected;
   document.getElementById('stat-total').textContent = counts.total;
-  setBadgeCount(navPaymentCount, counts.pending_review);
+  
 }
 
 function matchesSearch(payment, term) {
@@ -333,6 +388,7 @@ function matchesSearch(payment, term) {
     reservation?.package?.package_name,
     reservation?.event_time,
     payment.payment_method,
+    payment.payment_method_label,
     getPaymentMethodLabel(payment.payment_method),
     getPaymentTypeLabel(payment.payment_type),
     payment.reference_number
@@ -365,6 +421,12 @@ function renderTable(list) {
     const paymentInfo = getPaymentInfoSummary(payment);
     const balance = getReservationBalanceSummary(payment.reservation_id);
 
+    const evidenceSource = resolvePaymentEvidenceSource(payment, paymentMethodMap);
+    const isPending = String(payment.payment_status || '').toLowerCase() === 'pending_review';
+    const actionCell = (evidenceSource === 'cafe_issued' && isPending && currentRole !== 'admin')
+      ? `<button class="action-btn view record-payment-btn" data-action="record-payment" data-payment-id="${payment.payment_id}">Record payment</button>`
+      : `<button class="action-btn view review-payment-btn" data-action="review-payment" data-payment-id="${payment.payment_id}">Review Payment</button>`;
+
     return `
       <tr class="payment-row">
         <td data-label="Reservation">
@@ -382,8 +444,10 @@ function renderTable(list) {
         <td class="payment-amount-cell" data-label="Amount">
           <span class="payment-cell-main">${escapeHtml(formatCurrency(payment.amount))}</span>
           <span class="payment-cell-sub">Submitted ${escapeHtml(formatDate(payment.submitted_at))}</span>
-          <span class="payment-cell-sub payment-balance-sub ${escapeHtml(balance.toneKey)}">Remaining ${escapeHtml(balance.remainingBalance <= 0 ? 'Paid' : formatCurrency(balance.remainingBalance))}</span>
-          <span class="payment-cell-sub payment-balance-sub ${escapeHtml(balance.toneKey)}">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : `Pay by ${balance.dueDateLabel}`)}</span>
+          <div class="payment-balance-block ${escapeHtml(balance.toneKey)}">
+            <span class="payment-balance-amount">${balance.remainingBalance <= 0 ? 'Paid' : `Remaining ${escapeHtml(formatCurrency(balance.remainingBalance))}`}</span>
+            <span class="payment-balance-due">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : `Pay by ${balance.dueDateLabel}`)}</span>
+          </div>
         </td>
         <td data-label="Payment Info">
           <div class="payment-mode-stack compact">
@@ -397,7 +461,7 @@ function renderTable(list) {
           </div>
         </td>
         <td class="actions actions-single" data-label="Action">
-          <button class="action-btn view review-payment-btn" data-action="review-payment" data-payment-id="${payment.payment_id}">Review Payment</button>
+          ${actionCell}
         </td>
       </tr>
     `;
@@ -413,7 +477,9 @@ function filterAndRender() {
     && matchesSearch(payment, term)
   ));
   renderStats(paymentsCache);
-  renderTable(filtered);
+  paymentsFiltered = filtered;
+  paymentsCurrentPage = 1;
+  renderPaymentsPage();
   if (!filtered.length) {
     setMessage(tableMessage, 'No payment submissions match the current filter.');
   } else if (reservationFilterParam) {
@@ -421,6 +487,19 @@ function filterAndRender() {
   } else {
     setMessage(tableMessage, '');
   }
+}
+
+function renderPaymentsPage() {
+  renderTable(paginate(paymentsFiltered, paymentsCurrentPage, PAGE_SIZE));
+  renderPagination(paymentsPagination, {
+    totalItems: paymentsFiltered.length,
+    currentPage: paymentsCurrentPage,
+    pageSize: PAGE_SIZE,
+    onPageChange: (page) => {
+      paymentsCurrentPage = page;
+      renderPaymentsPage();
+    }
+  });
 }
 
 async function fetchReservationsForPayments(reservationIds) {
@@ -489,6 +568,9 @@ async function fetchPayments() {
       reschedule_request_id,
       payment_type,
       payment_method,
+      payment_method_id,
+      payment_method_label,
+      payment_source,
       amount,
       payment_status,
       reference_number,
@@ -496,6 +578,7 @@ async function fetchPayments() {
       notes,
       proof_url,
       cash_payment_date,
+      actual_payment_date,
       submitted_at,
       verified_at,
       ocr_extracted
@@ -506,38 +589,17 @@ async function fetchPayments() {
   return data || [];
 }
 
-function generateReceiptNumber(paymentId) {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
-  return `AR-${stamp}-${String(paymentId || '').slice(0, 6).toUpperCase()}`;
-}
-
-async function ensureReceiptForPayment(paymentId) {
-  const existingReceipt = getReceipt(paymentId);
-  if (existingReceipt) return existingReceipt;
-
-  const { data: lookedUpReceipt, error: lookupError } = await supabase
-    .from('receipts')
-    .select('receipt_id, payment_id, receipt_number, issued_at')
-    .eq('payment_id', paymentId)
-    .maybeSingle();
-
-  if (lookupError) throw lookupError;
-  if (lookedUpReceipt) return lookedUpReceipt;
-
-  const payload = {
-    payment_id: paymentId,
-    receipt_number: generateReceiptNumber(paymentId),
-    issued_at: new Date().toISOString()
-  };
-
+async function fetchPaymentMethodsById(ids) {
+  if (!ids.length) return {};
   const { data, error } = await supabase
-    .from('receipts')
-    .insert(payload)
-    .select('receipt_id, payment_id, receipt_number, issued_at')
-    .single();
-
+    .from('payment_method')
+    .select('payment_method_id, label, type, icon_key, evidence_source, is_active')
+    .in('payment_method_id', ids);
   if (error) throw error;
-  return data;
+  return (data || []).reduce((map, method) => {
+    map[method.payment_method_id] = method;
+    return map;
+  }, {});
 }
 
 function getPaymentById(paymentId) {
@@ -556,8 +618,9 @@ function getOcrConfidenceMeta(confidence) {
 }
 
 function buildOcrPanel(payment) {
-  // Cash payments don't have a proof image — skip OCR panel
-  if (payment.payment_method === 'cash') return '';
+  // Café-issued payments (cash/card confirmed at the counter) don't have a
+  // proof image to OCR — skip the panel.
+  if (resolvePaymentEvidenceSource(payment, paymentMethodMap) === 'cafe_issued') return '';
 
   // No proof uploaded
   if (!payment.proof_url) return '';
@@ -585,7 +648,7 @@ function buildOcrPanel(payment) {
           <span class="ocr-panel-title">OCR Extraction</span>
           <span class="ocr-badge ocr-badge-failed">Failed</span>
         </div>
-        <p class="ocr-panel-note">Cloud Vision could not read this image: ${escapeHtml(ocr.error)}</p>
+        <p class="ocr-panel-note">We couldn't read this image automatically: ${escapeHtml(ocr.error)}</p>
       </div>
     `;
   }
@@ -627,7 +690,11 @@ function buildOcrPanel(payment) {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-async function handlePaymentReview(paymentId, nextStatus) {
+async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') {
+  if (currentRole === 'admin') {
+    throw new Error('This action requires the Manager role.');
+  }
+
   const payment = getPaymentById(paymentId);
   if (!payment) throw new Error('Payment record could not be found.');
 
@@ -635,6 +702,10 @@ async function handlePaymentReview(paymentId, nextStatus) {
     payment_status: nextStatus,
     verified_at: new Date().toISOString()
   };
+
+  if (nextStatus === 'rejected') {
+    updatePayload.rejection_reason = rejectionReason;
+  }
 
   const { error: paymentError } = await supabase
     .from('payment')
@@ -644,7 +715,7 @@ async function handlePaymentReview(paymentId, nextStatus) {
   if (paymentError) throw paymentError;
 
   if (nextStatus === 'approved') {
-    await ensureReceiptForPayment(paymentId);
+    await ensureReceiptForPayment(supabase, paymentId, getReceipt(paymentId));
 
     if (payment.payment_type === 'reschedule_fee' && payment.reschedule_request_id) {
       const request = getRescheduleRequest(payment.reschedule_request_id);
@@ -679,6 +750,7 @@ async function handlePaymentReview(paymentId, nextStatus) {
 function closeDetailsModal() {
   activePaymentReviewId = null;
   paymentReviewFlash = null;
+  rejectReasonPaymentId = null;
   paymentProofZoomPercent = 100;
   paymentDetailsModal?.classList.add('hidden');
   paymentDetailsModal?.setAttribute('aria-hidden', 'true');
@@ -700,6 +772,7 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   const paymentInfo = getPaymentInfoSummary(payment);
   const paymentTypeSubvalue = payment.reschedule_request_id ? 'Linked to reschedule fee' : 'Reservation payment';
   const proofExists = Boolean(payment.proof_url);
+  const isCafeIssued = resolvePaymentEvidenceSource(payment, paymentMethodMap) === 'cafe_issued';
   const reviewActions = [];
   const receipt = getReceipt(payment.payment_id);
   const proofIsZoomed = paymentProofZoomPercent > 100;
@@ -726,12 +799,12 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
     buildReviewSummaryItem('Payment Method', paymentInfo.main, paymentInfo.sub),
     buildReviewSummaryItem('Submitted On', formatDateTime(payment.submitted_at)),
     buildReviewSummaryItem(
-      payment.payment_method === 'cash' ? 'Arrival Date' : 'Paid On',
-      payment.payment_method === 'cash' ? formatDate(payment.cash_payment_date) : formatDate(payment.payment_date)
+      isCafeIssued ? 'Arrival Date' : 'Paid On',
+      isCafeIssued ? formatDate(payment.cash_payment_date || payment.actual_payment_date) : formatDate(payment.payment_date)
     ),
     buildReviewSummaryItem(
       'Reference Number',
-      payment.payment_method === 'cash' ? 'Not required for cash payments' : (payment.reference_number || 'Not provided')
+      isCafeIssued ? 'Not required for café-issued payments' : (payment.reference_number || 'Not provided')
     ),
     buildReviewSummaryItem('Status', statusMeta.label),
     buildReviewSummaryItem('Notes', payment.notes || 'No notes provided.')
@@ -749,7 +822,7 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
       </div>
     </div>
   ` : `
-    <div class="proof-empty">${payment.payment_method === 'cash' ? 'Cash payments do not require a proof image.' : 'No proof image was submitted.'}</div>
+    <div class="proof-empty">${isCafeIssued ? 'Café-issued payments do not require a proof image.' : 'No proof image was submitted.'}</div>
   `;
 
   paymentProofActions.innerHTML = proofExists ? `
@@ -768,9 +841,23 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
 
   reviewActions.push('<button type="button" class="modal-btn modal-btn-secondary" id="paymentDetailsDismiss">Close</button>');
 
-  if (String(payment.payment_status || '').toLowerCase() === 'pending_review') {
-    reviewActions.push(`<button type="button" class="modal-btn modal-btn-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject Payment</button>`);
-    reviewActions.push(`<button type="button" class="modal-btn modal-btn-success" data-action="approve-payment" data-payment-id="${payment.payment_id}">${escapeHtml(payment.payment_method === 'cash' ? 'Approve Cash Payment' : 'Approve Payment')}</button>`);
+  if (currentRole !== 'admin' && String(payment.payment_status || '').toLowerCase() === 'pending_review') {
+    // Pending café-issued rows never reach this modal — the queue shows
+    // "Record payment" for those instead (see renderTable), so a pending
+    // row that gets here for review/approve is always customer_submitted.
+    if (rejectReasonPaymentId === payment.payment_id) {
+      reviewActions.push(`
+        <div class="reject-reason-inline">
+          <label class="record-payment-field-label" for="rejectReasonInput">Reason for rejection <span class="record-payment-optional">(required)</span></label>
+          <textarea id="rejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Receipt image was unreadable">${escapeHtml(payment.rejection_reason || '')}</textarea>
+        </div>
+        <button type="button" class="modal-btn modal-btn-secondary" data-action="cancel-reject-payment" data-payment-id="${payment.payment_id}">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-danger" data-action="confirm-reject-payment" data-payment-id="${payment.payment_id}">Confirm Rejection</button>
+      `);
+    } else {
+      reviewActions.push(`<button type="button" class="modal-btn modal-btn-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject Payment</button>`);
+      reviewActions.push(`<button type="button" class="modal-btn modal-btn-success" data-action="approve-payment" data-payment-id="${payment.payment_id}">Approve Payment</button>`);
+    }
   } else if (receipt) {
     reviewActions.push(`<button type="button" class="modal-btn modal-btn-secondary" data-action="view-receipt" data-payment-id="${payment.payment_id}">View Receipt</button>`);
   }
@@ -804,13 +891,233 @@ function openReceiptModalForPayment(paymentId) {
     buildDetailCard('Customer', reservation?.contact_name || 'Unknown customer'),
     buildDetailCard('Reservation', reservation?.package?.package_name || 'Package pending'),
     buildDetailCard('Amount', formatCurrency(payment.amount)),
-    buildDetailCard('Method', getPaymentMethodLabel(payment.payment_method)),
+    buildDetailCard('Method', payment.payment_method_label || getPaymentMethodLabel(payment.payment_method)),
     buildDetailCard('Payment Type', getPaymentTypeLabel(payment.payment_type)),
     buildDetailCard('Event Schedule', `${formatDate(reservation?.event_date)} at ${reservation?.event_time || 'No time selected'}`, { full: true })
   ].join('');
 
   receiptModal?.classList.remove('hidden');
   receiptModal?.setAttribute('aria-hidden', 'false');
+}
+
+/* ---------------------------------------------------------------- */
+/* Record payment modal — always attaches to a known queue row        */
+/* (payment_id); recording confirms it in place (see decision in     */
+/* admin_record_payment.js's recordInCafePayment). There is no        */
+/* search-for-a-reservation flow here — that requirement is met by    */
+/* the reservation always being known already (the row you clicked).  */
+/* ---------------------------------------------------------------- */
+
+function setRecordPaymentMessage(message, isError = false) {
+  if (!recordPaymentMessage) return;
+  recordPaymentMessage.textContent = message || '';
+  recordPaymentMessage.classList.toggle('error', isError);
+}
+
+function renderRecordPaymentMethodOptions(selectedMethodId) {
+  if (!recordPaymentMethodSelect) return;
+  if (!recordPaymentMethods.length) {
+    recordPaymentMethodSelect.innerHTML = '<option value="">No active café methods configured</option>';
+    recordPaymentMethodIcon.innerHTML = '';
+    return;
+  }
+  recordPaymentMethodSelect.innerHTML = recordPaymentMethods.map((method) => `
+    <option value="${escapeHtml(method.payment_method_id)}">${escapeHtml(method.label)}</option>
+  `).join('');
+
+  const matchExists = recordPaymentMethods.some((m) => String(m.payment_method_id) === String(selectedMethodId));
+  recordPaymentMethodSelect.value = matchExists ? selectedMethodId : recordPaymentMethods[0].payment_method_id;
+  updateRecordPaymentMethodIcon();
+}
+
+function updateRecordPaymentMethodIcon() {
+  if (!recordPaymentMethodIcon) return;
+  const method = recordPaymentMethods.find((m) => String(m.payment_method_id) === String(recordPaymentMethodSelect?.value));
+  recordPaymentMethodIcon.innerHTML = method ? paymentMethodIconSvg(method.icon_key) : '';
+}
+
+function clearRecordPaymentFile() {
+  recordPaymentFile = null;
+  if (recordPaymentFileInput) recordPaymentFileInput.value = '';
+  recordPaymentFilePreviewWrap?.classList.add('hidden');
+  if (recordPaymentFilePreviewImg) {
+    recordPaymentFilePreviewImg.src = '';
+    recordPaymentFilePreviewImg.classList.remove('hidden');
+  }
+  if (recordPaymentFileName) recordPaymentFileName.textContent = '';
+}
+
+function handleRecordPaymentFileChange(event) {
+  const file = event.target.files?.[0] || null;
+  setRecordPaymentMessage('');
+  if (!file) {
+    clearRecordPaymentFile();
+    return;
+  }
+
+  const maxSize = 5 * 1024 * 1024;
+  const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']);
+  const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.pdf']);
+  const mimeType = String(file.type || '').toLowerCase();
+  const extension = `.${String(file.name || '').toLowerCase().split('.').pop()}`;
+
+  if (file.size > maxSize) {
+    setRecordPaymentMessage('Receipt file must be 5MB or smaller.', true);
+    clearRecordPaymentFile();
+    return;
+  }
+  if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
+    setRecordPaymentMessage('Please upload the receipt as a JPG, JPEG, PNG, or PDF file.', true);
+    clearRecordPaymentFile();
+    return;
+  }
+
+  recordPaymentFile = file;
+  if (recordPaymentFileName) recordPaymentFileName.textContent = file.name;
+  recordPaymentFilePreviewWrap?.classList.remove('hidden');
+
+  const isPdf = mimeType === 'application/pdf' || extension === '.pdf';
+  if (isPdf || !recordPaymentFilePreviewImg) {
+    recordPaymentFilePreviewImg?.classList.add('hidden');
+  } else {
+    recordPaymentFilePreviewImg.classList.remove('hidden');
+    const reader = new FileReader();
+    reader.onload = () => { recordPaymentFilePreviewImg.src = reader.result; };
+    reader.readAsDataURL(file);
+  }
+}
+
+function checkRecordPaymentAmountWarning() {
+  if (!recordPaymentAmountWarning || !recordPaymentTargetPayment) return;
+  const amount = Number(recordPaymentAmountInput?.value || 0);
+  const summary = paymentSummaryMap[recordPaymentTargetPayment.reservation_id];
+  const reservation = getReservation(recordPaymentTargetPayment.reservation_id);
+  const outstanding = Number(summary?.outstanding_balance ?? reservation?.total_price ?? 0);
+  if (amount > 0 && outstanding > 0 && amount > outstanding) {
+    recordPaymentAmountWarning.textContent = `This is more than the outstanding balance of ${formatCurrency(outstanding)}`;
+    recordPaymentAmountWarning.classList.remove('hidden');
+  } else {
+    recordPaymentAmountWarning.classList.add('hidden');
+  }
+}
+
+async function openRecordPaymentModalForPayment(paymentId) {
+  if (currentRole === 'admin') return;
+  const payment = getPaymentById(paymentId);
+  if (!payment) return;
+  const reservation = getReservation(payment.reservation_id);
+  if (!reservation) return;
+
+  recordPaymentTargetPayment = payment;
+  if (recordPaymentAmountInput) recordPaymentAmountInput.value = '';
+  if (recordPaymentDateInput) {
+    const todayKey = getTodayDateKey();
+    recordPaymentDateInput.value = todayKey;
+    recordPaymentDateInput.max = todayKey;
+  }
+  if (recordPaymentReferenceInput) recordPaymentReferenceInput.value = '';
+  if (recordPaymentNotesInput) recordPaymentNotesInput.value = '';
+  clearRecordPaymentFile();
+  recordPaymentAmountWarning?.classList.add('hidden');
+  setRecordPaymentMessage('');
+
+  const summary = paymentSummaryMap[payment.reservation_id];
+  const outstanding = Number(summary?.outstanding_balance ?? reservation.total_price ?? 0);
+  recordPaymentContextName.textContent = `${reservation.contact_name || 'Customer'} · ${reservation.package?.package_name || 'Reservation'}`;
+  recordPaymentContextDate.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
+  recordPaymentContextBalance.textContent = formatCurrency(outstanding);
+  if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? outstanding : '';
+
+  const plannedArrival = payment.cash_payment_date;
+  if (plannedArrival) {
+    recordPaymentPlannedNote.textContent = `Customer planned to arrive ${formatDate(plannedArrival)} — the planned date is kept on the reservation.`;
+    recordPaymentPlannedNote.classList.remove('hidden');
+  } else {
+    recordPaymentPlannedNote.classList.add('hidden');
+  }
+
+  setRecordPaymentMessage('Loading payment methods...');
+  try {
+    recordPaymentMethods = await fetchCafeIssuedPaymentMethods(supabase);
+    renderRecordPaymentMethodOptions(payment.payment_method_id);
+    setRecordPaymentMessage(recordPaymentMethods.length ? '' : 'No active café payment methods are configured — add one in Payment Options first.', !recordPaymentMethods.length);
+  } catch (error) {
+    setRecordPaymentMessage(`Failed to load payment methods: ${error.message}`, true);
+  }
+
+  recordPaymentModal?.classList.remove('hidden');
+  recordPaymentModal?.setAttribute('aria-hidden', 'false');
+}
+
+function closeRecordPaymentModal() {
+  recordPaymentTargetPayment = null;
+  recordPaymentModal?.classList.add('hidden');
+  recordPaymentModal?.setAttribute('aria-hidden', 'true');
+  recordPaymentSaveBtn?.removeAttribute('disabled');
+}
+
+async function saveRecordPayment() {
+  if (currentRole === 'admin') return;
+  if (!recordPaymentTargetPayment) {
+    setRecordPaymentMessage('No payment selected.', true);
+    return;
+  }
+
+  const selectedMethod = recordPaymentMethods.find((m) => String(m.payment_method_id) === String(recordPaymentMethodSelect?.value));
+  if (!selectedMethod) {
+    setRecordPaymentMessage('Select a payment method.', true);
+    return;
+  }
+
+  recordPaymentSaveBtn?.setAttribute('disabled', 'true');
+  setRecordPaymentMessage('Saving payment...');
+
+  try {
+    let receiptUrl = '';
+    if (recordPaymentFile) {
+      setRecordPaymentMessage('Uploading receipt...');
+      receiptUrl = await uploadPaymentReceipt(recordPaymentFile);
+    }
+
+    await recordInCafePayment(supabase, {
+      reservationId: recordPaymentTargetPayment.reservation_id,
+      existingPaymentId: recordPaymentTargetPayment.payment_id,
+      amount: recordPaymentAmountInput?.value,
+      paymentMethodId: selectedMethod.payment_method_id,
+      paymentMethodLabel: selectedMethod.label,
+      paymentMethodType: selectedMethod.type,
+      actualPaymentDate: recordPaymentDateInput?.value,
+      referenceNumber: recordPaymentReferenceInput?.value.trim(),
+      notes: recordPaymentNotesInput?.value.trim(),
+      receiptUrl,
+      recordedByUserId: adminSession?.user?.id
+    });
+
+    closeRecordPaymentModal();
+    setMessage(tableMessage, 'Payment recorded.');
+    await loadData();
+  } catch (error) {
+    recordPaymentSaveBtn?.removeAttribute('disabled');
+    setRecordPaymentMessage(error.message || 'Failed to record payment.', true);
+  }
+}
+
+function wireRecordPaymentModal() {
+  recordPaymentModalClose?.addEventListener('click', closeRecordPaymentModal);
+  recordPaymentCancelBtn?.addEventListener('click', closeRecordPaymentModal);
+  recordPaymentSaveBtn?.addEventListener('click', saveRecordPayment);
+  recordPaymentModal?.addEventListener('click', (event) => {
+    if (event.target === recordPaymentModal) closeRecordPaymentModal();
+  });
+  recordPaymentMethodSelect?.addEventListener('change', () => {
+    updateRecordPaymentMethodIcon();
+  });
+  recordPaymentAmountInput?.addEventListener('input', checkRecordPaymentAmountWarning);
+  recordPaymentFileInput?.addEventListener('change', handleRecordPaymentFileChange);
+  recordPaymentFileRemoveBtn?.addEventListener('click', clearRecordPaymentFile);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !recordPaymentModal.classList.contains('hidden')) closeRecordPaymentModal();
+  });
 }
 
 async function loadData() {
@@ -826,14 +1133,14 @@ async function loadData() {
     rescheduleRequestMap = await fetchRescheduleRequests(
       Array.from(new Set(paymentsCache.map((payment) => payment.reschedule_request_id).filter(Boolean)))
     );
+    paymentSummaryMap = await fetchPaymentSummaries(
+      Array.from(new Set(paymentsCache.map((payment) => payment.reservation_id).filter(Boolean)))
+    );
+    paymentMethodMap = await fetchPaymentMethodsById(
+      Array.from(new Set(paymentsCache.map((payment) => payment.payment_method_id).filter(Boolean)))
+    );
 
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
+    await refreshSidebarBadges();
 
     filterAndRender();
     if (activePaymentReviewId) {
@@ -845,13 +1152,7 @@ async function loadData() {
     }
   } catch (error) {
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    await refreshSidebarBadges();
     renderTable([]);
   }
 }
@@ -871,6 +1172,8 @@ function wireTableActions() {
 
     if (action === 'review-payment') {
       openDetailsModal(paymentId);
+    } else if (action === 'record-payment') {
+      openRecordPaymentModalForPayment(paymentId);
     }
   });
 }
@@ -919,11 +1222,33 @@ function wireModals() {
       return;
     }
 
+    if (action === 'reject-payment') {
+      rejectReasonPaymentId = paymentId;
+      renderPaymentReviewModal(paymentId);
+      return;
+    }
+
+    if (action === 'cancel-reject-payment') {
+      rejectReasonPaymentId = null;
+      renderPaymentReviewModal(paymentId);
+      return;
+    }
+
+    let rejectionReason = '';
+    if (action === 'confirm-reject-payment') {
+      rejectionReason = document.getElementById('rejectReasonInput')?.value.trim() || '';
+      if (!rejectionReason) {
+        setPaymentReviewMessage('Please enter a reason for rejecting this payment.', true);
+        return;
+      }
+    }
+
     (async () => {
       try {
         setPaymentReviewMessage('Updating payment status...');
         if (action === 'approve-payment') await handlePaymentReview(paymentId, 'approved');
-        if (action === 'reject-payment') await handlePaymentReview(paymentId, 'rejected');
+        if (action === 'confirm-reject-payment') await handlePaymentReview(paymentId, 'rejected', rejectionReason);
+        rejectReasonPaymentId = null;
         paymentReviewFlash = { message: 'Payment updated.', isError: false };
         await loadData();
         setMessage(tableMessage, 'Payment updated.');
@@ -948,21 +1273,41 @@ function wireModals() {
   });
 }
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectLogin();
-});
-
 refreshBtn?.addEventListener('click', loadData);
 
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') redirectLogin();
-});
 
-(async function init() {
-  await validateAdmin();
-  wireFilters();
-  wireTableActions();
-  wireModals();
-  await loadData();
-})();
+wireLogoutButton();
+watchAuthState();
+
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
+
+    adminSession = session;
+    currentRole = profile.role;
+
+    // Setup inactivity (same as homepage)
+    setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
+    refreshSidebarBadges = initAdminSidebarBadges(supabase);
+    initManagerNotificationBell(supabase, session.user.id);
+    initAdminNav({ role: profile.role });
+
+    if (profile.role === 'admin') {
+      document.body.classList.add('is-super-admin');
+    } else {
+      document.body.classList.remove('is-super-admin');
+    }
+
+    // Attach UI event listeners
+    wireFilters();
+    wireTableActions();
+    wireModals();
+    wireRecordPaymentModal();
+
+    // Load data ONCE
+    await loadData();
+  }
+});

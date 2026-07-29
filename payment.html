@@ -4,10 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reservation Payment - ELI Coffee Events Cafe</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/account.css">
   <link rel="stylesheet" href="/css/payment.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
   <nav class="navbar">
@@ -20,16 +23,26 @@
         <span class="bar"></span>
         <span class="bar"></span>
       </div>
+      <div class="navbar__topbar-right" id="navTopbarRight"></div>
       <ul class="navbar__menu">
+        <li class="nav-drawer-header">
+          <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
+          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">
+            <i class="ti ti-x"></i>
+          </button>
+        </li>
         <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
         <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
         <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/reviews.html" class="navbar__links">Reviews</a></li>
         <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
         <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
         <li class="navbar__btn"></li>
       </ul>
     </div>
   </nav>
+  <div class="nav-overlay" id="nav-drawer-overlay"></div>
 
   <main class="payment-page">
     <div class="payment-page-shell">
@@ -59,6 +72,7 @@
     </div>
   </div>
 
+  <script src="/js/app.js"></script>
   <script type="module" src="/js/navbar.js"></script>
   <script type="module" src="/js/payment.js"></script>
 </body>

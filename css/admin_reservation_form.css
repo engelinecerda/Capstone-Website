@@ -1,0 +1,396 @@
+/* admin_reservation_form.css — Reservation Form config page (admin/config/form.html)
+   Uses manager-theme.css tokens (already linked before this file) — this
+   file used to @import super_admin_settings.css for .settings-tabs/.card/
+   .status-pill/.et-action-btn, which redeclared its own cream/Kumbh-Sans
+   :root and silently overrode the shared dark-sidebar theme on this page
+   only. Those classes are now defined locally, in the shared palette. */
+@import url('admin_payment_options.css');
+
+/* ── TOP-LEVEL TABS ── */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.settings-tab-btn {
+  flex: 1;
+  min-width: 130px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.settings-tab-btn:hover { background: var(--btn-secondary-hover); color: var(--text); }
+.settings-tab-btn.active { background: var(--btn-primary-bg); color: var(--btn-primary-text); }
+
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+
+.settings-card {
+  background: var(--card-bg);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(42, 18, 8, .04);
+}
+.settings-card-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.settings-card-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+
+/* ── SHARED SMALL PIECES (status pill, action buttons, inputs) ── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.status-pill.active { background: var(--approved); color: var(--approved-txt); }
+.status-pill.archived, .status-pill.inactive { background: var(--neutral); color: var(--neutral-txt); }
+
+.et-action-btn {
+  padding: 6px 13px;
+  border-radius: 8px;
+  border: 0.5px solid var(--btn-secondary-border);
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s;
+}
+.et-action-btn:hover { background: var(--btn-secondary-hover); }
+.et-action-btn.archive { color: #854F0B; border-color: #F0DCB8; }
+.et-action-btn.archive:hover { background: var(--pending); }
+.et-action-btn.danger { color: #A32D2D; border-color: #F3C9C9; }
+.et-action-btn.danger:hover { background: #FCEBEB; }
+
+/* Generic text/select/textarea input — this page previously used
+   reservations.css's .res-input, which isn't linked here, so these inputs
+   rendered completely unstyled. Defined locally now. */
+.res-input {
+  width: auto;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+}
+.res-input:focus { border-color: var(--input-focus); }
+
+.et-table { width: 100%; border-collapse: collapse; }
+.et-table th, .et-table td {
+  text-align: left;
+  padding: 10px 12px 10px 0;
+  vertical-align: middle;
+  border-bottom: 0.5px solid var(--border);
+  font-size: 13px;
+}
+.et-table th { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .03em; }
+.et-table tbody tr:last-child td { border-bottom: none; }
+.et-table tbody tr:hover td { background: var(--btn-secondary-hover); }
+
+/* ── REQUIRED FIELDS TAB ── */
+.rf-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.rf-field-row:last-child { border-bottom: none; }
+
+.rf-field-label { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.rf-field-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ── TERMS & LEGAL TAB ── */
+.rf-legal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.rf-legal-tab-btn {
+  padding: 8px 16px;
+  border: 0.5px solid var(--btn-secondary-border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rf-legal-tab-btn.active { background: var(--btn-primary-bg); color: var(--btn-primary-text); border-color: var(--btn-primary-bg); }
+
+.rf-legal-panel { display: none; }
+.rf-legal-panel.active { display: block; }
+
+.rf-legal-textarea {
+  width: 100%;
+  min-height: 360px;
+  padding: 14px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+}
+.rf-legal-textarea:focus { border-color: var(--input-focus); }
+
+.rf-legal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rf-legal-hint { font-size: 12px; color: var(--muted); }
+
+.rf-cross-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--info);
+  color: var(--info-txt);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.rf-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 18, 8, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+.rf-preview-backdrop.hidden { display: none; }
+
+.rf-preview-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(42, 18, 8, .18);
+}
+.rf-preview-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+.rf-preview-body { overflow-y: auto; font-size: 13px; line-height: 1.7; color: var(--text); }
+.rf-preview-body h4 { font-size: 13.5px; font-weight: 600; color: var(--text); margin: 16px 0 6px; }
+.rf-preview-body p { margin: 0 0 10px; }
+.rf-preview-body ul { margin: 0 0 10px 20px; padding: 0; }
+.rf-preview-close {
+  align-self: flex-end;
+  margin-top: 16px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: none;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  font: inherit;
+  font-weight: 500;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.rf-preview-close:hover { background: var(--btn-primary-hover); }
+
+/* ============================================================
+   CONTRACT TEMPLATE TAB (new)
+   ============================================================ */
+.ct-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pending);
+  color: var(--pending-txt);
+  border: 1px solid #F0DCB8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.ct-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.ct-picker-row .field-label { margin-bottom: 0; }
+.ct-picker-row .res-input { min-width: 260px; }
+
+.ct-editor.hidden { display: none; }
+
+.ct-section {
+  border-top: 0.5px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.ct-section:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+.ct-section-title { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.ct-section-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+.ct-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; }
+.ct-section-head .ct-section-title { margin-bottom: 0; }
+
+/* Layer 1 — document fields */
+.ct-fields-list { display: flex; flex-direction: column; gap: 2px; }
+.ct-field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.ct-field-row:last-child { border-bottom: none; }
+.ct-field-label-input {
+  flex: 1 1 180px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.ct-field-token {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--neutral);
+  border-radius: 5px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.ct-field-sample {
+  flex: 1 1 140px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ct-field-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.ct-field-actions button, .ct-clause-actions button {
+  border: 0.5px solid var(--btn-secondary-border);
+  background: var(--card-bg);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+.ct-field-actions button:hover, .ct-clause-actions button:hover { color: var(--text); background: var(--btn-secondary-hover); }
+.ct-field-actions button:disabled, .ct-clause-actions button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Layer 2/3 — clauses */
+.ct-clauses-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.ct-clause-row {
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+}
+.ct-clause-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.ct-clause-heading {
+  flex: 1 1 auto;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ct-clause-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.ct-clause-body {
+  width: 100%;
+  min-height: 90px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  resize: vertical;
+}
+.ct-clause-error {
+  font-size: 11.5px;
+  color: #A32D2D;
+  margin-top: 6px;
+}
+.ct-clause-error.hidden { display: none; }
+
+.ct-clause-locked { background: var(--neutral); }
+.ct-lock-icon { font-size: 13px; flex-shrink: 0; }
+.ct-clause-heading-text { flex: 1 1 auto; font-size: 13px; font-weight: 600; color: var(--text); }
+.ct-clause-body-readonly {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+/* Token reference panel */
+.ct-token-ref {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.ct-token-ref-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.ct-token-ref-list { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.ct-token-ref-item { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.ct-token-ref-item code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--btn-primary-bg);
+  background: var(--neutral);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+@media (max-width: 640px) {
+  .settings-card { padding: 20px 16px; }
+  .ct-field-row { flex-wrap: wrap; }
+  .ct-field-sample { display: none; }
+}

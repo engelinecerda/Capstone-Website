@@ -1,6 +1,11 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { markAdminReviewsSeen, refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
+import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -10,6 +15,7 @@ const refreshReviewsBtn = document.getElementById('refreshReviewsBtn');
 const searchInput = document.getElementById('searchInput');
 const reviewsMessage = document.getElementById('reviewsMessage');
 const reviewsBody = document.getElementById('reviewsBody');
+const reviewsPagination = document.getElementById('reviewsPagination');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
@@ -21,6 +27,8 @@ const statFiveStarReviews = document.getElementById('statFiveStarReviews');
 const statCommentedReviews = document.getElementById('statCommentedReviews');
 
 let allReviews = [];
+let reviewsFiltered = [];
+let reviewsCurrentPage = 1;
 let adminSession = null;
 
 function redirectToAdminLogin() {
@@ -131,7 +139,7 @@ function renderReviews(reviews) {
         <td>
           <div class="customer-cell">
             <div class="customer-head">
-              <span class="customer-avatar">${escapeHtml(getCustomerInitials(customer, reservation))}</span>
+              <span class="avatar">${escapeHtml(getCustomerInitials(customer, reservation))}</span>
               <div>
                 <span class="table-main">${escapeHtml(customerName)}</span>
                 <span class="table-sub">${escapeHtml(customerEmail)}</span>
@@ -194,13 +202,28 @@ function applyFilters() {
       return haystacks.some((value) => value.includes(query));
     });
 
-  renderReviews(filteredReviews);
+  reviewsFiltered = filteredReviews;
+  reviewsCurrentPage = 1;
+  renderReviewsPage();
 
   const summaryText = filteredReviews.length
     ? `Showing ${filteredReviews.length} of ${allReviews.length} submitted review(s).`
     : `No submitted reviews matched "${query}".`;
 
   setReviewsMessage(summaryText);
+}
+
+function renderReviewsPage() {
+  renderReviews(paginate(reviewsFiltered, reviewsCurrentPage, PAGE_SIZE));
+  renderPagination(reviewsPagination, {
+    totalItems: reviewsFiltered.length,
+    currentPage: reviewsCurrentPage,
+    pageSize: PAGE_SIZE,
+    onPageChange: (page) => {
+      reviewsCurrentPage = page;
+      renderReviewsPage();
+    }
+  });
 }
 
 async function fetchProfiles() {
@@ -331,54 +354,35 @@ async function loadReviews() {
       reviewBadgeEl: navReviewCount
     }).catch(() => {});
     setReviewsMessage(
-      `Failed to load submitted reviews: ${error?.message || 'unknown error'}. Check the reviews table, grants, and RLS policies for the admin account.`,
+      `Failed to load submitted reviews: ${error?.message || 'unknown error'}.`,
       true
     );
   }
 }
 
-async function validateAdminSession() {
-  const { session, profile } = await verifyAdminSession(supabase);
+wireLogoutButton();
+watchAuthState();
 
-  if (!session) {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-    return null;
-  }
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
 
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarName,
-    emailEl: sidebarEmail,
-    roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
-  });
+    // Save session (you use this later)
+    adminSession = session;
 
-  adminSession = session;
-  return session;
-}
+    // Setup inactivity
+    setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
+    initManagerNotificationBell(supabase, session.user.id);
+    initAdminNav({ role: profile.role });
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectToAdminLogin();
-});
+    // Wire UI
+    searchInput?.addEventListener('input', applyFilters);
+    refreshReviewsBtn?.addEventListener('click', loadReviews);
 
-refreshReviewsBtn?.addEventListener('click', async () => {
-  await loadReviews();
-});
-
-searchInput?.addEventListener('input', () => {
-  applyFilters();
-});
-
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') {
-    redirectToAdminLogin();
+    // Load data
+    await loadReviews();
   }
 });
-
-const session = await validateAdminSession();
-if (session) {
-  await loadReviews();
-}

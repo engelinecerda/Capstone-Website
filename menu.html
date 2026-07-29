@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menu — ELI Coffee Events Cafe</title>
+  <meta name="description" content="Browse the ELI Coffee Events Cafe menu — Sulit Picks, pizzas, appetizers, waffles, mains, pasta sets, drinks, and Tiramisu by Eli Coffee." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/home.css" />
+  <link rel="stylesheet" href="/css/menu.css" />
+  <style>.hidden { display: none !important; }</style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="navbar__container">
+      <a href="/index.html" id="navbar__logo">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo" />
+      </a>
+      <div class="navbar__toggle" id="mobile-menu">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+      </div>
+      <div class="navbar__topbar-right" id="navTopbarRight"></div>
+      <ul class="navbar__menu">
+        <li class="nav-drawer-header">
+          <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
+          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu"><i class="ti ti-x"></i></button>
+        </li>
+        <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
+        <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/reviews.html" class="navbar__links">Reviews</a></li>
+        <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
+        <li class="navbar__btn"></li>
+      </ul>
+    </div>
+  </nav>
+  <div class="nav-overlay" id="nav-drawer-overlay"></div>
+
+  <!-- PAGE HERO -->
+  <section class="page-hero">
+    <img class="page-hero-img" id="menuHeroImg" src="/images/group-order-4.jpg" alt="ELI Coffee Events Cafe interior" />
+    <div class="page-hero-overlay"></div>
+    <div class="page-hero-body">
+      <p class="hero-eyebrow" style="font-size:11px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-bottom:18px;">ELI Coffee Events Cafe</p>
+      <h1 class="page-hero-title" id="menuHeroHeading">Our <em>Menu</em></h1>
+      <p class="page-hero-sub" id="menuHeroSub">Tap any menu to zoom in</p>
+    </div>
+  </section>
+
+  <!-- MENU CONTENT -->
+  <main class="menu-section">
+
+    <!-- ELITE CARD PROMO BANNER — text/image below are the fallback shown
+         until/unless js/page_content.js's loadMenuBanner() overwrites them
+         with the admin-configured banner (Page Content > Elite Card Banner). -->
+    <button class="menu-elite-banner" id="eliteCardBtn" aria-label="View Elite Membership Card — tap to zoom" data-lb-src="/images/menu/elite-card.png" data-lb-alt="ELI Coffee Elite Membership Card — 20% off for members">
+      <div class="menu-elite-icon"><i class="ti ti-id-badge-2"></i></div>
+      <div class="menu-elite-text">
+        <p class="menu-elite-label" id="menuEliteLabel">Members Only</p>
+        <p class="menu-elite-desc"><strong id="menuEliteHeading">Elite Card</strong> — <span id="menuEliteDesc">Get 20% off on all orders. Elite price shown on menu sheets is exclusive to card holders.</span></p>
+      </div>
+      <i class="ti ti-chevron-right menu-elite-caret"></i>
+    </button>
+
+    <!-- CATEGORY CHIPS — fallback below, replaced if loadMenuSections()
+         returns rows (see the module script near the bottom of this file). -->
+    <nav class="menu-chips" id="menuChips" aria-label="Jump to menu section">
+      <a href="#sulit-picks"       class="menu-chip">Sulit picks</a>
+      <a href="#pizza-appetizers"  class="menu-chip">Pizza &amp; appetizers</a>
+      <a href="#mains-sets"        class="menu-chip">Mains &amp; sets</a>
+      <a href="#drinks"            class="menu-chip">Drinks</a>
+      <a href="#desserts"          class="menu-chip">Desserts</a>
+    </nav>
+
+    <!-- MENU IMAGES — fallback below, replaced if loadMenuSections() returns
+         rows. Kept as static markup (not just an empty container) so the
+         page still shows the current 5 menus if the fetch fails or the
+         table is empty, matching js/page_content.js's "hardcoded markup
+         stays on screen" resilience convention. -->
+    <div id="menuSectionsContainer">
+
+      <!-- 1. SULIT PICKS -->
+      <section class="menu-img-section" id="sulit-picks">
+        <h2 class="menu-img-section-title">Sulit Picks Meals</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/sulit-picks.jpg" data-lb-alt="ELI Coffee Sulit Picks budget meals menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Sulit Picks Meals menu">
+          <img src="/images/menu/sulit-picks.jpg"
+               alt="ELI Coffee Sulit Picks budget meals menu with prices"
+               loading="eager" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+      <!-- 2. PIZZA, APPETIZERS & WAFFLES -->
+      <section class="menu-img-section" id="pizza-appetizers">
+        <h2 class="menu-img-section-title">Pizzas / Appetizers / Waffles</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/pizza-appetizers-waffles.jpg" data-lb-alt="ELI Coffee pizza, appetizer, and waffle menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Pizza, Appetizers and Waffles menu">
+          <img src="/images/menu/pizza-appetizers-waffles.jpg"
+               alt="ELI Coffee pizza, appetizer, and waffle menu with prices"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+      <!-- 3. MAINS, PASTAS & SALU-SALO SETS -->
+      <section class="menu-img-section" id="mains-sets">
+        <h2 class="menu-img-section-title">Main Dish / Pastas / Salu-Salo Sets</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/main-pasta-sets.jpg" data-lb-alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Mains, Pastas and Salu-Salo Sets menu">
+          <img src="/images/menu/main-pasta-sets.jpg"
+               alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+      <!-- 4. DRINKS -->
+      <section class="menu-img-section" id="drinks">
+        <h2 class="menu-img-section-title">Drinks</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/drinks.png" data-lb-alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades" role="button" tabindex="0" aria-label="Tap to zoom Drinks menu">
+          <img src="/images/menu/drinks.png"
+               alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+      <!-- 5. TIRAMISU -->
+      <section class="menu-img-section" id="desserts">
+        <h2 class="menu-img-section-title">Tiramisu by ELI Coffee</h2>
+        <div class="menu-img-wrap" data-lb-src="/images/menu/tiramisu.png" data-lb-alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices" role="button" tabindex="0" aria-label="Tap to zoom Tiramisu menu">
+          <img src="/images/menu/tiramisu.png"
+               alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices"
+               loading="lazy" />
+          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+        </div>
+      </section>
+
+    </div>
+
+    <p class="menu-price-note">Prices subject to change without prior notice.</p>
+    <div class="menu-cta">
+      <a href="/packages.html" class="btn-primary">View Packages</a>
+    </div>
+
+  </main>
+
+  <!-- LIGHTBOX OVERLAY -->
+  <div class="menu-lb-backdrop" id="menuLightbox" role="dialog" aria-modal="true" aria-label="Menu image viewer">
+    <button class="menu-lb-close" id="menuLbClose" aria-label="Close image viewer">
+      <i class="ti ti-x"></i>
+    </button>
+    <div class="menu-lb-viewport" id="menuLbViewport">
+      <img class="menu-lb-img" id="menuLbImg" src="" alt="" draggable="false" />
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer-new">
+    <div class="footer-new-grid">
+      <div>
+        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
+        <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
+        <div class="footer-new-social">
+          <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>
+          <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>
+        </div>
+      </div>
+      <div>
+        <p class="footer-new-heading">Explore</p>
+        <ul class="footer-new-links">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/menu.html">Menu</a></li>
+          <li><a href="/packages.html">Packages</a></li>
+          <li><a href="/reservations.html">Reservations</a></li>
+          <li><a href="/reviews.html">Reviews</a></li>
+          <li><a href="/faqs.html">FAQs</a></li>
+          <li><a href="/about.html">About</a></li>
+          <li><a href="/terms-and-conditions.html">Terms &amp; Conditions</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-new-heading">Services</p>
+        <ul class="footer-new-links">
+          <li><a href="/packages.html">Cafe &amp; Lounge</a></li>
+          <li><a href="/packages.html">Private Events</a></li>
+          <li><a href="/packages.html">Catering</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-new-heading">Contact</p>
+        <div class="footer-new-contact-row"><i class="ti ti-phone"></i><span>0917 562 0306 | 0917 562 0308</span></div>
+        <div class="footer-new-contact-row"><i class="ti ti-mail"></i><span>elicoffeetea@gmail.com</span></div>
+        <div class="footer-new-contact-row"><i class="ti ti-map-pin"></i><span>Binangonan, Rizal &amp; Antipolo City</span></div>
+      </div>
+    </div>
+    <div class="footer-new-bottom">
+      <span>© 2026 ELI Coffee Events Cafe. All rights reserved.</span>
+      <span>Designed with care for every cup.</span>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script type="module" src="/js/navbar.js"></script>
+
+  <script type="module">
+    import { customerSupabase as supabase } from '/js/supabase.js';
+    import { loadPageHeader, loadMenuSections, loadMenuBanner } from '/js/page_content.js';
+
+    loadPageHeader(supabase, 'menu', {
+      imgEl: document.getElementById('menuHeroImg'),
+      headingEl: document.getElementById('menuHeroHeading'),
+      subEl: document.getElementById('menuHeroSub')
+    });
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    // Elite Card banner — the button's markup/dataset already hold the
+    // fallback shown until this resolves. Only overwrite on success.
+    loadMenuBanner(supabase).then((banner) => {
+      if (!banner) return;
+      const btn = document.getElementById('eliteCardBtn');
+      if (banner.is_active === false) {
+        btn.classList.add('hidden');
+        return;
+      }
+      document.getElementById('menuEliteLabel').textContent = banner.label || 'Members Only';
+      document.getElementById('menuEliteHeading').textContent = banner.heading || 'Elite Card';
+      document.getElementById('menuEliteDesc').textContent = banner.description || '';
+      if (banner.image_url) {
+        btn.dataset.lbSrc = banner.image_url;
+        btn.dataset.lbAlt = banner.alt_text || '';
+      }
+    });
+
+    // Menu category images — #menuChips / #menuSectionsContainer already
+    // hold the current 5 menus as a fallback; only rebuild them if the
+    // admin-configured list resolves with at least one active row. The
+    // lightbox trigger and the chip scroll-highlight (the plain inline
+    // script further down this file) are both delegated/re-queried live,
+    // so they pick up this replacement without needing to be re-wired here.
+    loadMenuSections(supabase).then((sections) => {
+      if (!sections.length) return;
+
+      document.getElementById('menuChips').innerHTML = sections.map((s) =>
+        `<a href="#ms-${s.id}" class="menu-chip">${escapeHtml(s.heading)}</a>`
+      ).join('');
+
+      document.getElementById('menuSectionsContainer').innerHTML = sections.map((s, i) => `
+        <section class="menu-img-section" id="ms-${s.id}">
+          <h2 class="menu-img-section-title">${escapeHtml(s.heading)}</h2>
+          <div class="menu-img-wrap" data-lb-src="${escapeHtml(s.image_url)}" data-lb-alt="${escapeHtml(s.alt_text)}" role="button" tabindex="0" aria-label="Tap to zoom ${escapeHtml(s.heading)} menu">
+            <img src="${escapeHtml(s.image_url)}" alt="${escapeHtml(s.alt_text)}" loading="${i === 0 ? 'eager' : 'lazy'}" />
+            <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
+          </div>
+        </section>`
+      ).join('');
+    });
+  </script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    var backdrop  = document.getElementById('menuLightbox');
+    var lbImg     = document.getElementById('menuLbImg');
+    var lbClose   = document.getElementById('menuLbClose');
+    var viewport  = document.getElementById('menuLbViewport');
+
+    /* ── State ── */
+    var scale     = 1;
+    var minScale  = 1;
+    var maxScale  = 6;
+    var tx = 0, ty = 0;
+    var dragging  = false;
+    var dragStartX, dragStartY, dragTx, dragTy;
+    var lastTap   = 0;
+    var pinchStartDist = 0;
+    var pinchStartScale = 1;
+    var pinchStartTx = 0, pinchStartTy = 0;
+
+    /* ── Helpers ── */
+    function clampTranslate(s, x, y) {
+      var iw = lbImg.naturalWidth  * s;
+      var ih = lbImg.naturalHeight * s;
+      var vw = viewport.clientWidth;
+      var vh = viewport.clientHeight;
+      var maxX = Math.max(0, (iw - vw) / 2);
+      var maxY = Math.max(0, (ih - vh) / 2);
+      return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
+    }
+
+    function applyTransform() {
+      lbImg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+    }
+
+    function resetTransform() {
+      scale = 1; tx = 0; ty = 0;
+      applyTransform();
+    }
+
+    /* ── Open / Close ── */
+    function openLightbox(src, alt) {
+      lbImg.src = src;
+      lbImg.alt = alt || '';
+      resetTransform();
+      backdrop.classList.add('lb-open');
+      document.body.style.overflow = 'hidden';
+      lbImg.onload = function () {
+        resetTransform();
+      };
+    }
+
+    function closeLightbox() {
+      backdrop.classList.remove('lb-open');
+      document.body.style.overflow = '';
+      setTimeout(function () { lbImg.src = ''; }, 250);
+    }
+
+    /* ── Trigger from image tiles + Elite Card banner ── delegated on
+       document (not queried once at parse time) because #menuSectionsContainer's
+       .menu-img-wrap tiles may be replaced after this script runs, once
+       js/page_content.js's loadMenuSections() resolves (see the module
+       script above) — a per-element listener wired here would miss them. */
+    function menuLbTrigger(el) {
+      openLightbox(el.dataset.lbSrc, el.dataset.lbAlt);
+    }
+    document.addEventListener('click', function (e) {
+      var el = e.target.closest('.menu-img-wrap, #eliteCardBtn');
+      if (el) menuLbTrigger(el);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var el = e.target.closest('.menu-img-wrap');
+      if (el) { e.preventDefault(); menuLbTrigger(el); }
+    });
+
+    /* ── Close button ── */
+    lbClose.addEventListener('click', closeLightbox);
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop || e.target === viewport) closeLightbox();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && backdrop.classList.contains('lb-open')) closeLightbox();
+    });
+
+    /* ── Mouse wheel zoom (desktop) ── */
+    viewport.addEventListener('wheel', function (e) {
+      if (!backdrop.classList.contains('lb-open')) return;
+      e.preventDefault();
+      var delta  = e.deltaY < 0 ? 1 : -1;
+      var factor = 1 + delta * 0.12;
+      var newScale = Math.max(minScale, Math.min(maxScale, scale * factor));
+
+      var rect = viewport.getBoundingClientRect();
+      var mx = e.clientX - rect.left - rect.width  / 2;
+      var my = e.clientY - rect.top  - rect.height / 2;
+      var ratio = newScale / scale;
+      tx = mx + (tx - mx) * ratio;
+      ty = my + (ty - my) * ratio;
+
+      scale = newScale;
+      if (scale <= minScale) { tx = 0; ty = 0; }
+      var clamped = clampTranslate(scale, tx, ty);
+      tx = clamped.x; ty = clamped.y;
+      applyTransform();
+    }, { passive: false });
+
+    /* ── Mouse drag (desktop pan) ── */
+    lbImg.addEventListener('mousedown', function (e) {
+      if (scale <= 1) return;
+      e.preventDefault();
+      dragging = true;
+      dragStartX = e.clientX; dragStartY = e.clientY;
+      dragTx = tx; dragTy = ty;
+      lbImg.classList.add('dragging');
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      var dx = e.clientX - dragStartX;
+      var dy = e.clientY - dragStartY;
+      var clamped = clampTranslate(scale, dragTx + dx, dragTy + dy);
+      tx = clamped.x; ty = clamped.y;
+      applyTransform();
+    });
+    window.addEventListener('mouseup', function () {
+      dragging = false;
+      lbImg.classList.remove('dragging');
+    });
+
+    /* ── Touch gestures (pinch-to-zoom + pan + swipe-down-to-close) ── */
+    var swipeStartY = 0;
+
+    viewport.addEventListener('touchstart', function (e) {
+      if (!backdrop.classList.contains('lb-open')) return;
+
+      if (e.touches.length === 1) {
+        var now = Date.now();
+        var t   = e.touches[0];
+        swipeStartY = t.clientY;
+        dragStartX  = t.clientX; dragStartY = t.clientY;
+        dragTx = tx; dragTy = ty;
+
+        if (now - lastTap < 300) {
+          /* Double tap — toggle 2× zoom */
+          e.preventDefault();
+          if (scale > 1.1) {
+            resetTransform();
+          } else {
+            var rect = viewport.getBoundingClientRect();
+            var cx = t.clientX - rect.left - rect.width  / 2;
+            var cy = t.clientY - rect.top  - rect.height / 2;
+            scale = 2.5;
+            tx = -cx * (scale - 1);
+            ty = -cy * (scale - 1);
+            var clamped = clampTranslate(scale, tx, ty);
+            tx = clamped.x; ty = clamped.y;
+            applyTransform();
+          }
+        }
+        lastTap = now;
+
+      } else if (e.touches.length === 2) {
+        e.preventDefault();
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchStartDist  = Math.hypot(dx, dy);
+        pinchStartScale = scale;
+        pinchStartTx    = tx;
+        pinchStartTy    = ty;
+      }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', function (e) {
+      if (!backdrop.classList.contains('lb-open')) return;
+      e.preventDefault();
+
+      if (e.touches.length === 2) {
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        var dist = Math.hypot(dx, dy);
+        var newScale = Math.max(minScale, Math.min(maxScale, pinchStartScale * (dist / pinchStartDist)));
+        var ratio    = newScale / scale;
+        tx = pinchStartTx * ratio;
+        ty = pinchStartTy * ratio;
+        scale = newScale;
+        var clamped = clampTranslate(scale, tx, ty);
+        tx = clamped.x; ty = clamped.y;
+        applyTransform();
+
+      } else if (e.touches.length === 1) {
+        var t  = e.touches[0];
+        var dy2 = t.clientY - swipeStartY;
+
+        if (scale <= 1.05 && dy2 > 60) {
+          closeLightbox();
+          return;
+        }
+        if (scale > 1) {
+          var ddx = t.clientX - dragStartX;
+          var ddy = t.clientY - dragStartY;
+          var clamped2 = clampTranslate(scale, dragTx + ddx, dragTy + ddy);
+          tx = clamped2.x; ty = clamped2.y;
+          applyTransform();
+        }
+      }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', function (e) {
+      if (e.touches.length === 0 && scale < minScale) {
+        resetTransform();
+      }
+    });
+
+    /* ── Chip active state on scroll ── queried fresh on every call, not
+       cached once, since #menuSectionsContainer / #menuChips may be
+       replaced after this script runs (see the module script above). */
+    function updateActiveChip() {
+      var sections = document.querySelectorAll('.menu-img-section[id]');
+      var chips    = document.querySelectorAll('.menu-chip');
+      var scrollY  = window.scrollY + 120;
+      var active   = null;
+      sections.forEach(function (s) {
+        if (s.offsetTop <= scrollY) active = s.id;
+      });
+      chips.forEach(function (c) {
+        var href = c.getAttribute('href').replace('#', '');
+        c.classList.toggle('active', href === active);
+      });
+    }
+
+    window.addEventListener('scroll', updateActiveChip, { passive: true });
+    updateActiveChip();
+
+  }());
+  </script>
+
+  <script type="module" src="/js/footer_content.js"></script>
+
+</body>
+</html>

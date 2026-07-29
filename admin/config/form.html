@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservation Form - ELI Coffee Events</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_reservation_form.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <section class="page-shell">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Reservation Form <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Configure the fields, legal text, and event types customers see when booking.</p>
+        </div>
+      </div>
+
+      <div class="settings-tabs" role="tablist">
+        <button type="button" class="settings-tab-btn active" data-tab="required-fields" role="tab">Required Fields</button>
+        <button type="button" class="settings-tab-btn" data-tab="legal" role="tab">Terms &amp; Legal</button>
+        <button type="button" class="settings-tab-btn" data-tab="contract-template" role="tab">Contract Template</button>
+        <button type="button" class="settings-tab-btn" data-tab="event-types" role="tab">Event Types</button>
+      </div>
+
+      <!-- ══ TAB: REQUIRED FIELDS ══ -->
+      <div class="settings-panel active" id="panel-required-fields" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Required Fields</p>
+          <p class="settings-card-sub">Most fields on the booking form (package, guest count, event date) drive pricing and availability and can't be made optional. These are the only fields that can be toggled.</p>
+
+          <div class="rf-field-row">
+            <div>
+              <div class="rf-field-label">Phone number required</div>
+              <div class="rf-field-desc">If off, customers can submit a reservation with just an email address.</div>
+            </div>
+            <label class="pm2-toggle">
+              <input type="checkbox" id="rf-contact-phone-required" checked>
+              <span class="pm2-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="rf-field-row">
+            <div>
+              <div class="rf-field-label">Special requests required</div>
+              <div class="rf-field-desc">If on, customers must write something in the Special Requests field before continuing.</div>
+            </div>
+            <label class="pm2-toggle">
+              <input type="checkbox" id="rf-special-requests-required">
+              <span class="pm2-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="rf-legal-actions">
+            <span class="rf-legal-hint" id="rf-fields-message"></span>
+            <button type="button" class="btn-primary" id="rf-fields-save">Save changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: TERMS & LEGAL ══ -->
+      <div class="settings-panel" id="panel-legal" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Terms &amp; Legal</p>
+          <p class="settings-card-sub">Shown to customers on the booking page before they sign their contract. Blank-line-separated paragraphs; a short line with no ending period becomes a heading, and lines starting with "- " become a bullet list.</p>
+
+          <div class="rf-cross-link">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>This text also feeds the contract via the <code>{{terms_and_conditions}}</code> and <code>{{data_privacy_policy}}</code> tokens on the Contract Template tab — editing it here updates any clause that references those tokens too.</span>
+          </div>
+
+          <div class="rf-legal-tabs">
+            <button type="button" class="rf-legal-tab-btn active" data-legal-tab="terms">Terms &amp; Conditions</button>
+            <button type="button" class="rf-legal-tab-btn" data-legal-tab="privacy">Data Privacy Policy</button>
+          </div>
+
+          <div class="rf-legal-panel active" id="rf-legal-panel-terms">
+            <textarea class="rf-legal-textarea" id="rf-terms-body" placeholder="Loading..."></textarea>
+          </div>
+          <div class="rf-legal-panel" id="rf-legal-panel-privacy">
+            <textarea class="rf-legal-textarea" id="rf-privacy-body" placeholder="Loading..."></textarea>
+          </div>
+
+          <div class="rf-legal-actions">
+            <span class="rf-legal-hint" id="rf-legal-message"></span>
+            <div style="display:flex;gap:10px;">
+              <button type="button" class="et-action-btn" id="rf-legal-preview">Preview</button>
+              <button type="button" class="btn-primary" id="rf-legal-save">Save changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: CONTRACT TEMPLATE ══ -->
+      <div class="settings-panel" id="panel-contract-template" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Contract Template</p>
+          <p class="settings-card-sub">The Event Reservation Agreement generated and signed for each booking. Templates are per package — pick one below to edit it.</p>
+
+          <div class="ct-banner">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Editing the template changes contracts signed from now on. Already-signed contracts keep the exact terms they were signed under.</span>
+          </div>
+
+          <div class="ct-picker-row">
+            <label class="field-label" for="ct-package-select">Package</label>
+            <select id="ct-package-select" class="res-input"></select>
+          </div>
+
+          <p class="rf-legal-hint" id="ct-message"></p>
+
+          <div id="ct-editor" class="ct-editor hidden">
+
+            <div class="ct-section">
+              <p class="ct-section-title">Document Fields</p>
+              <p class="ct-section-sub">Reservation Summary rows shown on every contract. Package and Venue details come from this template's clauses below, not fixed fields.</p>
+              <div id="ct-fields-list" class="ct-fields-list"></div>
+              <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+                <button type="button" class="btn-primary" id="ct-fields-save">Save fields</button>
+              </div>
+            </div>
+
+            <div class="ct-section">
+              <p class="ct-section-title">Clauses</p>
+              <p class="ct-section-sub">The prose the café controls. Locked clauses are shared legal boilerplate and require an explicit unlock to edit.</p>
+
+              <div class="ct-token-ref">
+                <p class="ct-token-ref-title">Available tokens</p>
+                <div class="ct-token-ref-list" id="ct-token-ref-list"></div>
+              </div>
+
+              <div id="ct-clauses-list" class="ct-clauses-list"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                <button type="button" class="et-action-btn" id="ct-add-clause-btn">+ Add clause</button>
+                <button type="button" class="btn-primary" id="ct-clauses-save">Save clauses</button>
+              </div>
+            </div>
+
+            <div class="ct-section">
+              <div class="ct-section-head">
+                <p class="ct-section-title">Live Preview</p>
+                <button type="button" class="et-action-btn" id="ct-preview-btn">Preview</button>
+              </div>
+              <p class="ct-section-sub">Preview uses sample booking data. Real contracts fill from the customer's reservation.</p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: EVENT TYPES ══ -->
+      <div class="settings-panel" id="panel-event-types" role="tabpanel">
+        <div class="settings-card">
+          <p class="settings-card-title">Event Types</p>
+          <p class="settings-card-sub">Manage the categories of events that customers can select when making a reservation.</p>
+
+          <div class="rf-cross-link">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>Each event type's minimum booking notice is set on the <a href="/admin/super%20admin/super_admin_settings.html#notice-overrides" style="color:inherit;font-weight:600;">Availability and scheduling &rarr; Per-Event-Type Notice Override</a> page, not here.</span>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+            <button type="button" class="btn-primary" id="et-add-btn">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Event Type
+            </button>
+          </div>
+
+          <p class="rf-legal-hint" id="et-message"></p>
+
+          <table class="et-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="et-body">
+              <tr><td colspan="4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── Add/Edit Event Type modal ── -->
+  <div class="rf-preview-backdrop hidden" id="et-modal-backdrop">
+    <div class="rf-preview-card" style="max-width:440px;">
+      <p class="rf-preview-title" id="et-modal-title">Add event type</p>
+      <div class="rf-preview-body" style="overflow:visible;">
+        <label class="field-label" for="et-name-input" style="display:block;margin-bottom:6px;">Name</label>
+        <input type="text" id="et-name-input" class="res-input" style="width:100%;margin-bottom:14px;" placeholder="e.g., Baby Shower" maxlength="80">
+
+        <label class="field-label" for="et-desc-input" style="display:block;margin-bottom:6px;">Description (optional)</label>
+        <textarea id="et-desc-input" class="res-input" style="width:100%;min-height:80px;margin-bottom:14px;" maxlength="240" placeholder="Shown to admins only, not customers"></textarea>
+
+        <label class="field-label" style="display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" id="et-active-input" checked>
+          Active (visible to customers)
+        </label>
+        <p class="rf-legal-hint" id="et-modal-message" style="margin-top:12px;"></p>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button type="button" class="et-action-btn" id="et-modal-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="et-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Preview modal (reuses customer-facing policy styling shape) ── -->
+  <div class="rf-preview-backdrop hidden" id="rf-preview-backdrop">
+    <div class="rf-preview-card">
+      <p class="rf-preview-title" id="rf-preview-title">Preview</p>
+      <div class="rf-preview-body" id="rf-preview-body"></div>
+      <button type="button" class="rf-preview-close" id="rf-preview-close">Close</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
+    import { setupInactivityLogout } from '/js/super_admin_inactivity.js';
+    import { getPortalInitials } from '/js/admin_auth.js';
+    import { initAdminNav } from '/js/admin_nav.js';
+    import { initReservationFormConfig } from '/js/admin_reservation_form_config.js';
+    import { initContractTemplateTab } from '/js/admin_contract_template.js';
+
+    async function init() {
+      const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
+      if (!result) return;
+
+      if (result.profile.role !== 'admin') {
+        window.location.replace('/admin/dashboard.html');
+        return;
+      }
+
+      const avatarEl = document.getElementById('sidebarAvatar');
+      if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
+      const roleBottomEl = document.getElementById('sidebarRoleBottom');
+      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+      const adminBadge = document.getElementById('adminBadge');
+      if (adminBadge) adminBadge.textContent = 'Admin';
+
+      watchAuthState();
+      wireLogoutButton();
+      setupInactivityLogout();
+      initAdminNav({ role: result.profile.role });
+
+      initReservationFormConfig();
+      initContractTemplateTab();
+    }
+
+    init();
+  </script>
+</body>
+</html>

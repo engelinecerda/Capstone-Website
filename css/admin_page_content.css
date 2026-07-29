@@ -1,0 +1,323 @@
+/* ============================================================
+   ELI Coffee Events — Page Content
+   Page-specific additions only — manager-theme.css (already linked
+   before this file) owns :root, sidebar, .main/.page-shell, .card,
+   .btn-primary, status-pill styling.
+   ============================================================ */
+
+/* manager-theme.css's .card has no margin of its own — every other admin
+   page that stacks multiple cards (e.g. admin_payment_options.css, used on
+   the Operating Hours page) supplies this same rule. Missing it here was
+   why the four sections had zero gap between them. */
+.card + .card { margin-top: 20px; }
+
+.card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.card-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.card-sub   { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+
+.pc-loading { font-size: 12.5px; color: var(--muted); padding: 12px 0; }
+
+.form-message {
+  font-size: 12.5px;
+  color: var(--muted);
+  min-height: 18px;
+  margin: 8px 0;
+}
+.form-message.error   { color: var(--declined-txt); }
+.form-message.success { color: var(--approved-txt); }
+
+/* ── BUTTONS ── */
+.btn-cancel {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px;
+  border: 0.5px solid var(--btn-secondary-border); background: var(--card-bg); color: var(--text);
+  border-radius: 8px; padding: 0 16px; font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: background .15s ease;
+}
+.btn-cancel:hover { background: var(--btn-secondary-hover); }
+
+.btn-danger {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px;
+  border: none; background: var(--declined-txt, #A32D2D); color: #fff;
+  border-radius: 8px; padding: 0 16px; font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: filter .15s ease;
+}
+.btn-danger:hover { filter: brightness(0.9); }
+
+.btn-outline-sm {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card-bg); color: var(--text); border: 0.5px solid var(--btn-secondary-border);
+  border-radius: 7px; padding: 6px 11px; font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: background .15s;
+}
+.btn-outline-sm:hover { background: var(--btn-secondary-hover); }
+
+.btn-icon-xs {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; border: 0.5px solid var(--btn-secondary-border);
+  background: var(--card-bg); color: var(--muted); cursor: pointer; transition: background .15s, color .15s;
+}
+.btn-icon-xs:hover,
+.btn-icon-xs:focus-visible { background: var(--btn-secondary-hover); color: var(--text); }
+.btn-icon-xs:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ── PAGE HEADERS list ── */
+.header-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.header-row {
+  display: flex; align-items: center; gap: 14px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.header-row-thumb {
+  width: 72px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0;
+  background: var(--bg); border: 0.5px solid var(--border);
+}
+.header-row-body { flex: 1; min-width: 0; }
+.header-row-key {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+}
+.header-row-heading { font-size: 13.5px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.header-row-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+/* ── GALLERY admin grid ── */
+.gallery-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.gallery-admin-card {
+  border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column; background: var(--card-bg);
+}
+.gallery-admin-card.is-inactive { opacity: .55; }
+.gallery-admin-thumb-wrap { position: relative; aspect-ratio: 4/3; background: var(--bg); }
+.gallery-admin-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-admin-body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.gallery-admin-caption { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.gallery-admin-alt { font-size: 11px; color: var(--muted); }
+.gallery-admin-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.gallery-admin-actions .spacer { flex: 1; }
+
+.gallery-empty, .faq-empty, .about-empty {
+  padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px;
+}
+
+/* ── UPLOADER (page header + gallery upload target) ── */
+.uploader {
+  position: relative; border: 1.5px dashed var(--input-border); border-radius: 10px;
+  min-height: 140px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; background: var(--input-bg); overflow: hidden; transition: border-color .15s;
+}
+.uploader:hover, .uploader:focus-visible { border-color: var(--input-focus); }
+.uploader-preview { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+.uploader-preview.hidden { display: none; }
+.uploader-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  color: var(--muted); font-size: 12.5px; padding: 20px;
+}
+
+/* ── HERO PREVIEW (mirrors the real customer page-hero) ── */
+.hero-preview {
+  position: relative; border-radius: 10px; overflow: hidden; height: 160px;
+  background: var(--bg); border: 0.5px solid var(--border);
+}
+.hero-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-preview-overlay {
+  position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,10,4,.15), rgba(20,10,4,.6));
+}
+.hero-preview-body {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center; padding: 12px; gap: 4px;
+}
+.hero-preview-body h3 { font-family: 'Fraunces', serif; font-size: 20px; color: #fff; font-weight: 600; }
+.hero-preview-body p { font-size: 12px; color: rgba(255,255,255,.9); }
+
+/* ── ABOUT editor ── */
+.about-section-card {
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 16px;
+}
+.about-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.about-section-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.about-body-input {
+  width: 100%; min-height: 140px; border: 1px solid var(--input-border); border-radius: 8px;
+  padding: 10px 12px; font: inherit; font-size: 13px; color: var(--text); background: var(--input-bg);
+  resize: vertical; outline: none; transition: border-color .15s;
+}
+.about-body-input:focus { border-color: var(--input-focus); }
+.about-section-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.about-preview-body h4 { font-family: 'Fraunces', serif; margin: 14px 0 6px; }
+.about-preview-body h4:first-child { margin-top: 0; }
+.about-preview-body p { font-size: 13.5px; line-height: 1.7; color: var(--text); margin-bottom: 8px; }
+.about-preview-body ul { padding-left: 20px; margin-bottom: 8px; }
+.about-preview-body li { font-size: 13.5px; line-height: 1.7; color: var(--text); }
+
+/* ── FAQ admin list ── */
+.faq-admin-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.faq-admin-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.faq-admin-row.is-inactive { opacity: .55; }
+.faq-admin-reorder { display: flex; flex-direction: column; gap: 2px; }
+.faq-admin-body { flex: 1; min-width: 0; }
+.faq-admin-question { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.faq-admin-answer { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.faq-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* ── SERVICES (What We Offer) admin list ── */
+.service-admin-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.service-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.service-admin-row {
+  display: flex; align-items: center; gap: 12px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.service-admin-row.is-inactive { opacity: .55; }
+.service-admin-reorder { display: flex; flex-direction: column; gap: 2px; }
+.service-admin-thumb {
+  width: 56px; height: 42px; border-radius: 8px; object-fit: cover; flex-shrink: 0;
+  background: var(--bg); border: 0.5px solid var(--border);
+}
+.service-admin-body { flex: 1; min-width: 0; }
+.service-admin-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.service-admin-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.service-admin-link { font-size: 11.5px; color: var(--muted); margin-top: 2px; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
+.service-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* ── MENU IMAGES admin list (same shape as .service-admin-*, kept as its
+   own named block to match this file's one-block-per-content-type
+   convention) ── */
+.menu-section-admin-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.menu-section-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.menu-section-admin-row {
+  display: flex; align-items: center; gap: 12px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.menu-section-admin-row.is-inactive { opacity: .55; }
+.menu-section-admin-reorder { display: flex; flex-direction: column; gap: 2px; }
+.menu-section-admin-thumb {
+  width: 56px; height: 42px; border-radius: 8px; object-fit: cover; flex-shrink: 0;
+  background: var(--bg); border: 0.5px solid var(--border);
+}
+.menu-section-admin-body { flex: 1; min-width: 0; }
+.menu-section-admin-heading { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.menu-section-admin-alt { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.menu-section-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* ── OUR VALUES admin list ── */
+.value-admin-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.value-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.value-admin-row {
+  display: flex; align-items: center; gap: 12px;
+  border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.value-admin-row.is-inactive { opacity: .55; }
+.value-admin-reorder { display: flex; flex-direction: column; gap: 2px; }
+.value-admin-icon {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 0.5px solid var(--border); color: var(--text); font-size: 17px;
+}
+.value-admin-body { flex: 1; min-width: 0; }
+.value-admin-label { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.value-admin-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.value-admin-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* Icon picker — a small grid of buttons rather than a native <select>, since
+   <option> elements can't reliably render icon-font glyphs across browsers.
+   Every button is natively focusable/activatable (Tab + Enter/Space), so
+   this needs no extra keyboard wiring. */
+.icon-picker-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.icon-pick-btn {
+  width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text);
+  font-size: 17px; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.icon-pick-btn:hover { background: var(--btn-secondary-hover); }
+.icon-pick-btn.active {
+  background: var(--btn-primary-bg); border-color: var(--btn-primary-bg); color: var(--btn-primary-text);
+}
+
+/* ── ELITE CARD BANNER (singleton — plain fields directly in the card, no
+   list/modal needed since there's only ever one row) ── */
+.card-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+.plain-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.plain-checkbox-row input { width: 16px; height: 16px; accent-color: var(--btn-primary-bg, #6B3A1F); }
+
+/* ── MODAL (shared shell, matches the established admin modal system) ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(42, 18, 8, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; overflow-y: auto;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
+  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
+}
+.modal-sm { max-width: 420px; }
+.modal-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 20px 22px 16px; gap: 12px; position: sticky; top: 0; background: var(--card-bg);
+  z-index: 1; border-bottom: 0.5px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.modal-sub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.modal-close {
+  background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color .15s, background .15s;
+}
+.modal-close:hover, .modal-close:focus-visible { color: var(--text); background: var(--bg); }
+.modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+.modal-footer {
+  padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 10px;
+  border-top: 0.5px solid var(--border); position: sticky; bottom: 0; background: var(--card-bg);
+}
+.modal-field { display: flex; flex-direction: column; gap: 6px; }
+.modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.modal-input {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none;
+  transition: border-color .15s; width: 100%;
+}
+.modal-input:focus { border-color: var(--input-focus); }
+.modal-textarea {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none; resize: vertical;
+  min-height: 90px; width: 100%; transition: border-color .15s;
+}
+.modal-textarea:focus { border-color: var(--input-focus); }
+.modal-hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.modal-message {
+  font-size: 12.5px; border-radius: 8px; padding: 9px 12px;
+  background: var(--declined); color: var(--declined-txt); border: 1px solid var(--declined);
+}
+.modal-message.hidden  { display: none; }
+.modal-message.success { background: var(--approved); color: var(--approved-txt); border-color: var(--approved); }
+.confirm-copy { font-size: 13.5px; color: var(--text); line-height: 1.6; }
+
+.gallery-edit-preview {
+  width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px;
+  border: 0.5px solid var(--border); background: var(--bg);
+}
+
+/* ── STATUS TOGGLE (active/inactive) ── */
+.status-pill.active   { background: var(--approved); color: var(--approved-txt); }
+.status-pill.inactive { background: var(--neutral); color: var(--neutral-txt); }
+
+@media (max-width: 700px) {
+  .gallery-admin-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .header-row { flex-direction: column; align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-cancel, .btn-danger, .btn-outline-sm, .btn-icon-xs, .modal-close, .uploader { transition: none !important; }
+}

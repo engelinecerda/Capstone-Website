@@ -1,6 +1,11 @@
 import { portalSupabase as supabase } from './supabase.js';
-import { populatePortalIdentity, verifyAdminSession } from './admin_auth.js';
-import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
+import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
+import { initAdminNav } from './admin_nav.js';
+import { getPortalInitials } from './admin_auth.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -10,17 +15,19 @@ const refreshCustomersBtn = document.getElementById('refreshCustomersBtn');
 const searchInput = document.getElementById('searchInput');
 const customersMessage = document.getElementById('customersMessage');
 const customersBody = document.getElementById('customersBody');
+const customersPagination = document.getElementById('customersPagination');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
 const navReviewCount = document.getElementById('navReviewCount');
-
 const statTotalCustomers = document.getElementById('statTotalCustomers');
 const statCustomersWithReservations = document.getElementById('statCustomersWithReservations');
 const statNewThisMonth = document.getElementById('statNewThisMonth');
 const statCustomersWithPhone = document.getElementById('statCustomersWithPhone');
 
 let allCustomers = [];
+let customersFiltered = [];
+let customersCurrentPage = 1;
 
 function redirectToAdminLogin() {
   window.location.replace('/admin/index.html');
@@ -145,7 +152,7 @@ function renderCustomers(customers) {
         <td>
           <div class="customer-cell">
             <div class="customer-head">
-              <span class="customer-avatar">${escapeHtml(getCustomerInitials(customer))}</span>
+              <span class="avatar">${escapeHtml(getCustomerInitials(customer))}</span>
               <div>
                 <span class="table-main">${escapeHtml(getCustomerName(customer))}</span>
                 <span class="table-sub">${escapeHtml(customer.role || 'customer')}</span>
@@ -200,13 +207,28 @@ function applyFilters() {
       return haystacks.some((value) => value.includes(query));
     });
 
-  renderCustomers(filteredCustomers);
+  customersFiltered = filteredCustomers;
+  customersCurrentPage = 1;
+  renderCustomersPage();
 
   const summaryText = filteredCustomers.length
     ? `Showing ${filteredCustomers.length} of ${allCustomers.length} registered customer(s).`
     : `No registered customers matched "${query}".`;
 
   setCustomersMessage(summaryText);
+}
+
+function renderCustomersPage() {
+  renderCustomers(paginate(customersFiltered, customersCurrentPage, PAGE_SIZE));
+  renderPagination(customersPagination, {
+    totalItems: customersFiltered.length,
+    currentPage: customersCurrentPage,
+    pageSize: PAGE_SIZE,
+    onPageChange: (page) => {
+      customersCurrentPage = page;
+      renderCustomersPage();
+    }
+  });
 }
 
 async function fetchProfiles() {
@@ -303,13 +325,7 @@ async function loadCustomers() {
     allCustomers = mergeCustomersWithActivity(profiles, reservations);
 
     updateStats(allCustomers);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    });
+    initAdminSidebarBadges(supabase)
 
     applyFilters();
   } catch (error) {
@@ -317,61 +333,34 @@ async function loadCustomers() {
     allCustomers = [];
     updateStats([]);
     renderCustomers([]);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    initAdminSidebarBadges(supabase)
     setCustomersMessage(
-      `Failed to load registered customers: ${error?.message || 'unknown error'}. If the admin account should see all profiles, check the RLS policies for the profiles table.`,
+      `Failed to load registered customers: ${error?.message || 'unknown error'}.`,
       true
     );
   }
 }
 
-async function validateAdminSession() {
-  const { session, profile } = await verifyAdminSession(supabase);
+wireLogoutButton();
+watchAuthState();
 
-  if (!session) {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
-    return null;
-  }
+validateAdminSession({
+  onSuccess: async ({ profile, session }) => {
 
-  populatePortalIdentity({
-    profile,
-    session,
-    nameEl: sidebarName,
-    emailEl: sidebarEmail,
-    roleEl: sidebarRolePill,
-    fallbackLabel: 'Admin'
-  });
+    // Setup inactivity
+    setupInactivityLogout(profile.role);
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
+    const roleBottomEl = document.getElementById('sidebarRoleBottom');
+    if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
+    initManagerNotificationBell(supabase, session.user.id);
+    initAdminNav({ role: profile.role });
 
-  return session;
-}
+    // Attach UI listeners (IMPORTANT)
+    refreshCustomersBtn?.addEventListener('click', loadCustomers);
+    searchInput?.addEventListener('input', applyFilters);
 
-logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectToAdminLogin();
-});
-
-refreshCustomersBtn?.addEventListener('click', async () => {
-  await loadCustomers();
-});
-
-searchInput?.addEventListener('input', () => {
-  applyFilters();
-});
-
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') {
-    redirectToAdminLogin();
+    // Load data
+    await loadCustomers();
   }
 });
-
-const session = await validateAdminSession();
-if (session) {
-  await loadCustomers();
-}

@@ -105,6 +105,7 @@ Deno.serve(async (req: Request) => {
     })(),
   });
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   let ocrResult: OcrResult;
 
   try {
@@ -124,6 +125,10 @@ Deno.serve(async (req: Request) => {
     if (!visionRes.ok) {
       throw new Error(`Cloud Vision error ${visionRes.status}: ${await visionRes.text()}`);
     }
+
+    supabase.rpc('increment_vision_usage', { p_units: 1 }).then(({ error }) => {
+      if (error) console.error('ocr-payment usage tracking failed', error.message);
+    });
 
     const visionData = await visionRes.json();
     const rawText = visionData?.responses?.[0]?.fullTextAnnotation?.text ?? '';
@@ -158,7 +163,6 @@ Deno.serve(async (req: Request) => {
     };
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: updatedPayment, error: dbError } = await supabase
     .from('payment')
     .update({ ocr_extracted: ocrResult })

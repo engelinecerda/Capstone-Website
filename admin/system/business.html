@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Profile - ELI Coffee Events</title>
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_business_profile.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <section class="page-shell">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Business Profile <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">The café's public identity — locations, contact info, and social links shown across the site.</p>
+        </div>
+      </div>
+
+      <!-- ── LOCATIONS ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Locations</p>
+            <p class="card-sub">Shown on the homepage's Find Us section and in every page's footer.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addLocationBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Location
+          </button>
+        </div>
+        <p class="form-message" id="locationMsg"></p>
+        <div id="locationList" class="location-admin-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── CONTACT & SOCIAL ── -->
+      <div class="card">
+        <p class="card-title">Contact &amp; Social</p>
+        <p class="card-sub">Phone, email, and social links shown on the homepage footer across the whole site.</p>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label">Brand Description</label>
+            <textarea id="fieldBrandDesc" class="modal-textarea" rows="2" placeholder="A short line shown under the logo in the footer"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="text" id="fieldPhone" class="modal-input" placeholder="0917 000 0000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="fieldEmail" class="modal-input" placeholder="hello@example.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Facebook URL</label>
+            <input type="text" id="fieldFacebook" class="modal-input" placeholder="https://www.facebook.com/...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Instagram URL</label>
+            <input type="text" id="fieldInstagram" class="modal-input" placeholder="https://www.instagram.com/...">
+          </div>
+        </div>
+        <p class="form-message" id="contactMsg"></p>
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveContactBtn">Save Contact &amp; Social</button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── LOCATION EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="locationModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="locationModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="locationModalTitle">Add Location</h2>
+        <button type="button" class="modal-close" id="locationModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="locationTagInput">Branch Tag</label>
+            <input type="text" id="locationTagInput" class="modal-input" placeholder="E.g., Main Branch">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="locationNameInput">Name *</label>
+            <input type="text" id="locationNameInput" class="modal-input" placeholder="E.g., ELI Coffee Events Cafe Binangonan">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="locationAddressInput">Address *</label>
+          <input type="text" id="locationAddressInput" class="modal-input" placeholder="Full street address">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="locationHoursInput">Hours</label>
+          <input type="text" id="locationHoursInput" class="modal-input" placeholder="E.g., Daily · 1:00 PM – 10:00 PM">
+        </div>
+        <p class="modal-message hidden" id="locationModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="locationModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="locationModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="locationModalSaveLabel">Add Location</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIRM MODAL (remove location) ── -->
+  <div class="modal-overlay hidden" id="confirmModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h2 class="modal-title" id="confirmTitle">Remove Location</h2>
+        <button type="button" class="modal-close" id="confirmClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="confirm-copy" id="confirmCopy"></p>
+        <p class="modal-message hidden" id="confirmMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmOk">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin_business_profile.js"></script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+/* admin_availability_calendar.css
+   Imports admin_reservations.css to reuse the calendar grid, legend,
+   day-panel, and blackout-modal rules already established there (see
+   .calendar-grid-wrap / .calendar-cell / .day-panel-* / .blackout-modal-card)
+   — only page-layout-specific rules live here. */
+@import url('./admin_reservations.css');
+
+.availability-stat-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ============================================================
+   Two-column page layout
+   ============================================================ */
+.availability-layout {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.availability-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .availability-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Calendar card header row — month nav left, legend right
+   ============================================================ */
+.calendar-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.calendar-card-head .calendar-header {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   Day-open-status pill — neutral espresso tones, distinct from the
+   booking-status semantic colors (.status-pill.approved/.cancelled etc.)
+   ============================================================ */
+.status-pill.day-open {
+  background: #EFE8DD;
+  color: #4A2C17;
+}
+
+.status-pill.day-closed {
+  background: #F1EFE8;
+  color: #5F5E5A;
+}
+
+/* ============================================================
+   Day-detail card — flex so it and the closed-dates card below it
+   share the right column cleanly
+   ============================================================ */
+.availability-day-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.availability-day-card .day-panel-bookings {
+  min-height: 60px;
+}
+
+/* ============================================================
+   Closed-dates card
+   ============================================================ */
+.availability-closed-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.closed-dates-head {
+  margin-bottom: 10px;
+}
+
+.closed-dates-head .card-title {
+  margin: 0;
+}
+
+.closed-dates-head .card-sub {
+  margin: 2px 0 0;
+}
+
+.closed-dates-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.closed-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.closed-date-row:last-child {
+  border-bottom: none;
+}
+
+.closed-date-row:hover {
+  background: #FBF8F3;
+}
+
+.closed-date-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.closed-date-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.closed-date-sub {
+  font-size: 10px;
+  color: #8A7A6C;
+}
+
+.closed-date-sub.amber {
+  color: #854F0B;
+}
+
+.closed-date-reopen-btn {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 0.5px solid #D8CCBD;
+  background: #fff;
+  color: #3D1A0A;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.closed-date-reopen-btn:hover {
+  background: #F5EEE4;
+}
+
+.closed-dates-empty {
+  font-size: 11px;
+  color: #8A7A6C;
+  padding: 8px 0;
+}
+
+@media (max-width: 480px) {
+  .availability-stat-row {
+    grid-template-columns: 1fr;
+  }
+}
