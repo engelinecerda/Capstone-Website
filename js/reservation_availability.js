@@ -249,6 +249,60 @@ export async function fetchBlackoutDates(supabase, cache = {}, includeReasons = 
     };
 }
 
+// ── Advance-notice window (min/max days from today, incl. per-event-type
+// override) ─────────────────────────────────────────────────────────────
+// Mirrors the logic reservations.html builds inline for the new-booking
+// calendar (loadReservationRules/getEffectiveMinAdvanceDays/
+// isOutsideBookingWindow) — extracted here so the reschedule flow
+// (js/account.js) can apply the exact same rule instead of not checking it
+// at all. reservations.html's own inline copy is intentionally left as-is;
+// this is additive, not a refactor of that already-working flow.
+const DEFAULT_MIN_ADVANCE_DAYS = 14;
+const DEFAULT_MAX_ADVANCE_DAYS = 365;
+
+export async function loadAdvanceNoticeRules(supabase) {
+    const rules = {
+        minAdvanceDays: DEFAULT_MIN_ADVANCE_DAYS,
+        maxAdvanceDays: DEFAULT_MAX_ADVANCE_DAYS,
+        eventTypeOverrides: new Map()
+    };
+
+    try {
+        const [{ data: settingsRow }, { data: eventTypeRows }] = await Promise.all([
+            supabase.from('system_settings').select('setting_value').eq('setting_key', 'reservation_rules').maybeSingle(),
+            supabase.from('event_types').select('name, min_advance_days')
+        ]);
+
+        if (settingsRow?.setting_value) {
+            const parsed = JSON.parse(settingsRow.setting_value);
+            if (Number.isFinite(Number(parsed.min_advance_days))) rules.minAdvanceDays = Number(parsed.min_advance_days);
+            if (Number.isFinite(Number(parsed.max_advance_days))) rules.maxAdvanceDays = Number(parsed.max_advance_days);
+        }
+
+        (eventTypeRows || []).forEach((row) => {
+            if (row?.name && Number.isFinite(Number(row.min_advance_days))) {
+                rules.eventTypeOverrides.set(row.name, Number(row.min_advance_days));
+            }
+        });
+    } catch {
+        // Fetch/parse failure — the site-wide defaults above stand.
+    }
+
+    return rules;
+}
+
+export function getEffectiveMinAdvanceDays(rules, eventType) {
+    const override = rules?.eventTypeOverrides?.get(eventType);
+    return Number.isFinite(override) ? override : (rules?.minAdvanceDays ?? DEFAULT_MIN_ADVANCE_DAYS);
+}
+
+export function isOutsideBookingWindow(date, today, rules, eventType) {
+    const diffDays = Math.round((date - today) / 86400000);
+    const minAdvanceDays = getEffectiveMinAdvanceDays(rules, eventType);
+    const maxAdvanceDays = rules?.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS;
+    return diffDays < minAdvanceDays || diffDays > maxAdvanceDays;
+}
+
 export function getCalendarRange(month) {
     const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
     const gridStart = new Date(monthStart);

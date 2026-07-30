@@ -10,7 +10,7 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 };
 
-const ALLOWED_ROLES = ['manager'];
+const ALLOWED_ROLES = ['manager', 'staff'];
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ detail: 'Email is required' }, 400);
   }
   if (!ALLOWED_ROLES.includes(role)) {
-    return jsonResponse({ detail: 'Role must be manager' }, 400);
+    return jsonResponse({ detail: 'Role must be manager or staff' }, 400);
   }
 
   const tempPassword = crypto.randomUUID();

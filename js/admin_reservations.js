@@ -638,6 +638,11 @@ async function fetchReservations() {
   }));
 }
 
+// Unfiltered — this file only ever uses the roster to resolve names for
+// the read-only "Staff" summary column (no assignment picker lives here,
+// that's on the reservation-details page), so a deactivated employee must
+// still resolve to a name on reservations they're already assigned to
+// rather than silently vanishing from this list.
 async function fetchStaffRoster() {
   const { data, error } = await supabase
     .from('staff_roster')
@@ -647,7 +652,6 @@ async function fetchStaffRoster() {
       last_name,
       staff_role
     `)
-    .eq('is_active', true)
     .order('first_name', { ascending: true });
 
   if (error) throw error;

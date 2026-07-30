@@ -31,6 +31,7 @@ export const ADMIN_NAV = [
       { label: 'Payments',         href: '/admin/payments.html',                                          iconKey: 'receipt', adminOverride: { label: 'Payment records' } },
       { label: 'Contracts',        href: '/admin/contracts.html',                                         iconKey: 'file-text' },
       { label: 'Customers',        href: '/admin/customers.html',                                         iconKey: 'users' },
+      { label: 'Employees',        href: '/admin/staff-roster.html',        key: 'staff-roster',          iconKey: 'id-badge' },
       { label: 'Reviews',          href: '/admin/reviews.html',                                           iconKey: 'star' },
       { label: 'Reports',          href: '/admin/reports.html',                                           iconKey: 'chart-bar' },
     ]

@@ -118,6 +118,9 @@ async function handleProfileSubmit(event) {
   event.preventDefault();
   if (!state.session) return;
 
+  // role is deliberately omitted — this form never edits it, and
+  // resubmitting a client-held copy risked silently overwriting the DB's
+  // live role with a stale one (see js/session_validation.js).
   const payload = {
     user_id: state.session.user.id,
     first_name: profileFirstName.value.trim(),
@@ -125,7 +128,6 @@ async function handleProfileSubmit(event) {
     last_name: profileLastName.value.trim(),
     email: state.session.user.email || '',
     phone_number: profilePhone.value.trim() || null,
-    role: state.profile?.role || 'manager',
     date_registered: state.profile?.date_registered || state.session.user.created_at || new Date().toISOString()
   };
 

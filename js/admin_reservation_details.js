@@ -441,6 +441,18 @@ async function fetchStaffRoster() {
   return data || [];
 }
 
+// Deliberately unfiltered (unlike fetchStaffRoster, which is active-only
+// and feeds the "assign someone new" picker) — a deactivated employee must
+// still resolve to a name on reservations they're already assigned to,
+// not silently vanish from the list.
+async function fetchAllStaffRosterForNames() {
+  const { data, error } = await supabase
+    .from('staff_roster')
+    .select('staff_id, first_name, last_name, staff_role, is_active');
+  if (error) throw error;
+  return data || [];
+}
+
 async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
   if (!reservationIds.length) return {};
 
@@ -1242,7 +1254,8 @@ async function loadStaffData() {
   }
 
   try {
-    const map = await fetchReservationAssignments([currentReservation.reservation_id], staffDirectory);
+    const allRoster = await fetchAllStaffRosterForNames();
+    const map = await fetchReservationAssignments([currentReservation.reservation_id], allRoster);
     assignedStaffForReservation = map[currentReservation.reservation_id] || [];
   } catch (err) {
     assignmentFeatureReady = false;

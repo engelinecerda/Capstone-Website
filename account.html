@@ -237,9 +237,23 @@
   <div class="account-modal-backdrop hidden" id="reschedule-modal-backdrop" aria-hidden="true">
     <div class="account-modal-card reschedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title">
       <button type="button" class="account-modal-close" id="reschedule-modal-close" aria-label="Close reschedule dialog">x</button>
-      <p class="account-modal-eyebrow">Reschedule Request</p>
+      <p class="account-modal-eyebrow">Important Notice</p>
       <h2 class="account-modal-title" id="reschedule-modal-title">Choose a New Date and Time</h2>
       <p class="account-modal-copy">Pick an available date first, then select a new start time for your event.</p>
+
+      <div class="cancel-policy-block">
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="cancel-policy-body" id="reschedule-policy-body">
+          <p class="cancel-policy-heading">Rescheduling Policy</p>
+          <p class="cancel-policy-text">Requests are subject to availability on the new date and time you select. Your original booking stays in place until an admin approves the request.</p>
+        </div>
+      </div>
+
+      <div class="cancel-fee-block">
+        <span class="cancel-fee-label">Rescheduling Fee</span>
+        <strong class="cancel-fee-amount" id="reschedule-fee-amount">&#8369;0</strong>
+        <p class="cancel-fee-note">This fee applies once your request is approved, and must be paid to confirm your new date.</p>
+      </div>
 
       <div class="reschedule-current-block">
         <span class="reschedule-current-label">Current booking</span>
@@ -290,8 +304,8 @@
       <h2 class="account-modal-title" id="cancel-modal-title">Cancel Reservation</h2>
 
       <div class="cancel-policy-block">
-        <div class="cancel-policy-icon">&#9888;&#65039;</div>
-        <div class="cancel-policy-body">
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="cancel-policy-body" id="cancel-policy-body">
           <p class="cancel-policy-heading">Non-Refundable Policy</p>
           <p class="cancel-policy-text">All payments already made for this reservation are strictly non-refundable. Cancelling will not reverse any amounts previously submitted or verified.</p>
         </div>

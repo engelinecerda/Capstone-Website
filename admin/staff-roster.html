@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employees - Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_reservations.css">
+  <!-- admin_staff_roster.css is inlined below rather than linked: this dev
+       environment (Live Server, then npx serve) has repeatedly failed to
+       apply updates to that external file - browser network tools showed
+       200 responses with correct bytes yet document.styleSheets reported
+       zero parsed rules, surviving cache-busting query strings, hard
+       reloads, and fresh tabs. Inline CSS has no separate network request
+       or cache entry to go stale, so it's the reliable option here. The
+       external file is kept in sync as the source of truth for the styles
+       themselves; only the loading mechanism differs. -->
+  <style>
+    .staff-roster-stat-row { grid-template-columns: repeat(2, minmax(0, 220px)); }
+
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .roster-table { width: 100%; border-collapse: collapse; border-spacing: 0; }
+    .roster-table th, .roster-table td { text-align: left; vertical-align: middle; padding: 14px 14px 14px 0; }
+    .roster-table th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      padding-top: 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .roster-table tbody td { border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
+    .roster-table tbody tr:last-child td { border-bottom: none; }
+    .roster-table tbody tr:hover td { background: #FBF8F3; }
+    .roster-name-cell { font-weight: 600; }
+    .roster-muted { color: var(--muted); }
+    .roster-actions-cell { display: flex; gap: 8px; align-items: center; }
+    .roster-count-suffix { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+    .roster-delete-btn {
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #A32D2D;
+      font: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .roster-delete-btn:hover {
+      background: rgba(163, 45, 45, 0.08);
+      border-color: rgba(163, 45, 45, 0.35);
+    }
+
+    .modal-btn-danger {
+      background: transparent;
+      border: 1px solid rgba(163, 45, 45, 0.35);
+      color: #A32D2D;
+    }
+    .modal-btn-danger:hover {
+      background: rgba(163, 45, 45, 0.08);
+    }
+
+    .pm2-toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+    .pm2-toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+    .pm2-toggle input:disabled { cursor: not-allowed; }
+    .pm2-toggle-track { position: absolute; inset: 0; background: #D8D3CD; border-radius: 999px; transition: background 0.15s ease; }
+    .pm2-toggle-track::before {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    .pm2-toggle input:checked + .pm2-toggle-track { background: var(--active-bg); }
+    .pm2-toggle input:checked + .pm2-toggle-track::before { transform: translateX(16px); }
+    .pm2-toggle input:focus-visible + .pm2-toggle-track { outline: 2px solid var(--active-bg); outline-offset: 2px; }
+
+    .roster-modal-card { width: min(100%, 520px); padding: 20px 24px; }
+    .roster-modal-card .modal-eyebrow { font-size: 10px; letter-spacing: 0.04em; color: #6B3F23; margin-bottom: 6px; }
+    .roster-modal-card .modal-title { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+    .roster-modal-card .modal-copy { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+
+    .form-grid { display: grid; gap: 16px; margin-top: 0; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field > .field-input { width: 100%; box-sizing: border-box; }
+    .field-label { font-size: 12px; font-weight: 500; color: var(--text); }
+    .field-label-opt { font-size: 11px; font-weight: 500; color: var(--muted); }
+    .field-note { display: block; width: 100%; font-size: 11px; color: #9B8B7C; line-height: 1.5; margin-top: 4px; }
+
+    .roster-active-field { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .roster-active-field .field-note { margin-top: 6px; flex-basis: 100%; }
+
+    .form-message { min-height: 18px; font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+    .form-message.error { color: var(--declined-text); }
+
+    .action-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 0.5px solid var(--border);
+    }
+    .roster-modal-card .modal-btn {
+      height: 36px;
+      border-radius: 8px;
+      padding: 0 16px;
+      font-size: 12.5px;
+      font-weight: 500;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .roster-modal-card .modal-btn-secondary {
+      border: 0.5px solid var(--btn-secondary-border, var(--border));
+      background: var(--card-bg, #fff);
+      color: var(--text);
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 720px) {
+      .staff-roster-stat-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Manager</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="page-shell">
+      <header class="page-header">
+        <div>
+          <h1 class="page-title">Employees<span class="view-only-pill">View only</span></h1>
+          <p class="page-sub">Your team — assign them to reservations from the reservation details page.</p>
+        </div>
+        <div class="header-actions">
+          <span id="managerNotifBell"></span>
+          <button type="button" class="refresh-btn" id="refreshBtn">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="card table-card">
+        <div class="card-header-row">
+          <div>
+            <h2 class="card-title">All employees<span class="roster-count-suffix" id="rosterCountSuffix"></span></h2>
+            <p class="card-sub">Name and contact records only — employees never log in. Assign them to a reservation from that reservation's details page.</p>
+          </div>
+          <button type="button" class="btn-primary" id="rosterAddBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add employee
+          </button>
+        </div>
+
+        <p class="form-message" id="rosterMessage">Loading employees...</p>
+
+        <div class="table-wrap">
+          <table class="roster-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Position</th>
+                <th>Assignments</th>
+                <th>Active</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rosterBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- ── Add/Edit Employee Modal ── -->
+  <div class="modal-backdrop hidden" id="rosterModal" aria-hidden="true">
+    <div class="modal-card roster-modal-card" role="dialog" aria-modal="true" aria-labelledby="rosterModalTitle">
+      <p class="modal-eyebrow" id="rosterModalEyebrow">Add Employee</p>
+      <h2 class="modal-title" id="rosterModalTitle">Add employee</h2>
+      <p class="modal-copy">A roster record only — no login is created.</p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">First name</label>
+          <input type="text" class="field-input" id="rosterFirstName" placeholder="e.g. Maria">
+        </div>
+        <div class="field">
+          <label class="field-label">Last name <span class="field-label-opt">(optional)</span></label>
+          <input type="text" class="field-input" id="rosterLastName" placeholder="e.g. Santos">
+        </div>
+        <div class="field">
+          <label class="field-label">Email <span class="field-label-opt">(optional, recommended)</span></label>
+          <input type="email" class="field-input" id="rosterEmail" placeholder="e.g. maria@example.com">
+          <span class="field-note">Contact detail only — not a login.</span>
+        </div>
+        <div class="field">
+          <label class="field-label">Position <span class="field-label-opt">(optional)</span></label>
+          <input type="text" class="field-input" id="rosterPosition" placeholder="e.g. Server, Barista, Coordinator">
+        </div>
+        <div class="field roster-active-field">
+          <label class="field-label">Active</label>
+          <label class="pm2-toggle">
+            <input type="checkbox" id="rosterActive" checked>
+            <span class="pm2-toggle-track"></span>
+          </label>
+          <span class="field-note">Only active employees can be newly assigned.</span>
+        </div>
+      </div>
+
+      <p class="form-message" id="rosterModalMsg"></p>
+
+      <div class="action-bar">
+        <button type="button" class="modal-btn modal-btn-secondary" id="rosterModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="rosterModalSave">Save employee</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Confirm Modal (deactivate / archive / delete) ── -->
+  <div class="modal-backdrop hidden" id="rosterConfirmModal" aria-hidden="true">
+    <div class="modal-card">
+      <p class="modal-eyebrow">Confirm</p>
+      <h2 class="modal-title" id="rosterConfirmTitle">Confirm</h2>
+      <p class="modal-copy" id="rosterConfirmCopy"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-secondary" id="rosterConfirmCancel">Cancel</button>
+        <button type="button" class="modal-btn modal-btn-primary" id="rosterConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../js/admin_staff_roster.js"></script>
+</body>
+</html>
