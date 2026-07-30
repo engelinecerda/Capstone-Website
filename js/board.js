@@ -149,7 +149,7 @@ function getLocationLabel(event) {
 
 function getStaffChipsHtml(event) {
   if (!event.staff_names || !event.staff_names.length) {
-    return '<span class="board-staff-pending">Staff to be assigned</span>';
+    return '<span class="board-staff-chip-outline">Staff TBA</span>';
   }
   return event.staff_names.map((name) => {
     const initial = String(name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -161,7 +161,7 @@ function computeEventFlag(event, now) {
   const start = getEventStartDate(event);
   const end = getEventEndDate(event);
   if (!start || !end) return null;
-  if (now >= start && now <= end) return { key: 'now', label: 'Happening now' };
+  if (now >= start && now <= end) return { key: 'now', label: 'Happening now', diffMinutes: 0 };
   if (now < start) {
     const diffMinutes = Math.round((start.getTime() - now.getTime()) / 60000);
     const hours = Math.floor(diffMinutes / 60);
@@ -169,9 +169,29 @@ function computeEventFlag(event, now) {
     const parts = [];
     if (hours) parts.push(`${hours}h`);
     parts.push(`${minutes}m`);
-    return { key: 'next', label: `in ${parts.join(' ')}` };
+    return { key: 'next', label: `in ${parts.join(' ')}`, diffMinutes };
   }
   return null;
+}
+
+const IMMINENT_WINDOW_MINUTES = 60;
+
+// Proximity carries "when" (Starting soon / Later today / Completed), not a
+// restated status — a plain status pill ("Confirmed") told staff nothing they
+// didn't already know from the event being on the board at all.
+function getProximityMeta(event, now, isViewingToday) {
+  const status = getStatusMeta(event.status);
+  if (status.key === 'cancelled') return { key: 'cancelled', label: 'Cancelled' };
+  if (status.key === 'completed') return { key: 'completed', label: 'Completed' };
+  if (!isViewingToday) return null;
+
+  const flag = computeEventFlag(event, now);
+  if (!flag) return { key: 'later', label: 'Later today' };
+  if (flag.key === 'now') return { key: 'now', label: 'Happening now' };
+  if (flag.diffMinutes <= IMMINENT_WINDOW_MINUTES) {
+    return { key: 'imminent', label: `Starting soon · ${flag.label}` };
+  }
+  return { key: 'later', label: 'Later today' };
 }
 
 function renderClock() {
@@ -188,22 +208,10 @@ function renderClock() {
   });
 }
 
-function findUpNextEventId(todayEvents, now) {
-  const upcoming = todayEvents
-    .map((event) => ({ event, start: getEventStartDate(event) }))
-    .filter((entry) => entry.start && entry.start > now)
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-  return upcoming.length ? upcoming[0].event.id : null;
-}
-
-function renderEventCard(event, now, upNextId, isViewingToday) {
+function renderEventCard(event, now, isViewingToday) {
   const status = getStatusMeta(event.status);
-  const flag = isViewingToday ? computeEventFlag(event, now) : null;
-  const isUpNext = isViewingToday && event.id === upNextId;
-  const isImminent = Boolean(flag && (flag.key === 'now' || isUpNext));
-  const flagHtml = flag && (flag.key === 'now' || isUpNext)
-    ? `<span class="board-flag board-flag-${flag.key}">${flag.key === 'now' ? '<i class="fa-solid fa-circle-play"></i> Happening now' : `<i class="fa-solid fa-clock"></i> Starting soon · ${escapeHtml(flag.label)}`}</span>`
-    : '';
+  const proximity = getProximityMeta(event, now, isViewingToday);
+  const isImminentCard = Boolean(proximity && (proximity.key === 'now' || proximity.key === 'imminent'));
 
   const startTime = getEventStartDate(event);
   const endTime = getEventEndDate(event);
@@ -212,29 +220,35 @@ function renderEventCard(event, now, upNextId, isViewingToday) {
     : (event.event_time || 'Time TBD');
 
   const stateClasses = [
-    isImminent ? 'board-event-imminent' : '',
+    isImminentCard ? 'board-event-imminent' : '',
     status.key === 'completed' ? 'board-event-completed' : '',
     status.key === 'cancelled' ? 'board-event-cancelled' : ''
   ].filter(Boolean).join(' ');
 
+  const proximityPillHtml = proximity
+    ? `<span class="board-proximity-pill board-proximity-${proximity.key}">${escapeHtml(proximity.label)}</span>`
+    : '';
+
   const updateBadgeHtml = status.key !== 'cancelled' && isRecentlyUpdated(event, now)
-    ? '<span class="board-update-badge"><i class="fa-solid fa-pen"></i> Updated</span>'
+    ? `<span class="board-update-badge"><i class="fa-solid fa-pen"></i> Updated ${escapeHtml(new Date(event.updated_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }))}</span>`
     : '';
 
   return `
     <article class="board-event-card${stateClasses ? ' ' + stateClasses : ''}">
-      <div class="board-event-time">${escapeHtml(timeLabel)}</div>
-      <div class="board-event-body">
-        <div class="board-event-head">
-          <h3 class="board-event-title">${escapeHtml(event.event_type || 'Reserved Event')}</h3>
-          <span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
+      <div class="board-event-card-head">
+        <h3 class="board-event-heading">
+          <span class="board-event-time-inline">${escapeHtml(timeLabel)}</span>
+          <span class="board-event-sep">·</span>
+          <span class="board-event-name-inline">${escapeHtml(event.event_type || 'Reserved Event')}</span>
+        </h3>
+        <div class="board-event-badges">
+          ${proximityPillHtml}
+          ${updateBadgeHtml}
         </div>
-        <p class="board-event-meta">${escapeHtml(event.package_name || 'Package pending')} · ${escapeHtml(String(event.guest_count || 0))} guests · ${escapeHtml(getLocationLabel(event))}</p>
-        <div class="board-staff-chips">${getStaffChipsHtml(event)}</div>
-        ${event.manager_notes ? `<p class="board-event-notes"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(event.manager_notes)}</p>` : ''}
-        ${updateBadgeHtml}
-        ${flagHtml}
       </div>
+      <p class="board-event-meta">${escapeHtml(event.package_name || 'Package pending')} · ${escapeHtml(String(event.guest_count || 0))} guests · ${escapeHtml(getLocationLabel(event))}</p>
+      <div class="board-staff-chips">${getStaffChipsHtml(event)}</div>
+      ${event.manager_notes ? `<p class="board-event-notes"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(event.manager_notes)}</p>` : ''}
     </article>
   `;
 }
@@ -246,10 +260,8 @@ function render() {
   const isViewingToday = state.selectedDate === todayKey;
 
   const todayEntry = state.days.find((day) => day.date === todayKey);
-  const todayEvents = todayEntry?.events || [];
   const viewedEntry = state.days.find((day) => day.date === state.selectedDate) || todayEntry;
   const viewedEvents = viewedEntry?.events || [];
-  const upNextId = isViewingToday ? findUpNextEventId(todayEvents, now) : null;
 
   boardPanelTitle.textContent = formatFullDayHeading(state.selectedDate);
   boardTodaySub.textContent = viewedEvents.length
@@ -264,7 +276,7 @@ function render() {
   }
 
   boardTodayList.innerHTML = viewedEvents.length
-    ? viewedEvents.map((event) => renderEventCard(event, now, upNextId, isViewingToday)).join('')
+    ? viewedEvents.map((event) => renderEventCard(event, now, isViewingToday)).join('')
     : '<div class="board-empty-day"><i class="fa-solid fa-mug-hot"></i><p>No events scheduled</p></div>';
 
   const daysWithEvents = state.days.filter((day) => day.events.length > 0);

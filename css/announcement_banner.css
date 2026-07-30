@@ -1,0 +1,116 @@
+/* ============================================================
+   Announcement banner — shared between the customer site
+   (js/announcement_banner.js) and the admin editor's live preview
+   (js/admin_announcements.js). New tokens, scoped to this file, since
+   the customer palette (css/home.css) has no semantic status colors —
+   kept in the same warm brown/cream family rather than introducing an
+   unrelated palette. Severity is conveyed by icon + text, not color
+   alone, so these are a support, not the only signal.
+   ============================================================ */
+
+:root {
+  --ann-info-bg:    #F2EBE0;
+  --ann-info-text:  #3D1A0A;
+  --ann-info-icon:  #6B3820;
+
+  --ann-maint-bg:   #F5E6C8;
+  --ann-maint-text: #5C4210;
+  --ann-maint-icon: #8A6416;
+
+  --ann-urgent-bg:   #F3DCD3;
+  --ann-urgent-text: #6E2415;
+  --ann-urgent-icon: #A6402A;
+}
+
+.ann-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 20px;
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ann-banner--info {
+  background: var(--ann-info-bg);
+  color: var(--ann-info-text);
+}
+.ann-banner--info .ann-banner-icon { color: var(--ann-info-icon); }
+
+.ann-banner--scheduled_maintenance {
+  background: var(--ann-maint-bg);
+  color: var(--ann-maint-text);
+}
+.ann-banner--scheduled_maintenance .ann-banner-icon { color: var(--ann-maint-icon); }
+
+.ann-banner--urgent {
+  background: var(--ann-urgent-bg);
+  color: var(--ann-urgent-text);
+}
+.ann-banner--urgent .ann-banner-icon { color: var(--ann-urgent-icon); }
+
+.ann-banner-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.ann-banner-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-weight: 500;
+}
+
+.ann-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.ann-banner-cta {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: inherit;
+  white-space: nowrap;
+}
+.ann-banner-cta:hover { opacity: 0.75; }
+
+.ann-banner-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.ann-banner-dismiss:hover,
+.ann-banner-dismiss:focus-visible {
+  background: rgba(0, 0, 0, 0.16);
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .ann-banner {
+    flex-wrap: wrap;
+    padding: 10px 16px;
+  }
+  .ann-banner-text { flex-basis: 100%; order: 1; }
+  .ann-banner-icon { order: 0; }
+  .ann-banner-actions { order: 2; margin-left: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ann-banner-dismiss { transition: none; }
+}

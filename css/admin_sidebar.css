@@ -294,3 +294,21 @@ body.sidebar-open .sidebar-overlay { display: block; }
     transition: none !important;
   }
 }
+
+/* Persistent app-wide indicator — injected by
+   js/admin_sidebar_counts.js's injectMaintenanceIndicator() on every admin
+   page whenever maintenance_mode.is_on is true. */
+.admin-maintenance-strip {
+  position: sticky; top: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 8px 16px;
+  background: var(--declined-txt); color: #fff;
+  font-size: 12.5px; font-weight: 600; text-align: center;
+  text-decoration: none;
+}
+.admin-maintenance-strip:hover,
+.admin-maintenance-strip:focus-visible {
+  background: #8a2424;
+  outline: none;
+}
+.admin-maintenance-strip svg { flex-shrink: 0; }

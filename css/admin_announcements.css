@@ -1,0 +1,123 @@
+/* ============================================================
+   ELI Coffee Events — Announcements (Maintenance module)
+   Page-specific additions only — manager-theme.css (already linked
+   before this file) owns :root, sidebar, .main/.page-shell, .card,
+   .btn-primary, status-pill styling. announcement_banner.css (also
+   linked before this file) owns the .ann-banner preview markup itself.
+   ============================================================ */
+
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+.card-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.card-sub   { font-size: 12.5px; color: var(--muted); margin-top: 2px; margin-bottom: 16px; line-height: 1.5; }
+
+/* ── BUTTONS ── */
+.btn-cancel {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px;
+  border: 0.5px solid var(--btn-secondary-border); background: var(--card-bg); color: var(--text);
+  border-radius: 8px; padding: 0 16px; font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: background .15s ease;
+}
+.btn-cancel:hover { background: var(--btn-secondary-hover); }
+.btn-outline-sm {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card-bg); color: var(--text); border: 0.5px solid var(--btn-secondary-border);
+  border-radius: 7px; padding: 5px 10px; font: inherit; font-size: 11.5px; font-weight: 500;
+  cursor: pointer; transition: background .15s;
+}
+.btn-outline-sm:hover { background: var(--btn-secondary-hover); }
+.btn-danger-sm { color: var(--declined-txt); border-color: var(--declined); }
+.btn-danger-sm:hover { background: var(--declined); }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x: auto; }
+.ann-table { width: 100%; border-collapse: collapse; }
+.ann-table th, .ann-table td {
+  text-align: left; padding: 10px 12px; border-bottom: 0.5px solid var(--border); font-size: 12.5px; vertical-align: top;
+}
+.ann-table th { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: .04em; }
+.ann-msg-cell { max-width: 320px; }
+.ann-window-cell { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.ann-actions-cell { display: flex; gap: 6px; flex-wrap: wrap; white-space: nowrap; }
+.ann-empty { text-align: center; color: var(--muted); padding: 32px 12px; }
+
+/* ── KIND BADGE ── */
+.ann-kind-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+}
+.ann-kind-info                   { background: var(--info);     color: var(--info-txt); }
+.ann-kind-scheduled_maintenance  { background: var(--pending);  color: var(--pending-txt); }
+.ann-kind-urgent                 { background: var(--declined); color: var(--declined-txt); }
+
+/* ── STATUS PILL (computed: live / scheduled / expired / disabled) ── */
+.status-pill.ann-status-live      { background: var(--approved); color: var(--approved-txt); }
+.status-pill.ann-status-scheduled { background: var(--pending);  color: var(--pending-txt); }
+.status-pill.ann-status-expired   { background: var(--neutral);  color: var(--neutral-txt); }
+.status-pill.ann-status-disabled  { background: var(--declined); color: var(--declined-txt); }
+
+/* ── MODAL (shared shell) ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(42, 18, 8, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; overflow-y: auto;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
+  width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 20px 22px 16px; gap: 12px; position: sticky; top: 0; background: var(--card-bg);
+  z-index: 1; border-bottom: 0.5px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.modal-sub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.modal-close {
+  background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color .15s, background .15s;
+}
+.modal-close:hover, .modal-close:focus-visible { color: var(--text); background: var(--bg); }
+.modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+.modal-footer {
+  padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 10px;
+  border-top: 0.5px solid var(--border); position: sticky; bottom: 0; background: var(--card-bg);
+}
+.modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal-field { display: flex; flex-direction: column; gap: 6px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.modal-input {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none;
+  transition: border-color .15s; width: 100%;
+}
+.modal-input:focus { border-color: var(--input-focus); }
+.modal-textarea {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none; resize: vertical;
+  min-height: 80px; width: 100%; transition: border-color .15s;
+}
+.modal-textarea:focus { border-color: var(--input-focus); }
+.modal-hint { font-size: 11px; color: var(--muted); line-height: 1.5; margin: 0; }
+.modal-hint.error { color: var(--declined-txt); }
+.modal-message {
+  font-size: 12.5px; border-radius: 8px; padding: 9px 12px;
+  background: var(--declined); color: var(--declined-txt); border: 1px solid var(--declined);
+}
+.modal-message.hidden { display: none; }
+
+.plain-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; }
+
+/* ── LIVE PREVIEW ── */
+.ann-preview-wrap {
+  border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.ann-preview-wrap .ann-banner { border-radius: 0; }
+
+@media (max-width: 700px) {
+  .modal-row { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-cancel, .btn-outline-sm, .modal-close { transition: none !important; }
+}

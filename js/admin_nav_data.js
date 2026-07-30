@@ -78,6 +78,13 @@ export const ADMIN_NAV = [
     ]
   },
   {
+    section: 'Maintenance',
+    items: [
+      { label: 'Announcements',     href: '/admin/maintenance/announcements.html', iconKey: 'speakerphone' },
+      { label: 'Maintenance Mode',  href: '/admin/maintenance/mode.html',           iconKey: 'alert-triangle' },
+    ]
+  },
+  {
     section: 'System',
     items: [
       { label: 'Users and roles',   href: '/admin/super%20admin/super_admin_accounts.html', iconKey: 'user-cog' },
