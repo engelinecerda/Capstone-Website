@@ -10,7 +10,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
-const GOOGLE_CLIENT_ID  = '840885111053-9o5sunpcth34kfv4c1fc74fp0h9nn2ub.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID  = '419921262357-ci1j9bi3i9v3hebp11m3077fa0b805pv.apps.googleusercontent.com';
 const DRIVE_FOLDER_NAME = 'ELI Coffee Backups';
 const DRIVE_SCOPE       = 'https://www.googleapis.com/auth/drive.file';
 
@@ -39,7 +39,7 @@ let driveFolderId         = null;
 let backupHistory         = [];
 let pendingRestoreFile    = null;
 let pendingSettingsAction = null;
-let settings              = { retentionDays: 30 };
+let settings              = { retentionDays: 0 };
 let currentAdminId        = null;
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
@@ -144,6 +144,55 @@ function hideProgress(wrap) {
   wrap.classList.add('hidden');
 }
 
+function updateRetentionRowText() {
+  const el = document.querySelector('.settings-row .settings-row-sub');
+  if (el) el.textContent = `Keep backups for ${settings.retentionDays} days`;
+}
+
+// ─── Retention setting: load / save (persisted in system_settings) ───────────
+async function loadRetentionSetting() {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'backup_retention_days')
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Failed to load retention setting:', error.message);
+    return;
+  }
+
+  if (data?.setting_value) {
+    try {
+      const parsed = JSON.parse(data.setting_value);
+      if (parsed?.days > 0) settings.retentionDays = parsed.days;
+    } catch {
+      // Backward-compat: tolerate a plain numeric string too
+      const n = parseInt(data.setting_value, 10);
+      if (n > 0) settings.retentionDays = n;
+    }
+  }
+
+  updateRetentionRowText();
+}
+
+async function saveRetentionSetting(days) {
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      {
+        setting_key:         'backup_retention_days',
+        setting_value:       JSON.stringify({ days }),
+        setting_category:    'backup',
+        setting_description: 'Number of days to keep Google Drive backups before automatic deletion.',
+        updated_by:          currentAdminId ?? null
+      },
+      { onConflict: 'setting_key' }
+    );
+
+  if (error) throw error;
+}
+
 // ─── Token helpers ────────────────────────────────────────────────────────────
 function isTokenExpired() {
   const expiresAt = parseInt(localStorage.getItem('drive_token_expires_at') || '0', 10);
@@ -193,7 +242,6 @@ function initGoogleAuth() {
 
       driveAccessToken = response.access_token;
 
-      // ✅ Save token + expiry time
       const expiresAt = Date.now() + (response.expires_in ?? 3600) * 1000;
       localStorage.setItem('drive_token', driveAccessToken);
       localStorage.setItem('drive_token_expires_at', String(expiresAt));
@@ -221,7 +269,6 @@ function refreshToken() {
       return;
     }
 
-    // Temporarily override callback just for this refresh
     window._tokenClient.callback = async (response) => {
       if (response.error) {
         clearSavedToken();
@@ -237,7 +284,6 @@ function refreshToken() {
       resolve();
     };
 
-    // prompt: '' = silent refresh (no popup if Google session still active)
     window._tokenClient.requestAccessToken({ prompt: '' });
   });
 }
@@ -394,7 +440,7 @@ async function uploadToDrive(filename, jsonContent, description, onProgress) {
 // ─── Create backup ────────────────────────────────────────────────────────────
 createBackupBtn?.addEventListener('click', async () => {
   try {
-    await ensureValidToken(); // ✅ check before opening modal
+    await ensureValidToken();
   } catch (err) {
     setPageMessage(err.message, 'error');
     return;
@@ -414,7 +460,7 @@ confirmBackupOk?.addEventListener('click', async () => {
     setProgress(backupProgressBar, backupProgressLabel, backupProgressWrap, pct, text);
 
   try {
-    await ensureValidToken(); // ✅ re-check at point of use
+    await ensureValidToken();
 
     const snapshot = await readAllTables(onProgress);
 
@@ -445,11 +491,12 @@ confirmBackupOk?.addEventListener('click', async () => {
     await supabase
       .from('system_settings')
       .upsert(
-        { setting_key: 'last_backup_at', setting_value: JSON.stringify({ created_at: now.toISOString(), file_name: uploaded.name }), updated_at: now.toISOString(), updated_by: currentAdminId ?? null },
+        { setting_key: 'last_backup_at', setting_value: JSON.stringify({ created_at: now.toISOString(), file_name: uploaded.name }), updated_by: currentAdminId ?? null },
         { onConflict: 'setting_key' }
       );
 
     await loadBackupHistory();
+    await enforceRetention();
     closeModal(confirmBackupModal);
     setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}`, 'success');
 
@@ -465,7 +512,7 @@ confirmBackupOk?.addEventListener('click', async () => {
 // ─── Restore: open modal ──────────────────────────────────────────────────────
 restoreSystemBtn?.addEventListener('click', async () => {
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken();
   } catch (err) {
     setPageMessage(err.message, 'error');
     return;
@@ -503,7 +550,7 @@ restoreOk?.addEventListener('click', async () => {
     setProgress(restoreProgressBar, restoreProgressLabel, restoreProgressWrap, pct, text);
 
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken();
 
     onProgress(5, 'Downloading backup from Google Drive…');
     const res = await fetch(
@@ -583,7 +630,7 @@ function getPrimaryKey(table) {
 // ─── Download backup file ─────────────────────────────────────────────────────
 async function handleDownload(fileId, filename) {
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken();
     setPageMessage('Preparing download…');
 
     const res = await fetch(
@@ -612,7 +659,7 @@ async function handleDelete(fileId, filename) {
   if (!confirm(`Delete "${filename}" from Google Drive? This cannot be undone.`)) return;
 
   try {
-    await ensureValidToken(); // ✅
+    await ensureValidToken();
 
     await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
       method:  'DELETE',
@@ -631,7 +678,7 @@ async function handleDelete(fileId, filename) {
 async function enforceRetention() {
   if (!driveAccessToken || !backupHistory.length) return;
 
-  const cutoff  = new Date();
+  const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - settings.retentionDays);
 
   const expired = backupHistory.filter(b => new Date(b.createdTime) < cutoff);
@@ -762,9 +809,21 @@ settingsSave?.addEventListener('click', async () => {
   if (pendingSettingsAction === 'retention') {
     const val = parseInt(document.getElementById('retentionInput')?.value, 10);
     if (!val || val < 1) { setPageMessage('Enter a valid number of days.', 'error'); return; }
-    settings.retentionDays = val;
-    document.querySelector('.settings-row .settings-row-sub').textContent = `Keep backups for ${val} days`;
-    setPageMessage('Retention period updated.', 'success');
+
+    settingsSave.disabled = true;
+
+    try {
+      await saveRetentionSetting(val);
+      settings.retentionDays = val;
+      updateRetentionRowText();
+      setPageMessage('Retention period updated.', 'success');
+    } catch (err) {
+      setPageMessage(`Failed to save retention setting: ${err.message}`, 'error');
+      settingsSave.disabled = false;
+      return;
+    }
+
+    settingsSave.disabled = false;
   }
   closeModal(settingsModal);
 });
@@ -813,6 +872,8 @@ function init() {
       createBackupBtn.disabled  = true;
       restoreSystemBtn.disabled = true;
 
+      await loadRetentionSetting();
+
       // Init Google OAuth client
       if (window.google?.accounts?.oauth2) {
         initGoogleAuth();
@@ -823,19 +884,16 @@ function init() {
       const savedToken = localStorage.getItem('drive_token');
 
       if (savedToken && !isTokenExpired()) {
-        // ✅ Token exists and is still valid — use it directly
         driveAccessToken = savedToken;
         await onTokenReady();
 
       } else if (savedToken && isTokenExpired()) {
-        // ✅ Token exists but expired — clear and prompt reconnect
         clearSavedToken();
         googleAuthStatus.textContent = 'Session expired — please reconnect to Google Drive';
         googleAuthStatus.className   = 'auth-status error';
         setPageMessage('Your Google Drive session has expired. Please reconnect.', 'error');
 
       } else {
-        // No token at all
         googleAuthStatus.textContent = 'Not connected';
         googleAuthStatus.className   = 'auth-status';
       }

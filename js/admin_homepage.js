@@ -17,6 +17,8 @@ const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const demandYearSelect = document.getElementById('demandYear');
+const monthlyYearSelect = document.getElementById('monthlyYear');
+const generateForecastBtn = document.getElementById('generateForecastBtn');
 const pageDate = document.getElementById('pageDate');
 const qaPendingCount = document.getElementById('qaPendingCount');
 const API = "https://capstone-website-papg.onrender.com";
@@ -31,6 +33,7 @@ if (pageDate) {
 }
 
 let fullData = [];
+let fullReservations = [];
 let barChart;
 let pieChart;
 let demandChart;
@@ -57,6 +60,11 @@ const STATUS_SEGMENT_COLORS = {
 };
 
 const PACKAGE_COLOR_RAMP = ['#4A2C17', '#6B3F23', '#A9805F', '#C9AE9B', '#E2D0BF', '#F0E6D9'];
+
+// Warm the backend as early as possible so cold starts on Render's free
+// tier overlap with auth/session checks instead of stacking on top of them.
+// Hits the lightweight /health endpoint — no DB/pandas work.
+fetch(`${API}/health`).catch(() => {});
 
 async function loadForecast() {
     const res = await fetch(`${API}/forecast`);
@@ -188,13 +196,16 @@ function updateTrends(reservations) {
     setTrend('customersTrend', newCustomersThisMonth, 'this month');
 }
 
-function computeMonthlyBreakdown(reservations) {
-    const now = new Date();
+// Now takes an optional `year` — defaults to the current year — so the
+// monthly reservations chart can be driven by the new year dropdown
+// instead of always showing a trailing 6-month window.
+function computeMonthlyBreakdown(reservations, year) {
+    const targetYear = year ? Number(year) : new Date().getFullYear();
     const months = [];
-    for (let i = 5; i >= 0; i -= 1) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    for (let m = 0; m <= 11; m += 1) {
+        const d = new Date(targetYear, m, 1);
         months.push({
-            key: `${d.getFullYear()}-${d.getMonth()}`,
+            key: `${targetYear}-${m}`,
             label: d.toLocaleDateString('en-US', { month: 'short' }),
             submitted: 0,
             completed: 0
@@ -218,8 +229,38 @@ function computeMonthlyBreakdown(reservations) {
     return months;
 }
 
-function renderMonthlyChart(reservations) {
-    const months = computeMonthlyBreakdown(reservations);
+// Builds the year dropdown for the monthly reservations chart from whatever
+// years actually appear in the reservation data (created_at / event_date),
+// always including the current year, and preserves the user's current
+// selection across refreshes when possible.
+function populateMonthlyYearOptions(reservations) {
+    if (!monthlyYearSelect) return;
+    const years = new Set();
+    reservations.forEach((r) => {
+        if (r.created_at) years.add(new Date(r.created_at).getFullYear());
+        if (r.event_date) years.add(new Date(r.event_date).getFullYear());
+    });
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear);
+
+    const previousValue = monthlyYearSelect.value;
+    const sortedYears = [...years].sort((a, b) => a - b);
+
+    monthlyYearSelect.innerHTML = '';
+    sortedYears.forEach((year) => {
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = String(year);
+        monthlyYearSelect.appendChild(option);
+    });
+
+    monthlyYearSelect.value = sortedYears.map(String).includes(previousValue)
+        ? previousValue
+        : String(currentYear);
+}
+
+function renderMonthlyChart(reservations, year) {
+    const months = computeMonthlyBreakdown(reservations, year);
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
     if (barChart) barChart.destroy();
@@ -531,10 +572,12 @@ async function loadDashboard() {
     const fastPath = (async () => {
         try {
             const reservations = await fetchReservations();
+            fullReservations = reservations;
             reservationsCount = reservations.length;
             updateStats(reservations);
             renderReservationsTable(reservations, {});
-            renderMonthlyChart(reservations);
+            populateMonthlyYearOptions(reservations);
+            renderMonthlyChart(reservations, monthlyYearSelect?.value);
             refreshSidebarBadges();
             const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
             const contractsByReservationId = await fetchContracts(reservationIds);
@@ -646,8 +689,53 @@ async function loadSystemOverview() {
     }
 }
 
+// MANUAL FORECAST GENERATION
+generateForecastBtn?.addEventListener('click', async () => {
+    generateForecastBtn.disabled = true;
+    generateForecastBtn.textContent = 'Generating…';
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id ?? null;
+
+        const res = await fetch(`${API}/forecast/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || 'Unknown error');
+
+        const fresh = await loadForecast();
+        fullData = Array.isArray(fresh) ? fresh : [];
+        if (demandYearSelect && fullData.length) {
+            const years = [...new Set(fullData.map((d) => d.year))].sort();
+            demandYearSelect.innerHTML = '';
+            years.forEach((year) => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                demandYearSelect.appendChild(option);
+            });
+            const currentYear = new Date().getFullYear().toString();
+            demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
+        }
+        const selectedYear = demandYearSelect?.value;
+        if (selectedYear) renderDemandChart(selectedYear);
+
+        setDashboardMessage('Forecast regenerated successfully.');
+    } catch (err) {
+        setDashboardMessage(`Forecast generation failed: ${err.message}`, true);
+    } finally {
+        generateForecastBtn.disabled = false;
+        generateForecastBtn.textContent = 'Update Forecast';
+    }
+});
+
 refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
+monthlyYearSelect?.addEventListener('change', () => { renderMonthlyChart(fullReservations, monthlyYearSelect.value); });
 
 wireLogoutButton();
 watchAuthState();

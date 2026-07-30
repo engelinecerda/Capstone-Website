@@ -1,11 +1,11 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from supabase import create_client
-from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
+from fastapi import HTTPException
+from pydantic import BaseModel
 import pandas as pd
 import subprocess
-import threading
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
 SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM" 
@@ -22,47 +22,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Run Prophet
-def run_forecast():
-    subprocess.run(["python", "python/forecast.py"])
-
-scheduler = BackgroundScheduler()
-scheduler.add_job(run_forecast, "interval", hours=24)
-
-@app.on_event("startup")
-def start_scheduler():
-    if not scheduler.running:
-        scheduler.start()
-
-    # Run forecast in background (non-blocking)
-    threading.Thread(target=run_forecast).start()
+# =========================
+# HEALTH / KEEP-ALIVE
+# =========================
+# Lightweight endpoint with zero heavy imports (no pandas/Prophet work),
+# so external uptime pingers can hit this to prevent Render free-tier
+# cold starts without triggering any real work.
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # =========================
-# FORECAST
+# FORECAST (read-only; generation now runs as a separate Render Cron Job)
 # =========================
 @app.get("/forecast")
-def get_forecast():
+async def get_forecast():
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
 
-    # 🔹 Forecast data
-    forecast_res = (
-        supabase.table("reservation_forecast")
-        .select("forecast_data")
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
+    def fetch_forecast():
+        return (
+            supabase.table("reservation_forecast")
+            .select("forecast_data")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    def fetch_actuals():
+        return supabase.table("reservations").select("event_date").eq("status", "completed").execute()  
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as pool:
+        forecast_res, res = await asyncio.gather(
+            loop.run_in_executor(pool, fetch_forecast),
+            loop.run_in_executor(pool, fetch_actuals)
+        )
 
     if not forecast_res.data:
         return []
 
     forecast_data = forecast_res.data[0]["forecast_data"]
-
     forecast_map = {
         f["ds"][:7]: f["yhat"] for f in forecast_data
     }
-
-    # Actual data
-    res = supabase.table("reservations").select("event_date").execute()
 
     actual_map = {}
     years = set()
@@ -97,12 +100,41 @@ def get_forecast():
     return result
 
 # =========================
-# MONTHLY RESERVATIONS (LAST 6 MONTHS)
+# FORECAST (manual trigger — kept for the "Update Forecast" button in the dashboard)
+# =========================
+class GenerateForecastRequest(BaseModel):
+    user_id: str | None = None
+
+@app.post("/forecast/generate")
+async def generate_forecast(body: GenerateForecastRequest):
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    def run():
+        args = ["python", "python/forecast.py"]
+        if body.user_id:
+            args.append(body.user_id)
+        result = subprocess.run(args, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr)
+
+    loop = asyncio.get_event_loop()
+    try:
+        with ThreadPoolExecutor() as pool:
+            await loop.run_in_executor(pool, run)
+        return {"success": True, "message": "Forecast generated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =========================
+# MONTHLY RESERVATIONS
 # =========================
 @app.get("/analytics/monthly-reservations")
 def monthly_reservations():
-
-    res = supabase.table("reservations").select("event_date").execute()
+    res = supabase.table("reservations") \
+        .select("event_date") \
+        .in_("status", ["approved", "confirmed", "completed"]) \
+        .execute()
 
     df = pd.DataFrame(res.data)
 
@@ -110,43 +142,44 @@ def monthly_reservations():
         return []
 
     df['event_date'] = pd.to_datetime(df['event_date'])
-
-    today = datetime.today()
-    six_months_ago = today - pd.DateOffset(months=5)
-
-    df = df[df['event_date'] >= six_months_ago]
-
+    df['year'] = df['event_date'].dt.year.astype(str)
     df['month_num'] = df['event_date'].dt.month
     df['month'] = df['event_date'].dt.strftime('%b')
 
     grouped = (
-        df.groupby(['month_num','month'])
+        df.groupby(['year', 'month_num', 'month'])
         .size()
         .reset_index(name='count')
-        .sort_values('month_num')
+        .sort_values(['year', 'month_num'])
     )
 
-    return grouped[['month','count']].to_dict(orient='records')
-
+    return grouped[['year', 'month_num', 'month', 'count']].to_dict(orient='records')
 # =========================
 # PACKAGE DISTRIBUTION
 # =========================
 @app.get("/analytics/package-distribution")
 def package_distribution():
 
-    res = supabase.table("reservations") \
-        .select("package!reservations_package_id_fkey(package_type)") \
+    res = (
+        supabase.table("reservations")
+        .select("""
+            reservation_id,
+            package:package_id (
+                package_category:package_category_id (
+                    category_name
+                )
+            )
+        """)
         .execute()
+    )
 
     counts = {}
 
     for r in res.data:
-        pkg = r.get("package")
+        pkg = r.get("package") or {}
+        category = pkg.get("package_category") or {}
 
-        if pkg and pkg.get("package_type"):
-            name = pkg["package_type"]
-        else:
-            name = "Unknown"
+        name = category.get("category_name", "Unknown")
 
         counts[name] = counts.get(name, 0) + 1
 

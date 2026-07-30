@@ -1,0 +1,38 @@
+name: Daily Forecast Generation
+
+on:
+  schedule:
+    # 12:00 AM Philippine Time (UTC+8) = 4:00 PM UTC the previous day.
+    # GitHub Actions schedules run on UTC and can be delayed by a few
+    # minutes during high-load periods — this is normal for free
+    # scheduled workflows and not something to worry about.
+    - cron: '0 16 * * *'
+    # 12:00 AM in Philippine time
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab, for testing
+
+jobs:
+  trigger-forecast:
+    runs-on: ubuntu-latest
+    steps:
+      # Wake the service up first with a cheap call, since /forecast/generate
+      # itself does heavy work (Prophet) and we don't want cold-start time
+      # counted against the same request that's also running the model.
+      - name: Warm up the backend
+        run: |
+          curl -s -o /dev/null -w "Warm-up status: %{http_code}\n" \
+            https://capstone-website-papg.onrender.com/health \
+            --max-time 90 || true
+
+      - name: Wait for service to fully wake
+        run: sleep 15
+
+      - name: Trigger forecast generation
+        run: |
+          curl -X POST https://capstone-website-papg.onrender.com/forecast/generate \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            --fail \
+            --max-time 180 \
+            --retry 2 \
+            --retry-delay 10 \
+            --retry-connrefused
