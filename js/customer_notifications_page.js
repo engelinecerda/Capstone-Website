@@ -1,30 +1,31 @@
-// admin_notifications.js — Manager/Admin full notification history page.
-// UI replacement of the old first-version page only — same notifications
-// table/RLS the sidebar bell already reads (js/notifications.js's
-// initAdminNotificationBell), same channel='in_app' scoping, no new
-// endpoints. Layout mirrors js/customer_notifications_page.js (dot/title/
-// preview/time rows, tab filter, mark-all, client-side pagination) but
-// wired to the Manager session/nav/sidebar-badge system instead.
-import { portalSupabase as supabase } from './supabase.js';
-import { validateAdminSession, watchAuthState, wireLogoutButton } from './session_validation.js';
-import { setupInactivityLogout } from './super_admin_inactivity.js';
-import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
-import { getPortalInitials } from './admin_auth.js';
-import { initAdminNav } from './admin_nav.js';
+// customer_notifications_page.js — powers the standalone /notifications.html
+// full notification history page. Reads the same `notifications` table/RLS
+// the navbar dropdown (js/notifications.js) uses — auth.uid() = user_id on
+// both SELECT and UPDATE already scopes every query to the logged-in
+// customer's own rows, so no new backend endpoint was needed for this page.
+// Filtering (All/Unread) and pagination are both done client-side against
+// one fetched batch, mirroring js/account.js's renderReservations() pattern
+// (RESERVATIONS_PAGE_SIZE + Array.slice) rather than server-side .range().
+import { customerSupabase as supabase } from './supabase.js';
+
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) {
+  window.location.href = '/login.html';
+}
+const userId = session.user.id;
 
 const PAGE_SIZE = 15;
-const FETCH_CAP = 300;
+const FETCH_CAP = 300; // generous — customers won't realistically exceed this
 
-let userId = null;
 let allNotifs = [];
 let activeFilter = 'all'; // 'all' | 'unread'
 let currentPage = 1;
 
-const listEl       = document.getElementById('notifPageList');
-const paginationEl = document.getElementById('notifPagePagination');
-const filterBtns   = document.querySelectorAll('.chip[data-filter]');
-const unreadPill   = document.getElementById('notifPageUnreadCount');
-const markAllBtn   = document.getElementById('notifPageMarkAll');
+const listEl        = document.getElementById('notifPageList');
+const paginationEl  = document.getElementById('notifPagePagination');
+const tabBtns       = document.querySelectorAll('.notif-page-tab[data-filter]');
+const unreadPill    = document.getElementById('notifPageUnreadCount');
+const markAllBtn    = document.getElementById('notifPageMarkAll');
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function escHtml(str) {
@@ -33,7 +34,8 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// "Jul 31, 2:10 PM" — matches the customer full page's detailed timestamp.
+// "Jul 31, 2:10 PM" — the detailed view, so an exact timestamp is more
+// useful here than the dropdown's relative "2h ago" phrasing.
 function fullTimestamp(iso) {
   const d = new Date(iso);
   const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -80,7 +82,7 @@ function renderPagination(totalPages) {
 function syncTabState() {
   const unread = allNotifs.filter((n) => !n.is_read).length;
   if (unreadPill) unreadPill.textContent = String(unread);
-  filterBtns.forEach((btn) => {
+  tabBtns.forEach((btn) => {
     const isActive = btn.dataset.filter === activeFilter;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-selected', String(isActive));
@@ -129,7 +131,7 @@ async function loadNotifs() {
 }
 
 // ── Events ───────────────────────────────────────────────────────────────
-filterBtns.forEach((btn) => {
+tabBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     activeFilter = btn.dataset.filter;
     currentPage = 1;
@@ -176,40 +178,18 @@ paginationEl.addEventListener('click', (e) => {
   listEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
-// Keeps this page's list/counts/badge live if the sidebar bell or another
-// tab mutates data while this page is open.
-function subscribeRealtime() {
-  supabase
-    .channel(`notif_admin_page_${userId}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'notifications',
-      filter: `user_id=eq.${userId}`,
-    }, () => loadNotifs())
-    .subscribe();
-}
+// Keeps this page's list/counts live if the dropdown (or another tab) marks
+// notifications read/unread while this page is open — same channel pattern
+// js/notifications.js's dropdown already uses.
+supabase
+  .channel(`notif_customer_page_${userId}`)
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'notifications',
+    filter: `user_id=eq.${userId}`,
+  }, () => loadNotifs())
+  .subscribe();
 
-// ── Session / init ───────────────────────────────────────────────────────
-async function init() {
-  const result = await validateAdminSession({ fallbackLabel: 'Notifications' });
-  if (!result) return;
-
-  userId = result.session.user.id;
-
-  const avatarEl = document.getElementById('sidebarAvatar');
-  if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
-  const roleBottomEl = document.getElementById('sidebarRoleBottom');
-  if (roleBottomEl) roleBottomEl.textContent = result.profile.role === 'admin' ? 'Admin' : 'Manager';
-
-  watchAuthState();
-  wireLogoutButton();
-  setupInactivityLogout(result.profile.role);
-  initAdminSidebarBadges(supabase);
-  initAdminNav({ role: result.profile.role });
-
-  subscribeRealtime();
-  await loadNotifs();
-}
-
-init();
+// ── Init ─────────────────────────────────────────────────────────────────
+await loadNotifs();

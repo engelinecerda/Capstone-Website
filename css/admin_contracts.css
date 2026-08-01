@@ -3,7 +3,7 @@
 /* admin_contracts.css */
 
 .stat-row {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .contract-details-modal-card {
@@ -50,32 +50,8 @@
   flex-wrap: nowrap;
 }
 
-/* Delete button style */
-.action-btn.delete-tmpl-btn {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.action-btn.delete-tmpl-btn:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-}
-
-@media (max-width: 1180px) {
-  .stat-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 900px) {
   .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .stat-row {
-    grid-template-columns: 1fr 1fr;
   }
 }

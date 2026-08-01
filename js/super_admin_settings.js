@@ -2,12 +2,15 @@
 // Five sections on one scrolling page (Operating Hours, Booking Notice
 // Window, Per-Event-Type Notice Override, Buffer & Capacity, Per-Scope
 // Capacity Override), each addressable via #hash from the sidebar's
-// expandable "Availability and scheduling" group (admin_nav_data.js) —
-// same anchor-scroll pattern as admin/config/payment-options.html, not
-// hide/show tabs, so no tab-switching JS is needed here.
-// Map Scope used to live here too (removed along with its tab). Its
-// underlying system_settings row (venue_map_scope) is untouched in the
-// database; this file just no longer has UI to edit it.
+// "Availability and scheduling" link (admin_nav_data.js) — same anchor-
+// scroll pattern as admin/config/payment-options.html, not hide/show tabs,
+// so no tab-switching JS is needed here.
+// Map Scope used to live here too (removed along with its tab, since its
+// six raw lat/lng number inputs had no live preview and a typo could
+// silently break the customer map). Its admin UI now lives on Business
+// Profile (admin_business_profile.js) as a draggable-bounds map editor
+// instead; the underlying system_settings row (venue_map_scope) is the
+// same one both versions of the UI have always read/written.
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';

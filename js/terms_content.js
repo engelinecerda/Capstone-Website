@@ -117,7 +117,6 @@ async function loadTerms() {
       renderContent(FALLBACK_BODY, null);
     }
   } catch (err) {
-    console.warn('[terms_content] loadTermsDocument failed:', err?.message || err);
     showRetry();
   }
 }

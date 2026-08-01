@@ -62,12 +62,6 @@ html {
     }
 }
 
-/* Greeting in mobile drawer — hidden on desktop */
-.navbar__greeting {
-    display: none;
-}
-
-
 /* Constrain the logo anchor so it never overflows the navbar height */
 .navbar__container > a:first-child {
     display: flex;
@@ -146,6 +140,14 @@ html {
 ======================== */
 .navbar__account-dropdown {
     position: relative;
+}
+
+/* Mobile-only equivalent of the dropdown above — shown instead of it at
+   ≤960px (css/styles.css mobile block), styled by .navbar__btn .button
+   there exactly like the logged-out Login button. Hidden here by default
+   so it never appears alongside the dropdown on desktop. */
+.navbar__mobile-account-btn {
+    display: none;
 }
 
 .navbar__account-trigger {
@@ -409,63 +411,6 @@ html {
     .nav-drawer-close:hover { background: rgba(61, 26, 10, 0.14); }
     .nav-drawer-close .ti { font-size: 18px; line-height: 1; }
 
-    /* ── Greeting row (logged-in) ── */
-    .navbar__greeting { display: none; }
-    .navbar__menu.active .navbar__greeting {
-        display: flex;
-        align-items: center;
-        height: auto;
-        list-style: none;
-        flex-shrink: 0;
-        padding: 20px 24px 12px;
-    }
-    .navbar__greeting-link {
-        color: #3D1A0A;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        width: 100%;
-        padding: 16px 20px;
-        font-size: 14px;
-        font-weight: 600;
-        background: rgba(176, 125, 90, 0.09);
-        border-radius: 12px;
-        transition: background 0.18s;
-    }
-    .navbar__greeting-link:hover { background: rgba(176, 125, 90, 0.16); }
-    .navbar__greeting-avatar {
-        width: 38px;
-        height: 38px;
-        border-radius: 50%;
-        background: rgba(61, 26, 10, 0.12);
-        color: #3D1A0A;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        font-weight: 700;
-        flex-shrink: 0;
-        letter-spacing: 0;
-    }
-    .navbar__greeting-text {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        flex: 1;
-    }
-    .navbar__greeting-name {
-        font-size: 14px;
-        font-weight: 600;
-        color: #3D1A0A;
-    }
-    .navbar__greeting-account-hint {
-        font-size: 11px;
-        font-weight: 500;
-        color: #B07D5A;
-        letter-spacing: 0.02em;
-    }
-
     /* ── Nav items ── */
     .navbar__item {
         height: auto;
@@ -492,12 +437,12 @@ html {
         border-radius: 11px;
         transition: background 0.18s, color 0.18s;
     }
-    /* Icon left */
+    /* Icon left — matches the Login/Account button's dark brown */
     .navbar__links::before {
         font-family: 'Font Awesome 6 Free';
         font-weight: 900;
         font-size: 16px;
-        color: #B07D5A;
+        color: #3D1A0A;
         width: 22px;
         text-align: center;
         flex-shrink: 0;
@@ -523,8 +468,13 @@ html {
         color: #3D1A0A;
     }
 
-    /* ── Login CTA — pinned to bottom ── */
-    .user-logged-in .navbar__btn { display: none; }
+    /* ── Login/Account CTA — pinned to bottom ──
+       Logged out: .navbar__btn holds the plain Login link (navbar.js).
+       Logged in: the desktop-style dropdown trigger+menu is hidden here in
+       favor of .navbar__mobile-account-btn, a plain link styled identically
+       via .navbar__btn .button below — same slot, same look either way. */
+    .navbar__account-dropdown { display: none; }
+    .navbar__mobile-account-btn { display: flex; }
     .navbar__btn {
         display: flex;
         justify-content: center;

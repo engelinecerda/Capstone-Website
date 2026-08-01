@@ -54,6 +54,10 @@
   background: var(--neutral); color: var(--neutral-txt);
 }
 .channel-pill.is-on { background: var(--approved); color: var(--approved-txt); }
+.timing-pill {
+  font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  background: var(--info); color: var(--info-txt); white-space: nowrap;
+}
 .trigger-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
 /* Toggle switch (on/off, matches the .pm2-toggle track/thumb convention

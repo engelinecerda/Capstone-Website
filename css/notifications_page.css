@@ -1,0 +1,329 @@
+/* notifications.html — standalone full notification history page.
+   account.css (loaded before this file, same as payment.html) owns the
+   redesigned navbar treatment (frosted-glass background, uppercase spaced
+   nav links) and the sitewide body font (Inter via --eli-body) — this file
+   only styles the page's own content on top of that foundation, the same
+   layering payment.css uses. Local token set mirrors css/payment.css's
+   --pay-* root exactly (same hex values, confirmed against the rest of the
+   redesigned system) rather than importing that file. */
+:root {
+  --notif-espresso:      #4A2C17;
+  --notif-espresso-dark: #3A2110;
+  --notif-cream:         #FAF6F0;
+  --notif-cream-alt:     #FFFDFA;
+  --notif-tint:          #FBF8F2;
+  --notif-border:        #E5DBCC;
+  --notif-hairline:      #F2EADD;
+  --notif-text:          #3E2418;
+  --notif-muted:         #8A7965;
+  --notif-muted-dark:    #6B5A47;
+  --notif-faint:         #A89880;
+  --notif-terracotta:    #A34F2E;
+}
+
+/* account.css sets body { background: var(--eli-cream) } (#FAF8F4) —
+   overridden here to this page's own cream shade, same one-line pattern
+   payment.css uses over the same base. */
+body { background: var(--notif-cream); }
+
+.notif-page {
+  background: var(--notif-cream);
+  min-height: calc(100vh - 80px);
+  padding: 40px 20px 80px;
+}
+
+.notif-page-inner {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* ── Back link ── */
+.notif-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 4px;
+  margin-bottom: 18px;
+  color: var(--notif-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+.notif-page-back:hover,
+.notif-page-back:focus-visible { color: var(--notif-terracotta); outline: none; }
+.notif-page-back i { font-size: 12px; }
+
+/* ── Header ── */
+.notif-page-header { margin-bottom: 20px; }
+
+.notif-page-title {
+  font-family: var(--eli-display, 'Cormorant Garamond', Georgia, serif);
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 500;
+  color: var(--notif-text);
+  margin: 0 0 6px;
+}
+
+.notif-page-subtitle {
+  font-size: 13.5px;
+  color: var(--notif-muted);
+  margin: 0;
+}
+
+/* ── Card ── */
+.notif-page-card {
+  background: var(--notif-cream-alt);
+  border: 0.5px solid var(--notif-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* ── Tabs row ── */
+.notif-page-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--notif-hairline);
+}
+
+.notif-page-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notif-page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px 4px;
+  margin-right: 18px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--notif-faint);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.notif-page-tab:hover { color: var(--notif-text); }
+.notif-page-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 44, 23, 0.14);
+  border-radius: 4px;
+}
+
+.notif-page-tab.active {
+  color: var(--notif-text);
+  font-weight: 600;
+  border-bottom-color: var(--notif-espresso);
+}
+
+.notif-page-tab span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--notif-hairline);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--notif-muted);
+}
+
+.notif-page-tab.active span {
+  background: var(--notif-espresso);
+  color: #fff;
+}
+
+.notif-page-mark-all {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 6px;
+  background: none;
+  border: none;
+  color: var(--notif-terracotta);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+.notif-page-mark-all:hover { background: var(--notif-tint); }
+.notif-page-mark-all:focus-visible {
+  outline: 2px solid var(--notif-terracotta);
+  outline-offset: 1px;
+}
+
+/* ── List ── */
+.notif-page-list { display: flex; flex-direction: column; }
+
+.notif-page-loading-text,
+.notif-page-error-text {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--notif-muted);
+  font-size: 13px;
+}
+
+.notif-page-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--notif-hairline);
+  background: var(--notif-cream-alt);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.notif-page-row:last-child { border-bottom: none; }
+.notif-page-row:hover { background: var(--notif-tint); }
+.notif-page-row:focus-visible {
+  outline: 2px solid var(--notif-terracotta);
+  outline-offset: -2px;
+}
+
+/* Unread rows are marked three ways at once — dot, bold title, and this
+   background tint — never by color alone. */
+.notif-page-row.unread { background: var(--notif-tint); }
+.notif-page-row.unread:hover { background: #F7EFE3; }
+
+.notif-page-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--notif-terracotta);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.notif-page-dot.is-read { background: transparent; }
+
+.notif-page-row-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Title always uses the primary ink at weight 600 — read/unread is conveyed
+   by the dot + row background tint instead, not by dimming the title text
+   (that was under 4.5:1 for the read state before). #3E2418 on this row's
+   backgrounds (#FFFDFA / #FBF8F2) is ≈14:1. */
+.notif-page-row-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--notif-text);
+}
+
+/* Body copy — was --notif-muted (#8A7965, ≈4.1:1, fails AA); --notif-muted-dark
+   (#6B5A47) is ≈6.5:1 here, still reads as secondary vs. the title. */
+.notif-page-row-desc {
+  font-size: 13px;
+  color: var(--notif-muted-dark);
+  line-height: 1.5;
+}
+
+.notif-page-row-time {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--notif-faint);
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+/* ── Empty state ── */
+.notif-page-empty {
+  padding: 56px 20px;
+  text-align: center;
+  color: var(--notif-faint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.notif-page-empty svg { opacity: 0.5; }
+.notif-page-empty p { margin: 0; font-size: 13.5px; color: var(--notif-muted); }
+
+/* ── Pagination — mirrors .reservation-pagination in css/account.css ── */
+.notif-page-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 0 20px;
+}
+.notif-page-pagination:empty { display: none; }
+
+.notif-page-pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--notif-border);
+  background: #fff;
+  color: var(--notif-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.notif-page-pagination-btn:hover:not(:disabled) {
+  border-color: var(--notif-espresso);
+  background: var(--notif-cream);
+}
+.notif-page-pagination-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 44, 23, 0.14);
+}
+.notif-page-pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.notif-page-pagination-btn.page-number { min-width: 40px; padding: 8px; }
+.notif-page-pagination-btn.page-number.current {
+  background: var(--notif-espresso);
+  border-color: var(--notif-espresso);
+  color: #fff;
+  cursor: default;
+}
+
+/* ── Responsive (375px target) ── */
+@media (max-width: 480px) {
+  .notif-page { padding: 24px 12px 56px; }
+  .notif-page-tabs-row { padding: 4px 14px 0; }
+  .notif-page-mark-all { margin-left: auto; }
+  .notif-page-row { padding: 14px; }
+  .notif-page-row-content { gap: 4px; }
+  /* Timestamp drops below the description instead of sitting beside it. */
+  .notif-page-row {
+    flex-wrap: wrap;
+  }
+  .notif-page-row-content { flex-basis: 100%; }
+  .notif-page-row-time {
+    margin-top: 0;
+    margin-left: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-page-tab, .notif-page-mark-all, .notif-page-row, .notif-page-pagination-btn, .notif-page-back {
+    transition: none !important;
+  }
+}

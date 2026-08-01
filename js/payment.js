@@ -963,12 +963,11 @@ async function loadPaymentPage() {
         state.cancellationInfo = state.reservationId ? await fetchCancellationInfo(state.reservationId) : null;
         renderReservationPaymentPage();
     } catch (error) {
-        console.error('Failed to load reservation payment page:', error);
         paymentApp.innerHTML = `
             <section class="payment-screen-card">
                 <p class="payment-screen-kicker">Unable to load payment page</p>
                 <h1 class="payment-screen-title">We couldn't load your reservation payment details</h1>
-                <p class="payment-screen-copy">${escapeHtml(error?.message || 'Unknown error')}</p>
+                <p class="payment-screen-copy">Something went wrong loading this page. Please try again in a moment.</p>
                 <div class="payment-screen-actions">
                     <a class="res-primary-btn" href="${escapeHtml(buildCustomerAccountUrl('reservations'))}">Back to My Reservations</a>
                 </div>

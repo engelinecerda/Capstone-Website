@@ -11,6 +11,14 @@
    why the four sections had zero gap between them. */
 .card + .card { margin-top: 20px; }
 
+/* Keeps the jumped-to section clear of the viewport edge when the sidebar's
+   Page content sub-links (admin_nav_data.js) land on #headers / #menu-images
+   / #elite-banner / #gallery / #services / #about / #values / #faqs — same
+   fix as super_admin_settings.css / admin_payment_options.css. */
+#headers, #menu-images, #elite-banner, #gallery, #services, #about, #values, #faqs {
+  scroll-margin-top: 24px;
+}
+
 .card-title-row {
   display: flex;
   align-items: flex-start;

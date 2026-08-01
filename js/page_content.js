@@ -1,8 +1,8 @@
 // page_content.js — shared customer-side loader for admin-configurable page
 // content (page_header, gallery_image, about_section, faq). Every function
-// fails silently (console.warn only) — a Page Content outage must never
-// break a customer-facing page; the page's existing hardcoded markup stays
-// on screen if a fetch fails or a row is missing.
+// fails silently — a Page Content outage must never break a customer-facing
+// page; the page's existing hardcoded markup stays on screen if a fetch
+// fails or a row is missing.
 
 export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}) {
   try {
@@ -20,7 +20,7 @@ export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subE
     if (headingEl && data.heading) headingEl.textContent = data.heading;
     if (subEl && data.subheading) subEl.textContent = data.subheading;
   } catch (err) {
-    console.warn('[page_content] loadPageHeader failed:', err?.message || err);
+    // Falls back to the static heading already in the HTML.
   }
 }
 
@@ -34,7 +34,6 @@ export async function loadGalleryImages(supabase) {
     if (error) return [];
     return data || [];
   } catch (err) {
-    console.warn('[page_content] loadGalleryImages failed:', err?.message || err);
     return [];
   }
 }
@@ -48,7 +47,6 @@ export async function loadAboutSections(supabase) {
     if (error) return [];
     return data || [];
   } catch (err) {
-    console.warn('[page_content] loadAboutSections failed:', err?.message || err);
     return [];
   }
 }
@@ -63,7 +61,6 @@ export async function loadFaqs(supabase) {
     if (error) return [];
     return data || [];
   } catch (err) {
-    console.warn('[page_content] loadFaqs failed:', err?.message || err);
     return [];
   }
 }
@@ -78,7 +75,6 @@ export async function loadMenuSections(supabase) {
     if (error) return [];
     return data || [];
   } catch (err) {
-    console.warn('[page_content] loadMenuSections failed:', err?.message || err);
     return [];
   }
 }
@@ -93,7 +89,6 @@ export async function loadAboutValues(supabase) {
     if (error) return [];
     return data || [];
   } catch (err) {
-    console.warn('[page_content] loadAboutValues failed:', err?.message || err);
     return [];
   }
 }
@@ -108,7 +103,6 @@ export async function loadMenuBanner(supabase) {
     if (error || !data) return null;
     return data;
   } catch (err) {
-    console.warn('[page_content] loadMenuBanner failed:', err?.message || err);
     return null;
   }
 }

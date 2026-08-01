@@ -11,11 +11,10 @@ function escapeHtml(str) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
-export function buildMaintenancePageHtml({ title, message, brandName, logoUrl }) {
+export function buildMaintenancePageHtml({ title, message, brandName }) {
   const safeTitle = escapeHtml(title || "We'll be right back");
   const safeMessage = escapeHtml(message || 'The site is briefly down for scheduled maintenance. Please check back soon.');
   const safeBrand = escapeHtml(brandName || 'ELI Coffee Events');
-  const safeLogo = escapeHtml(logoUrl || '/images/logo.png');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -31,7 +30,6 @@ export function buildMaintenancePageHtml({ title, message, brandName, logoUrl })
     padding: 24px; text-align: center; line-height: 1.6;
   }
   .card { max-width: 480px; }
-  .logo { width: 56px; height: 56px; object-fit: contain; margin: 0 auto 20px; display: block; }
   .brand { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B3820; margin: 0 0 18px; }
   h1 { font-size: 26px; font-weight: 600; margin: 0 0 12px; color: #1E0D04; }
   p.message { font-size: 15px; color: #5A3420; margin: 0 0 22px; }
@@ -41,7 +39,6 @@ export function buildMaintenancePageHtml({ title, message, brandName, logoUrl })
 </head>
 <body>
   <main class="card">
-    <img class="logo" src="${safeLogo}" alt="" />
     <p class="brand">${safeBrand}</p>
     <div class="icon" aria-hidden="true">
       <svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">

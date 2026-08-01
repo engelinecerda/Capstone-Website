@@ -1,535 +1,256 @@
 /* ============================================================
-   ELI Coffee Events — Admin Notifications Page
+   ELI Coffee Events — Manager Notifications (full history page)
+   Page-specific additions only — manager-theme.css (already linked
+   before this file) owns :root, sidebar, .main/.page-shell, .card,
+   .btn-primary, .admin-badge, status-pill styling. Layout mirrors the
+   customer full-page notifications view (dot + title + preview + time,
+   tab row, mark-all, pagination) but in the Manager espresso palette —
+   this file replaces the old first-version page's fully separate
+   :root/sidebar/nav system (Kumbh Sans, its own --active-bg, its own
+   .sidebar/.nav-item — none of that is used anymore).
    ============================================================ */
 
-:root {
-  --bg:          #f5efe7;
-  --panel-bg:    #ffffff;
-  --sidebar-bg:  #fffaf5;
-  --sidebar-w:   250px;
-  --active-bg:   #4e3624;
-  --active-text: #ffffff;
-  --nav-text:    #20150b;
-  --nav-hover:   #ffffff;
-  --badge-bg:    #2d1f14;
-  --badge-text:  #ffffff;
-  --border:      #eadfd2;
-  --line:        #eadfd2;
-  --text:        #20150b;
-  --muted:       #73685f;
-  --font:        'Kumbh Sans', sans-serif;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body { height: 100%; }
-
-body {
-  min-height: 100vh;
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--text);
+/* ── Breadcrumb (mirrors admin_reservation_details.css's exact pattern) ── */
+.breadcrumb {
   display: flex;
-  overflow-x: hidden;
-  font-size: 14px;
-}
-
-/* ── SIDEBAR ─────────────────────────────────────────────── */
-.sidebar {
-  width: var(--sidebar-w);
-  flex: 0 0 var(--sidebar-w);
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--border);
-  position: fixed;
-  inset: 0 auto 0 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  padding: 24px 18px 20px;
-}
-
-.sidebar-top {
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
-}
-
-.sidebar-header {
-  position: relative;
-}
-
-.sidebar-title {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text);
-}
-
-.sidebar-sub {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-top: 4px;
-}
-
-.sidebar-content {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-}
-
-.sidebar-profile {
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 24px;
-}
-
-.sidebar-profile-copy { min-width: 0; }
-
-.sidebar-name {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: var(--text);
-}
-
-.sidebar-email {
-  margin-top: 4px;
-  color: var(--muted);
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
-  line-height: 1.45;
-  word-break: break-word;
+  color: #8A7A6C;
+  margin-bottom: 12px;
 }
+.breadcrumb a { color: #8A7A6C; text-decoration: none; }
+.breadcrumb a:hover { color: #3D1A0A; text-decoration: underline; }
+.breadcrumb-sep { color: #C9B8A8; }
+.breadcrumb-current { color: #4A2C17; font-weight: 500; }
 
-.sidebar-role-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 24px;
-  margin-top: 8px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: #f6ece1;
-  border: 1px solid #d9c2aa;
-  color: #6b4f3a;
-  font-size: 11px;
-  font-weight: 700;
-}
+/* ── Card + tab row ── */
+.notif-page-card { padding: 0; overflow: hidden; }
 
-/* ── SIDEBAR NAV ─────────────────────────────────────────── */
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.sidebar-section-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 0 4px;
-  margin: 20px 0 4px;
-}
-
-.sidebar-nav .sidebar-section-label:first-child { margin-top: 8px; }
-.sidebar-bottom-nav .sidebar-section-label { margin-top: 0; }
-
-.nav-item {
+.notif-page-tabs-row {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 100%;
-  min-height: 48px;
-  padding: 13px 14px;
-  border-radius: 12px;
-  color: var(--nav-text);
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: background .15s, color .15s, border-color .15s;
-  border: 1px solid transparent;
-  background: transparent;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-
-.nav-item:hover {
-  background: var(--nav-hover);
-  border-color: var(--border);
-}
-
-.nav-item.active {
-  background: var(--active-bg);
-  color: var(--active-text);
-}
-
-.nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.nav-label {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.nav-badge {
-  margin-left: auto;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--badge-bg);
-  color: var(--badge-text);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.nav-badge[hidden] { display: none !important; }
-
-.nav-item.active .nav-badge {
-  background: rgba(255, 255, 255, .25);
-}
-
-.nav-item-button {
-  width: 100%;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-
-.sidebar-bottom-nav {
-  margin-top: auto;
-  border-top: 1px solid var(--border);
-  padding-top: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: stretch;
-}
-
-/* ── MAIN LAYOUT ─────────────────────────────────────────── */
-.main {
-  margin-left: var(--sidebar-w);
-  flex: 1;
-  padding: 36px 40px 48px;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-.page-shell {
-  display: block;
-  max-width: 760px;
-  min-width: 0;
-}
-
-.page-header {
-  margin-bottom: 28px;
-  display: flex;
   justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
   flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--border);
 }
 
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-sub {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 4px;
-  font-weight: 400;
-}
-
-.admin-badge {
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  padding: 3px 12px;
-  border-radius: 999px;
-}
-
-/* ── ACTIONS BAR ─────────────────────────────────────────── */
-.notif-page-actions {
+.notif-page-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.notif-filter-btn {
-  padding: 6px 16px;
-  border-radius: 20px;
+/* Filter chips — same pattern as the status chips on the Reservations list
+   (css/admin_reservations.css's .chip/.chip.active), redeclared here since
+   this page doesn't load that stylesheet. */
+.chip {
   border: 1px solid var(--border);
-  background: var(--panel-bg);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font);
-  transition: background .15s, color .15s, border-color .15s;
-}
-
-.notif-filter-btn:hover {
-  background: var(--bg);
+  background: #fff;
   color: var(--text);
+  border-radius: 999px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-
-.notif-filter-btn.active {
+.chip:hover { background: var(--bg); }
+.chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 44, 23, 0.14);
+}
+.chip.active {
   background: var(--active-bg);
-  color: var(--active-text);
+  color: #fff;
   border-color: var(--active-bg);
 }
 
-.notif-mark-all-page-btn {
-  padding: 6px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font);
-  transition: background .15s, color .15s;
-}
-
-.notif-mark-all-page-btn:hover {
-  background: var(--bg);
-  color: var(--text);
-}
-
-/* ── NOTIFICATION LIST ───────────────────────────────────── */
-.notif-page-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-/* ── SKELETON LOADING ────────────────────────────────────── */
-.notif-page-loading {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.notif-skeleton-item {
-  display: flex;
-  gap: 14px;
+.notif-page-count-pill {
+  display: inline-flex;
   align-items: center;
-  padding: 18px 20px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  font-weight: 600;
+}
+.chip:not(.active) .notif-page-count-pill {
+  background: var(--neutral);
+  color: var(--neutral-txt);
 }
 
-.notif-skeleton-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: #ede8e2;
-  flex-shrink: 0;
-  animation: skeletonPulse 1.5s ease-in-out infinite;
-}
-
-.notif-skeleton-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.notif-skeleton-line {
-  height: 13px;
+.notif-page-mark-all {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  color: var(--btn-primary-bg);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
   border-radius: 6px;
-  background: #ede8e2;
-  animation: skeletonPulse 1.5s ease-in-out infinite;
+  transition: background 0.15s ease;
+}
+.notif-page-mark-all:hover { background: var(--btn-secondary-hover); }
+.notif-page-mark-all:focus-visible {
+  outline: 2px solid var(--btn-primary-bg);
+  outline-offset: 1px;
 }
 
-.notif-skeleton-line.wide   { width: 65%; animation-delay: 0.08s; }
-.notif-skeleton-line.medium { width: 40%; animation-delay: 0.16s; }
+/* ── List ── */
+.notif-page-list { display: flex; flex-direction: column; }
 
-@keyframes skeletonPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
-}
-
-.notif-page-empty {
-  padding: 56px 24px;
+.notif-page-loading-text,
+.notif-page-error-text {
+  padding: 40px 20px;
   text-align: center;
   color: var(--muted);
-  font-size: 14px;
-  background: var(--panel-bg);
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  font-size: 13px;
 }
 
-.notif-page-empty svg { opacity: 0.35; }
-
-/* ── DATE GROUP HEADERS ──────────────────────────────────── */
-.notif-date-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.notif-date-group:last-child { margin-bottom: 0; }
-
-.notif-date-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 0 2px;
-  margin-bottom: 4px;
-}
-
-/* ── NOTIFICATION ITEM ───────────────────────────────────── */
-.notif-page-item {
+.notif-page-row {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 12px;
   padding: 16px 20px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-left: 3px solid transparent;
-  border-radius: 14px;
+  border-bottom: 0.5px solid var(--border);
+  background: var(--card-bg);
   cursor: pointer;
-  transition: background .15s, border-color .15s;
+  transition: background 0.12s ease;
+}
+.notif-page-row:last-child { border-bottom: none; }
+.notif-page-row:hover { background: var(--bg); }
+.notif-page-row:focus-visible {
+  outline: 2px solid var(--btn-primary-bg);
+  outline-offset: -2px;
 }
 
-.notif-page-item:hover { background: #fdf6ee; }
+/* Unread rows are marked three ways at once — dot, bold title, and this
+   background tint — never by color alone. */
+.notif-page-row.unread { background: #FBF6EF; }
+.notif-page-row.unread:hover { background: #F5EDE1; }
 
-.notif-page-item.unread {
-  background: #fdf6ee;
-  border-left-color: var(--active-bg);
-}
-
-.notif-page-item.unread:hover { background: #faeee0; }
-
-/* Type icon — overrides base .notif-type-icon for page context */
-.notif-page-item .notif-type-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+.notif-page-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--active-bg);
   flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 0;
+  margin-top: 6px;
 }
+.notif-page-dot.is-read { background: transparent; }
 
-.notif-page-item-body {
+.notif-page-row-content {
   flex: 1;
   min-width: 0;
-}
-
-/* Title + timestamp on same row */
-.notif-page-item-header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 5px;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.notif-page-item-title {
+/* Title is always the primary ink at weight 600 — read/unread state is
+   conveyed by the dot + row tint above, not by dimming the title. */
+.notif-page-row-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-  line-height: 1.35;
-  flex: 1;
-  min-width: 0;
 }
 
-.notif-page-item-time {
-  font-size: 12px;
-  color: #a09388;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.notif-page-item-text {
+.notif-page-row-desc {
   font-size: 13px;
   color: var(--muted);
   line-height: 1.5;
 }
 
-.notif-page-item-arrow {
-  font-size: 20px;
-  color: var(--muted);
-  align-self: center;
-  line-height: 1;
+.notif-page-row-time {
   flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted-2);
+  white-space: nowrap;
+  margin-top: 1px;
 }
 
-/* ── BELL BUTTON (injected by notifications.js) ──────────── */
-.notif-sidebar-btn-wrap {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.notif-bell-btn {
-  position: relative;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  color: var(--nav-text);
+/* ── Empty / loading state ── */
+.notif-page-empty {
+  padding: 56px 20px;
+  text-align: center;
+  color: var(--muted-2);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  border-radius: 6px;
-  transition: background .15s;
+  gap: 10px;
 }
+.notif-page-empty svg { opacity: 0.5; }
+.notif-page-empty p { margin: 0; font-size: 13.5px; color: var(--muted); }
 
-.notif-bell-btn:hover { background: var(--border); }
-
-.notif-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  background: #c0392b;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 10px;
+/* ── Pagination ── */
+.notif-page-pagination {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  font-family: var(--font);
-  line-height: 1;
-  pointer-events: none;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+.notif-page-pagination:empty { display: none; }
+
+.notif-page-pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.notif-page-pagination-btn:hover:not(:disabled) {
+  border-color: var(--active-bg);
+  background: var(--bg);
+}
+.notif-page-pagination-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 44, 23, 0.14);
+}
+.notif-page-pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.notif-page-pagination-btn.page-number { min-width: 36px; padding: 0; }
+.notif-page-pagination-btn.page-number.current {
+  background: var(--active-bg);
+  border-color: var(--active-bg);
+  color: #fff;
+  cursor: default;
 }
 
-/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+/* ── Responsive ── */
 @media (max-width: 768px) {
-  .notif-page-item { padding: 14px 16px; gap: 10px; }
-  .notif-page-item-title { font-size: 13.5px; }
+  .notif-page-row { padding: 14px 16px; }
+  .notif-page-row-title { font-size: 13.5px; }
+  .notif-page-row {
+    flex-wrap: wrap;
+  }
+  .notif-page-row-content { flex-basis: 100%; }
+  .notif-page-row-time { margin-top: 0; margin-left: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-page-row, .notif-page-mark-all, .notif-page-pagination-btn {
+    transition: none !important;
+  }
 }

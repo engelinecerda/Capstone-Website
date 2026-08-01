@@ -182,7 +182,6 @@ export async function syncCompletedReservations({ supabase, reservations, timeZo
             .in('reservation_id', candidateIds);
 
         if (error) {
-            console.warn('Unable to persist completed reservation statuses:', error.message || error);
             return items;
         }
 
@@ -193,7 +192,6 @@ export async function syncCompletedReservations({ supabase, reservations, timeZo
                 : reservation
         ));
     } catch (error) {
-        console.warn('Unable to persist completed reservation statuses:', error?.message || error);
         return items;
     }
 }

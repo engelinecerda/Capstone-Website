@@ -52,14 +52,10 @@
         </div>
       </div>
 
-      <div class="settings-note">
-        <p>Reminder notifications (payment due, balance due, event reminder) are Phase 2 — they need a scheduled job that doesn't exist yet, so they aren't configurable here.</p>
-      </div>
-
       <!-- ── TRIGGER LIST ── -->
       <div class="card">
         <p class="card-title">Triggers</p>
-        <p class="card-sub">Each fires from a real system event. This list can't be extended — the catalogue is fixed.</p>
+        <p class="card-sub">Most fire from a real system event; reminders fire on a daily schedule, a set number of days before their deadline. This list can't be extended — the catalogue is fixed.</p>
         <div id="triggerList" class="trigger-list">
           <p class="pc-loading">Loading…</p>
         </div>
@@ -114,6 +110,11 @@
         </button>
       </div>
       <div class="modal-body">
+        <div class="modal-field" id="editorLeadDaysField">
+          <label class="modal-label" for="editorLeadDaysInput">Send this many days before</label>
+          <input type="number" id="editorLeadDaysInput" class="modal-input" min="0" step="1" style="max-width:120px;">
+          <p class="modal-hint">Reminders fire once, on the day that's exactly this many days before the deadline — checked daily.</p>
+        </div>
         <div class="modal-field">
           <label class="modal-label">Channels</label>
           <div class="channel-checks">

@@ -413,12 +413,7 @@ body {
 .page-header .refresh-btn,
 .page-header .btn-primary,
 .page-header .header-btn,
-.page-header .header-btn-primary,
-.page-header-row .refresh-btn,
-.page-header-row .btn-primary,
-.page-header-row .header-btn,
-.page-header-row .header-btn-primary {
-  height: 30px;
+.page-header .header-btn-primary {
   flex-shrink: 0;
 }
 

@@ -6,12 +6,14 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
+import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let locations = [];
 let contact   = null;
 let editingLocationId = null;
 let pendingConfirmAction = null;
+let logoPendingFile = null;
 
 // ── DOM refs ─────────────────────────────────────────────────────
 const locationList = document.getElementById('locationList');
@@ -23,6 +25,21 @@ const fieldPhone     = document.getElementById('fieldPhone');
 const fieldEmail     = document.getElementById('fieldEmail');
 const fieldFacebook  = document.getElementById('fieldFacebook');
 const fieldInstagram = document.getElementById('fieldInstagram');
+
+const mapScopeMsg        = document.getElementById('mapScopeMsg');
+const mapScopeSwReadout  = document.getElementById('mapScopeSwReadout');
+const mapScopeNeReadout  = document.getElementById('mapScopeNeReadout');
+const saveMapScopeBtn    = document.getElementById('saveMapScopeBtn');
+const resetMapScopeBtn   = document.getElementById('resetMapScopeBtn');
+
+const brandMsg          = document.getElementById('brandMsg');
+const fieldBrandName    = document.getElementById('fieldBrandName');
+const logoUploader      = document.getElementById('logoUploader');
+const logoFileInput     = document.getElementById('logoFileInput');
+const logoImgPreview    = document.getElementById('logoImgPreview');
+const logoImgPlaceholder = document.getElementById('logoImgPlaceholder');
+const logoFileName      = document.getElementById('logoFileName');
+const saveBrandBtn      = document.getElementById('saveBrandBtn');
 
 const locationModal        = document.getElementById('locationModal');
 const locationModalTitle   = document.getElementById('locationModalTitle');
@@ -75,6 +92,13 @@ async function loadAll() {
     fieldEmail.value = contact.email || '';
     fieldFacebook.value = contact.facebook_url || '';
     fieldInstagram.value = contact.instagram_url || '';
+
+    fieldBrandName.value = contact.brand_name || '';
+    if (contact.logo_url) {
+      logoImgPreview.src = contact.logo_url;
+      logoImgPreview.classList.remove('hidden');
+      logoImgPlaceholder.style.display = 'none';
+    }
   }
 }
 
@@ -242,6 +266,187 @@ document.getElementById('confirmCancel').addEventListener('click', () => closeMo
 confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeModal(confirmModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// VENUE MAP SCOPE
+// Bounds an admin can drag rather than type — the old version of this UI
+// (removed, see js/super_admin_settings.js's header comment) used six raw
+// lat/lng number inputs with no live preview, so a typo could silently lock
+// customers out of picking an offsite venue at all. Two draggable corner
+// markers make an invalid box structurally impossible: whichever corner is
+// dragged, boundsFromCorners() below always normalizes to the true min/max,
+// and the map center is derived from the box rather than being its own
+// separately-editable (and separately-breakable) field.
+// ═══════════════════════════════════════════════════════════════════════════
+const RIZAL_MAP_DEFAULTS = {
+  center_lat: 14.5794, center_lng: 121.1878,
+  sw_lat: 14.26, sw_lng: 120.95,
+  ne_lat: 14.82, ne_lng: 121.62
+};
+const MIN_MAP_SPAN_DEG = 0.02; // ~2km — guards against the box being dragged to nothing
+
+let mapScopeMap = null;
+let cornerAMarker = null;
+let cornerBMarker = null;
+let scopeRectangle = null;
+
+function boundsFromCorners() {
+  const a = cornerAMarker.getLatLng();
+  const b = cornerBMarker.getLatLng();
+  return {
+    sw_lat: Math.min(a.lat, b.lat),
+    sw_lng: Math.min(a.lng, b.lng),
+    ne_lat: Math.max(a.lat, b.lat),
+    ne_lng: Math.max(a.lng, b.lng)
+  };
+}
+
+function refreshMapScopeDisplay() {
+  const b = boundsFromCorners();
+  scopeRectangle.setBounds([[b.sw_lat, b.sw_lng], [b.ne_lat, b.ne_lng]]);
+  mapScopeSwReadout.textContent = `${b.sw_lat.toFixed(4)}, ${b.sw_lng.toFixed(4)}`;
+  mapScopeNeReadout.textContent = `${b.ne_lat.toFixed(4)}, ${b.ne_lng.toFixed(4)}`;
+}
+
+function initMapScopeEditor(config) {
+  const center = [(config.sw_lat + config.ne_lat) / 2, (config.sw_lng + config.ne_lng) / 2];
+  mapScopeMap = L.map('mapScopeCanvas', { center, zoom: 10 });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(mapScopeMap);
+
+  scopeRectangle = L.rectangle(
+    [[config.sw_lat, config.sw_lng], [config.ne_lat, config.ne_lng]],
+    { color: '#A34F2E', weight: 2, fillOpacity: 0.08 }
+  ).addTo(mapScopeMap);
+
+  cornerAMarker = L.marker([config.sw_lat, config.sw_lng], { draggable: true, title: 'Drag to resize the allowed area' }).addTo(mapScopeMap);
+  cornerBMarker = L.marker([config.ne_lat, config.ne_lng], { draggable: true, title: 'Drag to resize the allowed area' }).addTo(mapScopeMap);
+
+  cornerAMarker.on('drag', refreshMapScopeDisplay);
+  cornerBMarker.on('drag', refreshMapScopeDisplay);
+
+  mapScopeMap.fitBounds(scopeRectangle.getBounds(), { padding: [24, 24] });
+  refreshMapScopeDisplay();
+}
+
+async function loadMapScope() {
+  let config = { ...RIZAL_MAP_DEFAULTS };
+  try {
+    const { data } = await supabase.from('system_settings').select('setting_value').eq('setting_key', 'venue_map_scope').maybeSingle();
+    if (data?.setting_value) config = { ...RIZAL_MAP_DEFAULTS, ...JSON.parse(data.setting_value) };
+  } catch {
+    // Malformed/missing row — Rizal defaults stand, matching reservations.html's own fallback.
+  }
+  initMapScopeEditor(config);
+}
+
+resetMapScopeBtn.addEventListener('click', () => {
+  cornerAMarker.setLatLng([RIZAL_MAP_DEFAULTS.sw_lat, RIZAL_MAP_DEFAULTS.sw_lng]);
+  cornerBMarker.setLatLng([RIZAL_MAP_DEFAULTS.ne_lat, RIZAL_MAP_DEFAULTS.ne_lng]);
+  refreshMapScopeDisplay();
+  mapScopeMap.fitBounds(scopeRectangle.getBounds(), { padding: [24, 24] });
+  setMsg(mapScopeMsg, 'Reset to Rizal province defaults — click Save Map Scope to apply.');
+});
+
+saveMapScopeBtn.addEventListener('click', async () => {
+  const b = boundsFromCorners();
+  if ((b.ne_lat - b.sw_lat) < MIN_MAP_SPAN_DEG || (b.ne_lng - b.sw_lng) < MIN_MAP_SPAN_DEG) {
+    setMsg(mapScopeMsg, 'That area is too small — drag the pins further apart (at least ~2km across).', 'error');
+    return;
+  }
+
+  const config = { ...b, center_lat: (b.sw_lat + b.ne_lat) / 2, center_lng: (b.sw_lng + b.ne_lng) / 2 };
+
+  setMsg(mapScopeMsg, 'Saving…');
+  saveMapScopeBtn.disabled = true;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('system_settings').upsert(
+      { setting_key: 'venue_map_scope', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
+    );
+    if (error) throw error;
+    await logAudit({ action: 'Updated Venue Map Scope', category: 'business_profile', details: JSON.stringify(config) });
+    setMsg(mapScopeMsg, 'Saved. Customers booking an offsite venue will see the updated map area.', 'success');
+  } catch (err) {
+    setMsg(mapScopeMsg, `Failed to save: ${err.message}`, 'error');
+  } finally {
+    saveMapScopeBtn.disabled = false;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BRAND
+// ═══════════════════════════════════════════════════════════════════════════
+logoUploader.addEventListener('click', () => logoFileInput.click());
+logoUploader.addEventListener('dragover', e => e.preventDefault());
+logoUploader.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files?.[0];
+  if (file) handleLogoFile(file);
+});
+logoFileInput.addEventListener('change', () => {
+  const file = logoFileInput.files?.[0];
+  if (file) handleLogoFile(file);
+});
+
+async function handleLogoFile(file) {
+  const err = validateImageFile(file);
+  if (err) { setMsg(brandMsg, err, 'error'); return; }
+  setMsg(brandMsg, '');
+  const resized = await resizeImageFile(file);
+  logoPendingFile = resized;
+  logoFileName.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    logoImgPreview.src = e.target.result;
+    logoImgPreview.classList.remove('hidden');
+    logoImgPlaceholder.style.display = 'none';
+  };
+  reader.readAsDataURL(resized);
+}
+
+saveBrandBtn.addEventListener('click', async () => {
+  const brandName = fieldBrandName.value.trim();
+  if (!brandName) { setMsg(brandMsg, 'Brand Name is required.', 'error'); return; }
+
+  setMsg(brandMsg, 'Saving…');
+  saveBrandBtn.disabled = true;
+  try {
+    // business_contact.logo_url is NOT NULL with a DB default — a reservation
+    // fallback keeps the save from ever attempting to write null into it.
+    let logoUrl = contact?.logo_url || '/images/logo.png';
+    if (logoPendingFile) {
+      logoUrl = await uploadToCloudinary(logoPendingFile, 'eli_coffee_business_profile');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const payload = {
+      id: true,
+      brand_name: brandName,
+      logo_url: logoUrl,
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id ?? null
+    };
+    const { error } = await supabase.from('business_contact').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+
+    if (logoPendingFile && contact?.logo_url) {
+      await destroyCloudinaryImage(supabase, contact.logo_url);
+    }
+
+    contact = { ...contact, ...payload };
+    logoPendingFile = null;
+    await logAudit({ action: 'Updated Brand', category: 'business_profile', details: 'Updated brand name/logo' });
+    setMsg(brandMsg, 'Saved successfully.', 'success');
+  } catch (err) {
+    setMsg(brandMsg, `Failed to save: ${err.message}`, 'error');
+  } finally {
+    saveBrandBtn.disabled = false;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // CONTACT & SOCIAL
 // ═══════════════════════════════════════════════════════════════════════════
 document.getElementById('saveContactBtn').addEventListener('click', async () => {
@@ -295,6 +500,7 @@ async function init() {
   initAdminSidebarBadges(supabase);
   initAdminNav({ role: result.profile.role });
   loadAll();
+  loadMapScope();
 }
 
 init();

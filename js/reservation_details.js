@@ -4,7 +4,8 @@ import {
     fetchPayments as fetchSharedPayments,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails,
-    isReservationPaymentEnabled
+    isReservationPaymentEnabled,
+    loadReservationRules
 } from './customer_payments.js';
 import {
     escapeHtml,
@@ -135,12 +136,13 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
-        fetchReview(reservationId)
+        fetchReview(reservationId),
+        loadReservationRules(supabase)
     ]);
 
     pageData = {
@@ -150,7 +152,8 @@ async function loadPageData() {
         rescheduleRequests: reschedulesByReservationId[reservationId] || [],
         paymentsByReservationId,
         cancellationInfo,
-        review
+        review,
+        reservationRules
     };
 }
 
@@ -503,11 +506,11 @@ function buildReviewRow(effectiveStatus, review) {
 }
 
 function render() {
-    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review } = pageData;
+    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules } = pageData;
     const effectiveStatus = getEffectiveReservationStatus(reservation);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
-    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate });
+    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const contractMeta = computeContractMeta(contract);
     const canReschedule = computeCanReschedule(reservation.status, rescheduleRequests);
     const canCancel = computeCanCancel(reservation.status, payments);
@@ -569,8 +572,7 @@ async function init() {
         await loadPageData();
         render();
     } catch (error) {
-        console.error('Failed to load reservation:', error);
-        pageContainer.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">${escapeHtml(error.message || 'Failed to load this reservation.')}</p>`;
+        pageContainer.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">We couldn't load this reservation. Please try again.</p>`;
     }
 }
 

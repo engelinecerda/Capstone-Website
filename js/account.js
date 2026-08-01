@@ -6,7 +6,9 @@ import {
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails as getSharedReservationBalanceDetails,
     isReservationPaymentEnabled as isSharedReservationPaymentEnabled,
-    loadPaymentRules
+    loadPaymentRules,
+    loadReservationRules,
+    RESERVATION_RULES_DEFAULTS
 } from './customer_payments.js';
 import {
     fetchAvailableStartTimes,
@@ -82,7 +84,6 @@ const PAYMENT_METHODS = {
 };
 
 const ONSITE_RESERVATION_FEE = 999;
-const PAYMENT_BALANCE_DUE_DAYS = 7;
 const RESERVATIONS_PAGE_SIZE = 5;
 
 const PAYMENT_STATUS_META = {
@@ -139,6 +140,7 @@ const submissionFeedbackCopy = document.getElementById('submission-feedback-copy
 const state = {
     reservations: [],
     paymentRules: null,
+    reservationRules: null,
     policyBodies: null,
     contractsByReservationId: {},
     paymentsByReservationId: {},
@@ -219,7 +221,7 @@ function getReviewFeatureErrorMessage(error, action = 'use') {
             : 'Supabase rejected this review submission. Apply the review migrations in `supabase/migrations/`, then make sure the reservation is completed or already past its event date/time in Manila time before submitting again.';
     }
 
-    return message || 'unknown error';
+    return 'Something went wrong. Please try again.';
 }
 
 function buildLocalDateKey(date) {
@@ -391,9 +393,17 @@ function getNormalPayments(reservationId) {
     return getReservationPayments(reservationId).filter((payment) => !payment.reschedule_request_id);
 }
 
+// Excludes cancellation_fee/reschedule_fee the same way public.
+// reservation_payment_summary does (see 20260725_payment_ledger.sql) — a
+// penalty fee isn't progress toward paying off the reservation total. An
+// approved cancellation_fee row carries no reschedule_request_id, so
+// without this it would inflate "amount paid" here.
+const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee']);
+
 function getApprovedBasePaymentsTotal(reservationId) {
     return getNormalPayments(reservationId)
         .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
+        .filter((payment) => !NON_BASE_PAYMENT_TYPES.has(payment.payment_type))
         .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
@@ -410,7 +420,8 @@ function getReservationBalanceDueDate(reservation) {
     const dueDate = new Date(`${eventDateKey}T00:00:00`);
     if (Number.isNaN(dueDate.getTime())) return null;
 
-    dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
+    const fullPaymentDays = Number(state.reservationRules?.full_payment_days ?? RESERVATION_RULES_DEFAULTS.full_payment_days);
+    dueDate.setDate(dueDate.getDate() - (Number.isFinite(fullPaymentDays) ? fullPaymentDays : RESERVATION_RULES_DEFAULTS.full_payment_days));
     return dueDate;
 }
 
@@ -1959,7 +1970,6 @@ async function fetchReviews(reservationIds) {
 
     if (error) {
         if (isMissingReviewsTableError(error)) {
-            console.warn('Reviews table is not available in Supabase yet:', error.message);
             return {};
         }
 
@@ -1981,6 +1991,9 @@ async function loadReservations() {
 
     if (!state.paymentRules) {
         state.paymentRules = await loadPaymentRules(supabase).catch(() => null);
+    }
+    if (!state.reservationRules) {
+        state.reservationRules = await loadReservationRules(supabase).catch(() => ({ ...RESERVATION_RULES_DEFAULTS }));
     }
     if (!state.policyBodies) {
         state.policyBodies = await loadPolicyBodies(supabase, ['cancellation_policy', 'reschedule_policy']).catch(() => ({}));
@@ -2018,7 +2031,6 @@ async function loadReservations() {
             .order('created_at', { ascending: false });
 
         if (reservationResponse.error && isMissingColumnError(reservationResponse.error, 'reservations', 'review_prompt_dismissed_at')) {
-            console.warn('review_prompt_dismissed_at is missing in Supabase; loading reservations without review prompt support.');
             reservationResponse = await supabase
                 .from('reservations')
                 .select(baseReservationSelect)
@@ -2057,7 +2069,6 @@ async function loadReservations() {
             openEligibleReviewPrompt();
         }
     } catch (error) {
-        console.error('Failed to load reservations:', error);
         if (reservationsList) {
             const reviewFeatureMessage = getReviewFeatureErrorMessage(error);
             reservationsList.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations: ${escapeHtml(reviewFeatureMessage)}.</p>`;
@@ -2874,7 +2885,6 @@ async function isEmailAlreadyUsed(requestedEmail) {
         .neq('user_id', user.id);
 
     if (error) {
-        console.warn('Profile email pre-check fallback:', error);
         return false;
     }
 
@@ -2965,7 +2975,6 @@ async function loadProfile() {
         if (dateInput) dateInput.textContent = formatDate(state.profile.date_registered);
         renderPendingEmailNotice(state.profile);
     } catch (error) {
-        console.error('Failed to load profile:', error);
         setFormMessage(profileMessage, 'Unable to load the latest profile details right now.', 'error');
     }
 }

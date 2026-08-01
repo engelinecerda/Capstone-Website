@@ -1,35 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Terms &amp; Conditions — ELI Coffee Events Cafe</title>
-  <meta name="description" content="Terms and conditions for booking events and reservations with ELI Coffee Events Cafe." />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - ELI Coffee Events Cafe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="/css/styles.css" />
-  <link rel="stylesheet" href="/css/home.css" />
-  <link rel="stylesheet" href="/css/terms.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/account.css">
+  <link rel="stylesheet" href="/css/notifications_page.css">
 </head>
 <body>
 
-  <!-- NAVBAR -->
   <nav class="navbar">
     <div class="navbar__container">
-      <a href="/index.html" id="navbar__logo">
-        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo" />
+      <a href="/index.html">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
       </a>
       <div class="navbar__toggle" id="mobile-menu">
-        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
       </div>
       <div class="navbar__topbar-right" id="navTopbarRight"></div>
       <ul class="navbar__menu">
         <li class="nav-drawer-header">
           <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
-          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu"><i class="ti ti-x"></i></button>
+          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">
+            <i class="ti ti-x"></i>
+          </button>
         </li>
         <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
         <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
@@ -44,23 +46,36 @@
   </nav>
   <div class="nav-overlay" id="nav-drawer-overlay"></div>
 
-  <!-- TERMS & CONDITIONS -->
-  <section class="terms-page">
-    <div class="terms-page-inner">
+  <section class="notif-page">
+    <div class="notif-page-inner">
 
-      <button type="button" class="terms-back-btn" id="termsBackBtn">
-        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Go Back
-      </button>
+      <a href="/account.html" class="notif-page-back">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Account
+      </a>
 
-      <div class="terms-card">
-        <div class="terms-head">
-          <h1 class="terms-title">Terms &amp; Conditions</h1>
-          <p class="terms-updated" id="termsUpdated"></p>
+      <div class="notif-page-header">
+        <h1 class="notif-page-title">Notifications</h1>
+        <p class="notif-page-subtitle">Updates about your reservations, payments, and contracts.</p>
+      </div>
+
+      <div class="notif-page-card">
+        <div class="notif-page-tabs-row">
+          <div class="notif-page-tabs" role="tablist" aria-label="Notification views">
+            <button type="button" class="notif-page-tab active" data-filter="all" role="tab" aria-selected="true">
+              All
+            </button>
+            <button type="button" class="notif-page-tab" data-filter="unread" role="tab" aria-selected="false">
+              Unread <span id="notifPageUnreadCount">0</span>
+            </button>
+          </div>
+          <button type="button" class="notif-page-mark-all" id="notifPageMarkAll">Mark all as read</button>
         </div>
 
-        <div id="termsBody">
-          <p class="terms-status">Loading…</p>
+        <div class="notif-page-list" id="notifPageList">
+          <p class="notif-page-loading-text">Loading notifications&hellip;</p>
         </div>
+
+        <div class="notif-page-pagination" id="notifPagePagination"></div>
       </div>
 
     </div>
@@ -115,7 +130,7 @@
   <script src="/js/app.js"></script>
   <script type="module" src="/js/navbar.js"></script>
   <script type="module" src="/js/footer_content.js"></script>
-  <script type="module" src="/js/terms_content.js"></script>
+  <script type="module" src="/js/customer_notifications_page.js"></script>
 
 </body>
 </html>

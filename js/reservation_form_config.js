@@ -56,6 +56,22 @@ export async function loadTermsDocument(supabase) {
   return { body: parsed.body || '', updatedAt: data.updated_at };
 }
 
+// Canonical loader for the standalone /privacy-policy.html page. Same
+// "null when unconfigured, throw on real failure" contract as
+// loadTermsDocument above — see that function's comment for why.
+export async function loadPrivacyPolicyDocument(supabase) {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('setting_value, updated_at')
+    .eq('setting_key', 'data_privacy_policy')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const parsed = JSON.parse(data.setting_value);
+  return { body: parsed.body || '', updatedAt: data.updated_at };
+}
+
 export async function loadReservationFormConfig(supabase) {
   const result = { fieldRules: { ...DEFAULT_FIELD_RULES }, policyOverrides: {} };
 

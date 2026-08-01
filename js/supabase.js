@@ -38,7 +38,6 @@ function readSupabaseOverride() {
 
         return { url, key, label }
     } catch (error) {
-        console.warn('Ignoring invalid Supabase override in localStorage:', error)
         return null
     }
 }
@@ -46,14 +45,6 @@ function readSupabaseOverride() {
 const supabaseOverride = readSupabaseOverride()
 const supabaseUrl = supabaseOverride?.url || DEFAULT_SUPABASE_URL
 const supabaseKey = supabaseOverride?.key || DEFAULT_SUPABASE_KEY
-
-if (typeof window !== 'undefined') {
-    const targetLabel = supabaseOverride?.label || 'hosted'
-    if (!isLocalDevelopmentHost() && window.localStorage?.getItem(SUPABASE_OVERRIDE_KEY)) {
-        console.info('Ignoring Supabase override because this page is not running on localhost.')
-    }
-    console.info(`Supabase client target: ${targetLabel} (${supabaseUrl})`)
-}
 
 function makeClient(storageKey) {
     return createClient(supabaseUrl, supabaseKey, {

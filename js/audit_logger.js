@@ -39,7 +39,11 @@ export async function logAudit({ action, category, details, entityId }) {
       }
     }
 
-    const { error } = await supabase.from('audit_log').insert({
+    // Fire-and-forget: if this insert fails, the caller's own action
+    // already succeeded or failed on its own terms and reports that
+    // itself — the user shouldn't be interrupted over an audit-trail
+    // write failing.
+    await supabase.from('audit_log').insert({
       user_id:   userId,
       user_name: userName,
       user_role: userRole,
@@ -48,9 +52,7 @@ export async function logAudit({ action, category, details, entityId }) {
       details:   details || null,
       entity_id: entityId || null,
     });
-
-    if (error) console.error('Failed to log audit:', error);
   } catch (err) {
-    console.error('Audit log error:', err);
+    // same reasoning — swallow, don't interrupt the caller's own flow.
   }
 }

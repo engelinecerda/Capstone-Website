@@ -64,17 +64,23 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 }
 
 /**
- * Converts a Cloudinary PDF URL to a JPEG URL by injecting the pg_1
+ * Converts a Cloudinary PDF URL to a JPEG URL by injecting a pg_N page
  * transformation. GCP Vision cannot read PDFs directly.
- * Example:
+ * Example (page = 3):
  *   .../upload/v123/contracts/signed.pdf
- *   → .../upload/pg_1/v123/contracts/signed.jpg
+ *   → .../upload/pg_3/v123/contracts/signed.jpg
+ *
+ * `page` should be the contract's last page — buildContractPdf() in
+ * generate-signed-contract always draws the signature section last, so the
+ * signature is never on page 1 of a multi-page contract. Defaults to 1 for
+ * contracts uploaded before page_count started being tracked.
  */
-function toImageUrl(contractUrl: string): string {
+function toImageUrl(contractUrl: string, page = 1): string {
   if (!contractUrl) return contractUrl;
+  const safePage = Number.isInteger(page) && page > 0 ? page : 1;
   if (contractUrl.toLowerCase().includes('.pdf')) {
     return contractUrl
-      .replace('/upload/', '/upload/pg_1/')
+      .replace('/upload/', `/upload/pg_${safePage}/`)
       .replace(/\.pdf$/i, '.jpg');
   }
   return contractUrl;
@@ -124,6 +130,15 @@ async function detectSignature(
 
   const data = await res.json();
   const result = data?.responses?.[0] ?? {};
+
+  // Vision returns per-image errors inside responses[0].error rather than
+  // failing the HTTP call — e.g. when imageUri didn't resolve to a real
+  // image (a broken Cloudinary transform, a 404, an unreadable format).
+  // Left unchecked, this silently reads as empty annotations → "not signed"
+  // instead of the actual scan failure it is.
+  if (result.error) {
+    throw new Error(`GCP Vision could not read the image: ${result.error.message || JSON.stringify(result.error)}`);
+  }
 
   // --- Label detection ---
   const detectedLabels: string[] = (result.labelAnnotations ?? []).map(
@@ -185,11 +200,13 @@ Deno.serve(async (req: Request) => {
 
   let reservation_id: string | undefined;
   let contract_url: string | undefined;
+  let page_count: number | undefined;
 
   try {
     const body = await req.json();
     reservation_id = body.reservation_id;
     contract_url = body.contract_url;
+    page_count = typeof body.page_count === 'number' ? body.page_count : undefined;
   } catch {
     return jsonResponse({ verified: false, error: 'Invalid JSON body.' }, 400);
   }
@@ -206,7 +223,7 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const imageUrl = toImageUrl(contract_url);
+    const imageUrl = toImageUrl(contract_url, page_count ?? 1);
     const { signed, confidence, detectedLabels } = await detectSignature(imageUrl, supabase);
 
     console.log('verify-contract detection result', { reservation_id, signed, confidence, detectedLabels });

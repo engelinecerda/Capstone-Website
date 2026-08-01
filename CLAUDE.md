@@ -38,6 +38,11 @@ Functions live in `supabase/functions/<name>/index.ts` and run on Deno:
 - `ocr-payment` — Google Cloud Vision text extraction from payment receipts
 - `send-notification-email` — Resend email dispatch triggered by `notifications` table inserts
 - `delete-payment-method` — admin-only hard delete of an unreferenced `payment_method` row; also destroys its Cloudinary QR asset (signed request — the admin UI's unsigned upload preset cannot delete)
+- `generate-signed-contract` — renders and uploads the signed reservation contract PDF to Cloudinary, merging `{{token}}` template text (see the merge-token sync note in `js/merge_tokens.js`)
+- `create-staff-account` — admin-only `auth.admin.createUser()` for a new `manager`/`staff` portal account (role allow-list enforced server-side)
+- `delete-staff-account` — admin-only `auth.admin.deleteUser()` hard delete of a staff/manager account
+- `delete-cloudinary-image` — signed Cloudinary `image/destroy` call for any admin-managed image (page content, business profile logo, etc.) whose upload preset is unsigned-only
+- `reset-board-password` — admin-only password reset restricted to the shared kiosk `is_board_account` profile
 
 Required secrets: `GCP_VISION_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
 

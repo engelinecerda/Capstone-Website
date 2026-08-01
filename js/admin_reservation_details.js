@@ -1011,7 +1011,7 @@ async function openRecordPaymentModal() {
   try {
     recordPaymentMethods = await fetchCafeIssuedPaymentMethods(supabase);
     renderRecordPaymentMethodOptions();
-    setRecordPaymentMessage(recordPaymentMethods.length ? '' : 'No active café payment methods are configured — add one in Payment Options first.', !recordPaymentMethods.length);
+    setRecordPaymentMessage(recordPaymentMethods.length ? '' : 'No active café payment methods are configured — add one in Payment Settings first.', !recordPaymentMethods.length);
   } catch (error) {
     setRecordPaymentMessage(`Failed to load payment methods: ${error.message}`, true);
   }

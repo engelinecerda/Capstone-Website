@@ -558,7 +558,8 @@ const DEFAULT_PAYMENT_RULES = {
   currency: 'PHP',
   cancellation_fee_onsite: 500,
   cancellation_fee_offsite: 2000,
-  reschedule_fee: 3000
+  reschedule_fee: 3000,
+  service_charge_percent: 10
 };
 
 function populatePaymentRulesFields(config) {
@@ -652,6 +653,176 @@ async function savePaymentRules() {
   );
 }
 
+// ── Service charge ───────────────────────────────────────────────────────────
+// Global default lives in the same system_settings.payment_rules blob as
+// reschedule_fee/cancellation_fee (see DEFAULT_PAYMENT_RULES above) — this
+// section has its own mini load/save so editing it doesn't require touching
+// the rest of the Payment Rules form. Per-category override is a real
+// column on package_category (service_charge_percent, null = inherit).
+//
+// Resolution used everywhere this actually applies (reservations.html):
+// offsite bookings are 0% (pending confirmation — see the note in the UI),
+// regardless of category, since a category can hold both onsite and offsite
+// packages; otherwise coalesce(category override, this global default).
+let scCategories = [];
+
+function setScMsg(elId, msg, isError = false) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+async function loadServiceChargeSection() {
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+
+  let globalPct = DEFAULT_PAYMENT_RULES.service_charge_percent;
+  if (data?.setting_value) {
+    try {
+      const parsed = JSON.parse(data.setting_value);
+      if (Number.isFinite(Number(parsed.service_charge_percent))) globalPct = Number(parsed.service_charge_percent);
+    } catch { /* keep default */ }
+  }
+
+  const globalInput = document.getElementById('sc-global-percent');
+  if (globalInput) globalInput.value = globalPct;
+
+  const { data: categories, error } = await supabase
+    .from('package_category')
+    .select('package_category_id, category_name, is_active, service_charge_percent')
+    .order('sort_order', { ascending: true });
+
+  const body = document.getElementById('sc-category-body');
+  if (error || !categories) {
+    if (body) body.innerHTML = '<tr><td colspan="4">Failed to load categories.</td></tr>';
+  } else {
+    scCategories = categories;
+    renderCategoryOverrideTable(globalPct);
+  }
+
+  updateWorkedExample(globalPct);
+}
+
+function renderCategoryOverrideTable(globalPct) {
+  const body = document.getElementById('sc-category-body');
+  if (!body) return;
+
+  if (!scCategories.length) {
+    body.innerHTML = '<tr><td colspan="4">No categories yet.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = scCategories.map((cat) => {
+    const hasOverride = cat.service_charge_percent !== null && cat.service_charge_percent !== undefined;
+    const effective = hasOverride ? Number(cat.service_charge_percent) : globalPct;
+    return `
+      <tr data-category-id="${cat.package_category_id}">
+        <td>${escapeHtmlSc(cat.category_name || 'Untitled')}${cat.is_active === false ? ' <span class="field-note" style="margin:0;">(inactive)</span>' : ''}</td>
+        <td>${effective}%</td>
+        <td>
+          <input type="number" class="pr-input-inline sc-override-input" min="0" max="100" step="0.5"
+                 placeholder="Inherits default (${globalPct}%)"
+                 value="${hasOverride ? effective : ''}">
+        </td>
+        <td><button type="button" class="action-btn view sc-save-category-btn">Save</button></td>
+      </tr>`;
+  }).join('');
+}
+
+function escapeHtmlSc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+function updateWorkedExample(globalPctOverride) {
+  const globalInput = document.getElementById('sc-global-percent');
+  const pct = Number.isFinite(globalPctOverride) ? globalPctOverride : Number(globalInput?.value);
+  const exampleEl = document.getElementById('sc-example-text');
+  if (!exampleEl || !Number.isFinite(pct)) return;
+
+  const base = 28000;
+  const charge = Math.round(base * pct) / 100;
+  const total = base + charge;
+  const deposit = Math.round(total * 0.5);
+
+  exampleEl.textContent =
+    `On a ₱${base.toLocaleString()} package, a ${pct}% service charge adds ₱${charge.toLocaleString()} ` +
+    `for a ₱${total.toLocaleString()} total; a 50% deposit is ₱${deposit.toLocaleString()}.`;
+}
+
+async function saveGlobalServiceCharge() {
+  const input = document.getElementById('sc-global-percent');
+  const pct = Number(input?.value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+    setScMsg('sc-global-msg', 'Service charge must be between 0 and 100.', true);
+    return;
+  }
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+
+  let config = { ...DEFAULT_PAYMENT_RULES };
+  if (current?.setting_value) {
+    try { config = { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) }; } catch { /* use default */ }
+  }
+  config.service_charge_percent = pct;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      { setting_key: 'payment_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
+    );
+
+  if (error) { setScMsg('sc-global-msg', 'Failed to save: ' + error.message, true); return; }
+
+  await logAudit({ action: 'Updated Service Charge Default', category: 'payment_config', details: `Global default set to ${pct}%` });
+  setScMsg('sc-global-msg', 'Saved.');
+  renderCategoryOverrideTable(pct);
+  updateWorkedExample(pct);
+}
+
+async function saveCategoryOverride(row) {
+  const categoryId = row.dataset.categoryId;
+  const input = row.querySelector('.sc-override-input');
+  const raw = input?.value?.trim();
+  const category = scCategories.find((c) => c.package_category_id === categoryId);
+
+  // Empty input = clear the override (inherit the default again).
+  let value = null;
+  if (raw !== '') {
+    value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      setScMsg('sc-category-msg', 'Category override must be between 0 and 100, or left blank to inherit.', true);
+      return;
+    }
+  }
+
+  const { error } = await supabase
+    .from('package_category')
+    .update({ service_charge_percent: value })
+    .eq('package_category_id', categoryId);
+
+  if (error) { setScMsg('sc-category-msg', 'Failed to save: ' + error.message, true); return; }
+
+  if (category) category.service_charge_percent = value;
+  await logAudit({
+    action: 'Updated Category Service Charge Override',
+    category: 'payment_config',
+    details: `${category?.category_name || categoryId}: ${value === null ? 'inherit default' : value + '%'}`
+  });
+  setScMsg('sc-category-msg', 'Saved.');
+  const globalInput = document.getElementById('sc-global-percent');
+  renderCategoryOverrideTable(Number(globalInput?.value) || DEFAULT_PAYMENT_RULES.service_charge_percent);
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
   const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
@@ -678,6 +849,7 @@ async function init() {
   await loadPaymentMethods();
   await loadPaymentTypes();
   await loadPaymentRules();
+  await loadServiceChargeSection();
 
   document.querySelectorAll('.pt-save-btn').forEach((btn) => {
     btn.addEventListener('click', () => ptSaveType(btn.dataset.code));
@@ -705,6 +877,14 @@ async function init() {
   document.getElementById('pm2ConfirmOk')?.addEventListener('click', pm2ConfirmAction);
 
   document.getElementById('pr-save-btn')?.addEventListener('click', savePaymentRules);
+
+  document.getElementById('sc-save-global-btn')?.addEventListener('click', saveGlobalServiceCharge);
+  document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());
+  document.getElementById('sc-category-body')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.sc-save-category-btn');
+    if (!btn) return;
+    saveCategoryOverride(btn.closest('tr'));
+  });
 }
 
 init();

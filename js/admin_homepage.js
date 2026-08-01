@@ -554,7 +554,6 @@ async function loadPaymentsTodayStat() {
         if (error) throw error;
         paymentsTodayEl.textContent = String(count || 0);
     } catch (error) {
-        console.error('Failed to load payments-today stat:', error);
         paymentsTodayEl.textContent = '—';
     }
 }
@@ -583,15 +582,14 @@ async function loadDashboard() {
             const contractsByReservationId = await fetchContracts(reservationIds);
             renderReservationsTable(reservations, contractsByReservationId);
         } catch (error) {
-            console.error('Failed to load reservations/contracts:', error);
             hasError = true;
-            setDashboardMessage(`Failed to load reservations: ${error?.message || 'unknown error'}.`, true);
+            setDashboardMessage('Failed to load reservations. Please try again.', true);
         }
     })();
 
     const packagePromise = loadPackages()
         .then((data) => renderPackageChart(data))
-        .catch((error) => { console.error('Failed to load package chart:', error); return renderPackageChart([]); });
+        .catch(() => renderPackageChart([]));
 
     const forecastPromise = loadForecast()
         .then(async (data) => {
@@ -611,7 +609,7 @@ async function loadDashboard() {
             const selectedYear = demandYearSelect?.value;
             if (selectedYear) renderDemandChart(selectedYear);
         })
-        .catch((error) => { console.error('Failed to load forecast:', error); });
+        .catch(() => {});
 
     await Promise.allSettled([fastPath, packagePromise, forecastPromise]);
 

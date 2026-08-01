@@ -53,7 +53,7 @@
       </div>
 
       <div class="settings-note">
-        <p>Scheduled maintenance windows are not yet available — this is a manual switch only. Turning this on takes effect immediately and stays on until turned off here.</p>
+        <p>The switch below takes effect immediately. A scheduled window (optional, below) is checked every few minutes, so the exact on/off moment can land a few minutes after the time you set.</p>
       </div>
 
       <!-- ── STATE CARD ── -->
@@ -62,8 +62,31 @@
           <div class="mm-state-copy">
             <p class="mm-state-label" id="mmStateLabel">Loading…</p>
             <p class="mm-state-detail" id="mmStateDetail"></p>
+            <p class="mm-state-detail" id="mmScheduleDetail"></p>
           </div>
           <button type="button" class="btn-primary" id="mmToggleBtn" disabled>Loading…</button>
+        </div>
+      </div>
+
+      <!-- ── SCHEDULE CARD ── -->
+      <div class="card">
+        <p class="card-title">Schedule a Maintenance Window</p>
+        <p class="card-sub">Optional — automatically turns maintenance mode on and off at the times below, in addition to the manual switch above. Leave either field blank to skip that half of the schedule.</p>
+
+        <div class="mm-schedule-grid">
+          <div class="modal-field">
+            <label class="modal-label" for="mmScheduledStartInput">Turn on at</label>
+            <input type="datetime-local" id="mmScheduledStartInput" class="modal-input">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="mmScheduledEndInput">Turn off at</label>
+            <input type="datetime-local" id="mmScheduledEndInput" class="modal-input">
+          </div>
+        </div>
+        <p class="modal-message hidden" id="mmScheduleMessage"></p>
+        <div class="mm-schedule-actions">
+          <button type="button" class="btn-primary" id="mmSaveScheduleBtn">Save Schedule</button>
+          <button type="button" class="btn-cancel" id="mmClearScheduleBtn">Clear Schedule</button>
         </div>
       </div>
 

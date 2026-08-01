@@ -29,6 +29,10 @@
 .mm-btn-on { background: var(--declined-txt); }
 .mm-btn-on:hover { opacity: 0.9; }
 
+/* ── SCHEDULE CARD ── */
+.mm-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+.mm-schedule-actions { display: flex; gap: 10px; }
+
 /* ── MESSAGE EDITOR ── */
 .mm-editor-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;
@@ -98,6 +102,7 @@
 
 @media (max-width: 800px) {
   .mm-editor-grid { grid-template-columns: 1fr; }
+  .mm-schedule-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

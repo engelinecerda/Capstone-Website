@@ -441,6 +441,7 @@
                     <li><a href="/faqs.html">FAQs</a></li>
                     <li><a href="/about.html">About</a></li>
                     <li><a href="/terms-and-conditions.html">Terms &amp; Conditions</a></li>
+                    <li><a href="/privacy-policy.html">Data Privacy Policy</a></li>
                 </ul>
             </div>
             <div>
@@ -487,6 +488,17 @@
         document.getElementById('resGuestNotice').classList.remove('hidden');
     }
 
+    // Fetched and awaited here, before anything else runs, so it's always
+    // resolved by the time showStep(cur) below can reach the offsite venue
+    // picker — a restored draft that already has offsite selected calls
+    // buildAddonOrVenueStep() (and schedules initVenueMap() 150ms later)
+    // immediately on this very first showStep(), which previously beat a
+    // fetch that didn't even start until several statements after it.
+    try {
+        const { data: mapSetting } = await supabase.from('system_settings').select('setting_value').eq('setting_key', 'venue_map_scope').maybeSingle();
+        if (mapSetting?.setting_value) window.venueMapConfig = JSON.parse(mapSetting.setting_value);
+    } catch { /* non-critical — initVenueMap()'s own fallback defaults stand */ }
+
     // ── State ──────────────────────────────────────────────────────────────
     const S = {
         locationType: '',
@@ -525,6 +537,23 @@
     let OFFSITE_BY_CAT  = {};
     let ONSITE_CATEGORIES  = []; // [{ id, name, count }]
     let OFFSITE_CATEGORIES = []; // [{ id, name, count }]
+
+    // ── Service charge (populated by loadServiceChargeSettings + loadPackages) ──
+    // Resolution: offsite bookings are 0% (pending manager confirmation —
+    // see admin Payment Settings note), else coalesce(category override,
+    // global default). Categories don't map to location (onsite/offsite/
+    // both packages share categories), so location is checked first, not
+    // derived from category structure. See resolveServiceCharge() below.
+    let GLOBAL_SERVICE_CHARGE_PCT = 10;
+    let CATEGORY_SERVICE_CHARGE_PCT = {}; // categoryId -> percent or null (null = inherit)
+
+    function resolveServiceCharge(basePrice, locationType, categoryId) {
+        const pct = locationType === 'offsite'
+            ? 0
+            : (CATEGORY_SERVICE_CHARGE_PCT[categoryId] ?? GLOBAL_SERVICE_CHARGE_PCT);
+        const amount = Math.round(basePrice * pct) / 100;
+        return { pct, amount, total: basePrice + amount };
+    }
 
     // Category name → icon (mirrors js/packages.js's getCategoryIcon so the
     // category chip here matches the public Packages page visually).
@@ -699,6 +728,23 @@
             if (Number.isFinite(Number(parsed.max_advance_days))) availabilityState.maxAdvanceDays = Number(parsed.max_advance_days);
         } catch {
             // Keep defaults — the calendar still works, just with the fallback window.
+        }
+    }
+
+    async function loadServiceChargeSettings() {
+        try {
+            const { data, error } = await supabase
+                .from('system_settings')
+                .select('setting_value')
+                .eq('setting_key', 'payment_rules')
+                .maybeSingle();
+            if (error || !data) return;
+            const parsed = JSON.parse(data.setting_value);
+            if (Number.isFinite(Number(parsed.service_charge_percent))) {
+                GLOBAL_SERVICE_CHARGE_PCT = Number(parsed.service_charge_percent);
+            }
+        } catch {
+            // Keep the 10% fallback.
         }
     }
 
@@ -1119,7 +1165,7 @@ By signing below, the Client confirms that the reservation details above are acc
         return S.offsitePackage?.label || null;
     }
 
-    function computeContractPreviewTotal() {
+    function computeContractPreviewBase() {
         if (S.locationType === 'onsite') {
             return (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
         }
@@ -1129,12 +1175,20 @@ By signing below, the Client confirms that the reservation details above are acc
         return S.offsitePackage ? S.offsitePackage.price : 0;
     }
 
+    // Same order of operations as buildSummary()/the submit handler: the
+    // service charge is added to the base to reach the total the customer
+    // actually signs for — never the pre-charge figure.
+    function computeContractPreviewCharge() {
+        return resolveServiceCharge(computeContractPreviewBase(), S.locationType, S.categoryId);
+    }
+
     function mergeTemplateTokens(template, data) {
         return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key) => (data[key] ?? ''));
     }
 
     function renderContractBody(templateBody) {
         if (!contractViewer) return '';
+        const charge = computeContractPreviewCharge();
         const data = {
             customer_name: S.name || 'Customer',
             package_name: getSelectedContractPackageLabel() || 'Selected Package',
@@ -1143,7 +1197,9 @@ By signing below, the Client confirms that the reservation details above are acc
             event_time: S.time || 'TBD',
             venue: S.locationType === 'offsite' ? (S.venueLocation || 'Customer-provided venue') : 'ELI Coffee Events Cafe Binangonan (Onsite)',
             reservation_number: 'Assigned upon submission',
-            total_price: fmtPeso(computeContractPreviewTotal()),
+            total_price: fmtPeso(charge.total),
+            service_charge_percent: String(charge.pct),
+            service_charge_amount: fmtPeso(charge.amount),
             guest_count: S.guestCount || ''
         };
         const merged = mergeTemplateTokens(templateBody, data);
@@ -1199,6 +1255,18 @@ By signing below, the Client confirms that the reservation details above are acc
 
     async function buildContractStep() {
         if (!contractViewer) return;
+
+        // "Draw" is the default active mode in the static HTML (no click
+        // ever fires setSignatureMode('draw') on first arrival at this
+        // step), so the SignaturePad instance was never actually created —
+        // the canvas looked ready but had no pointer/touch capture wired up
+        // at all, silently swallowing every stroke until the customer
+        // switched to "Type instead" and back, which does call
+        // setSignatureMode('draw'). initSignaturePad() is idempotent (bails
+        // if a pad already exists), so this is safe to call on every visit
+        // to this step without resetting an in-progress typed signature.
+        initSignaturePad();
+
         const pkgId = getSelectedContractPackageId();
 
         signatureState.agreementText = '';
@@ -1626,7 +1694,6 @@ By signing below, the Client confirms that the reservation details above are acc
                 setAvailabilityMessage(`Selected ${formatDisplayDate(S.eventDate)}.`, false);
             }
         } catch (err) {
-            console.error('Availability calendar failed:', err);
             availabilityState.calendarAvailability = new Map();
             availabilityState.closedDates = new Set();
             availabilityState.closedDateReasons = new Map();
@@ -1649,7 +1716,6 @@ By signing below, the Client confirms that the reservation details above are acc
             setAvailabilityMessage(availability.scopeTaken ? 'This date is fully booked.' : `Selected ${formatDisplayDate(S.eventDate)}.`, availability.scopeTaken);
             return availability;
         } catch (err) {
-            console.error('Selected date availability failed:', err);
             availabilityState.selectedDateAvailability = null;
             setAvailabilityMessage('Could not refresh the selected date availability right now.', true);
             return null;
@@ -1659,7 +1725,10 @@ By signing below, the Client confirms that the reservation details above are acc
     // ── Load event types ───────────────────────────────────────────────────
     async function loadEventTypes() {
         const { data, error } = await supabase.from('event_types').select('*').order('name', { ascending: true });
-        if (error || !data) { console.error('event_types fetch error:', error); return; }
+        if (error || !data) {
+            setAvailabilityMessage('Some booking options could not be loaded. Please refresh the page and try again.', true);
+            return;
+        }
 
         eventTypesCache = data
             .filter(et => !(et.status && et.status !== 'Active') && et.is_active !== false)
@@ -1728,13 +1797,12 @@ By signing below, the Client confirms that the reservation details above are acc
         packagesLoadState = 'loading';
         const { data: pkgs, error } = await supabase
             .from('package')
-            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, package_category(category_name, is_active, sort_order)')
+            .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, package_category(category_name, is_active, sort_order, service_charge_percent)')
             .eq('is_active', true)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false });
 
         if (error || !pkgs) {
-            console.error('Failed to load packages:', error);
             packagesLoadState = 'error';
             MINI = []; SNACK = []; OFFSITE_ALL = [];
             MINI_BY_CAT = {}; OFFSITE_BY_CAT = {};
@@ -1816,6 +1884,7 @@ By signing below, the Client confirms that the reservation details above are acc
             if (!categoryId) return;
             const categoryName = p.package_category?.category_name || '';
             const categorySortOrder = p.package_category?.sort_order ?? 0;
+            CATEGORY_SERVICE_CHARGE_PCT[categoryId] = p.package_category?.service_charge_percent ?? null;
 
             const cover = coverPhotoMap.get(p.package_id);
             const base = {
@@ -2459,7 +2528,15 @@ By signing below, the Client confirms that the reservation details above are acc
             if (S.offsitePackage.price > 0) pkgRows += sr('Price', '&#8369;' + S.offsitePackage.price.toLocaleString());
         }
 
-        const totalStr = total > 0 ? '&#8369;' + total.toLocaleString() : 'Contact for quote';
+        // Itemised, never folded into the package price — customer sees
+        // Subtotal, then the service charge as its own line, then Total.
+        const charge = resolveServiceCharge(total, S.locationType, S.categoryId);
+        const totalRowsHtml = total > 0
+            ? sr('Subtotal', '&#8369;' + total.toLocaleString()) +
+              sr('Service charge (' + charge.pct + '%)', '&#8369;' + charge.amount.toLocaleString()) +
+              '<div class="summary-total"><span>Total</span><span>&#8369;' + charge.total.toLocaleString() + '</span></div>'
+            : '<div class="summary-total"><span>Total</span><span>Contact for quote</span></div>';
+
         const locStr   = S.locationType === 'onsite'
             ? '&#127968; Onsite &mdash; ELI Coffee'
             : '&#128663; Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
@@ -2480,7 +2557,7 @@ By signing below, the Client confirms that the reservation details above are acc
             sr('Phone', S.phone) +
             (S.requests ? sr('Requests', S.requests) : '') +
             '<hr class="summary-divider">' +
-            '<div class="summary-total"><span>Total</span><span>' + totalStr + '</span></div>';
+            totalRowsHtml;
 
         document.getElementById('guest-warning').classList.toggle('hidden', isLoggedIn);
     }
@@ -2912,6 +2989,15 @@ By signing below, the Client confirms that the reservation details above are acc
                 totalPrice = S.offsitePackage ? S.offsitePackage.price : 0;
             }
 
+            // Service charge is added to the base to reach the total that
+            // gets stored — everything downstream (deposit %, custom-amount
+            // minimum) reads this same total_price column, so they
+            // automatically compute off the post-charge figure. Snapshotted
+            // alongside total_price so later default/override edits never
+            // change an existing booking.
+            const serviceCharge = resolveServiceCharge(totalPrice, S.locationType, S.categoryId);
+            totalPrice = serviceCharge.total;
+
             const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
             const { data: reservation, error: insertError } = await supabase
@@ -2927,6 +3013,8 @@ By signing below, the Client confirms that the reservation details above are acc
                     package_id:       packageId,
                     add_on_id:        addOnId,
                     total_price:      totalPrice,
+                    service_charge_percent: serviceCharge.pct,
+                    service_charge_amount:  serviceCharge.amount,
                     contact_name:     S.name,
                     contact_email:    S.email,
                     contact_phone:    S.phone,
@@ -2981,6 +3069,7 @@ By signing below, the Client confirms that the reservation details above are acc
     // ── Initialize ─────────────────────────────────────────────────────────
     syncSelectedDate('');
     await loadReservationRules();
+    await loadServiceChargeSettings();
     await loadEventTypes();
     await loadPackages();
 
@@ -3010,12 +3099,6 @@ By signing below, the Client confirms that the reservation details above are acc
     // Calendar loads after the page renders so the hero is fast
     loadAvailabilityCalendar();
 
-    // Load map scope config from system_settings
-    try {
-        const { data: mapSetting } = await supabase.from('system_settings').select('setting_value').eq('setting_key', 'venue_map_scope').maybeSingle();
-        if (mapSetting?.setting_value) window.venueMapConfig = JSON.parse(mapSetting.setting_value);
-    } catch { /* non-critical */ }
-
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
@@ -3024,12 +3107,21 @@ By signing below, the Client confirms that the reservation details above are acc
     (function () {
         'use strict';
 
-        var cfg          = window.venueMapConfig || {};
-        var RIZAL_CENTER = [cfg.center_lat || 14.5794, cfg.center_lng || 121.1878];
-        var RIZAL_BOUNDS = [
-            [cfg.sw_lat || 14.26, cfg.sw_lng || 120.95],
-            [cfg.ne_lat || 14.82, cfg.ne_lng || 121.62]
-        ];
+        // Read fresh at call time, not once at script-parse time — the
+        // system_settings fetch above is a separate awaited call with no
+        // ordering guarantee against this synchronous script block, so a
+        // value captured here at parse time can permanently miss whatever
+        // the admin has configured. initVenueMap()/searchAddress() are only
+        // ever invoked later, after the customer reaches the offsite venue
+        // step, by which point that fetch has long since resolved.
+        function getMapConfig() {
+            var cfg = window.venueMapConfig || {};
+            return {
+                sw_lat: cfg.sw_lat || 14.26, sw_lng: cfg.sw_lng || 120.95,
+                ne_lat: cfg.ne_lat || 14.82, ne_lng: cfg.ne_lng || 121.62,
+                center: [cfg.center_lat || 14.5794, cfg.center_lng || 121.1878]
+            };
+        }
 
         var map            = null;
         var marker         = null;
@@ -3039,9 +3131,10 @@ By signing below, the Client confirms that the reservation details above are acc
             if (mapInitialized) return;
             mapInitialized = true;
 
+            var cfg = getMapConfig();
             window.venueMap = map = L.map('venue-map', {
-                center: RIZAL_CENTER, zoom: 11,
-                maxBounds: RIZAL_BOUNDS, maxBoundsViscosity: 1.0,
+                center: cfg.center, zoom: 11,
+                maxBounds: [[cfg.sw_lat, cfg.sw_lng], [cfg.ne_lat, cfg.ne_lng]], maxBoundsViscosity: 1.0,
                 minZoom: 10, maxZoom: 18
             });
 
@@ -3087,7 +3180,8 @@ By signing below, the Client confirms that the reservation details above are acc
         function searchAddress(query) {
             if (!query.trim()) return;
             setVenueAddress('Searching…');
-            var viewbox = (cfg.sw_lng||120.95)+','+(cfg.sw_lat||14.26)+','+(cfg.ne_lng||121.62)+','+(cfg.ne_lat||14.82);
+            var cfg = getMapConfig();
+            var viewbox = cfg.sw_lng+','+cfg.sw_lat+','+cfg.ne_lng+','+cfg.ne_lat;
             var url = 'https://nominatim.openstreetmap.org/search'
                 + '?q=' + encodeURIComponent(query + ', Rizal, Philippines')
                 + '&format=json&limit=1&viewbox=' + viewbox + '&bounded=1&countrycodes=ph';

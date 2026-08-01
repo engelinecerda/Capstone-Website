@@ -16,8 +16,6 @@ let visibleCount = REVIEWS_PER_PAGE;
    FETCH REVIEWS
 ============================================================ */
 async function fetchReviews() {
-    console.log('[Reviews] Fetching reviews from Supabase...');
-
     // Step 1: Get reviews
     const { data: reviews, error: reviewsError } = await supabase
         .from('reviews')
@@ -25,11 +23,9 @@ async function fetchReviews() {
         .order('created_at', { ascending: false });
 
     if (reviewsError) {
-        console.error('[Reviews] Error fetching reviews:', reviewsError);
         throw reviewsError;
     }
 
-    console.log('[Reviews] Got', reviews?.length || 0, 'reviews');
     if (!reviews || reviews.length === 0) return [];
 
     // Step 2: Fetch profiles
@@ -39,9 +35,9 @@ async function fetchReviews() {
         .select('user_id, first_name, last_name')
         .in('user_id', userIds);
 
-    if (profilesError) {
-        console.warn('[Reviews] Could not fetch profiles:', profilesError);
-    }
+    // Missing profile data just means `profile` is null for that review
+    // below (rendering already handles that) — not worth interrupting the
+    // page for.
 
     const profileMap = {};
     (profiles || []).forEach(p => { profileMap[p.user_id] = p; });
@@ -56,9 +52,7 @@ async function fetchReviews() {
             .select('reservation_id, package:package_id ( package_name )')
             .in('reservation_id', reservationIds);
 
-        if (resError) {
-            console.warn('[Reviews] Could not fetch reservation packages:', resError);
-        } else {
+        if (!resError) {
             (reservations || []).forEach(res => {
                 packageNameMap[res.reservation_id] = res.package?.package_name || null;
             });
@@ -249,7 +243,6 @@ function showError(message) {
             <i class="fa-solid fa-triangle-exclamation" style="color:#c0392b;"></i>
             <h3 style="color:#c0392b;">Could not load reviews</h3>
             <p>${escapeHtml(message)}</p>
-            <p style="font-size:12px;margin-top:10px;">Check the browser console (F12) for details.</p>
         </div>
     `;
 }
@@ -298,26 +291,16 @@ async function init() {
 
     try {
         const raw = await fetchReviews();
-        console.log('[Reviews] Raw data sample:', raw.slice(0, 2));
 
-        allReviews = raw.filter(r => {
-            const result = shouldHideReview(r.comment);
-            if (result.hide) {
-                console.log(`🚫 Hidden (${result.reason}):`, r.comment?.slice(0, 60));
-            }
-            return !result.hide;
-        });
-
-        console.log(`[Reviews] Showing ${allReviews.length} of ${raw.length} reviews`);
+        allReviews = raw.filter(r => !shouldHideReview(r.comment).hide);
 
         if (loadingEl) loadingEl.remove();
 
         renderSummary();
         renderReviews();
     } catch (err) {
-        console.error('[Reviews] Init failed:', err);
         if (loadingEl) loadingEl.remove();
-        showError(err.message || 'An unexpected error occurred.');
+        showError('We couldn\'t load reviews right now. Please try again shortly.');
     }
 }
 

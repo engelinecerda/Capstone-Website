@@ -392,7 +392,6 @@ async function loadReports() {
             reviewBadgeEl: navReviewCount
         });
     } catch (error) {
-        console.error('Failed to load reservation reports:', error);
         reportsSummary.innerHTML = '';
         reportsTableBody.innerHTML = `
             <tr>

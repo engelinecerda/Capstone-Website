@@ -17,11 +17,19 @@ const stateLabel = document.getElementById('mmStateLabel');
 const stateDetail = document.getElementById('mmStateDetail');
 const toggleBtn = document.getElementById('mmToggleBtn');
 
+const scheduleDetail = document.getElementById('mmScheduleDetail');
+
 const titleInput = document.getElementById('mmTitleInput');
 const messageInput = document.getElementById('mmMessageInput');
 const formMessage = document.getElementById('mmFormMessage');
 const saveContentBtn = document.getElementById('mmSaveContentBtn');
 const previewFrame = document.getElementById('mmPreviewFrame');
+
+const scheduledStartInput = document.getElementById('mmScheduledStartInput');
+const scheduledEndInput = document.getElementById('mmScheduledEndInput');
+const scheduleMessage = document.getElementById('mmScheduleMessage');
+const saveScheduleBtn = document.getElementById('mmSaveScheduleBtn');
+const clearScheduleBtn = document.getElementById('mmClearScheduleBtn');
 
 const confirmModal = document.getElementById('mmConfirmModal');
 const confirmOk = document.getElementById('mmConfirmOk');
@@ -38,6 +46,26 @@ function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute
 function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
 function fmtDateTime(iso) {
   return iso ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+}
+function setScheduleMsg(msg, type = 'error') {
+  if (!msg) { scheduleMessage.className = 'modal-message hidden'; scheduleMessage.textContent = ''; return; }
+  scheduleMessage.textContent = msg;
+  scheduleMessage.className = `modal-message ${type}`;
+}
+// <input type="datetime-local"> takes/returns "YYYY-MM-DDTHH:mm" with no
+// timezone, interpreted as local time by both the browser and `new Date()`
+// — matches how the admin actually thinks about "turn on at 2am."
+function toDatetimeLocalValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromDatetimeLocalValue(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function updatePreview() {
@@ -67,6 +95,11 @@ function renderState(turnedOnByName) {
   toggleBtn.disabled = false;
   toggleBtn.textContent = isOn ? 'Turn Off Maintenance Mode' : 'Turn On Maintenance Mode';
   toggleBtn.className = `btn-primary ${isOn ? 'mm-btn-off' : 'mm-btn-on'}`;
+
+  const scheduleParts = [];
+  if (mode.scheduled_start) scheduleParts.push(`turns on ${fmtDateTime(mode.scheduled_start)}`);
+  if (mode.scheduled_end) scheduleParts.push(`turns off ${fmtDateTime(mode.scheduled_end)}`);
+  scheduleDetail.textContent = scheduleParts.length ? `Scheduled: ${scheduleParts.join(', ')}.` : '';
 }
 
 // ── LOAD ─────────────────────────────────────────────────────────
@@ -86,6 +119,8 @@ async function loadAll() {
 
   titleInput.value = mode.title || '';
   messageInput.value = mode.message || '';
+  scheduledStartInput.value = toDatetimeLocalValue(mode.scheduled_start);
+  scheduledEndInput.value = toDatetimeLocalValue(mode.scheduled_end);
   updatePreview();
 
   let turnedOnByName = '';
@@ -166,6 +201,64 @@ confirmOk.addEventListener('click', async () => {
     alert(`Failed to turn on: ${err.message}`);
   } finally {
     confirmOk.disabled = false;
+  }
+});
+
+// ── SCHEDULE ─────────────────────────────────────────────────────
+// Enforcement is a pg_cron job (apply_scheduled_maintenance_mode(), every 5
+// minutes — see 20260818_flagged_fixes.sql) that flips is_on when now()
+// passes scheduled_start/scheduled_end, then clears whichever field it
+// acted on so it's a one-shot schedule, not a recurring one, and can't
+// fight a later manual toggle.
+saveScheduleBtn.addEventListener('click', async () => {
+  setScheduleMsg('');
+  const scheduledStart = fromDatetimeLocalValue(scheduledStartInput.value);
+  const scheduledEnd = fromDatetimeLocalValue(scheduledEndInput.value);
+
+  if (scheduledStart && scheduledEnd && new Date(scheduledEnd) <= new Date(scheduledStart)) {
+    setScheduleMsg('Turn-off time must be after turn-on time.');
+    return;
+  }
+
+  saveScheduleBtn.disabled = true;
+  try {
+    const { error } = await supabase.from('maintenance_mode')
+      .update({ scheduled_start: scheduledStart, scheduled_end: scheduledEnd })
+      .eq('id', true);
+    if (error) throw error;
+
+    mode.scheduled_start = scheduledStart;
+    mode.scheduled_end = scheduledEnd;
+    await logAudit({ action: 'Updated Maintenance Schedule', category: 'maintenance_mode', details: `start=${scheduledStart || 'none'}, end=${scheduledEnd || 'none'}` });
+    setScheduleMsg('Schedule saved.', 'success');
+    renderState();
+  } catch (err) {
+    setScheduleMsg(`Failed to save: ${err.message}`);
+  } finally {
+    saveScheduleBtn.disabled = false;
+  }
+});
+
+clearScheduleBtn.addEventListener('click', async () => {
+  setScheduleMsg('');
+  clearScheduleBtn.disabled = true;
+  try {
+    const { error } = await supabase.from('maintenance_mode')
+      .update({ scheduled_start: null, scheduled_end: null })
+      .eq('id', true);
+    if (error) throw error;
+
+    mode.scheduled_start = null;
+    mode.scheduled_end = null;
+    scheduledStartInput.value = '';
+    scheduledEndInput.value = '';
+    await logAudit({ action: 'Cleared Maintenance Schedule', category: 'maintenance_mode', details: 'Schedule removed — manual switch only.' });
+    setScheduleMsg('Schedule cleared.', 'success');
+    renderState();
+  } catch (err) {
+    setScheduleMsg(`Failed to clear: ${err.message}`);
+  } finally {
+    clearScheduleBtn.disabled = false;
   }
 });
 

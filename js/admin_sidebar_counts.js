@@ -115,7 +115,6 @@ async function fetchUnreadReviewCount(supabase) {
     if (error) throw error;
     return count || 0;
   } catch (error) {
-    console.warn('Unable to refresh unread review badge count:', error?.message || error);
     return 0;
   }
 }
@@ -190,7 +189,8 @@ export function initAdminSidebarBadges(supabase) {
     try {
       await refreshAdminSidebarCounts({ supabase, ...badgeEls });
     } catch (error) {
-      console.error('Failed to refresh sidebar badge counts:', error);
+      // Badge counts are decorative — a failed refresh just leaves the last
+      // known counts on screen, nothing for the admin to act on.
     }
   }
 
@@ -237,7 +237,7 @@ async function injectMaintenanceIndicator(supabase) {
     `;
     document.body.prepend(strip);
   } catch (err) {
-    console.warn('Unable to check maintenance mode indicator:', err?.message || err);
+    // If this check fails, the strip just doesn't show — safe default.
   }
 }
 
