@@ -10,6 +10,56 @@ html {
 }
 
 /* ========================
+   Config-driven content skeleton
+   Applied to any element whose real content is admin-configurable
+   (js/page_content.js consumers). An opaque shimmer ::after overlay sits
+   on top of the element's existing hardcoded content at first paint, so a
+   slow config fetch never flashes stale copy — the real markup underneath
+   is completely untouched (no color/visibility tricks on the actual
+   text/images, which would have to special-case headings vs. paragraphs
+   vs. image grids). js/home_content.js and js/about_content.js remove this
+   class once the fetch settles, uncovering either the freshly-injected
+   configured content or, unchanged, the original hardcoded fallback that
+   was there the whole time. Because the real content was never hidden or
+   removed, the element's layout size never changes — no reflow when the
+   class comes off.
+   The animation-delay keyframe is a pure-CSS safety net: even if the page
+   script never runs at all, the overlay self-clears after 8s and whatever
+   is underneath (the original hardcoded content) is simply visible again.
+======================== */
+.cfg-loading {
+    position: relative;
+}
+.cfg-loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #F2EBE0 25%, #FAF8F4 37%, #F2EBE0 63%);
+    background-size: 400% 100%;
+    animation: cfgShimmer 1.4s ease infinite, cfgAutoReveal 0s linear 8s forwards;
+    pointer-events: none;
+}
+@keyframes cfgShimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+@keyframes cfgAutoReveal {
+    to {
+        animation: none;
+        background: none;
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cfg-loading::after {
+        animation: cfgAutoReveal 0s linear 8s forwards;
+    }
+}
+
+/* ========================
    Nav Account Wrapper
 ======================== */
 .nav-account-wrapper {

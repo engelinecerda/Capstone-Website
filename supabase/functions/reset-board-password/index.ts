@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile, error: callerProfileError } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, first_name, last_name')
     .eq('user_id', callerData.user.id)
     .maybeSingle();
 
@@ -81,6 +81,14 @@ Deno.serve(async (req) => {
   if (updateError) {
     return jsonResponse({ detail: updateError.message || 'Failed to reset password' }, 400);
   }
+
+  const performedBy = [callerProfile?.first_name, callerProfile?.last_name].filter(Boolean).join(' ') || callerData.user.email || 'an admin';
+  await supabaseAdmin.rpc('notify_admins', {
+    p_type: 'admin_board_password_reset',
+    p_title: 'Board account password reset',
+    p_body: `The shared Operations Board account password was reset by ${performedBy}.`,
+    p_link: '/admin/super%20admin/super_admin_accounts.html',
+  });
 
   // Best-effort only: Supabase access tokens are short-lived JWTs that remain
   // valid until they expire (typically ~1hr), so an already-open kiosk

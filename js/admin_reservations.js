@@ -9,7 +9,7 @@ import {
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
 import { getPaymentStatusPillMeta } from './reservation_shared.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -17,7 +17,6 @@ const reservationsPagination = document.getElementById('reservationsPagination')
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
 const chipsRow = document.getElementById('chipsRow');
-const refreshBtn = document.getElementById('refreshBtn');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
@@ -475,7 +474,12 @@ function renderTable(list) {
   }).join('');
 }
 
-function filterAndRender() {
+// resetPage=true is for user-initiated filter changes (search/dropdown/chip
+// clicks) — jumping back to page 1 is expected there. Auto-refresh triggers
+// pass resetPage=false so a Manager mid-way through the list doesn't get
+// yanked back to page 1 every time a background refresh fires; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
+function filterAndRender({ resetPage = true } = {}) {
   const term = searchInput?.value.trim().toLowerCase();
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
@@ -489,7 +493,11 @@ function filterAndRender() {
   );
   renderStats(reservationsCache);
   reservationsFiltered = filtered;
-  reservationsCurrentPage = 1;
+  if (resetPage) {
+    reservationsCurrentPage = 1;
+  } else {
+    reservationsCurrentPage = Math.min(reservationsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
+  }
   renderReservationsPage();
   setMessage(tableMessage, filtered.length ? '' : getEmptyFilterMessage(status), false);
 }
@@ -736,38 +744,51 @@ async function fetchReservationContracts(reservationIds) {
   throw error;
 }
 
-async function loadData() {
-  setMessage(tableMessage, 'Loading reservations...');
+// silent=true is used by the auto-refresh triggers (focus/visibility, bfcache
+// restore, background poll): it skips the "Loading..." message so existing
+// rows stay on screen undisturbed, fetches into local variables first so a
+// failed refresh never touches what's already rendered, and on failure it
+// keeps the last-good data and fails quietly instead of blanking the table.
+async function loadData({ silent = false } = {}) {
+  if (!silent) {
+    setMessage(tableMessage, 'Loading reservations...');
+  }
   try {
-    assignmentFeatureReady = true;
-    assignmentFeatureMessage = '';
+    let nextAssignmentFeatureReady = true;
+    let nextAssignmentFeatureMessage = '';
 
-    reservationsCache = await fetchReservations();
-    staffDirectory = [];
-    assignmentMapByReservationId = {};
-    paymentSummaryMap = await fetchPaymentSummaries(
-      reservationsCache.map((reservation) => reservation.reservation_id).filter(Boolean)
-    ).catch(() => ({}));
+    const freshReservations = await fetchReservations();
+    const freshReservationIds = freshReservations.map((r) => r.reservation_id).filter(Boolean);
 
+    const freshPaymentSummaryMap = await fetchPaymentSummaries(freshReservationIds).catch(() => ({}));
+
+    let freshStaffDirectory = [];
+    let freshAssignmentMap = {};
     try {
-      staffDirectory = await fetchStaffRoster();
+      freshStaffDirectory = await fetchStaffRoster();
     } catch (staffError) {
-      assignmentFeatureReady = false;
-      assignmentFeatureMessage = getStaffDirectoryHint(staffError);
+      nextAssignmentFeatureReady = false;
+      nextAssignmentFeatureMessage = getStaffDirectoryHint(staffError);
     }
 
-    if (assignmentFeatureReady) {
+    if (nextAssignmentFeatureReady) {
       try {
-        assignmentMapByReservationId = await fetchReservationAssignments(
-          reservationsCache.map((reservation) => reservation.reservation_id).filter(Boolean),
-          staffDirectory
-        );
+        freshAssignmentMap = await fetchReservationAssignments(freshReservationIds, freshStaffDirectory);
       } catch (assignmentError) {
-        assignmentFeatureReady = false;
-        assignmentFeatureMessage = getAssignmentSchemaHint(assignmentError);
-        assignmentMapByReservationId = {};
+        nextAssignmentFeatureReady = false;
+        nextAssignmentFeatureMessage = getAssignmentSchemaHint(assignmentError);
+        freshAssignmentMap = {};
       }
     }
+
+    // Commit only after every fetch has settled, so a mid-refresh failure
+    // (caught below) never leaves the page half-updated.
+    reservationsCache = freshReservations;
+    paymentSummaryMap = freshPaymentSummaryMap;
+    staffDirectory = freshStaffDirectory;
+    assignmentMapByReservationId = freshAssignmentMap;
+    assignmentFeatureReady = nextAssignmentFeatureReady;
+    assignmentFeatureMessage = nextAssignmentFeatureMessage;
 
     await refreshAdminSidebarCounts({
       supabase,
@@ -775,13 +796,20 @@ async function loadData() {
       paymentBadgeEl: navPaymentCount,
       contractBadgeEl: navContractCount,
       reviewBadgeEl: navReviewCount
-    });
+    }).catch(() => {});
     renderStats(reservationsCache);
-    filterAndRender();
+    filterAndRender({ resetPage: !silent });
     if (!assignmentFeatureReady) {
       setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
     }
   } catch (err) {
+    if (silent) {
+      // Quiet failure: keep whatever is already on screen; the next
+      // successful trigger (focus, poll, or the user changing a filter)
+      // resumes normal updates.
+      console.warn('Auto-refresh failed, keeping last loaded reservations:', err.message);
+      return;
+    }
     setMessage(tableMessage, `Failed to load: ${err.message}`, true);
     await refreshAdminSidebarCounts({
       supabase,
@@ -818,11 +846,43 @@ function escapeHtml(str) {
   redirectLogin();
 });*/
 
-refreshBtn?.addEventListener('click', loadData);
-
 /*supabase.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') redirectLogin();
 });*/
+
+// Auto-refresh replaces the old manual Refresh button: reservations and
+// their status/payment/staff data can change from elsewhere (an action on
+// reservation-details.html, another manager's session, a customer
+// cancellation) with no in-page event to hook, so freshness comes from
+// re-fetching whenever the Manager is plausibly looking at the page again,
+// plus a quiet background poll for changes that arrive while they're
+// already looking at it. All triggers funnel through one debounced entry
+// point so a focus + visibilitychange pair (which fire together when
+// switching back to this tab) can't cause a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadData({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+// Browsers can restore this page from the back-forward cache (e.g. the
+// Manager hits Back after acting on reservation-details.html) without
+// re-running any module code — pageshow with event.persisted is the only
+// reliable signal for that case, so it's handled separately from a normal
+// on-mount load.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 function applyStatusFilterFromUrl() {
   const requestedStatus = new URLSearchParams(window.location.search).get('status');

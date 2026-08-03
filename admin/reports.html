@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reservation Reports - Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="../css/admin_reports.css">
@@ -45,12 +46,13 @@
       <div class="page-header reports-page-header">
         <div>
           <h1 class="page-title">Reservation reports</h1>
-          <p class="page-sub">Reservation totals by event date, exportable as a PDF.</p>
+          <p class="page-sub">Reservation totals by event date, exportable as an Excel spreadsheet.</p>
         </div>
         <div class="reports-header-actions">
           <span id="managerNotifBell"></span>
-          <button type="button" class="refresh-btn" id="refreshReportsBtn">Refresh</button>
-          <button type="button" class="refresh-btn" id="exportPdfBtn">Download PDF</button>
+          <button type="button" class="refresh-btn" id="exportExcelBtn">
+            <i class="fa-solid fa-file-excel" aria-hidden="true"></i> Export to Excel
+          </button>
         </div>
       </div>
 
@@ -81,7 +83,7 @@
       <section class="card reports-table-card">
         <div>
           <h2 class="card-title">Reservation List</h2>
-          <p class="card-sub">Filtered reservations that will be included in the PDF export.</p>
+          <p class="card-sub">Filtered reservations that will be included in the Excel export.</p>
         </div>
         <div class="reports-table-wrap">
           <table class="reports-table">
@@ -103,8 +105,7 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script type="module" src="../js/admin_reports.js"></script>
 </body>
 </html>

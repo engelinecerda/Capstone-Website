@@ -16,7 +16,6 @@ import { logAudit } from './audit_logger.js';
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
 const logoutBtn = document.getElementById('logoutBtn');
-const refreshBtn = document.getElementById('refreshBtn');
 const rosterAddBtn = document.getElementById('rosterAddBtn');
 const rosterMessage = document.getElementById('rosterMessage');
 const rosterBody = document.getElementById('rosterBody');
@@ -94,8 +93,13 @@ async function fetchAssignmentCounts() {
   }, {});
 }
 
-async function loadRoster() {
-  setRosterMessage('Loading employees...');
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, and on failure it
+// keeps the last-good data and fails quietly instead of blanking the table.
+async function loadRoster({ silent = false } = {}) {
+  if (!silent) {
+    setRosterMessage('Loading employees...');
+  }
   try {
     rosterEmployees = await fetchRoster();
     assignmentCountByStaffId = await fetchAssignmentCounts();
@@ -103,6 +107,10 @@ async function loadRoster() {
     renderRosterRows();
     setRosterMessage(rosterEmployees.length ? '' : 'No employees yet. Add your team so you can assign them to events.');
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded roster:', error.message);
+      return;
+    }
     setRosterMessage(`Failed to load employees: ${error.message}`, true);
     rosterBody.innerHTML = '';
   }
@@ -416,7 +424,30 @@ watchAuthState();
 wireRosterTable();
 wireRosterModal();
 wireRosterConfirmModal();
-refreshBtn?.addEventListener('click', loadRoster);
+
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadRoster({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {

@@ -6,7 +6,7 @@ import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -14,7 +14,6 @@ const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
-const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const contractsBody = document.getElementById('contractsBody');
 const contractsPagination = document.getElementById('contractsPagination');
@@ -420,7 +419,10 @@ function syncActiveChip() {
   });
 }
 
-function filterAndRender() {
+// resetPage=false is used after an auto-refresh so a Manager mid-way
+// through the list isn't yanked back to page 1 every time; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
+function filterAndRender({ resetPage = true } = {}) {
   const term = String(searchInput?.value || '').trim().toLowerCase();
   const status = statusDropdown?.value || 'all';
   const filtered = contractsCache.filter((reservation) => (
@@ -431,7 +433,11 @@ function filterAndRender() {
   syncActiveChip();
   renderStats(contractsCache);
   contractsFiltered = filtered;
-  contractsCurrentPage = 1;
+  if (resetPage) {
+    contractsCurrentPage = 1;
+  } else {
+    contractsCurrentPage = Math.min(contractsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
+  }
   renderContractsPage();
 
   if (!contractsCache.length) {
@@ -733,8 +739,15 @@ async function performContractAction(action, button) {
   return { message: '' };
 }
 
-async function loadData() {
-  setMessage(tableMessage, 'Loading contracts...');
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, never re-renders an
+// open contract details modal (a background refresh must not disturb a
+// Manager mid-review), and on failure keeps the last-good data and fails
+// quietly instead of blanking the table.
+async function loadData({ silent = false } = {}) {
+  if (!silent) {
+    setMessage(tableMessage, 'Loading contracts...');
+  }
 
   try {
     const reservations = await fetchReservations();
@@ -745,9 +758,9 @@ async function loadData() {
       .filter((reservation) => getContractReviewMeta(reservation).hasFile)
       .sort((left, right) => new Date(getContractActivityDate(right)) - new Date(getContractActivityDate(left)));
 
-    filterAndRender();
+    filterAndRender({ resetPage: !silent });
 
-    if (activeContractReservationId) {
+    if (!silent && activeContractReservationId) {
       if (getReservationById(activeContractReservationId)) {
         renderContractDetailsModal(activeContractReservationId);
       } else {
@@ -755,6 +768,10 @@ async function loadData() {
       }
     }
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded contracts:', error.message);
+      return;
+    }
     setMessage(tableMessage, `Failed to load contracts: ${error.message}`, true);
     await refreshSidebarBadges().catch(() => {});
     renderStats([]);
@@ -819,7 +836,29 @@ function wireModals() {
   });
 }
 
-refreshBtn?.addEventListener('click', loadData);
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadData({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 
 wireLogoutButton();

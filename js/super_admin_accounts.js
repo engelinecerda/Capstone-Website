@@ -34,9 +34,14 @@ let openCardMenuEl = null;       // currently-open kebab popover element
 let lastFocusedTrigger = null;   // element to return focus to when a modal closes
 
 // ── LOAD ─────────────────────────────────────────────────────────
-async function loadAccounts() {
-  document.getElementById('accountsBody').innerHTML =
-    `<tr><td colspan="5"><div class="table-empty"><p style="color:var(--muted);">Loading accounts…</p></div></td></tr>`;
+// silent=true is used by the auto-refresh triggers: it skips blanking the
+// table with "Loading accounts…" first, and on failure it keeps the
+// last-good data and fails quietly instead of showing an error state.
+async function loadAccounts({ silent = false } = {}) {
+  if (!silent) {
+    document.getElementById('accountsBody').innerHTML =
+      `<tr><td colspan="5"><div class="table-empty"><p style="color:var(--muted);">Loading accounts…</p></div></td></tr>`;
+  }
 
   const { data, error } = await supabase
     .from('profiles')
@@ -45,6 +50,10 @@ async function loadAccounts() {
     .order('date_registered', { ascending: false });
 
   if (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded accounts:', error.message);
+      return;
+    }
     document.getElementById('accountsBody').innerHTML =
       `<tr><td colspan="5"><div class="table-empty"><p>Failed to load accounts</p><span>${error.message}</span></div></td></tr>`;
     return;
@@ -59,7 +68,7 @@ async function loadAccounts() {
     _status: a.is_locked ? 'deactivated' : (!a.last_sign_in_at ? 'invited' : 'active')
   }));
   updateStats();
-  applyFilters();
+  applyFilters({ resetPage: !silent });
 }
 
 // ── STATS ────────────────────────────────────────────────────────
@@ -76,7 +85,10 @@ function updateStats() {
 }
 
 // ── FILTERS ──────────────────────────────────────────────────────
-function applyFilters() {
+// resetPage=false is used after an auto-refresh so an admin mid-way
+// through the list isn't yanked back to page 1 every time; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
+function applyFilters({ resetPage = true } = {}) {
   const q       = document.getElementById('searchInput').value.trim().toLowerCase();
   const statusF = document.querySelector('#statusFilterSeg .seg-btn.active')?.dataset.status || '';
 
@@ -87,7 +99,11 @@ function applyFilters() {
     return matchQ && matchSt;
   });
 
-  currentPage = 1;
+  if (resetPage) {
+    currentPage = 1;
+  } else {
+    currentPage = Math.min(currentPage, Math.max(1, Math.ceil(filtered.length / PER_PAGE)));
+  }
   renderTable();
 }
 
@@ -250,7 +266,29 @@ document.getElementById('statusFilterSeg').addEventListener('click', e => {
   document.querySelectorAll('#statusFilterSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
   applyFilters();
 });
-document.getElementById('refreshBtn').addEventListener('click', loadAccounts);
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadAccounts({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 // ── FOCUS TRAP (shared by Account + Confirm modals) ───────────────
 function trapFocus(container) {

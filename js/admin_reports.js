@@ -8,15 +8,14 @@ import {
     getEffectiveReservationStatus,
     syncCompletedReservations
 } from './reservation_status.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const logoutBtn = document.getElementById('logoutBtn');
-const refreshReportsBtn = document.getElementById('refreshReportsBtn');
-const exportPdfBtn = document.getElementById('exportPdfBtn');
+const exportExcelBtn = document.getElementById('exportExcelBtn');
 const reportDateFrom = document.getElementById('reportDateFrom');
 const reportDateTo = document.getElementById('reportDateTo');
 const reportSearch = document.getElementById('reportSearch');
@@ -221,11 +220,18 @@ function renderTable(reservations) {
     }).join('');
 }
 
-function renderReports() {
+// resetPage=false is used after an auto-refresh so a Manager mid-way
+// through the list isn't yanked back to page 1 every time; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
+function renderReports({ resetPage = true } = {}) {
     const filteredReservations = getFilteredReservations();
     renderSummary(filteredReservations);
     reportsFiltered = filteredReservations;
-    reportsCurrentPage = 1;
+    if (resetPage) {
+        reportsCurrentPage = 1;
+    } else {
+        reportsCurrentPage = Math.min(reportsCurrentPage, getTotalPages(filteredReservations.length, PAGE_SIZE));
+    }
     renderReportsTablePage();
     setReportsMessage(`${filteredReservations.length} reservation(s) currently included in this report.`);
 }
@@ -243,76 +249,190 @@ function renderReportsTablePage() {
     });
 }
 
-function exportReportsPdf() {
+// Column layout for the "Reservations" sheet — shared between the row
+// writer and the Summary sheet's formulas below (colLetter() derives each
+// formula's column reference from this same array, so the two can never
+// drift out of sync with each other).
+const RESV_COLUMNS = [
+    { header: 'Customer Name', key: 'customerName', width: 24 },
+    { header: 'Customer Email', key: 'customerEmail', width: 26 },
+    { header: 'Event Type', key: 'eventType', width: 18 },
+    { header: 'Location Type', key: 'locationType', width: 16 },
+    { header: 'Event Date', key: 'eventDate', width: 14 },
+    { header: 'Event Time', key: 'eventTime', width: 16 },
+    { header: 'Package Name', key: 'packageName', width: 22 },
+    { header: 'Package Type', key: 'packageType', width: 16 },
+    { header: 'Guest Count', key: 'guestCount', width: 12 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Total Price', key: 'totalPrice', width: 16 },
+    { header: 'Amount Paid', key: 'amountPaid', width: 16 }
+];
+const CURRENCY_FORMAT = '"₱"#,##0.00';
+const REPORT_FONT = { name: 'Arial', size: 10 };
+
+function buildReportHeaderRows(sheet, subtitle) {
+    const titleRow = sheet.addRow(['ELI Coffee Events']);
+    titleRow.getCell(1).font = { name: 'Arial', size: 14, bold: true };
+
+    const subtitleRow = sheet.addRow([subtitle]);
+    subtitleRow.getCell(1).font = { name: 'Arial', size: 12, bold: true };
+
+    const rangeLabel = [
+        reportDateFrom?.value ? `From ${reportDateFrom.value}` : '',
+        reportDateTo?.value ? `To ${reportDateTo.value}` : ''
+    ].filter(Boolean).join('  ') || 'All reservation dates';
+    const rangeRow = sheet.addRow([`Date range: ${rangeLabel}`]);
+    rangeRow.getCell(1).font = REPORT_FONT;
+
+    const generatedRow = sheet.addRow([`Generated on: ${new Date().toLocaleString('en-PH')}`]);
+    generatedRow.getCell(1).font = REPORT_FONT;
+
+    sheet.addRow([]);
+}
+
+// 1-based column index within RESV_COLUMNS/a data row — used instead of
+// ExcelJS's key-based addRow()/worksheet.columns, since setting
+// worksheet.columns with `header` entries writes its own header row at
+// row 1 unconditionally, which would clobber this sheet's own title block
+// already sitting in row 1.
+function colIndex(key) {
+    return RESV_COLUMNS.findIndex((c) => c.key === key) + 1;
+}
+
+function buildReservationsSheet(workbook, reservations) {
+    const sheet = workbook.addWorksheet('Reservations');
+    buildReportHeaderRows(sheet, 'Reservation Report — Reservations');
+
+    const headerRowNumber = sheet.rowCount + 1;
+    const headerRow = sheet.addRow(RESV_COLUMNS.map((col) => col.header));
+    headerRow.eachCell((cell) => {
+        cell.font = { name: 'Arial', size: 10, bold: true };
+    });
+
+    reservations.forEach((reservation) => {
+        const eventDate = reservation?.event_date ? new Date(reservation.event_date) : null;
+        const row = sheet.addRow([
+            getCustomerName(reservation),
+            getCustomerEmail(reservation),
+            reservation?.event_type || 'Reservation',
+            reservation?.location_type || 'Location not set',
+            eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate : null,
+            reservation?.event_time || 'No time selected',
+            getPackageName(reservation),
+            reservation?.package?.package_type || 'Package',
+            Number(reservation?.guest_count || 0),
+            formatStatusLabel(getEffectiveReservationStatus(reservation)),
+            Number(reservation?.total_price || 0),
+            Number(state.paymentSummaryMap[reservation.reservation_id]?.total_paid || 0)
+        ]);
+        row.getCell(colIndex('eventDate')).numFmt = 'mmm d, yyyy';
+        row.getCell(colIndex('totalPrice')).numFmt = CURRENCY_FORMAT;
+        row.getCell(colIndex('amountPaid')).numFmt = CURRENCY_FORMAT;
+        row.eachCell((cell) => { cell.font = REPORT_FONT; });
+    });
+
+    RESV_COLUMNS.forEach((col, i) => { sheet.getColumn(i + 1).width = col.width; });
+    sheet.views = [{ state: 'frozen', ySplit: headerRowNumber }];
+
+    return { sheet, headerRowNumber, lastRow: sheet.rowCount };
+}
+
+function buildSummarySheet(workbook, resvRef) {
+    const sheet = workbook.addWorksheet('Summary');
+    buildReportHeaderRows(sheet, 'Reservation Report — Summary');
+
+    const headerRowNumber = sheet.rowCount + 1;
+    const headerRow = sheet.addRow(['Metric', 'Value']);
+    headerRow.eachCell((cell) => {
+        cell.font = { name: 'Arial', size: 10, bold: true };
+    });
+
+    // First/last data row on the Reservations sheet, for the formulas below
+    // — exportReportsExcel() already returns before this is called if there
+    // are zero filtered reservations, so there's always at least one row.
+    const first = resvRef.headerRowNumber + 1;
+    const last = resvRef.lastRow;
+    const colLetter = (key) => String.fromCharCode(65 + RESV_COLUMNS.findIndex((c) => c.key === key));
+    const range = (key) => `Reservations!${colLetter(key)}${first}:${colLetter(key)}${last}`;
+
+    const rows = [
+        ['Total Reservations', { formula: `COUNTA(${range('customerName')})` }],
+        ['Total Guests', { formula: `SUM(${range('guestCount')})` }],
+        ['Pending', { formula: `COUNTIF(${range('status')},"Pending")` }],
+        ['Approved', { formula: `COUNTIF(${range('status')},"Approved")` }],
+        ['Completed', { formula: `COUNTIF(${range('status')},"Completed")` }],
+        ['Cancelled', { formula: `COUNTIF(${range('status')},"Cancelled")` }],
+        ['Declined', { formula: `COUNTIF(${range('status')},"Declined")` }],
+        ['Rescheduled', { formula: `COUNTIF(${range('status')},"Rescheduled")` }],
+        ['Payments Collected', { formula: `SUM(${range('amountPaid')})` }]
+    ];
+
+    rows.forEach(([label, value]) => {
+        const row = sheet.addRow([label, value]);
+        row.getCell(1).font = REPORT_FONT;
+        row.getCell(2).font = REPORT_FONT;
+    });
+    // "Payments Collected" is the last row added — give it currency formatting.
+    sheet.getRow(sheet.rowCount).getCell(2).numFmt = CURRENCY_FORMAT;
+
+    sheet.getColumn(1).width = 26;
+    sheet.getColumn(2).width = 20;
+    sheet.views = [{ state: 'frozen', ySplit: headerRowNumber }];
+}
+
+async function exportReportsExcel() {
     const filteredReservations = getFilteredReservations();
     if (!filteredReservations.length) {
         setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
         return;
     }
 
-    const JsPdfConstructor = window.jspdf?.jsPDF;
-    if (!JsPdfConstructor) {
-        setReportsMessage('PDF export is not available because jsPDF did not load.', true);
+    const ExcelJSLib = window.ExcelJS;
+    if (!ExcelJSLib) {
+        setReportsMessage('Excel export is not available because the export library did not load.', true);
         return;
     }
 
-    const doc = new JsPdfConstructor({
-        orientation: 'landscape',
-        unit: 'pt',
-        format: 'a4'
-    });
+    exportExcelBtn.disabled = true;
+    const originalLabel = exportExcelBtn.innerHTML;
+    exportExcelBtn.innerHTML = 'Generating…';
 
-    const cards = buildSummaryCards(filteredReservations);
-    const filenameDate = new Date().toISOString().slice(0, 10);
-    const rangeLabel = [
-        reportDateFrom?.value ? `From ${reportDateFrom.value}` : '',
-        reportDateTo?.value ? `To ${reportDateTo.value}` : ''
-    ].filter(Boolean).join('  ');
+    try {
+        const workbook = new ExcelJSLib.Workbook();
+        workbook.creator = 'ELI Coffee Events';
+        workbook.created = new Date();
 
-    doc.setFontSize(18);
-    doc.text('ELI Coffee Events Reservation Report', 40, 42);
-    doc.setFontSize(11);
-    doc.text(rangeLabel || 'All reservation dates', 40, 62);
+        const resvRef = buildReservationsSheet(workbook, filteredReservations);
+        buildSummarySheet(workbook, resvRef);
 
-    let summaryY = 84;
-    cards.slice(0, 6).forEach((card, index) => {
-        const column = index % 3;
-        const row = Math.floor(index / 3);
-        const x = 40 + (column * 250);
-        const y = summaryY + (row * 48);
-        doc.setFontSize(10);
-        doc.text(card.label, x, y);
-        doc.setFontSize(16);
-        doc.text(String(card.value), x, y + 18);
-    });
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
 
-    if (typeof doc.autoTable !== 'function') {
-        setReportsMessage('PDF export is not available because the table plugin did not load.', true);
-        return;
+        const fromValue = reportDateFrom?.value || '';
+        const toValue = reportDateTo?.value || '';
+        const periodPart = fromValue || toValue
+            ? `${fromValue || 'start'}_to_${toValue || 'now'}`
+            : new Date().toISOString().slice(0, 10);
+        const filename = `reservation-report_${periodPart}.xlsx`;
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        setReportsMessage(`Exported ${filteredReservations.length} reservation(s) to Excel.`);
+    } catch (error) {
+        setReportsMessage("Couldn't generate the export — please try again.", true);
+    } finally {
+        exportExcelBtn.disabled = false;
+        exportExcelBtn.innerHTML = originalLabel;
     }
-
-    doc.autoTable({
-        startY: 196,
-        head: [['Customer', 'Event', 'Schedule', 'Package', 'Status', 'Total Price']],
-        body: filteredReservations.map((reservation) => ([
-            `${getCustomerName(reservation)}\n${getCustomerEmail(reservation)}`,
-            reservation?.event_type || 'Reservation',
-            `${formatDate(reservation?.event_date)}\n${reservation?.event_time || 'No time selected'}`,
-            getPackageName(reservation),
-            formatStatusLabel(getEffectiveReservationStatus(reservation)),
-            formatCurrency(reservation?.total_price || 0)
-        ])),
-        styles: {
-            fontSize: 9,
-            cellPadding: 7
-        },
-        headStyles: {
-            fillColor: [78, 54, 36]
-        }
-    });
-
-    doc.save(`reservation-report-${filenameDate}.pdf`);
-    setReportsMessage(`Exported ${filteredReservations.length} reservation(s) to PDF.`);
 }
 
 async function fetchReservations() {
@@ -375,23 +495,32 @@ async function validateAdminSession() {
     return session;
 }
 
-async function loadReports() {
-    setReportsMessage('Loading reservations...');
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, and on failure it
+// keeps the last-good data and fails quietly instead of blanking the table.
+async function loadReports({ silent = false } = {}) {
+    if (!silent) {
+        setReportsMessage('Loading reservations...');
+    }
 
     try {
         state.reservations = await fetchReservations();
         state.paymentSummaryMap = await fetchPaymentSummaries(
             state.reservations.map((r) => r.reservation_id).filter(Boolean)
         ).catch(() => ({}));
-        renderReports();
+        renderReports({ resetPage: !silent });
         await refreshAdminSidebarCounts({
             supabase,
             reservationBadgeEl: navReservationCount,
             paymentBadgeEl: navPaymentCount,
             contractBadgeEl: navContractCount,
             reviewBadgeEl: navReviewCount
-        });
+        }).catch(() => {});
     } catch (error) {
+        if (silent) {
+            console.warn('Auto-refresh failed, keeping last loaded reports data:', error.message);
+            return;
+        }
         reportsSummary.innerHTML = '';
         reportsTableBody.innerHTML = `
             <tr>
@@ -409,8 +538,7 @@ logoutBtn?.addEventListener('click', async () => {
     redirectToAdminLogin();
 });
 
-refreshReportsBtn?.addEventListener('click', loadReports);
-exportPdfBtn?.addEventListener('click', exportReportsPdf);
+exportExcelBtn?.addEventListener('click', exportReportsExcel);
 reportDateFrom?.addEventListener('input', renderReports);
 reportDateTo?.addEventListener('input', renderReports);
 reportSearch?.addEventListener('input', renderReports);
@@ -426,3 +554,27 @@ if (session) {
     initManagerNotificationBell(supabase, session.user.id);
     await loadReports();
 }
+
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+    const now = Date.now();
+    if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+    lastAutoRefreshAt = now;
+    loadReports({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);

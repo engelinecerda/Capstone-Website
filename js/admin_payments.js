@@ -5,7 +5,7 @@ import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource } from './reservation_shared.js';
 import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
@@ -16,7 +16,6 @@ const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
-const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
 const paymentsPagination = document.getElementById('paymentsPagination');
@@ -468,7 +467,10 @@ function renderTable(list) {
   }).join('');
 }
 
-function filterAndRender() {
+// resetPage=false is used after an auto-refresh so a Manager mid-way
+// through the list isn't yanked back to page 1 every time; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
+function filterAndRender({ resetPage = true } = {}) {
   const term = String(searchInput?.value || '').trim().toLowerCase();
   const status = statusDropdown?.value || 'all';
   const filtered = paymentsCache.filter((payment) => (
@@ -478,7 +480,11 @@ function filterAndRender() {
   ));
   renderStats(paymentsCache);
   paymentsFiltered = filtered;
-  paymentsCurrentPage = 1;
+  if (resetPage) {
+    paymentsCurrentPage = 1;
+  } else {
+    paymentsCurrentPage = Math.min(paymentsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
+  }
   renderPaymentsPage();
   if (!filtered.length) {
     setMessage(tableMessage, 'No payment submissions match the current filter.');
@@ -1120,8 +1126,15 @@ function wireRecordPaymentModal() {
   });
 }
 
-async function loadData() {
-  setMessage(tableMessage, 'Loading payment submissions...');
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, never re-renders an
+// open payment review modal (a background refresh must not disturb a
+// Manager mid-review, e.g. typing a rejection reason), and on failure keeps
+// the last-good data and fails quietly instead of blanking the table.
+async function loadData({ silent = false } = {}) {
+  if (!silent) {
+    setMessage(tableMessage, 'Loading payment submissions...');
+  }
   try {
     paymentsCache = await fetchPayments();
     reservationMap = await fetchReservationsForPayments(
@@ -1142,8 +1155,8 @@ async function loadData() {
 
     await refreshSidebarBadges();
 
-    filterAndRender();
-    if (activePaymentReviewId) {
+    filterAndRender({ resetPage: !silent });
+    if (!silent && activePaymentReviewId) {
       if (getPaymentById(activePaymentReviewId)) {
         renderPaymentReviewModal(activePaymentReviewId);
       } else {
@@ -1151,6 +1164,10 @@ async function loadData() {
       }
     }
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded payments:', error.message);
+      return;
+    }
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
     await refreshSidebarBadges();
     renderTable([]);
@@ -1273,8 +1290,29 @@ function wireModals() {
   });
 }
 
-refreshBtn?.addEventListener('click', loadData);
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
 
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadData({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 wireLogoutButton();
 watchAuthState();

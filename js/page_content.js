@@ -4,6 +4,39 @@
 // page; the page's existing hardcoded markup stays on screen if a fetch
 // fails or a row is missing.
 
+// ── Config-loading skeleton helper ──────────────────────────────────────
+// Paired with the .cfg-loading CSS class (css/styles.css — see that rule's
+// own header comment for the full mechanism). The class itself is baked
+// directly into index.html/about.html's markup on every configurable
+// element, not added by script — a script-added class would still leave a
+// gap between first paint and module execution where the hardcoded text
+// is briefly visible, which is exactly the flash this is meant to remove.
+// js/home_content.js and js/about_content.js (the "landing/landing-
+// adjacent" pages) only need to call this to remove the class once a
+// fetch settles; faqs.html/menu.html call the loaders above directly
+// without it, so their render order is unchanged.
+//
+// Must be called on every path (success, "not configured", error) or the
+// element shimmers until the CSS-only 8s safety net takes over — callers
+// use try/finally to guarantee that.
+export function revealConfigContent(...elements) {
+  elements.forEach((el) => el?.classList.remove('cfg-loading'));
+}
+
+// Races a fetch against a timeout so a slow/cold-cache fetch can't hold a
+// skeleton up indefinitely — resolves to the fetch's own result if it
+// wins, or `timeoutValue` (shaped like that loader's own "nothing found"
+// result, e.g. [] or { data: null, error: null }) if the clock runs out
+// first. The fetch itself is not aborted, so if it resolves shortly after
+// the timeout it still applies normally — this only bounds how long the
+// skeleton is shown, not the underlying request.
+export function withConfigTimeout(fetchPromise, timeoutValue, ms = 6000) {
+  return Promise.race([
+    fetchPromise,
+    new Promise((resolve) => setTimeout(() => resolve(timeoutValue), ms)),
+  ]);
+}
+
 export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}) {
   try {
     const { data, error } = await supabase

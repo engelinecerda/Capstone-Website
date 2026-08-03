@@ -5,13 +5,12 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
-const refreshCustomersBtn = document.getElementById('refreshCustomersBtn');
 const searchInput = document.getElementById('searchInput');
 const customersMessage = document.getElementById('customersMessage');
 const customersBody = document.getElementById('customersBody');
@@ -191,7 +190,10 @@ function updateStats(customers) {
   if (statCustomersWithPhone) statCustomersWithPhone.textContent = String(customersWithPhone);
 }
 
-function applyFilters() {
+// resetPage=false is used after an auto-refresh so a Manager mid-way
+// through the list isn't yanked back to page 1 every time; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
+function applyFilters({ resetPage = true } = {}) {
   const query = (searchInput?.value || '').trim().toLowerCase();
   const filteredCustomers = !query
     ? allCustomers
@@ -208,7 +210,11 @@ function applyFilters() {
     });
 
   customersFiltered = filteredCustomers;
-  customersCurrentPage = 1;
+  if (resetPage) {
+    customersCurrentPage = 1;
+  } else {
+    customersCurrentPage = Math.min(customersCurrentPage, getTotalPages(filteredCustomers.length, PAGE_SIZE));
+  }
   renderCustomersPage();
 
   const summaryText = filteredCustomers.length
@@ -313,8 +319,13 @@ function countPendingReservations(reservations) {
   return reservations.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
 }
 
-async function loadCustomers() {
-  setCustomersMessage('Loading customers...');
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, and on failure it
+// keeps the last-good data and fails quietly instead of blanking the table.
+async function loadCustomers({ silent = false } = {}) {
+  if (!silent) {
+    setCustomersMessage('Loading customers...');
+  }
 
   try {
     const [profiles, reservations] = await Promise.all([
@@ -327,8 +338,12 @@ async function loadCustomers() {
     updateStats(allCustomers);
     initAdminSidebarBadges(supabase)
 
-    applyFilters();
+    applyFilters({ resetPage: !silent });
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded customers:', error.message);
+      return;
+    }
     allCustomers = [];
     updateStats([]);
     renderCustomers([]);
@@ -353,10 +368,33 @@ validateAdminSession({
     initAdminNav({ role: profile.role });
 
     // Attach UI listeners (IMPORTANT)
-    refreshCustomersBtn?.addEventListener('click', loadCustomers);
-    searchInput?.addEventListener('input', applyFilters);
+    searchInput?.addEventListener('input', () => applyFilters());
 
     // Load data
     await loadCustomers();
   }
 });
+
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadCustomers({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
