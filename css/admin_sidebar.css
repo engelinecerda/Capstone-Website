@@ -130,69 +130,6 @@ body.sidebar-open .sidebar-overlay { display: block; }
   outline-offset: -2px;
 }
 
-/* ── COLLAPSIBLE NAV GROUPS (Bookable Inventory / Reservation Form /
-   Payment Options — see admin_nav_data.js `children`) ───────────── */
-/* The toggle is a native <button>, unlike every other .nav-item (an <a>) —
-   browsers put a default border/box-shadow on buttons. manager-theme.css
-   resets that with `.nav-item { border: none }`, but pages that don't load
-   manager-theme.css (dashboard.html, reports.html, and anything importing
-   the legacy admin_homepage.css nav-item rule) never got that reset, so the
-   toggle fell back to the browser's default button chrome — a visible
-   bordered box around just these three rows. Reset here instead, since this
-   file loads last on every admin page regardless of which page-specific
-   stylesheet is active, so it always wins. */
-.nav-group-toggle {
-  border: none;
-  box-shadow: none;
-}
-.nav-group-chevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-left: auto;
-  transition: transform 0.15s ease;
-}
-.nav-group-toggle[aria-expanded="true"] .nav-group-chevron {
-  transform: rotate(180deg);
-}
-
-/* Plain indent only — no border/box. A group's own row always looks
-   identical to a flat item (both are `.nav-item`) — the toggle button
-   never receives the shared `.active` filled-pill class (see buildGroup in
-   admin_nav.js), even while one of its children is the current page — so
-   the chevron stays the only thing marking it expandable. */
-.nav-group-children {
-  margin-top: 2px;
-  padding-left: 22px;
-  margin-left: 22px;
-}
-.nav-group-children .nav-item {
-  padding-top: 8px;
-  padding-bottom: 8px;
-  padding-left: 15px;
-  font-size: 12.5px;
-  position: relative;
-}
-
-/* Active sub-item: thin crema rail + brighter text, never a filled
-   background — the fill belongs to the parent (one highlight at a time). */
-.nav-group-children .nav-item.active-child {
-  color: var(--sidebar-cream, #F5EBDD);
-  font-weight: 500;
-  background: transparent;
-}
-.nav-group-children .nav-item.active-child::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--sidebar-cream, #F5EBDD);
-}
-
 /* ── COLLAPSE (desktop/tablet rail — never applies below the mobile
    breakpoint, so the rail and the drawer can't both be active) ── */
 .sidebar-collapse-btn {
@@ -246,14 +183,6 @@ body.sidebar-open .sidebar-overlay { display: block; }
 
   .sidebar.collapsed .nav-item { justify-content: center; }
 
-  /* Rail mode: no room for a submenu, so groups collapse to a plain icon
-     (tooltip on hover, same as any other collapsed nav item) rather than
-     an expandable control. */
-  .sidebar.collapsed .nav-group-chevron,
-  .sidebar.collapsed .nav-group-children {
-    display: none;
-  }
-
   body.sidebar-collapsed .main {
     margin-left: 64px !important;
     width: calc(100% - 64px) !important;
@@ -294,3 +223,21 @@ body.sidebar-open .sidebar-overlay { display: block; }
     transition: none !important;
   }
 }
+
+/* Persistent app-wide indicator — injected by
+   js/admin_sidebar_counts.js's injectMaintenanceIndicator() on every admin
+   page whenever maintenance_mode.is_on is true. */
+.admin-maintenance-strip {
+  position: sticky; top: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 8px 16px;
+  background: var(--declined-txt); color: #fff;
+  font-size: 12.5px; font-weight: 600; text-align: center;
+  text-decoration: none;
+}
+.admin-maintenance-strip:hover,
+.admin-maintenance-strip:focus-visible {
+  background: #8a2424;
+  outline: none;
+}
+.admin-maintenance-strip svg { flex-shrink: 0; }

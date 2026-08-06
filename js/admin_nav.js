@@ -33,13 +33,6 @@ function writeCollapsedPreference(collapsed) {
   }
 }
 
-// Flattens groups into their leaf links — an item with `children` is never
-// itself a link, only its children are, so matching/highlighting always
-// operates on this flat leaf list.
-function flattenLeaves(items) {
-  return items.flatMap((item) => (item.children ? item.children : [item]));
-}
-
 function resolveActiveHref(leaves) {
   if (window.__ADMIN_ACTIVE_NAV__) {
     const explicit = leaves.find((item) => item.label === window.__ADMIN_ACTIVE_NAV__ || item.key === window.__ADMIN_ACTIVE_NAV__);
@@ -75,20 +68,9 @@ function resolveActiveHref(leaves) {
   return current;
 }
 
-let groupSeq = 0;
-
-// `isChild` distinguishes a group's sub-item from a top-level link — a
-// sub-item still carries aria-current="page" when active, so assistive tech
-// lands on the exact active page, but its visual active styling is a thin
-// left rail (`.active-child`, see admin_sidebar.css), not the filled
-// `.active` pill flat items use — group toggles never show that pill at
-// all (see buildGroup), so this is the only active indicator inside a group.
-function buildLink(item, activeHref, isChild = false) {
+function buildLink(item, activeHref) {
   const isActive = item.href === activeHref;
-  const activeClass = isActive ? (isChild ? ' active-child' : ' active') : '';
-  // Child links under a group carry no iconKey — skip the icon slot
-  // entirely rather than rendering it empty, so indentation reads clean
-  // (an empty 16px+gap icon slot would read as a second, redundant indent).
+  const activeClass = isActive ? ' active' : '';
   const iconHtml = item.iconKey ? `<span class="nav-icon">${iconSvg(item.iconKey)}</span>` : '';
   return `
     <li>
@@ -103,58 +85,17 @@ function buildLink(item, activeHref, isChild = false) {
     </li>`;
 }
 
-// Renders an expandable group: a disclosure button (WAI-ARIA disclosure
-// pattern — aria-expanded + aria-controls, no menubar/arrow-key semantics
-// needed for a sidebar) followed by its children as plain nav links.
-//
-// The toggle button never carries the filled `.active` pill flat items get
-// (Dashboard, Reports, etc.) — a group row must look structurally identical
-// to a flat row, distinguished only by its trailing chevron. When a child is
-// the active page, the group still auto-expands (aria-expanded) and that
-// child shows its own thin-rail `.active-child` highlight (see buildLink) —
-// the toggle itself just stays a plain row regardless. aria-current is
-// deliberately omitted here for the same reason: the child link already
-// carries aria-current="page", and this button doesn't visually represent
-// "current" so it shouldn't claim it for assistive tech either.
-// None of today's groups have a page of their own, so the whole button is
-// the toggle target; if a future group needs its own landing page, this
-// button would need to split into a link + a separate chevron toggle.
-function buildGroup(item, activeHref) {
-  const submenuId = `navGroup${groupSeq++}`;
-  const hasActiveChild = item.children.some((child) => child.href === activeHref);
-  const childRows = item.children.map((child) => buildLink(child, activeHref, true)).join('');
-
-  return `
-    <li class="nav-group${hasActiveChild ? ' has-active' : ''}">
-      <button type="button"
-              class="nav-item nav-group-toggle"
-              aria-expanded="${hasActiveChild ? 'true' : 'false'}"
-              aria-controls="${submenuId}"
-              data-tooltip="${item.label}">
-        <span class="nav-icon">${item.iconKey ? iconSvg(item.iconKey) : ''}</span>
-        <span class="nav-label">${item.label}</span>
-        <span class="nav-group-chevron" aria-hidden="true">
-          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-        </span>
-      </button>
-      <ul class="sidebar-nav-list nav-group-children" id="${submenuId}" aria-label="${item.label}" ${hasActiveChild ? '' : 'hidden'}>
-        ${childRows}
-      </ul>
-    </li>`;
-}
-
 function renderNav(container, activeHref, role) {
-  // Configuration and System are admin-exclusive (every page behind them
-  // guards with an admin-only redirect) — Manager only ever sees Operations,
-  // matching the separation-of-duties model already established elsewhere
-  // in this admin portal.
+  // Booking Configuration, Website Content, and Platform Administration are
+  // all admin-exclusive (every page behind them guards with an admin-only
+  // redirect) — Manager only ever sees Operations, matching the separation-
+  // of-duties model already established elsewhere in this admin portal.
   const visibleGroups = role === 'admin' ? ADMIN_NAV : ADMIN_NAV.filter((g) => g.section === 'Operations');
-  groupSeq = 0;
 
   const groups = visibleGroups.map(({ section, items }) => {
     const rows = items.map((rawItem) => {
       const item = role === 'admin' && rawItem.adminOverride ? { ...rawItem, ...rawItem.adminOverride } : rawItem;
-      return item.children ? buildGroup(item, activeHref) : buildLink(item, activeHref);
+      return buildLink(item, activeHref);
     }).join('');
 
     return `
@@ -165,16 +106,6 @@ function renderNav(container, activeHref, role) {
   }).join('');
 
   container.innerHTML = groups;
-
-  container.querySelectorAll('.nav-group-toggle').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const submenu = document.getElementById(btn.getAttribute('aria-controls'));
-      if (!submenu) return;
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
-      btn.setAttribute('aria-expanded', String(!expanded));
-      submenu.hidden = expanded;
-    });
-  });
 }
 
 function wireCollapse(sidebar) {
@@ -232,9 +163,7 @@ function wireDrawer(container) {
     overlay.addEventListener('click', () => document.body.classList.remove('sidebar-open'));
   }
 
-  // Excludes .nav-group-toggle — expanding a group doesn't navigate
-  // anywhere, so it shouldn't close the mobile drawer.
-  container.querySelectorAll('.nav-item:not(.nav-group-toggle)').forEach((link) => {
+  container.querySelectorAll('.nav-item').forEach((link) => {
     link.addEventListener('click', () => {
       if (window.innerWidth <= 768) document.body.classList.remove('sidebar-open');
     });
@@ -246,16 +175,16 @@ export function initAdminNav({ role } = {}) {
   const sidebar = document.querySelector('.sidebar');
   if (!container || !sidebar) return;
 
-  const allLeaves = flattenLeaves(ADMIN_NAV.flatMap((g) => g.items));
+  const allLeaves = ADMIN_NAV.flatMap((g) => g.items);
 
   // Re-derives the active link from the current location and re-renders.
-  // Needed for more than the initial load: an expandable group's sub-items
-  // (Reservation Form's tabs, Payment Options' anchors, Availability &
-  // Scheduling's anchors) all point at one physical page with a different
-  // #hash, so moving between them is same-document navigation — no page
-  // load happens, so nothing else re-invokes this module. Without
-  // re-running the match on every hashchange, the sidebar highlight stays
-  // frozen on whichever sub-item matched at initial load.
+  // Needed for more than the initial load: some pages (Reservation Form's
+  // tabs, Payment Settings' anchors, Availability & Scheduling's anchors)
+  // use an internal #hash-based tab system on one physical page, so moving
+  // between tabs is same-document navigation — no page load happens, so
+  // nothing else re-invokes this module. Without re-running the match on
+  // every hashchange, the sidebar highlight stays frozen on whichever item
+  // matched at initial load.
   function refresh() {
     const activeHref = resolveActiveHref(allLeaves);
     renderNav(container, activeHref, role);

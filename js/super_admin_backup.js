@@ -158,8 +158,7 @@ async function loadRetentionSetting() {
     .maybeSingle();
 
   if (error) {
-    console.warn('Failed to load retention setting:', error.message);
-    return;
+    return; // keep the default retention value already in place
   }
 
   if (data?.setting_value) {
@@ -382,7 +381,6 @@ async function readAllTables(onProgress) {
     const { data, error } = await supabase.from(table).select('*');
 
     if (error) {
-      console.warn(`Skipping table "${table}": ${error.message}`);
       skipped.push(table);
       snapshot[table] = [];
       continue;
@@ -391,11 +389,7 @@ async function readAllTables(onProgress) {
     snapshot[table] = data || [];
   }
 
-  if (skipped.length) {
-    console.warn('Skipped tables during backup:', skipped.join(', '));
-  }
-
-  return snapshot;
+  return { snapshot, skipped };
 }
 
 // ─── Upload JSON to Google Drive ──────────────────────────────────────────────
@@ -462,7 +456,7 @@ confirmBackupOk?.addEventListener('click', async () => {
   try {
     await ensureValidToken();
 
-    const snapshot = await readAllTables(onProgress);
+    const { snapshot, skipped } = await readAllTables(onProgress);
 
     onProgress(72, 'Building backup file…');
     const now    = new Date();
@@ -498,7 +492,8 @@ confirmBackupOk?.addEventListener('click', async () => {
     await loadBackupHistory();
     await enforceRetention();
     closeModal(confirmBackupModal);
-    setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}`, 'success');
+    const skippedNote = skipped.length ? ` (${skipped.length} table(s) could not be read and were skipped: ${skipped.join(', ')})` : '';
+    setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}${skippedNote}`, skipped.length ? 'error' : 'success');
 
   } catch (err) {
     setModalMsg(confirmBackupMessage, `Backup failed: ${err.message}`);

@@ -149,9 +149,12 @@ function base64ToBytes(dataUrl: string): Uint8Array {
 async function uploadToCloudinary(
   bytes: Uint8Array,
   opts: { filename: string; folder: string; resourceType: 'image' | 'raw' },
-): Promise<string> {
+): Promise<{ url: string; pages?: number }> {
   const form = new FormData();
-  const mime = opts.resourceType === 'image' ? 'image/png' : 'application/pdf';
+  // mime must reflect the actual file bytes, not resourceType — the contract
+  // PDF now uploads as resourceType 'image' too (see call site comment) so it
+  // can no longer be inferred from resourceType alone.
+  const mime = opts.filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/png';
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const blob = new Blob([arrayBuffer], { type: mime });
   form.append('file', blob, opts.filename);
@@ -168,7 +171,7 @@ async function uploadToCloudinary(
   }
 
   const data = await res.json();
-  return data.secure_url as string;
+  return { url: data.secure_url as string, pages: typeof data.pages === 'number' ? data.pages : undefined };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -756,6 +759,7 @@ Deno.serve(async (req: Request) => {
       .select(`
         reservation_id, reservation_number, event_type, event_date, event_time, guest_count, location_type,
         venue_location, contact_name, contact_email, contact_phone, total_price,
+        service_charge_percent, service_charge_amount,
         package_id, package:package_id ( package_name )
       `)
       .eq('reservation_id', reservation_id)
@@ -838,6 +842,11 @@ Deno.serve(async (req: Request) => {
       venue: venueLabel,
       reservation_number: reservationNumber,
       total_price: formatCurrency(reservation.total_price),
+      // Snapshotted on the reservation at booking time (unlike deposit_percent/
+      // cancellation_fee below, which read live config) — the applied rate
+      // must freeze at the moment of booking, not reflect today's settings.
+      service_charge_percent: String(reservation.service_charge_percent ?? 0),
+      service_charge_amount: formatCurrency(reservation.service_charge_amount || 0),
       guest_count: String(reservation.guest_count || ''),
       contact_email: reservation.contact_email || '',
       contact_phone: reservation.contact_phone || '',
@@ -861,7 +870,7 @@ Deno.serve(async (req: Request) => {
 
     const signatureBytes = base64ToBytes(signature_data_url);
 
-    const signatureUrl = await uploadToCloudinary(signatureBytes, {
+    const { url: signatureUrl } = await uploadToCloudinary(signatureBytes, {
       filename: `signature-${reservationNumber}.png`,
       folder: 'contracts/signatures',
       resourceType: 'image',
@@ -888,10 +897,17 @@ Deno.serve(async (req: Request) => {
       sanitizeForPdf(signer_name),
     );
 
-    const contractUrl = await uploadToCloudinary(pdfBytes, {
+    // resourceType 'image' (not 'raw') — required so Cloudinary's pg_N page
+    // transformation and JPEG conversion (used by verify-contract's OCR scan)
+    // actually work; raw-uploaded assets never go through Cloudinary's image
+    // derivation pipeline. `pages` is Cloudinary's own count of pages in the
+    // uploaded PDF, snapshotted below so verify-contract can scan the last
+    // page (where drawSignatureSection always places the signature) instead
+    // of assuming it's on page 1.
+    const { url: contractUrl, pages: contractPageCount } = await uploadToCloudinary(pdfBytes, {
       filename: `contract-${reservationNumber}.pdf`,
       folder: 'contracts',
-      resourceType: 'raw',
+      resourceType: 'image',
     });
 
     const { error: contractInsertError } = await supabase
@@ -902,6 +918,7 @@ Deno.serve(async (req: Request) => {
         template_version_no: template?.version_no || null,
         contract_type: template?.contract_type || 'package_contract',
         contract_url: contractUrl,
+        page_count: contractPageCount ?? null,
         rendered_body: mergedBody,
         review_status: 'pending_review',
         review_notes: null,

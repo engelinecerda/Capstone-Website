@@ -4,7 +4,8 @@ import {
     fetchPayments as fetchSharedPayments,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails,
-    isReservationPaymentEnabled
+    isReservationPaymentEnabled,
+    loadReservationRules
 } from './customer_payments.js';
 import {
     escapeHtml,
@@ -135,12 +136,13 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
-        fetchReview(reservationId)
+        fetchReview(reservationId),
+        loadReservationRules(supabase)
     ]);
 
     pageData = {
@@ -150,7 +152,8 @@ async function loadPageData() {
         rescheduleRequests: reschedulesByReservationId[reservationId] || [],
         paymentsByReservationId,
         cancellationInfo,
-        review
+        review,
+        reservationRules
     };
 }
 
@@ -206,14 +209,32 @@ function buildStepperSteps(reservation, contractMeta, balance, payments) {
     ];
 }
 
+// Each step column renders as [left-half connector][dot][right-half
+// connector], both halves flex:1, so every dot lands at the exact center of
+// its (equal-width) column and consecutive gaps are always identical — no
+// more asymmetric centering between the last column and the rest.
+//
+// A connector half's color reflects the completion state of the EDGE it's
+// part of, not either endpoint alone: the edge between step i and step i+1
+// is green once step i itself is 'done', otherwise pale tan. Both halves of
+// a given edge (step i's right half + step i+1's left half) always get the
+// same class, so they read as one continuous line split only for layout.
+// The outer edges (before the first step, after the last) render with no
+// modifier class at all, so they stay transparent — no dangling line.
+function connectorClass(step) {
+    if (!step) return '';
+    return step.state === 'done' ? 'is-done' : 'is-upcoming';
+}
+
 function buildStepperMarkup(steps) {
     return `
         <ol class="rd-stepper">
             ${steps.map((step, index) => `
                 <li class="rd-step ${escapeHtml(step.state)}">
                     <span class="rd-step-track">
+                        <span class="rd-step-connector ${connectorClass(steps[index - 1])}" aria-hidden="true"></span>
                         <span class="rd-step-dot" aria-hidden="true">${step.state === 'done' ? '<i class="fa-solid fa-check"></i>' : ''}</span>
-                        ${index < steps.length - 1 ? '<span class="rd-step-connector"></span>' : ''}
+                        <span class="rd-step-connector ${connectorClass(index < steps.length - 1 ? step : null)}" aria-hidden="true"></span>
                     </span>
                     <span class="rd-step-text">
                         <span class="rd-step-label">${escapeHtml(step.label)}</span>
@@ -485,11 +506,11 @@ function buildReviewRow(effectiveStatus, review) {
 }
 
 function render() {
-    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review } = pageData;
+    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules } = pageData;
     const effectiveStatus = getEffectiveReservationStatus(reservation);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
-    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate });
+    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const contractMeta = computeContractMeta(contract);
     const canReschedule = computeCanReschedule(reservation.status, rescheduleRequests);
     const canCancel = computeCanCancel(reservation.status, payments);
@@ -551,8 +572,7 @@ async function init() {
         await loadPageData();
         render();
     } catch (error) {
-        console.error('Failed to load reservation:', error);
-        pageContainer.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">${escapeHtml(error.message || 'Failed to load this reservation.')}</p>`;
+        pageContainer.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">We couldn't load this reservation. Please try again.</p>`;
     }
 }
 

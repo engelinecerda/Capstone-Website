@@ -143,16 +143,26 @@ function wireLegalSubTabs() {
   });
 }
 
+// One entry per .rf-legal-tab-btn[data-legal-tab]. Adding a new admin-
+// editable policy is just one more entry here plus its tab button + panel/
+// textarea in admin/config/form.html — load/save/preview all key off this.
+const LEGAL_TAB_CONFIG = {
+  terms:        { settingKey: 'terms_and_conditions', textareaId: 'rf-terms-body',        title: 'Terms & Conditions' },
+  privacy:      { settingKey: 'data_privacy_policy',   textareaId: 'rf-privacy-body',      title: 'Data Privacy Policy' },
+  cancellation: { settingKey: 'cancellation_policy',   textareaId: 'rf-cancellation-body', title: 'Cancellation Policy' },
+  reschedule:   { settingKey: 'reschedule_policy',     textareaId: 'rf-reschedule-body',   title: 'Reschedule Policy' }
+};
+
 function activeLegalTabKey() {
   return document.querySelector('.rf-legal-tab-btn.active')?.dataset.legalTab || 'terms';
 }
 
 function openPreview() {
   const key = activeLegalTabKey();
-  const textareaId = key === 'terms' ? 'rf-terms-body' : 'rf-privacy-body';
+  const { textareaId, title } = LEGAL_TAB_CONFIG[key];
   const body = document.getElementById(textareaId).value.trim();
 
-  document.getElementById('rf-preview-title').textContent = key === 'terms' ? 'Terms & Conditions' : 'Data Privacy Policy';
+  document.getElementById('rf-preview-title').textContent = title;
   document.getElementById('rf-preview-body').innerHTML = body
     ? renderPolicyBlocks(parsePolicyBody(body))
     : '<p><em>Nothing saved yet — customers currently see the built-in fallback copy.</em></p>';
@@ -272,15 +282,14 @@ export function initReservationFormConfig() {
   wireLegalSubTabs();
 
   loadRequiredFields();
-  loadLegalBody('terms_and_conditions', 'rf-terms-body');
-  loadLegalBody('data_privacy_policy', 'rf-privacy-body');
+  Object.values(LEGAL_TAB_CONFIG).forEach(({ settingKey, textareaId }) => loadLegalBody(settingKey, textareaId));
   loadEventTypes();
 
   document.getElementById('rf-fields-save')?.addEventListener('click', saveRequiredFields);
 
   document.getElementById('rf-legal-save')?.addEventListener('click', () => {
-    const key = activeLegalTabKey();
-    saveLegalBody(key === 'terms' ? 'terms_and_conditions' : 'data_privacy_policy', key === 'terms' ? 'rf-terms-body' : 'rf-privacy-body');
+    const { settingKey, textareaId } = LEGAL_TAB_CONFIG[activeLegalTabKey()];
+    saveLegalBody(settingKey, textareaId);
   });
   document.getElementById('rf-legal-preview')?.addEventListener('click', openPreview);
   document.getElementById('rf-preview-close')?.addEventListener('click', () => {

@@ -115,7 +115,6 @@ async function fetchUnreadReviewCount(supabase) {
     if (error) throw error;
     return count || 0;
   } catch (error) {
-    console.warn('Unable to refresh unread review badge count:', error?.message || error);
     return 0;
   }
 }
@@ -190,7 +189,8 @@ export function initAdminSidebarBadges(supabase) {
     try {
       await refreshAdminSidebarCounts({ supabase, ...badgeEls });
     } catch (error) {
-      console.error('Failed to refresh sidebar badge counts:', error);
+      // Badge counts are decorative — a failed refresh just leaves the last
+      // known counts on screen, nothing for the admin to act on.
     }
   }
 
@@ -210,8 +210,35 @@ export function initAdminSidebarBadges(supabase) {
   });
 
   injectSidebarHamburger();
+  injectMaintenanceIndicator(supabase);
 
   return refresh;
+}
+
+// Persistent, app-wide "the customer site is currently offline" strip —
+// runs on every admin page via initAdminSidebarBadges, so an admin can never
+// forget maintenance mode is on just because they navigated away from its
+// own settings page. Read-only indicator; the actual toggle lives at
+// /admin/maintenance/mode.html.
+async function injectMaintenanceIndicator(supabase) {
+  if (document.getElementById('adminMaintenanceStrip')) return;
+
+  try {
+    const { data, error } = await supabase.from('maintenance_mode').select('is_on').eq('id', true).maybeSingle();
+    if (error || !data?.is_on) return;
+
+    const strip = document.createElement('a');
+    strip.id = 'adminMaintenanceStrip';
+    strip.className = 'admin-maintenance-strip';
+    strip.href = '/admin/maintenance/mode.html';
+    strip.innerHTML = `
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Maintenance mode is ON — the customer site is offline. Click to manage.</span>
+    `;
+    document.body.prepend(strip);
+  } catch (err) {
+    // If this check fails, the strip just doesn't show — safe default.
+  }
 }
 
 function injectSidebarHamburger() {

@@ -1,0 +1,110 @@
+/* ============================================================
+   ELI Coffee Events — Maintenance Mode (Maintenance module)
+   Page-specific additions only — manager-theme.css (already linked
+   before this file) owns :root, sidebar, .main/.page-shell, .card,
+   .btn-primary styling.
+   ============================================================ */
+
+.card + .card { margin-top: 20px; }
+
+.card-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.card-sub   { font-size: 12.5px; color: var(--muted); margin-top: 2px; margin-bottom: 16px; line-height: 1.5; }
+
+.settings-note {
+  background: var(--info); color: var(--info-txt);
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-size: 12.5px; line-height: 1.6;
+}
+
+/* ── STATE CARD ── */
+.mm-state-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.mm-state-label { font-size: 18px; font-weight: 700; margin: 0; }
+.mm-state-label.is-on  { color: var(--approved-txt); }
+.mm-state-label.is-off { color: var(--declined-txt); }
+.mm-state-detail { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
+
+/* mm-btn-on = about to take the customer site offline: warning color.
+   mm-btn-off = the safe, recovery action: default btn-primary styling. */
+.mm-btn-on { background: var(--declined-txt); }
+.mm-btn-on:hover { opacity: 0.9; }
+
+/* ── SCHEDULE CARD ── */
+.mm-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+.mm-schedule-actions { display: flex; gap: 10px; }
+
+/* ── MESSAGE EDITOR ── */
+.mm-editor-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;
+}
+.mm-form { display: flex; flex-direction: column; gap: 14px; }
+.mm-preview-col { display: flex; flex-direction: column; gap: 8px; }
+.mm-preview-frame {
+  width: 100%; height: 340px; border: 0.5px solid var(--border); border-radius: 10px; background: #fff;
+}
+
+.modal-field { display: flex; flex-direction: column; gap: 6px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--text); }
+.modal-input {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none;
+  transition: border-color .15s; width: 100%;
+}
+.modal-input:focus { border-color: var(--input-focus); }
+.modal-textarea {
+  border: 1px solid var(--input-border); border-radius: 8px; padding: 9px 12px; font: inherit;
+  font-size: 13px; color: var(--text); background: var(--input-bg); outline: none; resize: vertical;
+  min-height: 90px; width: 100%; transition: border-color .15s;
+}
+.modal-textarea:focus { border-color: var(--input-focus); }
+.modal-message {
+  font-size: 12.5px; border-radius: 8px; padding: 9px 12px;
+  background: var(--declined); color: var(--declined-txt); border: 1px solid var(--declined);
+}
+.modal-message.hidden  { display: none; }
+.modal-message.success { background: var(--approved); color: var(--approved-txt); border-color: var(--approved); }
+
+/* ── CONFIRM MODAL (shared shell) ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(42, 18, 8, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; overflow-y: auto;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
+  width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 20px 22px 16px; gap: 12px; border-bottom: 0.5px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.modal-close {
+  background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color .15s, background .15s;
+}
+.modal-close:hover, .modal-close:focus-visible { color: var(--text); background: var(--bg); }
+.modal-body { padding: 18px 22px; }
+.mm-confirm-copy { font-size: 13.5px; line-height: 1.6; color: var(--text); margin: 0; }
+.modal-footer {
+  padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 10px;
+  border-top: 0.5px solid var(--border);
+}
+.btn-cancel {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px;
+  border: 0.5px solid var(--btn-secondary-border); background: var(--card-bg); color: var(--text);
+  border-radius: 8px; padding: 0 16px; font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer; transition: background .15s ease;
+}
+.btn-cancel:hover { background: var(--btn-secondary-hover); }
+.mm-confirm-on-btn { background: var(--declined-txt); }
+
+@media (max-width: 800px) {
+  .mm-editor-grid { grid-template-columns: 1fr; }
+  .mm-schedule-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-cancel, .modal-close { transition: none !important; }
+}

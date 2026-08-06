@@ -228,7 +228,6 @@ async function loadCategories() {
     }
 
   } catch (err) {
-    console.error('loadCategories:', err);
     hide(pkgCatLoading);
     show(pkgCatError);
     if (pkgCatErrorMsg) pkgCatErrorMsg.textContent = 'Unable to load packages right now. Please try again.';
@@ -426,7 +425,6 @@ async function loadPackages(categoryId, categoryName) {
     hide(pkgOptLoading);
 
   } catch (err) {
-    console.error('loadPackages:', err);
     hide(pkgOptLoading);
     pkgMainGrid.innerHTML = `<p style="color:#b91c1c;font-size:14px">Failed to load packages. Please try again.</p>`;
   }

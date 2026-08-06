@@ -5,7 +5,6 @@ import { initCustomerNotificationBell } from './notifications.js';
 async function updateNavbar() {
     const { data: { session } } = await supabase.auth.getSession();
     const navBtn = document.querySelector('.navbar__btn');
-    const navMenu = document.querySelector('.navbar__menu');
     const navTopbarRight = document.getElementById('navTopbarRight');
 
     if (!navBtn) return;
@@ -19,27 +18,12 @@ async function updateNavbar() {
 
         const displayName = profile ? profile.first_name : 'Account';
 
-        // Mobile drawer: inject greeting linking to account page
-        if (navMenu) {
-            const initial = displayName.charAt(0).toUpperCase();
-            const greeting = document.createElement('li');
-            greeting.className = 'navbar__greeting';
-            greeting.innerHTML = `
-                <a href="/account.html" class="navbar__greeting-link">
-                    <div class="navbar__greeting-avatar">${initial}</div>
-                    <div class="navbar__greeting-text">
-                        <span class="navbar__greeting-name">Hi, ${displayName}!</span>
-                        <span class="navbar__greeting-account-hint">My Account ›</span>
-                    </div>
-                </a>`;
-            const drawerHeader = navMenu.querySelector('.nav-drawer-header');
-            if (drawerHeader) {
-                drawerHeader.insertAdjacentElement('afterend', greeting);
-            } else {
-                navMenu.insertBefore(greeting, navMenu.firstChild);
-            }
-        }
-
+        // Desktop: full dropdown trigger (Profile/Reservations/Logout). Mobile
+        // hides that dropdown entirely (css/styles.css, ≤960px) and shows
+        // .navbar__mobile-account-btn instead — a plain link pinned to the
+        // drawer's bottom in the exact same slot/style as the logged-out
+        // Login button, replacing the old top-of-drawer "Hi, name!" greeting
+        // card. Logout when on mobile happens from account.html's own tab bar.
         navBtn.innerHTML = `
             <div class="navbar__account-dropdown">
                 <button type="button" class="navbar__account-trigger" id="navbarAccountTrigger" aria-haspopup="true" aria-expanded="false" aria-label="Account menu for ${displayName}">
@@ -59,6 +43,7 @@ async function updateNavbar() {
                     </button>
                 </div>
             </div>
+            <a href="/account.html" class="button navbar__mobile-account-btn">Account</a>
         `;
         document.body.classList.add('user-logged-in');
 

@@ -99,7 +99,7 @@
       <div class="settings-panel" id="panel-legal" role="tabpanel">
         <div class="settings-card">
           <p class="settings-card-title">Terms &amp; Legal</p>
-          <p class="settings-card-sub">Shown to customers on the booking page before they sign their contract. Blank-line-separated paragraphs; a short line with no ending period becomes a heading, and lines starting with "- " become a bullet list.</p>
+          <p class="settings-card-sub">Terms &amp; Conditions and Data Privacy Policy appear on the booking page before customers sign their contract; Cancellation Policy and Reschedule Policy appear on the My Reservations page before a customer confirms a cancellation or reschedule request. All four use the same format: blank-line-separated paragraphs, a short line with no ending period becomes a heading, and lines starting with "- " become a bullet list.</p>
 
           <div class="rf-cross-link">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -109,6 +109,8 @@
           <div class="rf-legal-tabs">
             <button type="button" class="rf-legal-tab-btn active" data-legal-tab="terms">Terms &amp; Conditions</button>
             <button type="button" class="rf-legal-tab-btn" data-legal-tab="privacy">Data Privacy Policy</button>
+            <button type="button" class="rf-legal-tab-btn" data-legal-tab="cancellation">Cancellation Policy</button>
+            <button type="button" class="rf-legal-tab-btn" data-legal-tab="reschedule">Reschedule Policy</button>
           </div>
 
           <div class="rf-legal-panel active" id="rf-legal-panel-terms">
@@ -116,6 +118,14 @@
           </div>
           <div class="rf-legal-panel" id="rf-legal-panel-privacy">
             <textarea class="rf-legal-textarea" id="rf-privacy-body" placeholder="Loading..."></textarea>
+          </div>
+          <div class="rf-legal-panel" id="rf-legal-panel-cancellation">
+            <p class="settings-card-sub" style="margin-top:0;">Shown in the "Important Notice" box customers see before confirming a cancellation on the My Reservations page — right above the cancellation fee amount.</p>
+            <textarea class="rf-legal-textarea" id="rf-cancellation-body" placeholder="Loading..."></textarea>
+          </div>
+          <div class="rf-legal-panel" id="rf-legal-panel-reschedule">
+            <p class="settings-card-sub" style="margin-top:0;">Shown in the "Important Notice" box customers see before submitting a reschedule request — right above the reschedule fee amount.</p>
+            <textarea class="rf-legal-textarea" id="rf-reschedule-body" placeholder="Loading..."></textarea>
           </div>
 
           <div class="rf-legal-actions">

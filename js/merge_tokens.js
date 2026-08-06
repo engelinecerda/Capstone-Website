@@ -21,14 +21,17 @@ export const TOKEN_INFO = {
   contact_email: "Client's email",
   contact_phone: "Client's phone number",
   signed_date: 'Date and time the contract is signed',
-  reschedule_fee: 'Reschedule fee — Payment Options → Payment Rules',
-  cancellation_fee: 'Cancellation fee (onsite/offsite) — Payment Options → Payment Rules',
-  deposit_percent: 'Down payment percentage — Payment Options → Payment Types',
+  reschedule_fee: 'Reschedule fee — Payment Settings → Payment Rules',
+  cancellation_fee: 'Cancellation fee (onsite/offsite) — Payment Settings → Payment Rules',
+  deposit_percent: 'Down payment percentage — Payment Settings → Payment Types',
   terms_and_conditions: "The café's Terms & Conditions text — Terms & Legal tab",
   data_privacy_policy: "The café's Data Privacy Policy text — Terms & Legal tab",
   amount_paid: 'Total amount paid so far on this reservation',
   remaining_balance: 'Outstanding balance still owed on this reservation',
+  pay_by_date: 'Full-settlement deadline (event date minus the Full Payment Days setting, default 7) — Payment due / Balance due reminders',
   rejection_reason: 'Why a payment was rejected — Payment Rejected notice only',
+  service_charge_percent: 'Service charge percentage applied to this booking, frozen at booking time — Payment Settings → Service Charge',
+  service_charge_amount: 'Service charge amount (₱) applied to this booking, frozen at booking time — Payment Settings → Service Charge',
 };
 
 export const SAMPLE_RESERVATION = {
@@ -46,7 +49,10 @@ export const SAMPLE_RESERVATION = {
   signed_date: 'August 1, 2026, 3:45 PM',
   amount_paid: '₱14,000.00',
   remaining_balance: '₱14,000.00',
+  pay_by_date: 'August 8, 2026',
   rejection_reason: 'Receipt image was unreadable',
+  service_charge_percent: '10',
+  service_charge_amount: '₱2,800.00',
 };
 
 export const TOKEN_REGEX = /\{\{\s*(\w+)\s*\}\}/g;

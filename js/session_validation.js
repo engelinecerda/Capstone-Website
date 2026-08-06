@@ -67,31 +67,25 @@ export async function validateAdminSession({
     return null;
   }
 
-  let profile = null;
+  // Always re-fetch the live row — a cached copy goes stale the moment a
+  // role changes (promotion/demotion) and was previously trusted forever,
+  // which let a stale role get silently resubmitted on unrelated saves
+  // (see js/admin_profile.js) and could misfire the last-admin guard.
+  const { data: fetchedProfile, error } = await supabase
+    .from('profiles')
+    .select('role, staff_role, first_name, middle_name, last_name, email, phone_number, date_registered')
+    .eq('user_id', session.user.id)
+    .maybeSingle();
 
-  //  CACHE FIRST
-  const cached = localStorage.getItem('profile');
-  if (cached) {
-    profile = JSON.parse(cached);
-  } else {
-    const { data: fetchedProfile, error } = await supabase
-      .from('profiles')
-      .select('role, staff_role, first_name, middle_name, last_name, email, phone_number, date_registered')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-
-    if (error || !fetchedProfile || !ALLOWED_ROLES.includes(fetchedProfile.role)) {
-      await supabase.auth.signOut();
-      localStorage.removeItem('profile');
-      window.location.replace(redirectTo);
-      return null;
-    }
-
-    profile = fetchedProfile;
-
-    //  SAVE CACHE
-    localStorage.setItem('profile', JSON.stringify(profile));
+  if (error || !fetchedProfile || !ALLOWED_ROLES.includes(fetchedProfile.role)) {
+    await supabase.auth.signOut();
+    localStorage.removeItem('profile');
+    window.location.replace(redirectTo);
+    return null;
   }
+
+  const profile = fetchedProfile;
+  localStorage.setItem('profile', JSON.stringify(profile));
 
   populatePortalIdentity({
     profile,

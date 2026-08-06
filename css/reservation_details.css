@@ -163,22 +163,25 @@
     color: #fff;
     font-size: 11px;
     flex-shrink: 0;
-    margin: 0 auto;
 }
 
+/* Both halves of every column are always present (flex:1 each) so a dot is
+   always exactly centered in its equal-width column — this is what keeps
+   every inter-step gap the same length. The outer edges (before the first
+   step, after the last) simply never get an .is-done/.is-upcoming class, so
+   they stay transparent instead of dangling off the end. */
 .rd-step-connector {
     flex: 1;
     height: 2px;
+    background: transparent;
+}
+
+.rd-step-connector.is-done {
+    background: var(--acc-green-text);
+}
+
+.rd-step-connector.is-upcoming {
     background: var(--acc-border-tan);
-    margin-left: -1px;
-}
-
-.rd-step:last-child .rd-step-track {
-    justify-content: center;
-}
-
-.rd-step:last-child .rd-step-dot {
-    margin: 0;
 }
 
 .rd-step-text {
@@ -199,14 +202,10 @@
     line-height: 1.4;
 }
 
-/* Done — solid green dot + green connector */
+/* Done — solid green dot (connector coloring is per-edge, see .rd-step-connector.is-done above) */
 .rd-step.done .rd-step-dot {
     background: var(--acc-green-text);
     border-color: var(--acc-green-text);
-}
-
-.rd-step.done .rd-step-connector {
-    background: var(--acc-green-text);
 }
 
 /* Active — white dot, amber border */
@@ -729,10 +728,6 @@
         min-height: 20px;
         flex: 1;
         margin: 2px 0;
-    }
-
-    .rd-step:last-child .rd-step-track {
-        justify-content: flex-start;
     }
 
     .rd-step-text {

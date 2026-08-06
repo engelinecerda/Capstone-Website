@@ -89,7 +89,6 @@ export async function loadPaymentMethods(supabase) {
             };
         });
     } catch (err) {
-        console.warn('[Payments] Could not load payment methods from DB:', err?.message || err);
         return [];
     }
 }
@@ -218,7 +217,6 @@ export async function loadPaymentRules(supabase) {
 }
 
 const ONSITE_RESERVATION_FEE = 999;
-const PAYMENT_BALANCE_DUE_DAYS = 7;
 
 const BASE_CUSTOMER_RESERVATION_SELECT = `
     reservation_id,
@@ -299,9 +297,19 @@ export function getNormalPayments(paymentsByReservationId, reservationId) {
     return getReservationPayments(paymentsByReservationId, reservationId).filter((payment) => !payment.reschedule_request_id);
 }
 
+// Excludes cancellation_fee/reschedule_fee the same way public.
+// reservation_payment_summary does (see 20260725_payment_ledger.sql) — a
+// penalty fee isn't progress toward paying off the reservation total.
+// reschedule_fee rows are already excluded above via reschedule_request_id,
+// but cancellation_fee rows carry no reschedule_request_id, so without this
+// filter an approved cancellation fee would inflate "amount paid" and
+// understate the remaining balance shown to the customer.
+const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee']);
+
 export function getApprovedBasePaymentsTotal(paymentsByReservationId, reservationId) {
     return getNormalPayments(paymentsByReservationId, reservationId)
         .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
+        .filter((payment) => !NON_BASE_PAYMENT_TYPES.has(payment.payment_type))
         .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
@@ -311,14 +319,20 @@ export function getPendingBasePayment(paymentsByReservationId, reservationId) {
         .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
 }
 
-export function getReservationBalanceDueDate(reservation) {
+// fullPaymentDays defaults to RESERVATION_RULES_DEFAULTS.full_payment_days
+// (7) so callers that haven't loaded reservation_rules yet keep the exact
+// prior behavior — pass options.reservationRules?.full_payment_days from
+// loadReservationRules() to make this reflect the live admin-configured
+// value instead (matches public.get_full_payment_days() on the DB side).
+export function getReservationBalanceDueDate(reservation, fullPaymentDays = RESERVATION_RULES_DEFAULTS.full_payment_days) {
     const eventDateKey = String(reservation?.event_date || '').split('T')[0];
     if (!eventDateKey) return null;
 
     const dueDate = new Date(`${eventDateKey}T00:00:00`);
     if (Number.isNaN(dueDate.getTime())) return null;
 
-    dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
+    const days = Number.isFinite(Number(fullPaymentDays)) ? Number(fullPaymentDays) : RESERVATION_RULES_DEFAULTS.full_payment_days;
+    dueDate.setDate(dueDate.getDate() - days);
     return dueDate;
 }
 
@@ -327,7 +341,7 @@ export function getReservationBalanceDetails(reservation, paymentsByReservationI
     const totalPrice = roundCurrency(Number(reservation?.total_price || 0));
     const approvedBaseTotal = roundCurrency(getApprovedBasePaymentsTotal(paymentsByReservationId, reservationId));
     const remainingBalance = roundCurrency(Math.max(totalPrice - approvedBaseTotal, 0));
-    const dueDate = getReservationBalanceDueDate(reservation);
+    const dueDate = getReservationBalanceDueDate(reservation, options.reservationRules?.full_payment_days);
     const dueDateKey = dueDate ? buildLocalDateKey(dueDate) : '';
     const dueDateLabel = dueDateKey ? safeFormatDate(options.formatDate, dueDateKey) : 'No due date';
     const isPastDue = Boolean(remainingBalance > 0 && dueDateKey && getTodayDateKey() > dueDateKey);
@@ -409,7 +423,7 @@ function buildPaymentOption(reservation, paymentType, amount, paymentsByReservat
         paymentsByReservationId,
         options
     );
-    // payment_type.label (admin-editable on the Payment Options page) wins
+    // payment_type.label (admin-editable on the Payment Settings page) wins
     // over the PAYMENT_TYPE_META fallback when available, so a rename takes
     // effect on this "what can I pay next" list immediately.
     const dbLabel = options.paymentTypes?.[paymentType]?.label;
@@ -960,10 +974,8 @@ export async function submitCustomerPayment({
         });
 
         if (ocrError) {
-            console.warn('OCR invoke failed:', ocrError.message);
             successMessage = 'Payment details submitted for admin review, but OCR could not be processed yet.';
         } else if (ocrData?.saved === false) {
-            console.warn('OCR save failed:', ocrData?.error || 'Unknown OCR save error');
             successMessage = 'Payment details submitted for admin review, but OCR could not be saved yet.';
         }
     }

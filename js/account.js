@@ -6,15 +6,20 @@ import {
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails as getSharedReservationBalanceDetails,
     isReservationPaymentEnabled as isSharedReservationPaymentEnabled,
-    loadPaymentRules
+    loadPaymentRules,
+    loadReservationRules,
+    RESERVATION_RULES_DEFAULTS
 } from './customer_payments.js';
 import {
+    fetchAvailableStartTimes,
     fetchBlackoutDates,
     fetchCalendarAvailability,
-    fetchDateAvailability,
     getBookingScope as getSharedBookingScope,
     getCalendarRange,
     getScopeLabel,
+    loadAdvanceNoticeRules,
+    getEffectiveMinAdvanceDays,
+    isOutsideBookingWindow,
 } from './reservation_availability.js';
 import {
     BUSINESS_TIME_ZONE,
@@ -45,6 +50,7 @@ import {
     computeCanReschedule,
     computeCanCancel
 } from './reservation_shared.js';
+import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 
 const PAYMENT_METHODS = {
     card: {
@@ -78,7 +84,6 @@ const PAYMENT_METHODS = {
 };
 
 const ONSITE_RESERVATION_FEE = 999;
-const PAYMENT_BALANCE_DUE_DAYS = 7;
 const RESERVATIONS_PAGE_SIZE = 5;
 
 const PAYMENT_STATUS_META = {
@@ -86,11 +91,6 @@ const PAYMENT_STATUS_META = {
     approved: { label: 'Approved', key: 'approved' },
     rejected: { label: 'Rejected', key: 'rejected' }
 };
-
-const TIMES = [
-    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
-    '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM'
-];
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -140,6 +140,8 @@ const submissionFeedbackCopy = document.getElementById('submission-feedback-copy
 const state = {
     reservations: [],
     paymentRules: null,
+    reservationRules: null,
+    policyBodies: null,
     contractsByReservationId: {},
     paymentsByReservationId: {},
     receiptsByPaymentId: {},
@@ -159,7 +161,8 @@ const state = {
         selectedDate: '',
         selectedTime: '',
         calendarAvailability: new Map(),
-        selectedDateAvailability: null,
+        availableStartTimes: [],
+        advanceNoticeRules: null,
         closedDates: new Set(),
         blackoutDateColumn: null,
         blackoutReasonColumn: null
@@ -218,7 +221,7 @@ function getReviewFeatureErrorMessage(error, action = 'use') {
             : 'Supabase rejected this review submission. Apply the review migrations in `supabase/migrations/`, then make sure the reservation is completed or already past its event date/time in Manila time before submitting again.';
     }
 
-    return message || 'unknown error';
+    return 'Something went wrong. Please try again.';
 }
 
 function buildLocalDateKey(date) {
@@ -373,6 +376,10 @@ function getReservationDurationHours(reservation) {
     return 3;
 }
 
+function getEffectiveMinAdvanceDaysForReservation(reservation) {
+    return getEffectiveMinAdvanceDays(state.rescheduleModal.advanceNoticeRules, reservation?.event_type);
+}
+
 function getReservationName(profile) {
     const parts = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean);
     return parts.join(' ') || profile.email || 'Customer';
@@ -386,9 +393,17 @@ function getNormalPayments(reservationId) {
     return getReservationPayments(reservationId).filter((payment) => !payment.reschedule_request_id);
 }
 
+// Excludes cancellation_fee/reschedule_fee the same way public.
+// reservation_payment_summary does (see 20260725_payment_ledger.sql) — a
+// penalty fee isn't progress toward paying off the reservation total. An
+// approved cancellation_fee row carries no reschedule_request_id, so
+// without this it would inflate "amount paid" here.
+const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee']);
+
 function getApprovedBasePaymentsTotal(reservationId) {
     return getNormalPayments(reservationId)
         .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
+        .filter((payment) => !NON_BASE_PAYMENT_TYPES.has(payment.payment_type))
         .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
@@ -405,7 +420,8 @@ function getReservationBalanceDueDate(reservation) {
     const dueDate = new Date(`${eventDateKey}T00:00:00`);
     if (Number.isNaN(dueDate.getTime())) return null;
 
-    dueDate.setDate(dueDate.getDate() - PAYMENT_BALANCE_DUE_DAYS);
+    const fullPaymentDays = Number(state.reservationRules?.full_payment_days ?? RESERVATION_RULES_DEFAULTS.full_payment_days);
+    dueDate.setDate(dueDate.getDate() - (Number.isFinite(fullPaymentDays) ? fullPaymentDays : RESERVATION_RULES_DEFAULTS.full_payment_days));
     return dueDate;
 }
 
@@ -1954,7 +1970,6 @@ async function fetchReviews(reservationIds) {
 
     if (error) {
         if (isMissingReviewsTableError(error)) {
-            console.warn('Reviews table is not available in Supabase yet:', error.message);
             return {};
         }
 
@@ -1976,6 +1991,12 @@ async function loadReservations() {
 
     if (!state.paymentRules) {
         state.paymentRules = await loadPaymentRules(supabase).catch(() => null);
+    }
+    if (!state.reservationRules) {
+        state.reservationRules = await loadReservationRules(supabase).catch(() => ({ ...RESERVATION_RULES_DEFAULTS }));
+    }
+    if (!state.policyBodies) {
+        state.policyBodies = await loadPolicyBodies(supabase, ['cancellation_policy', 'reschedule_policy']).catch(() => ({}));
     }
 
     try {
@@ -2010,7 +2031,6 @@ async function loadReservations() {
             .order('created_at', { ascending: false });
 
         if (reservationResponse.error && isMissingColumnError(reservationResponse.error, 'reservations', 'review_prompt_dismissed_at')) {
-            console.warn('review_prompt_dismissed_at is missing in Supabase; loading reservations without review prompt support.');
             reservationResponse = await supabase
                 .from('reservations')
                 .select(baseReservationSelect)
@@ -2049,7 +2069,6 @@ async function loadReservations() {
             openEligibleReviewPrompt();
         }
     } catch (error) {
-        console.error('Failed to load reservations:', error);
         if (reservationsList) {
             const reviewFeatureMessage = getReviewFeatureErrorMessage(error);
             reservationsList.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations: ${escapeHtml(reviewFeatureMessage)}.</p>`;
@@ -2171,22 +2190,24 @@ function formatDateForInput(value) {
 async function loadRescheduleAvailability(reservation) {
     const month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const range = getCalendarRange(month);
-    const [blackoutData, calendarAvailability] = await Promise.all([
+    const [blackoutData, calendarAvailability, advanceNoticeRules] = await Promise.all([
         fetchBlackoutDates(supabase, state.rescheduleModal),
         fetchCalendarAvailability(supabase, {
             fromDate: range.fromDate,
             toDate: range.toDate
-        })
+        }),
+        loadAdvanceNoticeRules(supabase)
     ]);
 
     state.rescheduleModal.closedDates = blackoutData.closedDates;
     state.rescheduleModal.blackoutDateColumn = blackoutData.blackoutDateColumn;
     state.rescheduleModal.blackoutReasonColumn = blackoutData.blackoutReasonColumn;
     state.rescheduleModal.calendarAvailability = calendarAvailability;
+    state.rescheduleModal.advanceNoticeRules = advanceNoticeRules;
     state.rescheduleModal.month = month;
     state.rescheduleModal.selectedDate = '';
     state.rescheduleModal.selectedTime = reservation.event_time || '';
-    state.rescheduleModal.selectedDateAvailability = null;
+    state.rescheduleModal.availableStartTimes = [];
 }
 
 async function loadRescheduleCalendarMonth() {
@@ -2197,40 +2218,59 @@ async function loadRescheduleCalendarMonth() {
     });
 }
 
+// Reflects the admin's actual per-weekday Operating Hours + buffer +
+// per-scope capacity, live, per time slot — the same RPC the new-booking
+// calendar in reservations.html uses (get_available_start_times via
+// fetchAvailableStartTimes). Previously this modal built its time buttons
+// from a hardcoded 1:00 PM-10:00 PM list and never disabled an individual
+// slot for being taken, so an admin's hours/buffer/capacity changes never
+// reached this grid at all.
 async function loadRescheduleSelectedDateAvailability(reservation) {
     if (!state.rescheduleModal.selectedDate) {
-        state.rescheduleModal.selectedDateAvailability = null;
-        return null;
+        state.rescheduleModal.availableStartTimes = [];
+        return [];
     }
 
-    const availability = await fetchDateAvailability(supabase, {
+    const rows = await fetchAvailableStartTimes(supabase, {
         eventDate: state.rescheduleModal.selectedDate,
         scope: getBookingScope(reservation),
         durationHours: getReservationDurationHours(reservation),
         excludeReservationId: reservation.reservation_id
     });
-    state.rescheduleModal.selectedDateAvailability = availability;
-    return availability;
+    state.rescheduleModal.availableStartTimes = rows;
+    return rows;
+}
+
+function isRescheduleDateFullyBooked() {
+    const rows = state.rescheduleModal.availableStartTimes || [];
+    return rows.length === 0 || rows.every((row) => !row.isAvailable);
 }
 
 function renderRescheduleTimes() {
     if (!rescheduleTimeGrid) return;
 
     const selectedTime = state.rescheduleModal.selectedTime;
-    const selectedAvailability = state.rescheduleModal.selectedDateAvailability || {
-        occupiedScopes: [],
-        scopeTaken: false,
-        blockedTimes: []
-    };
-    const blockedTimes = new Set(selectedAvailability.blockedTimes || []);
-    rescheduleTimeGrid.innerHTML = TIMES.map((time) => `
+    const rows = state.rescheduleModal.availableStartTimes || [];
+
+    if (!state.rescheduleModal.selectedDate) {
+        rescheduleTimeGrid.innerHTML = '';
+        return;
+    }
+
+    if (!rows.length) {
+        rescheduleTimeGrid.innerHTML = '<p class="reschedule-time-empty">No valid start times for this date within operating hours.</p>';
+        return;
+    }
+
+    rescheduleTimeGrid.innerHTML = rows.map((row) => `
         <button
             type="button"
-            class="reschedule-time-btn ${selectedTime === time ? 'active' : ''} ${blockedTimes.has(time) || !state.rescheduleModal.selectedDate ? 'disabled' : ''}"
-            data-time="${escapeHtml(time)}"
-            ${blockedTimes.has(time) || !state.rescheduleModal.selectedDate ? 'disabled' : ''}
+            class="reschedule-time-btn ${selectedTime === row.timeLabel ? 'active' : ''} ${!row.isAvailable ? 'disabled' : ''}"
+            data-time="${escapeHtml(row.timeLabel)}"
+            title="${escapeHtml(row.isAvailable ? `Choose ${row.timeLabel} as your new start time.` : (row.reason || 'Unavailable at this time.'))}"
+            ${!row.isAvailable ? 'disabled' : ''}
         >
-            ${escapeHtml(time)}
+            ${escapeHtml(row.timeLabel)}
         </button>
     `).join('');
 }
@@ -2269,6 +2309,9 @@ function renderRescheduleCalendar() {
         ].join('-');
         const isPastOrToday = date <= today;
         const isClosed = state.rescheduleModal.closedDates.has(dateKey);
+        const isOutsideWindow = !isPastOrToday && isOutsideBookingWindow(
+            date, today, state.rescheduleModal.advanceNoticeRules, reservation.event_type
+        );
         const dateAvailability = state.rescheduleModal.calendarAvailability.get(dateKey) || {
             occupiedScopes: [],
             isFullyBooked: false
@@ -2276,7 +2319,7 @@ function renderRescheduleCalendar() {
         const reservationScope = getBookingScope(reservation);
         const isBooked = dateAvailability.isFullyBooked;
         const isCurrent = currentReservationDate === dateKey;
-        const isAvailable = !isPastOrToday && !isClosed && !isBooked && !isCurrent;
+        const isAvailable = !isPastOrToday && !isClosed && !isOutsideWindow && !isBooked && !isCurrent;
         const isSelected = state.rescheduleModal.selectedDate === dateKey;
         const classNames = ['reschedule-day'];
         let label = 'Unavailable';
@@ -2290,6 +2333,13 @@ function renderRescheduleCalendar() {
         } else if (isBooked) {
             classNames.push('booked');
             label = 'This date is fully booked.';
+        } else if (isOutsideWindow) {
+            classNames.push('disabled');
+            const effectiveMinDays = getEffectiveMinAdvanceDaysForReservation(reservation);
+            const diffDays = Math.round((date - today) / 86400000);
+            label = diffDays < effectiveMinDays
+                ? `Too soon to book — needs at least ${effectiveMinDays} day(s) notice.`
+                : 'Too far in advance to book.';
         } else {
             classNames.push('disabled');
             label = isCurrent ? 'Current booking date' : 'Unavailable';
@@ -2319,7 +2369,7 @@ function closeRescheduleModal() {
     state.rescheduleModal.selectedDate = '';
     state.rescheduleModal.selectedTime = '';
     state.rescheduleModal.calendarAvailability = new Map();
-    state.rescheduleModal.selectedDateAvailability = null;
+    state.rescheduleModal.availableStartTimes = [];
     state.rescheduleModal.closedDates = new Set();
     rescheduleModalBackdrop?.classList.add('hidden');
     rescheduleModalBackdrop?.setAttribute('aria-hidden', 'true');
@@ -2341,6 +2391,17 @@ function closeCancelModal() {
     setCancelModalMessage('');
 }
 
+// Swaps the hardcoded fallback copy inside a policy block for the
+// admin-saved override, if one exists — same "override only when present"
+// contract as the Terms & Conditions / Data Privacy Policy modal on the
+// booking page. Leaves the fallback markup untouched when there's nothing
+// saved yet, or the fetch failed.
+function applyPolicyOverride(elId, settingKey) {
+    const el = document.getElementById(elId);
+    const body = state.policyBodies?.[settingKey];
+    if (el && body) el.innerHTML = renderPolicyText(body);
+}
+
 function openCancelModal(reservationId) {
     const reservation = state.reservations.find((r) => String(r.reservation_id) === String(reservationId));
     if (!reservation) return;
@@ -2348,6 +2409,7 @@ function openCancelModal(reservationId) {
     state.cancelModal.reservationId = reservationId;
     const fee = getCancellationFee(reservation, state.paymentRules);
     if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
     setCancelModalMessage('');
     cancelReservationBackdrop?.classList.remove('hidden');
     cancelReservationBackdrop?.setAttribute('aria-hidden', 'false');
@@ -2362,26 +2424,21 @@ async function submitCancellationRequest() {
     setCancelModalMessage('Processing your cancellation request...');
 
     try {
-        const fee = getCancellationFee(reservation, state.paymentRules);
-
+        // No `payment` row is inserted here. The customer hasn't chosen a
+        // payment_method (or submitted proof) yet at this point, and that
+        // column is NOT NULL — inserting a stub row here previously failed
+        // outright. Flipping the reservation to 'cancellation_requested' is
+        // enough: js/customer_payments.js's getPaymentOptionsForReservation()
+        // already offers a "Cancellation Fee" option on the payment page for
+        // any reservation in this status that has no pending/approved
+        // cancellation_fee payment yet, and the real row (with payment_method)
+        // gets created when the customer actually submits that payment.
         const { error: statusError } = await supabase
             .from('reservations')
             .update({ status: 'cancellation_requested' })
             .eq('reservation_id', reservationId);
 
         if (statusError) throw statusError;
-
-        const { error: paymentError } = await supabase
-            .from('payment')
-            .insert({
-                reservation_id: reservationId,
-                payment_type: 'cancellation_fee',
-                amount: fee,
-                payment_status: 'pending_review',
-                submitted_at: new Date().toISOString()
-            });
-
-        if (paymentError) throw paymentError;
 
         closeCancelModal();
         await loadReservations();
@@ -2400,6 +2457,9 @@ async function openRescheduleModal(reservationId) {
     if (rescheduleCurrentValue) {
         rescheduleCurrentValue.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
     }
+    const rescheduleFeeAmountEl = document.getElementById('reschedule-fee-amount');
+    if (rescheduleFeeAmountEl) rescheduleFeeAmountEl.textContent = `₱${getRescheduleFee(state.paymentRules).toLocaleString()}`;
+    applyPolicyOverride('reschedule-policy-body', 'reschedule_policy');
 
     setRescheduleModalMessage('Loading availability...');
     rescheduleModalBackdrop?.classList.remove('hidden');
@@ -2429,15 +2489,35 @@ async function submitRescheduleRequest() {
         return;
     }
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDateObj = new Date(`${state.rescheduleModal.selectedDate}T00:00:00`);
+    if (isOutsideBookingWindow(selectedDateObj, today, state.rescheduleModal.advanceNoticeRules, reservation.event_type)) {
+        const effectiveMinDays = getEffectiveMinAdvanceDaysForReservation(reservation);
+        const diffDays = Math.round((selectedDateObj - today) / 86400000);
+        setRescheduleModalMessage(
+            diffDays < effectiveMinDays
+                ? `This date is too soon — please choose a date at least ${effectiveMinDays} day(s) from today.`
+                : 'This date is too far in advance — please choose a closer date.',
+            true
+        );
+        return;
+    }
+
     rescheduleModalSubmit?.setAttribute('disabled', 'true');
     setRescheduleModalMessage('Submitting your reschedule request...');
 
     try {
-        const latestAvailability = await loadRescheduleSelectedDateAvailability(reservation);
-        if (latestAvailability?.scopeTaken) {
+        // Re-checks the specific selected date+time right before submit (not
+        // just "is the whole date fully booked") — closes the same race a
+        // second customer could otherwise win between this modal opening and
+        // the request being sent.
+        const rows = await loadRescheduleSelectedDateAvailability(reservation);
+        const selectedRow = rows.find((row) => row.timeLabel === state.rescheduleModal.selectedTime);
+        if (!selectedRow?.isAvailable) {
             state.rescheduleModal.selectedTime = '';
             renderRescheduleTimes();
-            throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
+            throw new Error(selectedRow?.reason || 'That time is no longer available. Please choose another.');
         }
 
         const payload = {
@@ -2623,12 +2703,16 @@ function wireRescheduleModal() {
         const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
         if (!reservation) return;
         state.rescheduleModal.selectedDate = dayButton.dataset.date || '';
-        state.rescheduleModal.selectedTime = reservation.event_time || '';
-        const availability = await loadRescheduleSelectedDateAvailability(reservation);
+        state.rescheduleModal.selectedTime = '';
+        await loadRescheduleSelectedDateAvailability(reservation);
+        // The just-picked date may no longer hold the previous reservation
+        // time (different scope capacity, buffer, or hours that day), so
+        // don't carry it over — let the customer pick fresh from what's
+        // actually open on this date.
         renderRescheduleCalendar();
         renderRescheduleTimes();
         setRescheduleModalMessage(
-            availability?.scopeTaken
+            isRescheduleDateFullyBooked()
                 ? 'This date is fully booked.'
                 : `Selected ${formatDate(state.rescheduleModal.selectedDate)} for your ${getScopeLabel(getBookingScope(reservation))} booking slot.`
         );
@@ -2801,7 +2885,6 @@ async function isEmailAlreadyUsed(requestedEmail) {
         .neq('user_id', user.id);
 
     if (error) {
-        console.warn('Profile email pre-check fallback:', error);
         return false;
     }
 
@@ -2892,7 +2975,6 @@ async function loadProfile() {
         if (dateInput) dateInput.textContent = formatDate(state.profile.date_registered);
         renderPendingEmailNotice(state.profile);
     } catch (error) {
-        console.error('Failed to load profile:', error);
         setFormMessage(profileMessage, 'Unable to load the latest profile details right now.', 'error');
     }
 }

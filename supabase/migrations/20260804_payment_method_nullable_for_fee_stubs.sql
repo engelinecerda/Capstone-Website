@@ -1,0 +1,23 @@
+-- Bug: cancelling reservation ELI-260803-001 failed with "null value in
+-- column payment_method of relation payment violates not-null constraint".
+--
+-- Root cause: public.payment.payment_method has been NOT NULL since the
+-- column was first created directly in the live database (predates this
+-- migrations folder — see 20260723_payment_types_and_method_delete.sql's
+-- note that it "has never had a real FK"). Two code paths insert a
+-- cancellation_fee row before any payment_method is known:
+--   1. js/account.js's submitCancellationRequest() — fixed separately by
+--      removing that premature insert entirely; the real row (with a real
+--      payment_method) is created when the customer actually submits
+--      payment on the Payments page, same as every other payment type.
+--   2. public.auto_cancel_overdue_reservations() (pg_cron, hourly) — this
+--      one legitimately needs to insert a fee-owed row with no method yet:
+--      an auto-cancelled reservation never went through the "Important
+--      Notice" modal, so this stub row is the only place the customer (and
+--      admin) can see that a fee is now owed. Its insert is left as-is;
+--      this migration just makes the column able to hold that null.
+--
+-- No CHECK constraint on this column depends on it being non-null (grepped
+-- all migrations touching payment_method), so this is a pure relaxation.
+alter table public.payment
+  alter column payment_method drop not null;

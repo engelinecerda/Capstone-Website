@@ -341,10 +341,13 @@ function openEditModal(a) {
   const roleSelect = document.getElementById('fieldRole');
   const staffRoleInput = document.getElementById('fieldStaffRole');
   const boardHint = document.getElementById('fieldRoleBoardHint');
-  // Dynamic option append (extends the same defensive pattern for whichever
-  // role this specific account holds but the base <select> doesn't offer as
-  // an assignable default) — legacy 'staff' rows keep displaying/editing
-  // correctly even though new staff accounts aren't created through here.
+  // 'Staff' is now a permanent option in the base <select> (admin/super
+  // admin/super_admin_accounts.html), so a plain staff row just uses it
+  // directly — no more dynamic append for that case (it would now only
+  // duplicate the static option). The board account still gets its own
+  // distinct, disabled option; selected by reference (opt.selected) rather
+  // than roleSelect.value=, since that assignment would otherwise resolve
+  // to the static "Staff" option that now shares its value.
   roleSelect.querySelectorAll('option[data-dynamic]').forEach(o => o.remove());
 
   if (a.is_board_account) {
@@ -353,18 +356,11 @@ function openEditModal(a) {
     opt.textContent = 'Staff (Board Account)';
     opt.dataset.dynamic = '1';
     roleSelect.appendChild(opt);
-    roleSelect.value = 'staff';
+    opt.selected = true;
     roleSelect.disabled = true;
     staffRoleInput.disabled = true;
     boardHint.style.display = 'block';
   } else {
-    if (a.role === 'staff') {
-      const opt = document.createElement('option');
-      opt.value = 'staff';
-      opt.textContent = 'Staff (Legacy)';
-      opt.dataset.dynamic = '1';
-      roleSelect.appendChild(opt);
-    }
     roleSelect.value = a.role || 'manager';
     roleSelect.disabled = false;
     staffRoleInput.disabled = false;

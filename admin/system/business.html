@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/admin_business_profile.css">
   <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
@@ -67,6 +68,53 @@
         <p class="form-message" id="locationMsg"></p>
         <div id="locationList" class="location-admin-list">
           <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── VENUE MAP SCOPE ── -->
+      <div class="card">
+        <p class="card-title">Venue Map Scope</p>
+        <p class="card-sub">Sets the area shown on the booking map when a customer picks an offsite venue — the map is locked to this box, so a pin can never be dropped outside it. Drag either pin to resize the area.</p>
+
+        <div id="mapScopeCanvas" class="map-scope-canvas"></div>
+
+        <div class="map-scope-readout">
+          <span><strong>South-West corner:</strong> <span id="mapScopeSwReadout">—</span></span>
+          <span><strong>North-East corner:</strong> <span id="mapScopeNeReadout">—</span></span>
+        </div>
+
+        <p class="form-message" id="mapScopeMsg"></p>
+        <div class="action-bar">
+          <button type="button" class="btn-cancel" id="resetMapScopeBtn">Reset to Rizal Defaults</button>
+          <button type="button" class="btn-primary" id="saveMapScopeBtn">Save Map Scope</button>
+        </div>
+      </div>
+
+      <!-- ── BRAND ── -->
+      <div class="card">
+        <p class="card-title">Brand</p>
+        <p class="card-sub">Drives the navbar logo on every customer page, and the Maintenance Mode page. The footer keeps its own separate logo image (a different crop, meant for its dark background) — not controlled from here.</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Brand Name</label>
+            <input type="text" id="fieldBrandName" class="modal-input" placeholder="ELI Coffee Events">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Logo</label>
+            <div class="uploader" id="logoUploader">
+              <img class="uploader-preview hidden" id="logoImgPreview" alt="">
+              <div class="uploader-placeholder" id="logoImgPlaceholder">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Click or drag an image here</span>
+              </div>
+              <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/webp" hidden>
+            </div>
+            <span class="modal-hint" id="logoFileName">No file chosen</span>
+          </div>
+        </div>
+        <p class="form-message" id="brandMsg"></p>
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveBrandBtn">Save Brand</button>
         </div>
       </div>
 
@@ -165,6 +213,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="/js/admin_business_profile.js"></script>
 </body>
 </html>

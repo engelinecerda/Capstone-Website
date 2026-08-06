@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="/css/super_admin_only.css">
   <link rel="stylesheet" href="/css/manager-theme.css">
   <link rel="stylesheet" href="/css/admin_contracts.css">
-  <link rel="stylesheet" href="/css/contracts_template.css">
   <link rel="stylesheet" href="/css/admin_sidebar.css">
 </head>
 <body>
@@ -46,7 +45,7 @@
   <!-- ── MAIN ── -->
   <main class="main">
     <section class="page-shell">
-      <header class="page-header-row">
+      <header class="page-header">
         <div>
           <h1 class="page-title">Contract management<span class="view-only-pill">View only</span></h1>
           <p class="page-sub">A dedicated review queue for uploaded reservation contracts, automatically verified by signature scan.</p>
@@ -58,24 +57,6 @@
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"/></svg>
             <span>Refresh</span>
           </button>
-          <div class="header-btn-group super-admin-only">
-            <button type="button" class="btn-toggle-templates" id="toggleTemplatesBtn">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-              </svg>
-              <span id="toggleTemplatesLabel">View templates</span>
-            </button>
-            <button type="button" class="btn-add-template super-admin-only" id="addTemplateBtn">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Add template
-            </button>
-          </div>
         </div>
       </header>
 
@@ -144,37 +125,6 @@
         </div>
         <div class="pagination-bar" id="contractsPagination"></div>
       </section>
-
-            <!-- ══ CONTRACT TEMPLATES SECTION ══ -->
-      <section class="card table-card templates-section hidden" id="templatesSection">
-        <div class="table-head">
-          <div>
-            <h2 class="card-title">Contract Templates</h2>
-            <p class="card-sub">All contract templates uploaded by super admins, linked to packages.</p>
-          </div>
-        </div>
-        <p class="dashboard-message" id="templatesMessage">Loading templates...</p>
-        <div class="table-wrap">
-          <table class="reservation-table">
-            <thead>
-              <tr>
-                <th>Template Name</th>
-                <th>Package</th>
-                <th>Version</th>
-                <th>Status</th>
-                <th>Description</th>
-                <th>Added</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="templatesBody">
-              <tr class="empty-row">
-                <td colspan="7">No templates found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
     </section>
   </main>
 
@@ -225,123 +175,8 @@
   </div>
 
 
-  <!-- ══ ADD CONTRACT TEMPLATE MODAL (new) ══ -->
-  <div class="tmpl-overlay hidden" id="addTemplateModal" aria-hidden="true">
-    <div class="tmpl-modal" role="dialog" aria-modal="true" aria-labelledby="addTemplateTitle">
-
-      <div class="tmpl-modal-header">
-        <div>
-          <h2 class="tmpl-modal-title" id="addTemplateTitle">Add Contract Template</h2>
-          <p class="tmpl-modal-sub">Upload a new contract template and link it to a package</p>
-        </div>
-        <button type="button" class="tmpl-modal-close" id="addTemplateClose" aria-label="Close">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-
-      <div class="tmpl-modal-body">
-
-        <div class="tmpl-form-grid">
-          <div class="tmpl-form-group">
-            <label class="tmpl-label" for="tmplPackage">Package</label>
-            <select class="tmpl-select" id="tmplPackage">
-              <option value="">Loading packages…</option>
-            </select>
-          </div>
-          <div class="tmpl-form-group">
-            <label class="tmpl-label" for="tmplContractType">Contract Type</label>
-            <input type="text" class="tmpl-input" id="tmplContractType" placeholder="e.g. Service Agreement">
-          </div>
-          <div class="tmpl-form-group">
-            <label class="tmpl-label" for="tmplVersionNo">Version No.</label>
-            <input type="number" class="tmpl-input" id="tmplVersionNo" placeholder="e.g. 1" min="1">
-          </div>
-          <div class="tmpl-form-group">
-            <label class="tmpl-label" for="tmplIsActive">Status</label>
-            <select class="tmpl-select" id="tmplIsActive">
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
-          </div>
-          <div class="tmpl-form-group full">
-            <label class="tmpl-label" for="tmplDescription">
-              Description <span class="tmpl-label-opt">(optional)</span>
-            </label>
-            <textarea class="tmpl-textarea" id="tmplDescription" placeholder="Briefly describe what this template is for…"></textarea>
-          </div>
-          <div class="tmpl-form-group full">
-            <label class="tmpl-label" for="tmplTemplateBody">
-              Contract Body (shown to customers for e-signing)
-            </label>
-            <textarea class="tmpl-textarea" id="tmplTemplateBody" rows="10" placeholder="One paragraph per line. Use {{customer_name}}, {{package_name}}, {{event_date}}, {{event_time}}, {{venue}}, {{reservation_number}}, {{total_price}}, {{guest_count}} as placeholders — they're filled in automatically when a customer reviews and signs."></textarea>
-            <p class="tmpl-hint">This is the text customers actually read and sign in-app. If left blank, a generic default contract is used instead.</p>
-          </div>
-        </div>
-
-        <!-- File source toggle -->
-        <div class="tmpl-form-group full">
-          <label class="tmpl-label">Template File</label>
-          <div class="tmpl-source-tabs">
-            <button type="button" class="tmpl-source-tab active" data-source="upload">Upload File</button>
-            <button type="button" class="tmpl-source-tab" data-source="url">Paste URL</button>
-          </div>
-
-          <!-- Upload panel -->
-          <div class="tmpl-source-panel active" id="tmplUploadPanel">
-            <div class="tmpl-file-zone" id="tmplFileZone">
-              <input type="file" id="tmplFileInput" accept=".pdf,.doc,.docx">
-              <div class="tmpl-file-zone-icon">
-                <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-              </div>
-              <div class="tmpl-file-zone-label">Click to upload or drag &amp; drop</div>
-              <div class="tmpl-file-zone-sub">PDF — max 20 MB</div>
-            </div>
-            <div class="tmpl-file-chosen hidden" id="tmplFileChosen">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <span id="tmplFileName">No file chosen</span>
-              <button type="button" id="tmplFileClear" title="Remove file">
-                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <p class="tmpl-hint">
-              Accepted formats: PDF or Word documents, up to 10MB.
-            </p>
-          </div>
-
-          <!-- URL panel -->
-          <div class="tmpl-source-panel" id="tmplUrlPanel">
-            <input type="url" class="tmpl-input" id="tmplTemplateUrl"
-              placeholder="https://…  (Google Drive, Dropbox, or direct link)">
-            <p class="tmpl-hint">Paste a publicly accessible link to the template document.</p>
-          </div>
-        </div>
-
-        <!-- Upload progress bar (hidden until upload starts) -->
-        <div class="tmpl-progress-wrap hidden" id="tmplProgressWrap">
-          <div class="tmpl-progress-header">
-            <span class="tmpl-progress-label" id="tmplProgressLabel">Uploading…</span>
-            <span class="tmpl-progress-pct"   id="tmplProgressPct">0%</span>
-          </div>
-          <div class="tmpl-progress-track">
-            <div class="tmpl-progress-bar" id="tmplProgressBar" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <div class="tmpl-msg hidden" id="addTemplateMsg"></div>
-      </div>
-
-      <div class="tmpl-modal-footer">
-        <button type="button" class="tmpl-btn-cancel" id="addTemplateCancel">Cancel</button>
-        <button type="button" class="tmpl-btn-save"   id="addTemplateSave">Add Template</button>
-      </div>
-    </div>
-  </div>
-
-
   <!-- JS: existing contracts logic -->
   <script type="module" src="../js/admin_contracts.js"></script>
-  <!-- JS: add-template modal + Cloudinary upload -->
-  <script type="module" src="../js/contracts_template.js"></script>
 
 </body>
 </html>

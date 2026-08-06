@@ -329,15 +329,11 @@ async function loadCustomers() {
 
     applyFilters();
   } catch (error) {
-    console.error('Failed to load customers:', error);
     allCustomers = [];
     updateStats([]);
     renderCustomers([]);
     initAdminSidebarBadges(supabase)
-    setCustomersMessage(
-      `Failed to load registered customers: ${error?.message || 'unknown error'}.`,
-      true
-    );
+    setCustomersMessage('Failed to load registered customers. Please try again.', true);
   }
 }
 

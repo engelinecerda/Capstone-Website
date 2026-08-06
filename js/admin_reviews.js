@@ -318,9 +318,7 @@ async function loadReviews() {
       await markAdminReviewsSeen({
         supabase,
         userId: adminSession.user.id
-      }).catch((error) => {
-        console.warn('Unable to mark reviews as seen:', error?.message || error);
-      });
+      }).catch(() => {});
     }
 
     const [profiles, reservations, reviews] = await Promise.all([
@@ -342,10 +340,10 @@ async function loadReviews() {
 
     applyFilters();
   } catch (error) {
-    console.error('Failed to load reviews:', error);
     allReviews = [];
     updateStats([]);
     renderReviews([]);
+    setReviewsMessage('Failed to load reviews. Please try again.', true);
     await refreshAdminSidebarCounts({
       supabase,
       reservationBadgeEl: navReservationCount,

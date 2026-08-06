@@ -29,15 +29,22 @@
     <main class="board-main">
       <section class="board-today-panel">
         <div class="board-panel-head">
-          <h2 class="board-panel-title">Today</h2>
+          <h2 class="board-panel-title" id="boardPanelTitle">Today</h2>
           <p class="board-panel-sub" id="boardTodaySub">Loading schedule...</p>
+        </div>
+        <div class="board-browsing-banner hidden" id="boardBrowsingBanner">
+          <span id="boardBrowsingBannerText"></span>
+          <button type="button" class="board-back-to-today-btn" id="boardBackToTodayBtn">
+            <i class="fa-solid fa-rotate-left"></i> Back to Today
+          </button>
         </div>
         <div class="board-today-list" id="boardTodayList"></div>
       </section>
 
       <aside class="board-week-rail">
         <div class="board-panel-head">
-          <h2 class="board-panel-title">This Week</h2>
+          <h2 class="board-panel-title">Coming Up</h2>
+          <p class="board-panel-sub"><i class="fa-solid fa-hand-pointer"></i> Tap a day to view its schedule</p>
         </div>
         <div class="board-week-days" id="boardWeekDays"></div>
       </aside>
@@ -63,6 +70,16 @@
       <i class="fa-solid fa-lock"></i>
       <h1>Signed out</h1>
       <p>Ask the administrator to sign this display back in.</p>
+    </div>
+  </div>
+
+  <div class="board-logout-confirm-overlay hidden" id="boardLogoutConfirmOverlay">
+    <div class="board-logout-confirm-card">
+      <p>Sign out this display?</p>
+      <div class="board-logout-confirm-actions">
+        <button type="button" class="board-logout-cancel-btn" id="boardLogoutCancelBtn">Cancel</button>
+        <button type="button" class="board-logout-confirm-btn" id="boardLogoutConfirmBtn">Sign out</button>
+      </div>
     </div>
   </div>
 

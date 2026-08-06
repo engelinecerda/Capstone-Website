@@ -123,7 +123,6 @@ export function initManagerNotificationBell(supabase, userId) {
             .order('created_at', { ascending: false })
             .limit(20);
         if (error) {
-            console.error('Failed to load notifications:', error);
             return;
         }
         notifications = data || [];
@@ -169,7 +168,6 @@ export function initManagerNotificationBell(supabase, userId) {
             .eq('user_id', userId)
             .eq('is_read', false);
         if (error) {
-            console.error('Failed to mark all notifications read:', error);
             return;
         }
         await fetchAndRender();
@@ -182,8 +180,7 @@ export function initManagerNotificationBell(supabase, userId) {
         const link = item.dataset.link;
 
         if (item.classList.contains('unread') && id) {
-            const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-            if (error) console.error('Failed to mark notification read:', error);
+            await supabase.from('notifications').update({ is_read: true }).eq('id', id);
         }
 
         if (link) {

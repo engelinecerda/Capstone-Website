@@ -73,7 +73,7 @@ async function initServices() {
         </div>
       </div>`).join('');
   } catch (err) {
-    console.warn('[home_content] initServices failed:', err?.message || err);
+    // Falls back to the static homepage content already in the HTML.
   }
 }
 
@@ -111,7 +111,7 @@ async function initLocations() {
         </div>` : ''}
       </div>`).join('');
   } catch (err) {
-    console.warn('[home_content] initLocations failed:', err?.message || err);
+    // Falls back to the static homepage content already in the HTML.
   }
 }
 

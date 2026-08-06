@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Announcements - ELI Coffee Events</title>
+  <link rel="stylesheet" href="/css/super_admin_only.css">
+  <link rel="stylesheet" href="/css/manager-theme.css">
+  <link rel="stylesheet" href="/css/admin_announcements.css">
+  <link rel="stylesheet" href="/css/announcement_banner.css">
+  <link rel="stylesheet" href="/css/admin_sidebar.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <section class="page-shell">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Announcements <span class="admin-badge" id="adminBadge">Loading...</span></h1>
+          <p class="page-sub">Post notices customers see as a banner on the site. This never takes the site offline — that's a separate Maintenance Mode feature.</p>
+        </div>
+        <button type="button" class="btn-primary" id="addAnnouncementBtn">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Announcement
+        </button>
+      </div>
+
+      <div class="card">
+        <p class="card-title">All Announcements</p>
+        <p class="card-sub">Status is computed from the enabled state and display window, not just the on/off switch.</p>
+        <div class="table-wrap">
+          <table class="ann-table">
+            <thead>
+              <tr><th>Message</th><th>Kind</th><th>Status</th><th>Window</th><th></th></tr>
+            </thead>
+            <tbody id="announcementsTableBody">
+              <tr><td colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── ADD/EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="announcementModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="announcementModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="announcementModalTitle">New Announcement</h2>
+          <p class="modal-sub">Shown as a banner on the customer site while active.</p>
+        </div>
+        <button type="button" class="modal-close" id="announcementModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="announceMessage">Message</label>
+          <textarea id="announceMessage" class="modal-textarea" rows="3" placeholder="e.g. We're closed on July 30 for a private event."></textarea>
+        </div>
+
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="announceKind">Kind</label>
+            <select id="announceKind" class="modal-input">
+              <option value="info">Info</option>
+              <option value="scheduled_maintenance">Scheduled Maintenance</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">&nbsp;</label>
+            <label class="plain-checkbox-row"><input type="checkbox" id="announceEnabled" checked> Enabled</label>
+          </div>
+        </div>
+
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="announceStartsAt">Starts (optional)</label>
+            <input type="datetime-local" id="announceStartsAt" class="modal-input">
+            <p class="modal-hint">Blank = show immediately.</p>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="announceEndsAt">Ends (optional)</label>
+            <input type="datetime-local" id="announceEndsAt" class="modal-input">
+            <p class="modal-hint">Blank = show until turned off.</p>
+          </div>
+        </div>
+
+        <div class="modal-field">
+          <label class="plain-checkbox-row"><input type="checkbox" id="announceDismissible" checked> Customers can dismiss this</label>
+          <p class="modal-hint">Turn off for notices that must stay visible the whole time (e.g. urgent same-day closures).</p>
+        </div>
+
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="announceLinkLabel">CTA label (optional)</label>
+            <input type="text" id="announceLinkLabel" class="modal-input" placeholder="e.g. Learn more">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="announceLinkUrl">CTA link (optional)</label>
+            <input type="text" id="announceLinkUrl" class="modal-input" placeholder="e.g. /faqs.html">
+          </div>
+        </div>
+        <p class="modal-hint" id="announceLinkError"></p>
+
+        <div class="modal-field">
+          <label class="modal-label">Live Preview</label>
+          <div id="announcePreviewWrap" class="ann-preview-wrap"></div>
+        </div>
+
+        <p class="modal-message hidden" id="announcementModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="announcementModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="announcementModalSave">Save Announcement</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin_announcements.js"></script>
+</body>
+</html>

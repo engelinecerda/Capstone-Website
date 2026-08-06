@@ -40,7 +40,3 @@ body.is-super-admin a.super-admin-only.nav-item {
 body.is-super-admin .header-btn-group.super-admin-only {
   display: flex !important;
 }
-
-body.is-super-admin .btn-add-template.super-admin-only {
-  display: inline-flex !important;
-}

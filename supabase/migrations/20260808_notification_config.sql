@@ -6,12 +6,23 @@
 -- no client-side .insert() into notifications anywhere (confirmed by a
 -- full-codebase search) and send-notification-email is a generic relay that
 -- just emails whatever title/body a row already has. This migration moves
--- 7 specific branches (the spec's fixed trigger catalogue) out of those
+-- 6 specific branches (the spec's fixed trigger catalogue) out of those
 -- CASE statements into notification_template, seeded with today's real
 -- wording so nothing changes for customers until an admin edits something.
--- Every other branch these functions handle (declined/for_finalization/
--- completed reservation-status cases, every admin_* alert, contract review)
--- is NOT in the spec's 7-trigger catalogue and is copied through unchanged.
+-- Every other branch these functions handle (declined/for_contract_signing/
+-- for_finalization/completed reservation-status cases, every admin_* alert,
+-- contract review) is NOT in the catalogue and is copied through unchanged.
+--
+-- 'for_contract_signing' (originally a 7th candidate, "contract_ready") was
+-- deliberately excluded: nothing in the live app ever sets
+-- reservations.status to that value (or its legacy alias
+-- 'resubmission_requested') anymore. Since 20260419_reservation_flow_
+-- rewrite.sql, a reservation can only be approved once its contract is
+-- already uploaded (see getReservationApprovalState() in
+-- js/admin_reservation_details.js) — contract signing happens before/at
+-- submission, not as a post-approval step. That CASE branch is dead code
+-- inherited unmodified from 20260513; it's left hardcoded and unreachable
+-- exactly as it already was, not templated.
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 1. SCHEMA
@@ -31,8 +42,7 @@ insert into public.notification_trigger (code, label, description, is_disableabl
   ('payment_received',        'Payment received',        'Sent when a payment is approved.', true, 3),
   ('payment_rejected',        'Payment rejected',        'Sent when a payment is rejected, with the reason.', false, 4),
   ('reschedule_confirmed',    'Reschedule confirmed',    'Sent when a reschedule is approved.', true, 5),
-  ('cancellation_confirmed',  'Cancellation confirmed',  'Sent when a cancellation is processed.', false, 6),
-  ('contract_ready',          'Contract ready',          'Sent when the contract is ready to sign.', true, 7)
+  ('cancellation_confirmed',  'Cancellation confirmed',  'Sent when a cancellation is processed.', false, 6)
 on conflict (code) do nothing;
 
 create table if not exists public.notification_template (
@@ -62,9 +72,7 @@ insert into public.notification_template (trigger_code, email_subject, body) val
   ('reschedule_confirmed', 'Reschedule approved — payment required',
    'Hi {{customer_name}}, your reschedule request has been approved. Please submit the reschedule fee to confirm the new date.'),
   ('cancellation_confirmed', 'Your reservation has been cancelled',
-   'Hi {{customer_name}}, your {{event_type}} reservation has been cancelled. Contact us if you have any questions.'),
-  ('contract_ready', 'Your contract is ready to sign',
-   'Hi {{customer_name}}, your reservation is confirmed. Please upload your signed contract to proceed.')
+   'Hi {{customer_name}}, your {{event_type}} reservation has been cancelled. Contact us if you have any questions.')
 on conflict (trigger_code) do nothing;
 
 -- Extend the existing live table — not a parallel one.
@@ -222,12 +230,14 @@ end;
 $$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 4. TRIGGER FUNCTION REWRITES — only the 7 target branches change;
+-- 4. TRIGGER FUNCTION REWRITES — only the 6 target branches change;
 --    everything else in each function is copied through byte-identical.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- 4a. Reservation status change → customer. Targets: approved, cancelled,
---     for_contract_signing. declined/for_finalization/completed unchanged.
+-- 4a. Reservation status change → customer. Targets: approved, cancelled.
+--     declined/for_contract_signing/for_finalization/completed unchanged —
+--     for_contract_signing is dead (see file header): left hardcoded exactly
+--     as the original migration had it, not templated.
 create or replace function public.notify_customer_on_reservation_status()
 returns trigger language plpgsql security definer as $$
 declare
@@ -243,8 +253,8 @@ begin
       insert into notifications (user_id, type, title, body, link)
       values (NEW.user_id, 'reservation_status', 'Reservation Not Approved', 'Unfortunately, your reservation was not approved at this time.', '/account.html');
     when 'for_contract_signing' then
-      v_merge_data := public.build_notification_merge_data(NEW.reservation_id);
-      perform public.dispatch_notification(NEW.user_id, 'contract_ready', 'reservation_status', '/account.html', v_merge_data);
+      insert into notifications (user_id, type, title, body, link)
+      values (NEW.user_id, 'reservation_status', 'Contract Ready to Sign', 'Your reservation is confirmed. Please upload your signed contract to proceed.', '/account.html');
     when 'for_finalization' then
       insert into notifications (user_id, type, title, body, link)
       values (NEW.user_id, 'reservation_status', 'Contract Verified', 'Your signed contract has been verified. Your reservation is now moving to the finalization stage.', '/account.html');
@@ -358,7 +368,7 @@ end;
 $$;
 
 -- Not touched: notify_on_contract_review() (contract_rejected /
--- admin_contract_submitted — neither is in the 7-trigger catalogue),
+-- admin_contract_submitted — neither is in the catalogue),
 -- notify_admins_on_new_payment() (admin-only), notify_manager_on_
 -- reschedule_request() (admin-only). Triggers already bound to all 5
 -- rewritten functions stay bound — create or replace function preserves

@@ -51,3 +51,35 @@ export function renderPolicyBlocks(blocks) {
 export function renderPolicyText(text) {
   return renderPolicyBlocks(parsePolicyBody(text));
 }
+
+// Batch-fetches admin-authored body text for one or more system_settings
+// policy keys (e.g. 'cancellation_policy', 'reschedule_policy'). Returns
+// only the keys that have a real, non-empty saved body — callers keep
+// whatever hardcoded fallback copy they already have for any key missing
+// from the result, same "override only when present" contract as
+// js/reservation_form_config.js's loadReservationFormConfig. Never throws:
+// a missing row, malformed JSON, or network failure just means an empty
+// result and every caller falls back to its own hardcoded default.
+export async function loadPolicyBodies(supabase, keys) {
+  const result = {};
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('setting_key, setting_value')
+      .in('setting_key', keys);
+
+    if (error || !data) return result;
+
+    data.forEach((row) => {
+      try {
+        const parsed = JSON.parse(row.setting_value);
+        if (parsed?.body?.trim()) result[row.setting_key] = parsed.body.trim();
+      } catch {
+        // Malformed row for this key — skip it, caller's fallback stands.
+      }
+    });
+  } catch {
+    // Network/DB failure — every key falls back to the caller's default.
+  }
+  return result;
+}

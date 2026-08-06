@@ -29,8 +29,14 @@ async function loadBusinessContact() {
 
     const emailSpan = document.querySelector('.footer-new-contact-row .ti-mail')?.closest('.footer-new-contact-row')?.querySelector('span');
     if (emailSpan && data.email) emailSpan.textContent = data.email;
+
+    // Navbar logo only — the footer keeps its own separate image
+    // (.footer-new-logo, a different crop meant for its dark background).
+    const navLogoEl = document.querySelector('.logo');
+    if (navLogoEl && data.logo_url) navLogoEl.src = data.logo_url;
+    if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
   } catch (err) {
-    console.warn('[footer_content] loadBusinessContact failed:', err?.message || err);
+    // Falls back to the static footer text already in the HTML.
   }
 }
 
@@ -52,7 +58,7 @@ async function loadFooterLocationsSummary() {
     const shortNames = data.map(loc => (loc.name || '').split(',')[0].replace(/^ELI Coffee( Events Cafe)?\s*/i, '').trim() || loc.name);
     addressSpan.textContent = shortNames.join(' & ');
   } catch (err) {
-    console.warn('[footer_content] loadFooterLocationsSummary failed:', err?.message || err);
+    // Falls back to the static footer text already in the HTML.
   }
 }
 
@@ -74,7 +80,7 @@ async function loadFooterServices() {
       `<li><a href="${escapeHtml(s.link_url || '/packages.html')}">${escapeHtml(s.title)}</a></li>`
     ).join('');
   } catch (err) {
-    console.warn('[footer_content] loadFooterServices failed:', err?.message || err);
+    // Falls back to the static footer text already in the HTML.
   }
 }
 

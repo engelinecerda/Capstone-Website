@@ -30,7 +30,8 @@ export async function destroyCloudinaryImage(supabase, imageUrl) {
   try {
     await supabase.functions.invoke('delete-cloudinary-image', { body: { image_url: imageUrl } });
   } catch (err) {
-    console.warn('[image_upload] Cloudinary cleanup failed (non-blocking):', err?.message || err);
+    // Non-blocking cleanup of an already-failed/replaced upload — nothing
+    // for the user to act on either way.
   }
 }
 

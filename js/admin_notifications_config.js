@@ -8,6 +8,13 @@ import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
 
+// Reminders are the only triggers with a lead_days timing control — see
+// supabase/migrations/20260815_reminder_notifications.sql. The catalogue is
+// fixed (no admin-added triggers), so a small static set here is simpler
+// and safer than inferring "is this a reminder" from lead_days being
+// non-null on whatever template row happens to be loaded.
+const REMINDER_TRIGGER_CODES = new Set(['payment_due', 'balance_due', 'event_reminder']);
+
 // ── STATE ────────────────────────────────────────────────────────
 let triggers  = [];   // notification_trigger rows
 let templates = {};   // trigger_code -> notification_template row
@@ -24,6 +31,8 @@ const editorModal        = document.getElementById('editorModal');
 const editorModalTitle   = document.getElementById('editorModalTitle');
 const editorModalSub     = document.getElementById('editorModalSub');
 const editorModalMessage = document.getElementById('editorModalMessage');
+const editorLeadDaysField = document.getElementById('editorLeadDaysField');
+const editorLeadDaysInput = document.getElementById('editorLeadDaysInput');
 const editorSendInApp    = document.getElementById('editorSendInApp');
 const editorSendEmail    = document.getElementById('editorSendEmail');
 const editorSubjectField = document.getElementById('editorSubjectField');
@@ -88,6 +97,9 @@ function renderTriggerList() {
           <p class="trigger-desc">${escapeHtml(t.description)}</p>
         </div>
         <div class="trigger-channels">
+          ${REMINDER_TRIGGER_CODES.has(t.code)
+            ? `<span class="timing-pill">${Number.isFinite(tpl.lead_days) ? `${tpl.lead_days} day${tpl.lead_days === 1 ? '' : 's'} before` : 'Not timed yet'}</span>`
+            : ''}
           <span class="channel-pill ${tpl.send_in_app ? 'is-on' : ''}">In-app</span>
           <span class="channel-pill ${tpl.send_email ? 'is-on' : ''}">Email</span>
         </div>
@@ -181,6 +193,11 @@ function openEditor(triggerCode) {
   editingTriggerCode = triggerCode;
   editorModalTitle.textContent = `Edit Message — ${trigger.label}`;
   editorModalSub.textContent = trigger.description;
+
+  const isReminder = REMINDER_TRIGGER_CODES.has(triggerCode);
+  editorLeadDaysField.style.display = isReminder ? '' : 'none';
+  editorLeadDaysInput.value = isReminder ? (tpl.lead_days ?? '') : '';
+
   editorSendInApp.checked = tpl.send_in_app;
   editorSendEmail.checked = tpl.send_email;
   editorSubjectInput.value = tpl.email_subject || '';
@@ -197,6 +214,16 @@ editorModalSave.addEventListener('click', async () => {
   const body = editorBodyInput.value.trim();
   if (!body) { setModalMsg(editorModalMessage, 'Message body is required.'); return; }
   if (!editorSendInApp.checked && !editorSendEmail.checked) { setModalMsg(editorModalMessage, 'At least one channel must be selected.'); return; }
+
+  const isReminder = REMINDER_TRIGGER_CODES.has(editingTriggerCode);
+  let leadDays = null;
+  if (isReminder) {
+    leadDays = Number(editorLeadDaysInput.value);
+    if (!Number.isFinite(leadDays) || leadDays < 0 || !Number.isInteger(leadDays)) {
+      setModalMsg(editorModalMessage, 'Days before must be a whole number, zero or more.');
+      return;
+    }
+  }
 
   const unknownBody = findUnknownTokens(body);
   const unknownSubject = editorSendEmail.checked ? findUnknownTokens(editorSubjectInput.value) : [];
@@ -217,6 +244,10 @@ editorModalSave.addEventListener('click', async () => {
       updated_at: new Date().toISOString(),
       updated_by: user?.id ?? null,
     };
+    // Only reminder triggers ever get lead_days written — omitted entirely
+    // for the other 6, so that column stays null for them, never touched.
+    if (isReminder) payload.lead_days = leadDays;
+
     const { error } = await supabase.from('notification_template').update(payload).eq('trigger_code', editingTriggerCode);
     if (error) throw error;
 

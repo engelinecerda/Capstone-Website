@@ -52,7 +52,7 @@ loginForm.addEventListener('submit', async function (e) {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
         if (error.message.toLowerCase().includes('email not confirmed')) {
@@ -64,7 +64,6 @@ loginForm.addEventListener('submit', async function (e) {
         return;
     }
 
-    console.log('Login success:', data);
     window.location.href = '/';
 });
 

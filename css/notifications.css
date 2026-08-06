@@ -284,3 +284,92 @@
   outline-offset: -2px;
   border-radius: 6px;
 }
+
+/* ── Customer dropdown — brand palette ──────────────────────────────────────
+   Scoped under .notif-navbar-wrapper (customer-only mount point) rather than
+   restyling the base .notif-* classes directly, so the admin sidebar bell
+   (which reuses those same class names under .notif-sidebar-panel) keeps its
+   existing look untouched. ── */
+.notif-navbar-wrapper .notif-panel {
+  background: #FFFDFA;
+  border: 0.5px solid #E5DBCC;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(62, 36, 24, 0.14), 0 2px 8px rgba(62, 36, 24, 0.06);
+}
+
+.notif-navbar-wrapper .notif-panel-header { border-bottom: 1px solid #F2EADD; }
+.notif-navbar-wrapper .notif-panel-title  { color: #3E2418; }
+
+.notif-navbar-wrapper .notif-panel-unread-count {
+  background: #A34F2E;
+  color: #fff;
+}
+
+.notif-navbar-wrapper .notif-mark-all-btn { color: #A34F2E; }
+.notif-navbar-wrapper .notif-mark-all-btn:hover { background: #FBF8F2; }
+.notif-navbar-wrapper .notif-mark-all-btn:focus-visible {
+  outline: 2px solid #A34F2E;
+  outline-offset: 1px;
+}
+
+.notif-navbar-wrapper .notif-item { border-bottom: 1px solid #F2EADD; }
+.notif-navbar-wrapper .notif-item:hover { background: #FBF8F2; }
+.notif-navbar-wrapper .notif-item:focus-visible {
+  outline: 2px solid #A34F2E;
+  outline-offset: -2px;
+}
+
+.notif-navbar-wrapper .notif-item.unread {
+  background: #FBF8F2;
+  border-left-color: #A34F2E;
+}
+.notif-navbar-wrapper .notif-item.unread:hover { background: #F7EFE3; }
+
+/* Title always uses the primary ink at weight 600 — read/unread is conveyed
+   by the dot + row background instead, not by dimming the title text (that
+   was under 4.5:1 for the read state before). #3E2418 on #FFFDFA ≈ 14:1. */
+.notif-navbar-wrapper .notif-item-title { color: #3E2418; font-weight: 600; }
+
+/* Body copy — was #8A7965 (≈4.1:1, fails AA); #6B5A47 ≈ 6.5:1 on this
+   panel's #FFFDFA/#FBF8F2 backgrounds, still reads as secondary vs. title. */
+.notif-navbar-wrapper .notif-item-body { color: #6B5A47; }
+
+/* Timestamp stays the lighter/faint tone — secondary metadata, not the
+   primary reading content. */
+.notif-navbar-wrapper .notif-item-time { color: #8A7965; }
+
+/* Always rendered — .is-read makes it an invisible spacer instead of being
+   removed from the DOM, so read/unread rows stay aligned. */
+.notif-navbar-wrapper .notif-unread-dot { background: #A34F2E; }
+.notif-navbar-wrapper .notif-unread-dot.is-read { background: transparent; }
+
+.notif-navbar-wrapper .notif-empty { color: #A89880; }
+.notif-navbar-wrapper .notif-empty-icon { opacity: 0.5; }
+.notif-navbar-wrapper .notif-empty-icon svg { display: block; margin: 0 auto; }
+
+.notif-navbar-wrapper .notif-panel-footer {
+  border-top: 1px solid #F2EADD;
+  padding: 8px;
+}
+
+.notif-navbar-wrapper .notif-see-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  border-radius: 8px;
+  background: none;
+  color: #A34F2E;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.notif-navbar-wrapper .notif-see-all-btn:hover,
+.notif-navbar-wrapper .notif-see-all-btn:focus-visible {
+  background: #FBF8F2;
+  outline: none;
+}

@@ -124,6 +124,7 @@
 /* ── TERMS & LEGAL TAB ── */
 .rf-legal-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
 }

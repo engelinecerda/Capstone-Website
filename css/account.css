@@ -3190,6 +3190,35 @@ body {
     line-height: 1.5;
 }
 
+/* Admin-authored overrides (js/policy_text.js's renderPolicyText) replace
+   the hardcoded <p class="cancel-policy-heading"/"cancel-policy-text"> pair
+   above with plain <h4>/<p>/<ul> — style those the same way so a saved
+   override looks identical to the fallback copy. */
+.cancel-policy-body h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #92400e;
+    margin: 0;
+}
+
+.cancel-policy-body p {
+    font-size: 13px;
+    color: #6b4e1e;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.cancel-policy-body ul {
+    margin: 2px 0 0;
+    padding-left: 18px;
+}
+
+.cancel-policy-body li {
+    font-size: 13px;
+    color: #6b4e1e;
+    line-height: 1.5;
+}
+
 .cancel-fee-block {
     display: flex;
     flex-direction: column;
@@ -3551,6 +3580,14 @@ body {
     cursor: not-allowed;
     background: #f5f1eb;
     border-color: #e3d8cd;
+    color: #9c8f84;
+}
+
+.reschedule-time-empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 10px 0;
+    font-size: 12.5px;
     color: #9c8f84;
 }
 

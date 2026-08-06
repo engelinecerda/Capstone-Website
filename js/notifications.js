@@ -76,11 +76,13 @@ function renderList(listEl, notifications) {
   if (!notifications.length) {
     listEl.innerHTML = `
       <li class="notif-empty">
-        <span class="notif-empty-icon">🔔</span>
+        <span class="notif-empty-icon">${BELL_SVG(28)}</span>
         No notifications yet
       </li>`;
     return;
   }
+  // The dot is always rendered (an invisible spacer via .is-read) rather than
+  // omitted when read, so title/body text stays aligned across mixed rows.
   listEl.innerHTML = notifications.map(n => `
     <li class="notif-item ${n.is_read ? '' : 'unread'}"
         data-id="${escHtml(n.id)}"
@@ -93,7 +95,7 @@ function renderList(listEl, notifications) {
         </span>
         <span class="notif-item-body">${escHtml(n.body)}</span>
       </span>
-      ${n.is_read ? '' : '<span class="notif-unread-dot"></span>'}
+      <span class="notif-unread-dot ${n.is_read ? 'is-read' : ''}"></span>
     </li>`).join('');
 }
 
@@ -120,16 +122,27 @@ function syncUnreadPill(count) {
 
 async function fetchAndRender(supabase, userId, listEl, badgeEl) {
   try {
-    const { data } = await supabase
-      .from('notifications')
-      .select('id, type, title, body, link, is_read, created_at')
-      .eq('user_id', userId)
-      .eq('channel', 'in_app')
-      .order('created_at', { ascending: false })
-      .limit(20);
-    const notifs = data || [];
-    renderList(listEl, notifs);
-    const unread = notifs.filter(n => !n.is_read).length;
+    // The dropdown only ever shows the 5 most recent rows, but the badge/
+    // unread pill must reflect the customer's TRUE unread total (which can
+    // exceed 5) — so the count comes from its own head:true query, not from
+    // filtering the capped list.
+    const [{ data }, { count }] = await Promise.all([
+      supabase
+        .from('notifications')
+        .select('id, type, title, body, link, is_read, created_at')
+        .eq('user_id', userId)
+        .eq('channel', 'in_app')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('channel', 'in_app')
+        .eq('is_read', false)
+    ]);
+    renderList(listEl, data || []);
+    const unread = count ?? 0;
     syncBadge(badgeEl, unread);
     syncUnreadPill(unread);
   } catch { /* silently ignore fetch failures */ }
@@ -228,6 +241,9 @@ export async function initCustomerNotificationBell(supabase, userId) {
           <button class="notif-mark-all-btn" id="notifMarkAllCustomer">Mark all read</button>
         </div>
         <ul class="notif-list" id="notifListCustomer"></ul>
+        <div class="notif-panel-footer">
+          <a class="notif-see-all-btn" href="/notifications.html">View all notifications</a>
+        </div>
       </div>
     </span>`;
 
