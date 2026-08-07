@@ -25,6 +25,8 @@ const PACKAGE_VENUE_TABLE = 'package_venue';
 const PACKAGE_PHOTO_TABLE = 'package_photo';
 const BADGE_TABLE = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
+const CATERING_CATEGORY_TABLE = 'catering_dish_category';
+const CATERING_DISH_TABLE = 'catering_dish';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allCategories         = [];
@@ -63,13 +65,22 @@ let bestSellerByCategory  = new Map();   // package_category_id -> package_id  [
 let badgeModalPackageId   = null;
 let editingBadgeTypeId    = null;        // badge_id being edited in the Badge Types view, null = add mode
 
+// Catering menu
+let allCateringCategories   = [];        // catering_dish_category rows
+let allCateringDishes       = [];        // catering_dish rows (flat, all categories)
+let editingCateringCategoryId = null;    // category_id being edited, null = add mode
+let cateringDishDrawerCategoryId = null;
+let cateringDishDrawerCategoryName = '';
+let cateringDishDrawerTriggerEl = null;
+
 // Package-modal dirty-tracking
 let pkgFormSnapshot   = null;
 let tierDrawerTriggerEl = null;
 
 // ─── DOM: Views ───────────────────────────────────────────────────────────────
-const inventoryView = document.getElementById('inventoryView');
-const venueView     = document.getElementById('venueView');
+const inventoryView    = document.getElementById('inventoryView');
+const venueView        = document.getElementById('venueView');
+const cateringMenuView = document.getElementById('cateringMenuView');
 
 // ─── DOM: Inventory toolbar / rail / content ──────────────────────────────────
 const healthStrip         = document.getElementById('healthStrip');
@@ -242,6 +253,44 @@ const badgeTypeVariantSelect  = document.getElementById('badgeTypeVariantSelect'
 const badgeTypeScopeSelect    = document.getElementById('badgeTypeScopeSelect');
 const badgeTypeSortOrder      = document.getElementById('badgeTypeSortOrder');
 
+// ─── DOM: Catering Menu View + Category Modal + Dish Drawer ───────────────────
+const openCateringMenuBtn                 = document.getElementById('openCateringMenuBtn');
+const backToCategoriesFromCateringBtn     = document.getElementById('backToCategoriesFromCateringBtn');
+const addCateringCategoryBtn              = document.getElementById('addCateringCategoryBtn');
+const cateringPageMessage                 = document.getElementById('cateringPageMessage');
+const activeCateringSection               = document.getElementById('activeCateringSection');
+const archivedCateringSection             = document.getElementById('archivedCateringSection');
+const activeCateringBody                  = document.getElementById('activeCateringBody');
+const archivedCateringBody                = document.getElementById('archivedCateringBody');
+
+const cateringCategoryModal          = document.getElementById('cateringCategoryModal');
+const cateringCategoryModalTitle     = document.getElementById('cateringCategoryModalTitle');
+const cateringCategoryModalSub       = document.getElementById('cateringCategoryModalSub');
+const cateringCategoryModalClose     = document.getElementById('cateringCategoryModalClose');
+const cateringCategoryModalCancel    = document.getElementById('cateringCategoryModalCancel');
+const cateringCategoryModalSave      = document.getElementById('cateringCategoryModalSave');
+const cateringCategoryModalSaveLabel = document.getElementById('cateringCategoryModalSaveLabel');
+const cateringCategoryModalMessage   = document.getElementById('cateringCategoryModalMessage');
+const cateringCatName        = document.getElementById('cateringCatName');
+const cateringCatIcon        = document.getElementById('cateringCatIcon');
+const cateringCatTag         = document.getElementById('cateringCatTag');
+const cateringCatSortOrder   = document.getElementById('cateringCatSortOrder');
+const cateringCatRequired    = document.getElementById('cateringCatRequired');
+const cateringPrice20        = document.getElementById('cateringPrice20');
+const cateringPrice30        = document.getElementById('cateringPrice30');
+const cateringPrice40        = document.getElementById('cateringPrice40');
+const cateringPrice50        = document.getElementById('cateringPrice50');
+
+const cateringDishDrawerScrim = document.getElementById('cateringDishDrawerScrim');
+const cateringDishDrawer      = document.getElementById('cateringDishDrawer');
+const cateringDishDrawerTitle = document.getElementById('cateringDishDrawerTitle');
+const cateringDishDrawerList  = document.getElementById('cateringDishDrawerList');
+const cateringDishDrawerClose = document.getElementById('cateringDishDrawerClose');
+const cateringDishDrawerDone  = document.getElementById('cateringDishDrawerDone');
+const cateringDishDrawerMessage = document.getElementById('cateringDishDrawerMessage');
+const cateringNewDishInput    = document.getElementById('cateringNewDishInput');
+const cateringAddDishBtn      = document.getElementById('cateringAddDishBtn');
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -350,9 +399,10 @@ async function ensureArchivedRefCounts(ids) {
 // VIEW SWITCHING
 // ═══════════════════════════════════════════════════════════════════════════════
 function hideAllViews() {
-  inventoryView.style.display   = 'none';
-  venueView.style.display       = 'none';
-  badgeTypesView.style.display  = 'none';
+  inventoryView.style.display    = 'none';
+  venueView.style.display        = 'none';
+  badgeTypesView.style.display   = 'none';
+  cateringMenuView.style.display = 'none';
 }
 
 function showInventoryView() {
@@ -372,10 +422,18 @@ function showBadgeTypesView() {
   renderBadgeTypesTables();
 }
 
+async function showCateringMenuView() {
+  hideAllViews();
+  cateringMenuView.style.display = '';
+  await loadCateringMenu();
+}
+
 openVenuesBtn.addEventListener('click', showVenueView);
 backToCategoriesFromVenuesBtn.addEventListener('click', showInventoryView);
 openBadgeTypesBtn.addEventListener('click', showBadgeTypesView);
 backToCategoriesFromBadgeTypesBtn.addEventListener('click', showInventoryView);
+openCateringMenuBtn.addEventListener('click', showCateringMenuView);
+backToCategoriesFromCateringBtn.addEventListener('click', showInventoryView);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INVENTORY: LOAD (all categories + all packages, batched venue/tier counts)
@@ -1930,6 +1988,18 @@ deleteModalOk.addEventListener('click', async () => {
       }
       renderBadgeTypesTables();
       renderInventory();
+
+    } else if (scope === 'catering-category') {
+      const cat = allCateringCategories.find(c => c.category_id === id);
+      // catering_dish rows cascade automatically (ON DELETE CASCADE, see
+      // 20260820_catering_menu.sql) — no separate dish cleanup needed here.
+      const { error } = await supabase.from(CATERING_CATEGORY_TABLE).delete().eq('category_id', id);
+      if (error) throw error;
+      allCateringCategories = allCateringCategories.filter(c => c.category_id !== id);
+      allCateringDishes = allCateringDishes.filter(d => d.category_id !== id);
+      await logAudit({ action: 'Deleted Catering Category', category: 'package', details: `Deleted catering category: ${cat?.name}`, entityId: id });
+      renderCateringTables();
+      setMessage(cateringPageMessage, 'Category deleted.', 'success');
     }
 
     closeModal(deleteModal);
@@ -2061,6 +2131,26 @@ confirmOk.addEventListener('click', async () => {
       renderBadgeTypesTables();
       renderInventory();
       setMessage(badgeTypesPageMessage, type === 'archive' ? 'Badge type archived.' : 'Badge type restored.', 'success');
+    }
+
+    if (scope === 'catering-category') {
+      const cat = allCateringCategories.find(c => c.category_id === id);
+      const { error, count } = await supabase
+        .from(CATERING_CATEGORY_TABLE)
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('category_id', id);
+      if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
+      const idx = allCateringCategories.findIndex(c => c.category_id === id);
+      if (idx !== -1) allCateringCategories[idx] = { ...allCateringCategories[idx], is_active: isActive };
+      await logAudit({
+        action:   type === 'archive' ? 'Archived Catering Category' : 'Restored Catering Category',
+        category: 'package',
+        details:  `Catering category ${type === 'archive' ? 'archived' : 'restored'}: ${cat?.name}`,
+        entityId: id
+      });
+      renderCateringTables();
+      setMessage(cateringPageMessage, type === 'archive' ? 'Category archived.' : 'Category restored.', 'success');
     }
 
     if (scope === 'badge-move') {
@@ -3015,6 +3105,387 @@ function openConfirmDeleteBadgeType(badgeId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CATERING MENU (catering_dish_category + catering_dish) — backs the buffet
+// builder on reservations.html. Categories are the selectable groups
+// (Chicken, Pasta, Drinks...); dishes are the items inside each.
+// ═══════════════════════════════════════════════════════════════════════════════
+const CATERING_TAG_LABELS = { main: 'Main dish', pasta: 'Pasta', dessert: 'Dessert', rice: 'Rice', drinks: 'Drinks', addon: 'Add-on' };
+
+async function loadCateringMenu() {
+  setMessage(cateringPageMessage, 'Loading catering menu…');
+  try {
+    const [{ data: cats, error: catErr }, { data: dishes, error: dishErr }] = await Promise.all([
+      supabase.from(CATERING_CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }),
+      supabase.from(CATERING_DISH_TABLE).select('*').order('sort_order', { ascending: true }),
+    ]);
+    if (catErr) throw catErr;
+    if (dishErr) throw dishErr;
+    allCateringCategories = cats || [];
+    allCateringDishes = dishes || [];
+    renderCateringTables();
+    setMessage(cateringPageMessage, '');
+  } catch (err) {
+    setMessage(cateringPageMessage, `Failed to load catering menu: ${err.message}`, 'error');
+  }
+}
+
+function dishesForCategory(categoryId) {
+  return allCateringDishes.filter(d => d.category_id === categoryId);
+}
+
+function cateringPriceSummary(cat) {
+  return `${formatCurrency(cat.price_20)} / ${formatCurrency(cat.price_30)} / ${formatCurrency(cat.price_40)} / ${formatCurrency(cat.price_50)}`;
+}
+
+function buildCateringCategoryRow(cat) {
+  const isArchived = !cat.is_active;
+  const dishes = dishesForCategory(cat.category_id);
+  const activeDishCount = dishes.filter(d => d.is_active).length;
+  const actions = isArchived
+    ? `<div class="action-cell">
+        <button class="action-btn edit" data-catering-action="edit" data-id="${cat.category_id}">Edit</button>
+        <button class="action-btn restore" data-catering-action="restore" data-id="${cat.category_id}">Restore</button>
+        <button class="action-btn archive" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
+      </div>`
+    : `<div class="action-cell">
+        <button class="action-btn tiers" data-catering-action="dishes" data-id="${cat.category_id}">Dishes</button>
+        <button class="action-btn edit" data-catering-action="edit" data-id="${cat.category_id}">Edit</button>
+        <button class="action-btn archive" data-catering-action="archive" data-id="${cat.category_id}">Archive</button>
+        <button class="action-btn archive" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
+      </div>`;
+
+  return `<tr>
+    <td>${cat.icon ? cat.icon + ' ' : ''}${escapeHtml(cat.name)} <span class="category-pill">${CATERING_TAG_LABELS[cat.tag] || cat.tag}</span></td>
+    <td>${cat.is_required ? 'Required' : 'Optional'}</td>
+    <td><span class="count-pill">${activeDishCount} dish${activeDishCount === 1 ? '' : 'es'}</span></td>
+    <td>${cateringPriceSummary(cat)}</td>
+    <td>${cat.sort_order}</td>
+    <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
+    <td>${actions}</td>
+  </tr>`;
+}
+
+function renderCateringTables() {
+  const active = allCateringCategories.filter(c => c.is_active);
+  const archived = allCateringCategories.filter(c => !c.is_active);
+
+  activeCateringBody.innerHTML = active.length
+    ? active.map(buildCateringCategoryRow).join('')
+    : '<tr class="empty-row"><td colspan="7">No categories yet. Add one so customers have something to pick from.</td></tr>';
+
+  archivedCateringSection.style.display = archived.length ? '' : 'none';
+  archivedCateringBody.innerHTML = archived.length ? archived.map(buildCateringCategoryRow).join('') : '';
+}
+
+function handleCateringCategoryTableAction(e) {
+  const btn = e.target.closest('[data-catering-action]');
+  if (!btn) return;
+  const { cateringAction, id } = btn.dataset;
+  if (cateringAction === 'edit')    openEditCateringCategoryModal(id);
+  if (cateringAction === 'dishes')  openCateringDishDrawer(id, btn);
+  if (cateringAction === 'archive') openConfirmArchiveCateringCategory(id);
+  if (cateringAction === 'restore') openConfirmRestoreCateringCategory(id);
+  if (cateringAction === 'delete')  openConfirmDeleteCateringCategory(id);
+}
+
+activeCateringBody.addEventListener('click', handleCateringCategoryTableAction);
+archivedCateringBody.addEventListener('click', handleCateringCategoryTableAction);
+
+// ─── Category Modal: Add / Edit ────────────────────────────────────────────────
+function openAddCateringCategoryModal() {
+  editingCateringCategoryId = null;
+  cateringCategoryModalTitle.textContent = 'Add New Category';
+  cateringCategoryModalSub.textContent = 'A selectable group in the buffet builder';
+  cateringCategoryModalSaveLabel.textContent = 'Add Category';
+  cateringCatName.value = '';
+  cateringCatIcon.value = '';
+  cateringCatTag.value = 'main';
+  cateringCatSortOrder.value = '0';
+  cateringCatRequired.checked = true;
+  cateringPrice20.value = '';
+  cateringPrice30.value = '';
+  cateringPrice40.value = '';
+  cateringPrice50.value = '';
+  setModalMsg(cateringCategoryModalMessage, '');
+  openModal(cateringCategoryModal);
+}
+
+function openEditCateringCategoryModal(categoryId) {
+  const cat = allCateringCategories.find(c => c.category_id === categoryId);
+  if (!cat) return;
+
+  editingCateringCategoryId = categoryId;
+  cateringCategoryModalTitle.textContent = 'Edit Category';
+  cateringCategoryModalSub.textContent = `Update "${cat.name}"`;
+  cateringCategoryModalSaveLabel.textContent = 'Save Changes';
+  cateringCatName.value = cat.name || '';
+  cateringCatIcon.value = cat.icon || '';
+  cateringCatTag.value = cat.tag || 'main';
+  cateringCatSortOrder.value = cat.sort_order ?? 0;
+  cateringCatRequired.checked = !!cat.is_required;
+  cateringPrice20.value = cat.price_20 ?? 0;
+  cateringPrice30.value = cat.price_30 ?? 0;
+  cateringPrice40.value = cat.price_40 ?? 0;
+  cateringPrice50.value = cat.price_50 ?? 0;
+  setModalMsg(cateringCategoryModalMessage, '');
+  openModal(cateringCategoryModal);
+}
+
+cateringCategoryModalSave.addEventListener('click', async () => {
+  const name = cateringCatName.value.trim();
+  if (!name) { setModalMsg(cateringCategoryModalMessage, 'Category name is required.'); return; }
+
+  const prices = [cateringPrice20, cateringPrice30, cateringPrice40, cateringPrice50].map(el => Number(el.value));
+  if (prices.some(p => Number.isNaN(p) || p < 0)) {
+    setModalMsg(cateringCategoryModalMessage, 'All four pax-bracket prices are required and must be 0 or more.');
+    return;
+  }
+
+  cateringCategoryModalSave.disabled = true;
+  cateringCategoryModalSaveLabel.textContent = 'Saving…';
+  setModalMsg(cateringCategoryModalMessage, '');
+
+  try {
+    const payload = {
+      name,
+      icon: cateringCatIcon.value.trim() || null,
+      tag: cateringCatTag.value,
+      is_required: cateringCatRequired.checked,
+      sort_order: parseInt(cateringCatSortOrder.value, 10) || 0,
+      price_20: prices[0], price_30: prices[1], price_40: prices[2], price_50: prices[3],
+    };
+
+    if (editingCateringCategoryId) {
+      const { data, error } = await supabase.from(CATERING_CATEGORY_TABLE).update(payload).eq('category_id', editingCateringCategoryId).select().single();
+      if (error) throw error;
+      const idx = allCateringCategories.findIndex(c => c.category_id === editingCateringCategoryId);
+      if (idx !== -1) allCateringCategories[idx] = data;
+      await logAudit({ action: 'Updated Catering Category', category: 'package', details: `Catering category updated: ${name}`, entityId: editingCateringCategoryId });
+      setMessage(cateringPageMessage, 'Category updated successfully.', 'success');
+    } else {
+      payload.is_active = true;
+      const { data, error } = await supabase.from(CATERING_CATEGORY_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      allCateringCategories.push(data);
+      await logAudit({ action: 'Added Catering Category', category: 'package', details: `New catering category created: ${name}`, entityId: data.category_id });
+      setMessage(cateringPageMessage, 'Category added successfully.', 'success');
+    }
+
+    allCateringCategories.sort((a, b) => a.sort_order - b.sort_order);
+    renderCateringTables();
+    closeModal(cateringCategoryModal);
+  } catch (err) {
+    setModalMsg(cateringCategoryModalMessage, `Failed to save: ${err.message}`);
+  } finally {
+    cateringCategoryModalSave.disabled = false;
+    cateringCategoryModalSaveLabel.textContent = editingCateringCategoryId ? 'Save Changes' : 'Add Category';
+  }
+});
+
+addCateringCategoryBtn.addEventListener('click', openAddCateringCategoryModal);
+cateringCategoryModalClose.addEventListener('click',  () => closeModal(cateringCategoryModal));
+cateringCategoryModalCancel.addEventListener('click', () => closeModal(cateringCategoryModal));
+cateringCategoryModal.addEventListener('click', e => { if (e.target === cateringCategoryModal) closeModal(cateringCategoryModal); });
+
+// ─── Category Archive / Restore / Delete ───────────────────────────────────────
+function openConfirmArchiveCateringCategory(categoryId) {
+  const cat = allCateringCategories.find(c => c.category_id === categoryId);
+  if (!cat) return;
+  pendingAction = { scope: 'catering-category', type: 'archive', id: categoryId };
+  confirmTitle.textContent = 'Archive Category';
+  confirmCopy.textContent  = `Archive "${cat.name}"? It will disappear from the customer buffet builder until restored. Its dishes and prices are kept.`;
+  confirmOk.textContent    = 'Archive';
+  confirmOk.className      = 'btn-danger';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+function openConfirmRestoreCateringCategory(categoryId) {
+  const cat = allCateringCategories.find(c => c.category_id === categoryId);
+  if (!cat) return;
+  pendingAction = { scope: 'catering-category', type: 'restore', id: categoryId };
+  confirmTitle.textContent = 'Restore Category';
+  confirmCopy.textContent  = `Restore "${cat.name}" and show it in the buffet builder again?`;
+  confirmOk.textContent    = 'Restore';
+  confirmOk.className      = 'btn-primary';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+// Nothing else in the schema references a catering category (reservations
+// store the customer's pick as text, not a foreign key), so unlike
+// package/venue delete this needs no reservation-reference check — a plain
+// confirm is enough. Dishes cascade automatically (ON DELETE CASCADE).
+function openConfirmDeleteCateringCategory(categoryId) {
+  const cat = allCateringCategories.find(c => c.category_id === categoryId);
+  if (!cat) return;
+  const dishCount = dishesForCategory(categoryId).length;
+  pendingDeleteAction = { scope: 'catering-category', id: categoryId, mode: 'delete' };
+  deleteReassignField.classList.add('hidden');
+  deleteModalTitle.textContent = 'Delete Category';
+  deleteModalCopy.textContent  = `Delete "${cat.name}"${dishCount ? ` and its ${dishCount} dish${dishCount === 1 ? '' : 'es'}` : ''}? This can't be undone. Past reservations that already picked from this category keep their record — deleting it doesn't touch reservation history.`;
+  deleteModalOk.textContent    = 'Delete';
+  deleteModalOk.disabled = false;
+  setModalMsg(deleteModalMessage, '');
+  openModal(deleteModal);
+}
+
+// ─── Dish Drawer (right-anchored, reuses tier-drawer styling) ─────────────────
+function openCateringDishDrawer(categoryId, triggerEl) {
+  const cat = allCateringCategories.find(c => c.category_id === categoryId);
+  if (!cat) return;
+
+  cateringDishDrawerCategoryId   = categoryId;
+  cateringDishDrawerCategoryName = cat.name;
+  cateringDishDrawerTriggerEl    = triggerEl || document.activeElement;
+
+  cateringDishDrawerTitle.textContent = cat.name;
+  cateringNewDishInput.value = '';
+  setModalMsg(cateringDishDrawerMessage, '');
+
+  cateringDishDrawerScrim.classList.remove('hidden');
+  cateringDishDrawer.classList.add('open');
+  cateringDishDrawer.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('tier-drawer-open');
+
+  renderCateringDishDrawerList();
+
+  const trapHandler = trapFocus(cateringDishDrawer);
+  function escHandler(e) { if (e.key === 'Escape') closeCateringDishDrawer(); }
+  document.addEventListener('keydown', escHandler);
+  cateringDishDrawer._cleanup = () => {
+    if (trapHandler) cateringDishDrawer.removeEventListener('keydown', trapHandler);
+    document.removeEventListener('keydown', escHandler);
+  };
+}
+
+function closeCateringDishDrawer() {
+  cateringDishDrawerScrim.classList.add('hidden');
+  cateringDishDrawer.classList.remove('open');
+  cateringDishDrawer.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('tier-drawer-open');
+  if (cateringDishDrawer._cleanup) { cateringDishDrawer._cleanup(); cateringDishDrawer._cleanup = null; }
+  cateringDishDrawerCategoryId = null;
+  cateringDishDrawerCategoryName = '';
+  renderCateringTables(); // refresh dish counts on the row behind the drawer
+  if (cateringDishDrawerTriggerEl && document.body.contains(cateringDishDrawerTriggerEl)) cateringDishDrawerTriggerEl.focus();
+  cateringDishDrawerTriggerEl = null;
+}
+
+cateringDishDrawerClose.addEventListener('click', closeCateringDishDrawer);
+cateringDishDrawerDone.addEventListener('click', closeCateringDishDrawer);
+cateringDishDrawerScrim.addEventListener('click', closeCateringDishDrawer);
+
+function renderCateringDishDrawerList() {
+  const dishes = dishesForCategory(cateringDishDrawerCategoryId);
+  if (!dishes.length) {
+    cateringDishDrawerList.innerHTML = '<p class="modal-hint">No dishes yet — add one below.</p>';
+    return;
+  }
+  cateringDishDrawerList.innerHTML = dishes.map((dish, index) => `
+    <div class="inclusion-row ${!dish.is_active ? 'is-archived-dish' : ''}" data-dish-id="${dish.dish_id}">
+      <button type="button" class="reorder-btn" data-dish-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="reorder-btn" data-dish-action="down" ${index === dishes.length - 1 ? 'disabled' : ''}>↓</button>
+      <input type="text" data-dish-name-input value="${escapeHtml(dish.name)}" placeholder="Dish name">
+      <button type="button" class="dish-toggle-btn ${dish.is_active ? 'is-active' : 'is-hidden'}" data-dish-action="toggle" title="${dish.is_active ? 'Hide from customers' : 'Show to customers'}">${dish.is_active ? '●' : '○'}</button>
+      <button type="button" data-dish-action="remove" title="Delete dish">✕</button>
+    </div>
+  `).join('');
+}
+
+async function persistDishOrder(dishes) {
+  // Swap-only reorder writes just the two touched rows, not the whole list.
+  await Promise.all(dishes.map(d => supabase.from(CATERING_DISH_TABLE).update({ sort_order: d.sort_order }).eq('dish_id', d.dish_id)));
+}
+
+cateringDishDrawerList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-dish-action]');
+  if (!btn) return;
+  const row = btn.closest('[data-dish-id]');
+  const dishId = row?.dataset.dishId;
+  const dish = allCateringDishes.find(d => d.dish_id === dishId);
+  if (!dish) return;
+  const action = btn.dataset.dishAction;
+
+  try {
+    if (action === 'remove') {
+      const { error } = await supabase.from(CATERING_DISH_TABLE).delete().eq('dish_id', dishId);
+      if (error) throw error;
+      allCateringDishes = allCateringDishes.filter(d => d.dish_id !== dishId);
+      await logAudit({ action: 'Deleted Catering Dish', category: 'package', details: `Deleted dish: ${dish.name} (Category: ${cateringDishDrawerCategoryName})`, entityId: dishId });
+      renderCateringDishDrawerList();
+    }
+
+    if (action === 'toggle') {
+      const nextActive = !dish.is_active;
+      const { error } = await supabase.from(CATERING_DISH_TABLE).update({ is_active: nextActive }).eq('dish_id', dishId);
+      if (error) throw error;
+      dish.is_active = nextActive;
+      renderCateringDishDrawerList();
+    }
+
+    if (action === 'up' || action === 'down') {
+      const siblings = dishesForCategory(cateringDishDrawerCategoryId);
+      const idx = siblings.findIndex(d => d.dish_id === dishId);
+      const swapWith = action === 'up' ? idx - 1 : idx + 1;
+      if (swapWith < 0 || swapWith >= siblings.length) return;
+      const a = siblings[idx], b = siblings[swapWith];
+      const tmp = a.sort_order; a.sort_order = b.sort_order; b.sort_order = tmp;
+      await persistDishOrder([a, b]);
+      renderCateringDishDrawerList();
+    }
+  } catch (err) {
+    setModalMsg(cateringDishDrawerMessage, `Failed: ${err.message}`);
+  }
+});
+
+cateringDishDrawerList.addEventListener('change', async (e) => {
+  const input = e.target.closest('[data-dish-name-input]');
+  if (!input) return;
+  const row = input.closest('[data-dish-id]');
+  const dishId = row?.dataset.dishId;
+  const dish = allCateringDishes.find(d => d.dish_id === dishId);
+  const newName = input.value.trim();
+  if (!dish || !newName || newName === dish.name) { if (dish) input.value = dish.name; return; }
+
+  try {
+    const { error } = await supabase.from(CATERING_DISH_TABLE).update({ name: newName }).eq('dish_id', dishId);
+    if (error) throw error;
+    dish.name = newName;
+  } catch (err) {
+    input.value = dish.name;
+    setModalMsg(cateringDishDrawerMessage, `Failed to rename: ${err.message}`);
+  }
+});
+
+async function addCateringDish() {
+  const name = cateringNewDishInput.value.trim();
+  if (!name || !cateringDishDrawerCategoryId) return;
+  cateringAddDishBtn.disabled = true;
+  setModalMsg(cateringDishDrawerMessage, '');
+  try {
+    const siblings = dishesForCategory(cateringDishDrawerCategoryId);
+    const nextSort = siblings.length ? Math.max(...siblings.map(d => d.sort_order)) + 10 : 10;
+    const { data, error } = await supabase.from(CATERING_DISH_TABLE)
+      .insert({ category_id: cateringDishDrawerCategoryId, name, sort_order: nextSort, is_active: true })
+      .select().single();
+    if (error) throw error;
+    allCateringDishes.push(data);
+    await logAudit({ action: 'Added Catering Dish', category: 'package', details: `New dish added: ${name} (Category: ${cateringDishDrawerCategoryName})`, entityId: data.dish_id });
+    cateringNewDishInput.value = '';
+    renderCateringDishDrawerList();
+  } catch (err) {
+    setModalMsg(cateringDishDrawerMessage, `Failed to add dish: ${err.message}`);
+  } finally {
+    cateringAddDishBtn.disabled = false;
+    cateringNewDishInput.focus();
+  }
+}
+
+cateringAddDishBtn.addEventListener('click', addCateringDish);
+cateringNewDishInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCateringDish(); } });
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // KEYBOARD: Escape closes modals
 // ═══════════════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
@@ -3027,6 +3498,8 @@ document.addEventListener('keydown', e => {
   if (!badgeModal.classList.contains('hidden'))    closeModal(badgeModal);
   if (!badgeTypeModal.classList.contains('hidden')) closeModal(badgeTypeModal);
   if (!deleteModal.classList.contains('hidden'))   closeModal(deleteModal);
+  if (!cateringCategoryModal.classList.contains('hidden')) closeModal(cateringCategoryModal);
+  if (cateringDishDrawer.classList.contains('open')) closeCateringDishDrawer();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

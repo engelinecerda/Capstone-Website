@@ -126,23 +126,7 @@
                         </div>
 
                         <div id="catering-section" class="hidden">
-                            <div class="catering-inclusions">
-                                <h4><i class="ti ti-clipboard-list" aria-hidden="true"></i> Catering Package Inclusions</h4>
-                                <ul>
-                                    <li>Catering Buffet Set Up (3 Dishes, 1 Pasta, Rice, Dessert &amp; Drink)</li>
-                                    <li>Set of Utensils</li>
-                                    <li>Uniformed Waiters &amp; Servers</li>
-                                    <li>Dressed Tables &amp; Chairs</li>
-                                    <li>Basic Backdrop Stage Set Up</li>
-                                    <li>Table Centerpiece</li>
-                                    <li>3&ndash;4 Hours of Service</li>
-                                    <li>Crew meal and transportation fee applies</li>
-                                </ul>
-                                <div class="special-offer">
-                                    <i class="ti ti-gift" aria-hidden="true"></i> Special Offer
-                                    <span>FREE Overflowing Coffee &amp; 1 Appetizer/Dessert</span>
-                                </div>
-                            </div>
+                            <div class="catering-inclusions" id="catering-inclusions-block"></div>
 
                             <div class="progress-tracker" id="catering-progress-tracker"></div>
 
@@ -868,7 +852,11 @@ By signing below, the Client confirms that the reservation details above are acc
     let activePolicyKey = 'terms';
 
     // ── Catering dish data ─────────────────────────────────────────────────
-    const DISHES = [
+    // Admin-editable via Bookable Inventory > Catering Menu (super_admin_packages.js),
+    // backed by public.catering_dish_category + public.catering_dish. Falls
+    // back to the old hardcoded menu only if that fetch fails, so the form
+    // never breaks outright on a DB hiccup.
+    const FALLBACK_DISHES = [
         { cat:'Chicken',    icon:'&#127831;', tag:'main',    required:true,  items:['Chicken ala King','Chicken Fillet w/ White Sauce','Garlic Butter Chicken'] },
         { cat:'Pork',       icon:'&#129385;', tag:'main',    required:true,  items:['Pork with Mushroom','Crunchy Pork','Pork Caldereta'] },
         { cat:'Beef',       icon:'&#129385;', tag:'main',    required:true,  items:['Beef Teriyaki','Beef Salpicao','Beef and Broccoli'] },
@@ -879,7 +867,7 @@ By signing below, the Client confirms that the reservation details above are acc
         { cat:'Rice',       icon:'&#127834;', tag:'rice',    required:false, items:['Steamed Rice'] }
     ];
 
-    const PRICES = {
+    const FALLBACK_PRICES = {
         Chicken:    {20:2700, 30:3800, 40:4800, 50:5900},
         Pork:       {20:2700, 30:3800, 40:4800, 50:5900},
         Beef:       {20:2700, 30:3800, 40:4800, 50:5900},
@@ -889,6 +877,45 @@ By signing below, the Client confirms that the reservation details above are acc
         Dessert:    {20:1400, 30:2900, 40:2600, 50:3200},
         Rice:       {20:600,  30:900,  40:1200, 50:1500}
     };
+
+    let DISHES = FALLBACK_DISHES;
+    let PRICES = FALLBACK_PRICES;
+
+    async function loadCateringMenu() {
+        try {
+            const [{ data: cats, error: catErr }, { data: dishRows, error: dishErr }] = await Promise.all([
+                supabase.from('catering_dish_category').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+                supabase.from('catering_dish').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+            ]);
+            if (catErr) throw catErr;
+            if (dishErr) throw dishErr;
+            if (!cats || !cats.length) return; // empty menu — keep the fallback rather than showing nothing
+
+            const dishesByCategory = {};
+            (dishRows || []).forEach(d => {
+                (dishesByCategory[d.category_id] ||= []).push(d.name);
+            });
+
+            DISHES = cats
+                .filter(c => (dishesByCategory[c.category_id] || []).length > 0) // hide empty categories from the builder
+                .map(c => ({
+                    cat: c.name,
+                    icon: c.icon || '&#127860;',
+                    tag: c.tag,
+                    required: !!c.is_required,
+                    items: dishesByCategory[c.category_id],
+                }));
+
+            PRICES = {};
+            cats.forEach(c => { PRICES[c.name] = { 20: Number(c.price_20), 30: Number(c.price_30), 40: Number(c.price_40), 50: Number(c.price_50) }; });
+        } catch (err) {
+            console.warn('Failed to load catering menu from database, using fallback menu:', err);
+            DISHES = FALLBACK_DISHES;
+            PRICES = FALLBACK_PRICES;
+        }
+    }
+
+    await loadCateringMenu();
 
     // ── Utility ────────────────────────────────────────────────────────────
     function pad(v) { return String(v).padStart(2, '0'); }
@@ -1892,6 +1919,7 @@ By signing below, the Client confirms that the reservation details above are acc
                 label: p.package_name,
                 price: p.price,
                 desc: p.description || '',
+                inclusions: Array.isArray(p.inclusions) ? p.inclusions : [],
                 durationHours: Number(p.duration_hours || 0) || null,
                 bookingScope: p.booking_scope || null,
                 min_guests: p.min_guests ?? null,
@@ -2043,6 +2071,7 @@ By signing below, the Client confirms that the reservation details above are acc
             if (S.offsiteCategory === 'catering') {
                 subEl.classList.add('hidden');
                 cateringEl.classList.remove('hidden');
+                buildCateringInclusionsBlock();
                 buildCateringDishBuilder();
             } else {
                 cateringEl.classList.add('hidden');
@@ -2193,6 +2222,52 @@ By signing below, the Client confirms that the reservation details above are acc
                 if (window.venueMap) window.venueMap.invalidateSize();
             }, 150);
         }
+    }
+
+    // ── Catering inclusions block (admin-editable via the package's own
+    // Description + Inclusions fields in Inventory, same fields used on the
+    // public Packages page — this used to be static hardcoded HTML) ───────
+    function escHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    }
+
+    function buildCateringInclusionsBlock() {
+        const block = document.getElementById('catering-inclusions-block');
+        if (!block) return;
+        const pkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
+        if (!pkg) { block.innerHTML = ''; return; }
+
+        const items = Array.isArray(pkg.inclusions) ? pkg.inclusions.filter(i => i && i.trim()) : [];
+        const desc  = (pkg.desc || '').trim();
+
+        // An inclusion line written as "Special Offer: ..." (case-insensitive,
+        // same "label: text" convention already used for tier inclusions
+        // elsewhere in this app) renders in the highlighted offer box instead
+        // of a plain bullet — lets admins control it without a dedicated field.
+        const bulletItems = [];
+        const offerItems = [];
+        items.forEach(item => {
+            const m = item.match(/^\s*special offer\s*:\s*(.+)$/i);
+            if (m) offerItems.push(m[1].trim());
+            else bulletItems.push(item);
+        });
+
+        if (!desc && !bulletItems.length && !offerItems.length) {
+            block.innerHTML = `
+                <h4><i class="ti ti-clipboard-list" aria-hidden="true"></i> Catering Package Inclusions</h4>
+                <p style="font-size:14px;color:var(--text-light,#8a8378);margin:0;">Inclusions are provided upon inquiry. Please contact us for details.</p>`;
+            return;
+        }
+
+        let html = `<h4><i class="ti ti-clipboard-list" aria-hidden="true"></i> Catering Package Inclusions</h4>`;
+        if (desc) html += `<p class="catering-inclusions-desc">${escHtml(desc)}</p>`;
+        if (bulletItems.length) {
+            html += `<ul>${bulletItems.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
+        }
+        offerItems.forEach(offer => {
+            html += `<div class="special-offer"><i class="ti ti-gift" aria-hidden="true"></i> Special Offer<span>${escHtml(offer)}</span></div>`;
+        });
+        block.innerHTML = html;
     }
 
     // ── Catering dish builder ──────────────────────────────────────────────
@@ -2512,9 +2587,14 @@ By signing below, the Client confirms that the reservation details above are acc
             }
         } else if (S.offsiteCategory === 'catering') {
             const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
+            const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
             pkgRows += sr('Service', catObj ? catObj.name : 'Catering');
-            pkgRows += sr('Inclusions', 'Buffet setup, utensils, waiters, styled tables, backdrop, centerpiece, 3–4 hrs');
-            pkgRows += sr('Special Offer', 'FREE Overflowing Coffee &amp; 1 Appetizer/Dessert');
+            const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
+            const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
+            const cateringPlainItems = cateringItems.filter(i => i !== cateringOffer);
+            if (cateringPlainItems.length) pkgRows += sr('Inclusions', cateringPlainItems.join(', '));
+            else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc);
+            if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''));
             S.cateringCart.filter(i => i && i.pax).forEach(i => {
                 total += i.price;
                 pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; &#8369;' + i.price.toLocaleString());
