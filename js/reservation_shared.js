@@ -154,7 +154,8 @@ export function getReservationStatusMeta(status) {
         completed: 'Completed',
         rescheduled: 'Rescheduled',
         resubmission_requested: 'Resubmission Requested',
-        cancellation_requested: 'Cancellation Requested'
+        cancellation_requested: 'Cancellation Requested',
+        cancellation_approved: 'Cancellation Approved — Fee Due'
     };
 
     return {
@@ -299,7 +300,7 @@ export function computeCanReschedule(status, rescheduleRequests) {
     return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !latestOpenRequest;
 }
 
-export function computeCanCancel(status, payments) {
+export function computeCanCancel(status, payments, reservation = null, paymentRules = null) {
     const normalizedStatus = String(status || '').toLowerCase();
     if (!['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) return false;
 
@@ -307,6 +308,40 @@ export function computeCanCancel(status, payments) {
         payment.payment_type === 'cancellation_fee'
         && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
     ));
+    if (hasPendingFee) return false;
 
-    return !hasPendingFee;
+    return getCancellationBlockReason(reservation, paymentRules) === null;
+}
+
+// Returns null when the optional time-based cancellation rules allow a
+// request right now, or a customer-facing sentence explaining why they
+// don't. Both rules are opt-in — a null/unset value in paymentRules means
+// that particular rule is off (see the admin Payment Rules panel).
+export function getCancellationBlockReason(reservation, paymentRules) {
+    if (!reservation) return null;
+
+    const minNotice = paymentRules?.cancellation_min_notice_days;
+    if (minNotice !== null && minNotice !== undefined && Number.isFinite(Number(minNotice))) {
+        const eventDate = getReservationEventDateTime(reservation);
+        if (eventDate) {
+            const daysUntilEvent = (eventDate.getTime() - Date.now()) / 86400000;
+            if (daysUntilEvent < Number(minNotice)) {
+                const n = Number(minNotice);
+                return `Cancellation requests must be submitted at least ${n} day${n === 1 ? '' : 's'} before your event date.`;
+            }
+        }
+    }
+
+    const requestWindow = paymentRules?.cancellation_request_window_days;
+    if (requestWindow !== null && requestWindow !== undefined && Number.isFinite(Number(requestWindow))) {
+        if (reservation.created_at) {
+            const daysSinceBooking = (Date.now() - new Date(reservation.created_at).getTime()) / 86400000;
+            if (daysSinceBooking > Number(requestWindow)) {
+                const n = Number(requestWindow);
+                return `Cancellation requests are only accepted within ${n} day${n === 1 ? '' : 's'} of booking.`;
+            }
+        }
+    }
+
+    return null;
 }

@@ -620,7 +620,8 @@ table td {
 .status-pill.pending,
 .status-pill.pending_review,
 .status-pill.requested,
-.status-pill.resubmission_requested {
+.status-pill.resubmission_requested,
+.status-pill.cancellation_requested {
   background: var(--pending);
   color: var(--pending-txt);
 }
@@ -638,6 +639,11 @@ table td {
 .status-pill.overpaid {
   background: var(--declined);
   color: var(--declined-txt);
+}
+
+.status-pill.cancellation_approved {
+  background: var(--info);
+  color: var(--info-txt);
 }
 
 .status-pill.completed {
@@ -822,6 +828,7 @@ table td {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

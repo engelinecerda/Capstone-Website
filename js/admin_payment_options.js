@@ -559,7 +559,9 @@ const DEFAULT_PAYMENT_RULES = {
   cancellation_fee_onsite: 500,
   cancellation_fee_offsite: 2000,
   reschedule_fee: 3000,
-  service_charge_percent: 10
+  service_charge_percent: 10,
+  cancellation_min_notice_days: null,
+  cancellation_request_window_days: null
 };
 
 function populatePaymentRulesFields(config) {
@@ -570,6 +572,11 @@ function populatePaymentRulesFields(config) {
   const cancelOnsite = document.getElementById('pr-cancellation-fee-onsite');
   const cancelOffsite = document.getElementById('pr-cancellation-fee-offsite');
   const rescheduleFee = document.getElementById('pr-reschedule-fee');
+  const minNoticeEnabled = document.getElementById('pr-cancellation-min-notice-enabled');
+  const minNoticeInput = document.getElementById('pr-cancellation-min-notice-days');
+  const requestWindowEnabled = document.getElementById('pr-cancellation-request-window-enabled');
+  const requestWindowInput = document.getElementById('pr-cancellation-request-window-days');
+
   if (maxInst) maxInst.value = config.max_installments ?? '';
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
   if (refundWindow) refundWindow.value = config.refund_window_days ?? '';
@@ -577,9 +584,26 @@ function populatePaymentRulesFields(config) {
   if (cancelOnsite) cancelOnsite.value = config.cancellation_fee_onsite ?? '';
   if (cancelOffsite) cancelOffsite.value = config.cancellation_fee_offsite ?? '';
   if (rescheduleFee) rescheduleFee.value = config.reschedule_fee ?? '';
+
+  const hasMinNotice = config.cancellation_min_notice_days !== null && config.cancellation_min_notice_days !== undefined;
+  if (minNoticeEnabled) minNoticeEnabled.checked = hasMinNotice;
+  if (minNoticeInput) {
+    minNoticeInput.value = hasMinNotice ? config.cancellation_min_notice_days : '';
+    minNoticeInput.disabled = !hasMinNotice;
+  }
+
+  const hasRequestWindow = config.cancellation_request_window_days !== null && config.cancellation_request_window_days !== undefined;
+  if (requestWindowEnabled) requestWindowEnabled.checked = hasRequestWindow;
+  if (requestWindowInput) {
+    requestWindowInput.value = hasRequestWindow ? config.cancellation_request_window_days : '';
+    requestWindowInput.disabled = !hasRequestWindow;
+  }
 }
 
 function readPaymentRulesFields() {
+  const minNoticeEnabled = !!document.getElementById('pr-cancellation-min-notice-enabled')?.checked;
+  const requestWindowEnabled = !!document.getElementById('pr-cancellation-request-window-enabled')?.checked;
+
   return {
     max_installments: Number(document.getElementById('pr-max-installments')?.value),
     auto_hold_enabled: !!document.getElementById('pr-auto-hold')?.checked,
@@ -587,7 +611,13 @@ function readPaymentRulesFields() {
     currency: 'PHP',
     cancellation_fee_onsite: Number(document.getElementById('pr-cancellation-fee-onsite')?.value),
     cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value),
-    reschedule_fee: Number(document.getElementById('pr-reschedule-fee')?.value)
+    reschedule_fee: Number(document.getElementById('pr-reschedule-fee')?.value),
+    cancellation_min_notice_days: minNoticeEnabled
+      ? Number(document.getElementById('pr-cancellation-min-notice-days')?.value)
+      : null,
+    cancellation_request_window_days: requestWindowEnabled
+      ? Number(document.getElementById('pr-cancellation-request-window-days')?.value)
+      : null
   };
 }
 
@@ -597,6 +627,12 @@ function validatePaymentRules(config) {
   if (!Number.isFinite(config.cancellation_fee_onsite) || config.cancellation_fee_onsite < 0) return 'Onsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.cancellation_fee_offsite) || config.cancellation_fee_offsite < 0) return 'Offsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.reschedule_fee) || config.reschedule_fee < 0) return 'Reschedule fee must be zero or more.';
+  if (config.cancellation_min_notice_days !== null && (!Number.isFinite(config.cancellation_min_notice_days) || config.cancellation_min_notice_days < 0)) {
+    return 'Minimum cancellation notice must be zero or more days.';
+  }
+  if (config.cancellation_request_window_days !== null && (!Number.isFinite(config.cancellation_request_window_days) || config.cancellation_request_window_days < 1)) {
+    return 'Cancellation request window must be at least 1 day.';
+  }
   return null;
 }
 
@@ -877,6 +913,14 @@ async function init() {
   document.getElementById('pm2ConfirmOk')?.addEventListener('click', pm2ConfirmAction);
 
   document.getElementById('pr-save-btn')?.addEventListener('click', savePaymentRules);
+  document.getElementById('pr-cancellation-min-notice-enabled')?.addEventListener('change', (e) => {
+    const input = document.getElementById('pr-cancellation-min-notice-days');
+    if (input) input.disabled = !e.target.checked;
+  });
+  document.getElementById('pr-cancellation-request-window-enabled')?.addEventListener('change', (e) => {
+    const input = document.getElementById('pr-cancellation-request-window-days');
+    if (input) input.disabled = !e.target.checked;
+  });
 
   document.getElementById('sc-save-global-btn')?.addEventListener('click', saveGlobalServiceCharge);
   document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());

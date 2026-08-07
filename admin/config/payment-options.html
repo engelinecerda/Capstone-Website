@@ -233,6 +233,36 @@
 
         <div class="pr-row">
           <div class="pr-row-copy">
+            <p class="pr-row-label">Minimum notice before event</p>
+            <p class="pr-row-desc">Customers must request cancellation at least this many days before their event date. Leave unchecked for no minimum.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle" style="margin-right:8px;">
+              <input type="checkbox" id="pr-cancellation-min-notice-enabled">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-min-notice-days" min="0" disabled>
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Cancellation request window</p>
+            <p class="pr-row-desc">Customers may only request cancellation within this many days of booking. Leave unchecked to allow cancellation any time before the event.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle" style="margin-right:8px;">
+              <input type="checkbox" id="pr-cancellation-request-window-enabled">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-request-window-days" min="1" disabled>
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
             <p class="pr-row-label">Currency</p>
             <p class="pr-row-desc">Single currency used across all reservations and payments.</p>
           </div>

@@ -5,6 +5,7 @@ import {
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails,
     isReservationPaymentEnabled,
+    loadPaymentRules,
     loadReservationRules
 } from './customer_payments.js';
 import {
@@ -22,7 +23,9 @@ import {
     getRescheduleStatusMeta,
     computeContractMeta,
     computeCanReschedule,
-    computeCanCancel
+    computeCanCancel,
+    getCancellationBlockReason,
+    getCancellationFee
 } from './reservation_shared.js';
 
 const { data: { session } } = await supabase.auth.getSession();
@@ -136,13 +139,14 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules, paymentRules] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
-        loadReservationRules(supabase)
+        loadReservationRules(supabase),
+        loadPaymentRules(supabase).catch(() => null)
     ]);
 
     pageData = {
@@ -153,7 +157,8 @@ async function loadPageData() {
         paymentsByReservationId,
         cancellationInfo,
         review,
-        reservationRules
+        reservationRules,
+        paymentRules
     };
 }
 
@@ -166,6 +171,19 @@ function getLatestApprovedPaymentDate(payments) {
 
 function getCancellationFeePayment(payments) {
     return (payments || []).find((payment) => payment.payment_type === 'cancellation_fee') || null;
+}
+
+// True only while the reservation is sitting in cancellation_approved with
+// no cancellation_fee payment yet submitted, or with one that was rejected
+// (needs resubmission). Once a cancellation_fee payment is pending_review
+// or approved, this goes false — matches the same "hasPendingCancellationFee"
+// gating customer_payments.js's getAvailablePaymentOptions() already uses
+// to decide whether to offer the fee as a payment option.
+function isCancellationFeeOwed(reservation, payments) {
+    if (String(reservation?.status || '').toLowerCase() !== 'cancellation_approved') return false;
+    const feePayment = getCancellationFeePayment(payments);
+    const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
+    return !feePayment || feeStatus === 'rejected';
 }
 
 // Four-step stepper: Submitted -> Verification -> Payment -> Confirmed.
@@ -367,8 +385,15 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl) {
-    const paymentDone = balance.remainingBalance <= 0;
+function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null) {
+    // balance.remainingBalance only tracks the base package price — it goes
+    // to 0 the moment the package itself is paid off, regardless of whether
+    // a *cancellation* fee is now separately owed on top of that. Without
+    // the cancellationFeeOwed check, a fully-paid reservation that later
+    // moves to cancellation_approved reads as paymentDone forever and the
+    // CTA below never renders, even though the customer still owes money.
+    const baseBalancePaid = balance.remainingBalance <= 0;
+    const paymentDone = baseBalancePaid && !cancellationFeeOwed;
     const verificationDone = isReservationPaymentEnabled(reservation);
     const hideActions = ['cancelled', 'declined', 'completed'].includes(effectiveStatus);
     const showPaymentCta = !hideActions && !paymentDone;
@@ -388,9 +413,15 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     <span>${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</span>
                 </div>
                 <div class="rd-receipt-row rd-receipt-total">
-                    <span>${paymentDone ? 'Paid in full' : `Balance due by ${escapeHtml(balance.dueDateLabel)}`}</span>
-                    <span>${escapeHtml(paymentDone ? formatCurrency(0) : formatCurrency(balance.remainingBalance))}</span>
+                    <span>${baseBalancePaid ? 'Paid in full' : `Balance due by ${escapeHtml(balance.dueDateLabel)}`}</span>
+                    <span>${escapeHtml(baseBalancePaid ? formatCurrency(0) : formatCurrency(balance.remainingBalance))}</span>
                 </div>
+                ${cancellationFeeOwed ? `
+                    <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
+                        <span>Cancellation fee due</span>
+                        <span>${escapeHtml(formatCurrency(getCancellationFee(reservation, paymentRules)))}</span>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="rd-contract-inset">
@@ -415,7 +446,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} Continue payment
+                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : 'Continue payment'}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your contract is verified</p>` : ''}
             ` : ''}
@@ -423,14 +454,24 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     `;
 }
 
-function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus) {
+function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason = null) {
     if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return '';
 
     const latestRequest = rescheduleRequests[0] || null;
     const openRescheduleUrl = `/account.html?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
     const openCancelUrl = `/account.html?section=reservations&open=cancel&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
-    if (!latestRequest && !canReschedule && !canCancel) return '';
+    // A block reason is only ever shown for the time-based rules (min notice
+    // / request window) — computeCanCancel already returns false for other
+    // reasons (wrong status, open fee) without a matching reason string, so
+    // cancelMarkup naturally renders nothing in those cases, same as before.
+    const cancelMarkup = canCancel
+        ? `<a class="rd-cancel-link" href="${escapeHtml(openCancelUrl)}">Cancel reservation</a>`
+        : (cancelBlockReason
+            ? `<span class="rd-cancel-blocked" title="${escapeHtml(cancelBlockReason)}">${escapeHtml(cancelBlockReason)}</span>`
+            : '');
+
+    if (!latestRequest && !canReschedule && !canCancel && !cancelBlockReason) return '';
 
     if (!latestRequest) {
         return `
@@ -441,7 +482,7 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
                 </div>
                 <div class="rd-reschedule-row-actions">
                     ${canReschedule ? `<a class="rd-btn-outline" href="${escapeHtml(openRescheduleUrl)}">Request reschedule</a>` : ''}
-                    ${canCancel ? `<a class="rd-cancel-link" href="${escapeHtml(openCancelUrl)}">Cancel reservation</a>` : ''}
+                    ${cancelMarkup}
                 </div>
             </div>
         `;
@@ -467,10 +508,10 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
                     </div>
                 ` : ''}
             </dl>
-            ${(canReschedule || canCancel) ? `
+            ${(canReschedule || canCancel || cancelBlockReason) ? `
                 <div class="rd-reschedule-row-actions">
                     ${canReschedule ? `<a class="rd-btn-outline" href="${escapeHtml(openRescheduleUrl)}">Request reschedule</a>` : ''}
-                    ${canCancel ? `<a class="rd-cancel-link" href="${escapeHtml(openCancelUrl)}">Cancel reservation</a>` : ''}
+                    ${cancelMarkup}
                 </div>
             ` : ''}
         </section>
@@ -506,19 +547,21 @@ function buildReviewRow(effectiveStatus, review) {
 }
 
 function render() {
-    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules } = pageData;
+    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
     const effectiveStatus = getEffectiveReservationStatus(reservation);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const contractMeta = computeContractMeta(contract);
     const canReschedule = computeCanReschedule(reservation.status, rescheduleRequests);
-    const canCancel = computeCanCancel(reservation.status, payments);
+    const canCancel = computeCanCancel(reservation.status, payments, reservation, paymentRules);
+    const cancelBlockReason = getCancellationBlockReason(reservation, paymentRules);
     const isTerminalCancelled = ['cancelled', 'declined'].includes(effectiveStatus);
     const paymentUrl = buildCustomerPaymentUrl(reservationId);
+    const cancellationFeeOwed = isCancellationFeeOwed(reservation, payments);
 
     const showBalanceSummary = !isTerminalCancelled;
-    const paymentDone = balance.remainingBalance <= 0;
+    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed;
 
     pageContainer.innerHTML = `
         <section class="rd-header-card">
@@ -532,10 +575,14 @@ function render() {
                 </div>
                 ${showBalanceSummary ? `
                     <div class="rd-header-right">
-                        <span class="rd-balance-label">${paymentDone ? 'Paid in full' : 'Balance due'}</span>
+                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (paymentDone ? 'Paid in full' : 'Balance due')}</span>
                         <div class="rd-balance-amount-row">
-                            <strong class="rd-balance-amount">${escapeHtml(paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))}</strong>
-                            ${!paymentDone ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
+                            <strong class="rd-balance-amount">${escapeHtml(
+                                cancellationFeeOwed
+                                    ? formatCurrency(getCancellationFee(reservation, paymentRules))
+                                    : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))
+                            )}</strong>
+                            ${(!paymentDone && !cancellationFeeOwed) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
                         </div>
                     </div>
                 ` : ''}
@@ -559,10 +606,10 @@ function render() {
 
         <div class="rd-grid">
             ${buildEventDetailsPanel(reservation)}
-            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl)}
+            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules)}
         </div>
 
-        ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus)}
+        ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason)}
         ${buildReviewRow(effectiveStatus, review)}
     `;
 }

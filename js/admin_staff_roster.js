@@ -138,7 +138,7 @@ function renderRosterRows() {
     const actionsCell = isManager ? `
       <button type="button" class="action-btn view roster-edit-btn" data-id="${escapeHtml(employee.staff_id)}">Edit</button>
       <button type="button" class="roster-delete-btn" data-id="${escapeHtml(employee.staff_id)}">Delete</button>
-    ` : '';
+    ` : '<span class="roster-muted">—</span>';
 
     return `
       <tr>
@@ -152,7 +152,7 @@ function renderRosterRows() {
             <span class="pm2-toggle-track"></span>
           </label>
         </td>
-        <td class="roster-actions-cell">${actionsCell}</td>
+        <td class="roster-actions-cell"><div class="roster-actions-inner">${actionsCell}</div></td>
       </tr>
     `;
   }).join('');
