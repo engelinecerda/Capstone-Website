@@ -66,7 +66,9 @@ let badgeModalPackageId   = null;
 let editingBadgeTypeId    = null;        // badge_id being edited in the Badge Types view, null = add mode
 
 // Catering menu
-let allCateringCategories   = [];        // catering_dish_category rows
+let allCateringCategories   = [];        // catering_dish_category rows (for the currently selected package)
+let cateringMenuPackages    = [];        // package rows where uses_catering_menu = true
+let cateringMenuActivePackageId = null;  // currently selected package_id being managed
 let allCateringDishes       = [];        // catering_dish rows (flat, all categories)
 let editingCateringCategoryId = null;    // category_id being edited, null = add mode
 let cateringDishDrawerCategoryId = null;
@@ -75,6 +77,7 @@ let cateringDishDrawerTriggerEl = null;
 
 // Package-modal dirty-tracking
 let pkgFormSnapshot   = null;
+let catFormSnapshot   = null;    // same idea as pkgFormSnapshot, for the category modal
 let tierDrawerTriggerEl = null;
 
 // ─── DOM: Views ───────────────────────────────────────────────────────────────
@@ -153,6 +156,7 @@ const pkgInclusionsListEl = document.getElementById('pkgInclusionsList');
 const pkgAddInclusionBtn = document.getElementById('pkgAddInclusionBtn');
 const pkgActivationChecklist = document.getElementById('pkgActivationChecklist');
 const pkgActiveToggle    = document.getElementById('pkgActiveToggle');
+const pkgUsesCateringMenuToggle = document.getElementById('pkgUsesCateringMenuToggle');
 
 // ─── DOM: Confirm Modal ───────────────────────────────────────────────────────
 const confirmModal   = document.getElementById('confirmModal');
@@ -258,6 +262,8 @@ const openCateringMenuBtn                 = document.getElementById('openCaterin
 const backToCategoriesFromCateringBtn     = document.getElementById('backToCategoriesFromCateringBtn');
 const addCateringCategoryBtn              = document.getElementById('addCateringCategoryBtn');
 const cateringPageMessage                 = document.getElementById('cateringPageMessage');
+const cateringPackagePickerCard           = document.getElementById('cateringPackagePickerCard');
+const cateringPackageSelect               = document.getElementById('cateringPackageSelect');
 const activeCateringSection               = document.getElementById('activeCateringSection');
 const archivedCateringSection             = document.getElementById('archivedCateringSection');
 const activeCateringBody                  = document.getElementById('activeCateringBody');
@@ -425,7 +431,7 @@ function showBadgeTypesView() {
 async function showCateringMenuView() {
   hideAllViews();
   cateringMenuView.style.display = '';
-  await loadCateringMenu();
+  await loadCateringMenuPackages();
 }
 
 openVenuesBtn.addEventListener('click', showVenueView);
@@ -643,7 +649,12 @@ categoryRail.addEventListener('click', (e) => {
     const popover = menuTrigger.nextElementSibling;
     const isOpen = openCardMenuEl === popover;
     closeOpenCardMenu();
-    if (!isOpen) { popover.hidden = false; menuTrigger.setAttribute('aria-expanded', 'true'); openCardMenuEl = popover; }
+    if (!isOpen) {
+      popover.hidden = false;
+      menuTrigger.setAttribute('aria-expanded', 'true');
+      openCardMenuEl = popover;
+      positionRailPopover(popover, menuTrigger);
+    }
     return;
   }
   const catActionBtn = e.target.closest('[data-cat-action]');
@@ -662,12 +673,58 @@ categoryRail.addEventListener('click', (e) => {
   }
 });
 
+// The category rail scrolls its own contents (overflow-y: auto), which
+// clips the popover's default CSS positioning (absolute, relative to the
+// narrow rail row) — it visually gets cut off inside that row instead of
+// floating over the page. Fixed-positioning it from the trigger's real
+// on-screen coordinates escapes that clipping entirely.
+function positionRailPopover(popover, trigger) {
+  const rect = trigger.getBoundingClientRect();
+  popover.style.position = 'fixed';
+  popover.style.top = '0px';
+  popover.style.bottom = 'auto';
+  popover.style.left = '0px';
+  popover.style.right = 'auto'; 
+
+  const popRect = popover.getBoundingClientRect(); 
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const openUpward = spaceBelow < popRect.height + 12 && rect.top > popRect.height + 12;
+
+  if (openUpward) {
+    popover.style.top = 'auto';
+    popover.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+  } else {
+    popover.style.top = `${rect.bottom + 4}px`;
+    popover.style.bottom = 'auto';
+  }
+
+  let leftPos = rect.right - popRect.width;
+  if (leftPos < 8) leftPos = 8;
+  popover.style.left = `${leftPos}px`;
+  // Escaping to fixed positioning moves this into the root stacking
+  // context, where the admin sidebar/topbar (z-index up to 500) would
+  // otherwise sit on top of it.
+  popover.style.zIndex = '600';
+}
+
+// A fixed-position popover doesn't track the rail scrolling beneath it, so
+// close it rather than leave it visually detached from its trigger.
+categoryRail.addEventListener('scroll', () => {
+  if (openCardMenuEl && categoryRail.contains(openCardMenuEl)) closeOpenCardMenu();
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // KEBAB MENU (shared: package cards, list rows, category rail items)
 // ═══════════════════════════════════════════════════════════════════════════════
 function closeOpenCardMenu() {
   if (openCardMenuEl) {
     openCardMenuEl.hidden = true;
+    openCardMenuEl.style.position = '';
+    openCardMenuEl.style.top = '';
+    openCardMenuEl.style.bottom = '';
+    openCardMenuEl.style.left = '';
+    openCardMenuEl.style.right = '';
+    openCardMenuEl.style.zIndex = '';
     const trigger = openCardMenuEl.previousElementSibling;
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
     openCardMenuEl = null;
@@ -990,6 +1047,7 @@ function openAddCategoryModal() {
   catInclusionsInput.value  = '';
   setModalMsg(catModalMessage, '');
   openModal(categoryModal);
+  snapshotCatForm();
 }
 
 function openEditCategoryModal(catId) {
@@ -1006,6 +1064,40 @@ function openEditCategoryModal(catId) {
 
   setModalMsg(catModalMessage, '');
   openModal(categoryModal);
+  snapshotCatForm();
+}
+
+// ── Category modal: unsaved-changes guard (same pattern as the package modal) ──
+function getCatFormState() {
+  return JSON.stringify({
+    name: catNameInput.value,
+    description: catDescriptionInput.value,
+    inclusions: catInclusionsInput.value,
+  });
+}
+
+function snapshotCatForm() {
+  catFormSnapshot = getCatFormState();
+}
+
+function isCatFormDirty() {
+  if (catFormSnapshot === null) return false;
+  return getCatFormState() !== catFormSnapshot;
+}
+
+function attemptCloseCategoryModal() {
+  if (isCatFormDirty()) {
+    pendingAction = { scope: 'discard-category-changes' };
+    confirmTitle.textContent = 'Discard Unsaved Changes?';
+    confirmCopy.textContent  = 'You have unsaved changes to this category. Closing now will discard them.';
+    confirmOk.textContent    = 'Discard Changes';
+    confirmOk.className      = 'btn-danger';
+    setModalMsg(confirmMessage, '');
+    openModal(confirmModal);
+    return;
+  }
+  catFormSnapshot = null;
+  closeModal(categoryModal);
 }
 
 // Category save
@@ -1064,6 +1156,7 @@ catModalSave.addEventListener('click', async () => {
 
     renderCategoryRail();
     renderInventory();
+    catFormSnapshot = null;
     closeModal(categoryModal);
 
   } catch (err) {
@@ -1075,9 +1168,9 @@ catModalSave.addEventListener('click', async () => {
 });
 
 addCategoryBtn.addEventListener('click', openAddCategoryModal);
-catModalClose.addEventListener('click',  () => closeModal(categoryModal));
-catModalCancel.addEventListener('click', () => closeModal(categoryModal));
-categoryModal.addEventListener('click', e => { if (e.target === categoryModal) closeModal(categoryModal); });
+catModalClose.addEventListener('click',  attemptCloseCategoryModal);
+catModalCancel.addEventListener('click', attemptCloseCategoryModal);
+categoryModal.addEventListener('click', e => { if (e.target === categoryModal) attemptCloseCategoryModal(); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CATEGORY: ARCHIVE / RESTORE / DELETE
@@ -1526,6 +1619,7 @@ function getPkgFormState() {
     maxQty: pkgMaxQuantity.value, minGuests: pkgMinGuests.value, maxGuests: pkgMaxGuests.value,
     extPrice: pkgExtensionPrice.value, location: pkgLocationType.value, bookingScope: pkgBookingScope.value,
     active: pkgActiveToggle.checked,
+    usesCateringMenu: pkgUsesCateringMenuToggle.checked,
     inclusions: pkgInclusions,
     venues: Array.from(pkgVenueIds).sort(),
     photos: pkgPhotos.map(p => ({ id: p.photo_id || null, url: p.image_url || null, alt: p.alt_text, cover: p.is_cover })),
@@ -1547,7 +1641,16 @@ function updateUnsavedBanner() {
 }
 
 function attemptClosePackageModal() {
-  if (isPkgFormDirty() && !window.confirm('Discard unsaved changes?')) return;
+  if (isPkgFormDirty()) {
+    pendingAction = { scope: 'discard-package-changes' };
+    confirmTitle.textContent = 'Discard Unsaved Changes?';
+    confirmCopy.textContent  = 'You have unsaved changes to this package. Closing now will discard them.';
+    confirmOk.textContent    = 'Discard Changes';
+    confirmOk.className      = 'btn-danger';
+    setModalMsg(confirmMessage, '');
+    openModal(confirmModal);
+    return;
+  }
   pkgFormSnapshot = null;
   closeModal(packageModal);
 }
@@ -1648,6 +1751,7 @@ async function openEditPackageModal(packageId) {
   pkgLocationPrevValue    = pkg.location_type || '';
   pkgBookingScope.value   = pkg.booking_scope || '';
   pkgActiveToggle.checked = !!pkg.is_active;
+  pkgUsesCateringMenuToggle.checked = !!pkg.uses_catering_menu;
 
   populateCategorySelect(pkg.package_category_id);
 
@@ -1684,6 +1788,7 @@ function clearPackageForm() {
   pkgBookingScope.value = '';
   pkgMaxQuantity.value  = '1';
   pkgActiveToggle.checked = false;
+  pkgUsesCateringMenuToggle.checked = false;
   pkgPhotos      = [];
   pkgInclusions  = [];
   pkgVenueIds    = new Set();
@@ -1750,6 +1855,7 @@ pkgModalSave.addEventListener('click', async () => {
       booking_scope:      pkgBookingScope.value || null,
       package_category_id: pkgCategorySelect.value || null,
       is_active:          !!pkgActiveToggle.checked,
+      uses_catering_menu: !!pkgUsesCateringMenuToggle.checked,
     };
 
     let packageId = editingPackageId;
@@ -2025,6 +2131,16 @@ confirmOk.addEventListener('click', async () => {
 
   try {
     const isActive = type === 'restore';
+
+    if (scope === 'discard-package-changes') {
+      pkgFormSnapshot = null;
+      closeModal(packageModal);
+    }
+
+    if (scope === 'discard-category-changes') {
+      catFormSnapshot = null;
+      closeModal(categoryModal);
+    }
 
     if (scope === 'category') {
       const cat = allCategories.find(c => c.package_category_id === id);
@@ -3111,11 +3227,62 @@ function openConfirmDeleteBadgeType(badgeId) {
 // ═══════════════════════════════════════════════════════════════════════════════
 const CATERING_TAG_LABELS = { main: 'Main dish', pasta: 'Pasta', dessert: 'Dessert', rice: 'Rice', drinks: 'Drinks', addon: 'Add-on' };
 
+async function loadCateringMenuPackages() {
+  setMessage(cateringPageMessage, 'Loading catering packages…');
+  try {
+    const { data, error } = await supabase
+      .from('package')
+      .select('package_id, package_name, is_active')
+      .eq('uses_catering_menu', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+
+    cateringMenuPackages = data || [];
+
+    if (!cateringMenuPackages.length) {
+      cateringMenuActivePackageId = null;
+      cateringPackageSelect.innerHTML = '';
+      cateringPackagePickerCard.style.display = 'none';
+      activeCateringSection.style.display = 'none';
+      archivedCateringSection.style.display = 'none';
+      addCateringCategoryBtn.disabled = true;
+      setMessage(cateringPageMessage,
+        'No catering-enabled packages yet. In Inventory, edit a package and check "Uses the customizable catering menu" to manage its menu here.',
+        'error');
+      return;
+    }
+
+    addCateringCategoryBtn.disabled = false;
+    cateringPackagePickerCard.style.display = '';
+    activeCateringSection.style.display = '';
+
+    // Keep the previous selection if it's still a valid catering package, else default to the first.
+    if (!cateringMenuActivePackageId || !cateringMenuPackages.some(p => p.package_id === cateringMenuActivePackageId)) {
+      cateringMenuActivePackageId = cateringMenuPackages[0].package_id;
+    }
+
+    cateringPackageSelect.innerHTML = cateringMenuPackages
+      .map(p => `<option value="${p.package_id}" ${p.package_id === cateringMenuActivePackageId ? 'selected' : ''}>${escapeHtml(p.package_name)}${p.is_active ? '' : ' (Archived package)'}</option>`)
+      .join('');
+
+    setMessage(cateringPageMessage, '');
+    await loadCateringMenu();
+  } catch (err) {
+    setMessage(cateringPageMessage, `Failed to load catering packages: ${err.message}`, 'error');
+  }
+}
+
+cateringPackageSelect.addEventListener('change', async () => {
+  cateringMenuActivePackageId = cateringPackageSelect.value || null;
+  await loadCateringMenu();
+});
+
 async function loadCateringMenu() {
+  if (!cateringMenuActivePackageId) { allCateringCategories = []; allCateringDishes = []; renderCateringTables(); return; }
   setMessage(cateringPageMessage, 'Loading catering menu…');
   try {
     const [{ data: cats, error: catErr }, { data: dishes, error: dishErr }] = await Promise.all([
-      supabase.from(CATERING_CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }),
+      supabase.from(CATERING_CATEGORY_TABLE).select('*').eq('package_id', cateringMenuActivePackageId).order('sort_order', { ascending: true }),
       supabase.from(CATERING_DISH_TABLE).select('*').order('sort_order', { ascending: true }),
     ]);
     if (catErr) throw catErr;
@@ -3193,9 +3360,11 @@ archivedCateringBody.addEventListener('click', handleCateringCategoryTableAction
 
 // ─── Category Modal: Add / Edit ────────────────────────────────────────────────
 function openAddCateringCategoryModal() {
+  if (!cateringMenuActivePackageId) return; // guarded by the disabled button too
   editingCateringCategoryId = null;
   cateringCategoryModalTitle.textContent = 'Add New Category';
-  cateringCategoryModalSub.textContent = 'A selectable group in the buffet builder';
+  const activePkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+  cateringCategoryModalSub.textContent = activePkg ? `For "${activePkg.package_name}"` : 'A selectable group in the buffet builder';
   cateringCategoryModalSaveLabel.textContent = 'Add Category';
   cateringCatName.value = '';
   cateringCatIcon.value = '';
@@ -3263,7 +3432,9 @@ cateringCategoryModalSave.addEventListener('click', async () => {
       await logAudit({ action: 'Updated Catering Category', category: 'package', details: `Catering category updated: ${name}`, entityId: editingCateringCategoryId });
       setMessage(cateringPageMessage, 'Category updated successfully.', 'success');
     } else {
+      if (!cateringMenuActivePackageId) throw new Error('No catering package selected.');
       payload.is_active = true;
+      payload.package_id = cateringMenuActivePackageId;
       const { data, error } = await supabase.from(CATERING_CATEGORY_TABLE).insert(payload).select().single();
       if (error) throw error;
       allCateringCategories.push(data);
@@ -3490,7 +3661,7 @@ cateringNewDishInput.addEventListener('keydown', (e) => { if (e.key === 'Enter')
 // ═══════════════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (!categoryModal.classList.contains('hidden')) closeModal(categoryModal);
+  if (!categoryModal.classList.contains('hidden')) attemptCloseCategoryModal();
   if (!packageModal.classList.contains('hidden'))  attemptClosePackageModal();
   if (!tierModal.classList.contains('hidden'))     closeModal(tierModal);
   if (!confirmModal.classList.contains('hidden'))  closeModal(confirmModal);

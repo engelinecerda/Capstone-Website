@@ -313,6 +313,18 @@
 
         <p class="page-message" id="cateringPageMessage"></p>
 
+        <div class="card" id="cateringPackagePickerCard">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Managing menu for</h2>
+              <p class="section-sub">Each catering-type package has its own set of categories, dishes, and pricing. Flag a package as catering-enabled from its Edit modal in Inventory.</p>
+            </div>
+          </div>
+          <div class="modal-field" style="max-width:420px;">
+            <select id="cateringPackageSelect" class="modal-input modal-select"></select>
+          </div>
+        </div>
+
         <div class="card" id="activeCateringSection">
           <div class="section-head">
             <div>
@@ -544,6 +556,14 @@
         <div class="modal-field">
           <label class="modal-label">Before this can go active</label>
           <div id="pkgActivationChecklist" class="checklist-list"></div>
+        </div>
+
+        <div class="modal-field">
+          <label class="pkg-active-toggle-label">
+            <input type="checkbox" id="pkgUsesCateringMenuToggle">
+            <span>Uses the customizable catering menu (foods &amp; drinks)</span>
+          </label>
+          <span class="modal-hint">Enable this for packages that need a buffet/menu builder during booking. Manage the menu itself from Inventory &rarr; Catering Menu once saved.</span>
         </div>
 
         <div class="modal-field">
@@ -794,8 +814,8 @@
             <input type="text" id="cateringCatName" class="modal-input" placeholder="E.g., Chicken, Drinks">
           </div>
           <div class="modal-field">
-            <label class="modal-label" for="cateringCatIcon">Icon</label>
-            <input type="text" id="cateringCatIcon" class="modal-input" placeholder="🍗" maxlength="8">
+            <label class="modal-label" for="cateringCatIcon">Icon (optional)</label>
+            <input type="text" id="cateringCatIcon" class="modal-input" placeholder="Leave blank for none" maxlength="8">
           </div>
         </div>
         <div class="modal-row">

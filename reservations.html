@@ -881,10 +881,11 @@ By signing below, the Client confirms that the reservation details above are acc
     let DISHES = FALLBACK_DISHES;
     let PRICES = FALLBACK_PRICES;
 
-    async function loadCateringMenu() {
+    async function loadCateringMenu(packageId) {
+        if (!packageId) return; // no catering-flagged package found — keep the fallback
         try {
             const [{ data: cats, error: catErr }, { data: dishRows, error: dishErr }] = await Promise.all([
-                supabase.from('catering_dish_category').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+                supabase.from('catering_dish_category').select('*').eq('is_active', true).eq('package_id', packageId).order('sort_order', { ascending: true }),
                 supabase.from('catering_dish').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
             ]);
             if (catErr) throw catErr;
@@ -914,8 +915,6 @@ By signing below, the Client confirms that the reservation details above are acc
             PRICES = FALLBACK_PRICES;
         }
     }
-
-    await loadCateringMenu();
 
     // ── Utility ────────────────────────────────────────────────────────────
     function pad(v) { return String(v).padStart(2, '0'); }
@@ -3152,6 +3151,17 @@ By signing below, the Client confirms that the reservation details above are acc
     await loadServiceChargeSettings();
     await loadEventTypes();
     await loadPackages();
+
+    // Resolve which package backs the catering flow the same way the rest of
+    // this file already does (first active package under the category whose
+    // name matches "cater"), then load that package's own menu — keeps the
+    // dish builder, the inclusions block, and the contract summary always
+    // pointed at the exact same package.
+    {
+        const cateringCatObj = OFFSITE_CATEGORIES.find(c => deriveOffsiteCategoryFlag(c.name) === 'catering');
+        const cateringPkg = cateringCatObj ? (OFFSITE_BY_CAT[cateringCatObj.id] || [])[0] : null;
+        await loadCateringMenu(cateringPkg?.id || null);
+    }
 
     // URL params (from "Book" on the Packages page) always take priority over
     // any saved draft — the user made an explicit package selection, so discard
