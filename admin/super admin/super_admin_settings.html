@@ -141,6 +141,48 @@
         </div>
       </div>
 
+      <!-- ── CANCELLATION NOTICE RULES ── -->
+      <div class="card" id="cancellation-notice">
+        <p class="card-title">Cancellation Notice Rules</p>
+        <p class="card-sub">How much lead time a customer needs to cancel an existing reservation — separate from the Booking Notice Window above, which governs new bookings instead. Fees for cancelling live in <a href="/admin/config/payment-options.html" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Minimum notice before event</p>
+            <p class="pr-row-desc">Customers must request cancellation at least this many days before their event date. Leave unchecked for no minimum.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle" style="margin-right:8px;">
+              <input type="checkbox" id="pr-cancellation-min-notice-enabled">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-min-notice-days" min="0" disabled>
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Cancellation request window</p>
+            <p class="pr-row-desc">Customers may only request cancellation within this many days of booking. Leave unchecked to allow cancellation any time before the event.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle" style="margin-right:8px;">
+              <input type="checkbox" id="pr-cancellation-request-window-enabled">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-request-window-days" min="1" disabled>
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <p class="form-message" id="cancellation-notice-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveCancellationNoticeBtn">Save Cancellation Notice Rules</button>
+        </div>
+      </div>
+
       <!-- ── BUFFER & CAPACITY ── -->
       <div class="card" id="buffer-capacity">
         <p class="card-title">Buffer &amp; Capacity</p>

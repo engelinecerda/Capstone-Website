@@ -257,6 +257,88 @@ async function saveMinAdvanceDays() {
 let eventTypesForAdvance = [];  // [{ id, name }]
 let eventTypeAdvanceCache = {}; // { id: overrideDays|null }
 
+// ── Cancellation Notice Rules ───────────────────────────────────────────────
+// Lives in the same system_settings.payment_rules JSON blob as the fee
+// fields still edited on Payment Settings (js/admin_payment_options.js) — so
+// loads/saves here always merge with whatever else is in that blob instead
+// of overwriting it outright, same pattern saveMinAdvanceDays() above uses
+// for reservation_rules.
+function setCancellationNoticeMsg(msg, isError = false) {
+  const el = document.getElementById('cancellation-notice-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+async function loadCancellationNoticeRules() {
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+
+  const parsed = data ? JSON.parse(data.setting_value) : {};
+  const minNoticeEnabled = document.getElementById('pr-cancellation-min-notice-enabled');
+  const minNoticeInput = document.getElementById('pr-cancellation-min-notice-days');
+  const requestWindowEnabled = document.getElementById('pr-cancellation-request-window-enabled');
+  const requestWindowInput = document.getElementById('pr-cancellation-request-window-days');
+
+  const hasMinNotice = parsed.cancellation_min_notice_days !== null && parsed.cancellation_min_notice_days !== undefined;
+  if (minNoticeEnabled) minNoticeEnabled.checked = hasMinNotice;
+  if (minNoticeInput) {
+    minNoticeInput.value = hasMinNotice ? parsed.cancellation_min_notice_days : '';
+    minNoticeInput.disabled = !hasMinNotice;
+  }
+
+  const hasRequestWindow = parsed.cancellation_request_window_days !== null && parsed.cancellation_request_window_days !== undefined;
+  if (requestWindowEnabled) requestWindowEnabled.checked = hasRequestWindow;
+  if (requestWindowInput) {
+    requestWindowInput.value = hasRequestWindow ? parsed.cancellation_request_window_days : '';
+    requestWindowInput.disabled = !hasRequestWindow;
+  }
+}
+
+async function saveCancellationNoticeRules() {
+  const minNoticeEnabled = !!document.getElementById('pr-cancellation-min-notice-enabled')?.checked;
+  const requestWindowEnabled = !!document.getElementById('pr-cancellation-request-window-enabled')?.checked;
+  const minNoticeDays = minNoticeEnabled ? Number(document.getElementById('pr-cancellation-min-notice-days')?.value) : null;
+  const requestWindowDays = requestWindowEnabled ? Number(document.getElementById('pr-cancellation-request-window-days')?.value) : null;
+
+  if (minNoticeDays !== null && (!Number.isFinite(minNoticeDays) || minNoticeDays < 0)) {
+    setCancellationNoticeMsg('Minimum cancellation notice must be zero or more days.', true); return;
+  }
+  if (requestWindowDays !== null && (!Number.isFinite(requestWindowDays) || requestWindowDays < 1)) {
+    setCancellationNoticeMsg('Cancellation request window must be at least 1 day.', true); return;
+  }
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+  const existing = current ? JSON.parse(current.setting_value) : {};
+  const merged = { ...existing, cancellation_min_notice_days: minNoticeDays, cancellation_request_window_days: requestWindowDays };
+
+  showSettingsConfirm(
+    'Change Cancellation Notice Rules',
+    `Min notice: ${existing.cancellation_min_notice_days ?? 'none'}, request window: ${existing.cancellation_request_window_days ?? 'none'}`,
+    `Min notice: ${minNoticeDays ?? 'none'}, request window: ${requestWindowDays ?? 'none'}`,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'payment_rules', setting_value: JSON.stringify(merged), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+
+      if (error) { setCancellationNoticeMsg('Failed to save: ' + error.message, true); return; }
+      await logAudit({ action: 'Updated Cancellation Notice Rules', category: 'scheduling_config', details: `min_notice=${minNoticeDays}, request_window=${requestWindowDays}` });
+      setCancellationNoticeMsg('Cancellation notice rules saved successfully.');
+    }
+  );
+}
+
 function setEventTypeAdvanceMsg(msg, isError = false) {
   const el = document.getElementById('event-type-advance-msg');
   if (!el) return;
@@ -498,12 +580,22 @@ async function init() {
   await loadOperatingHours();
   await loadMinAdvanceDays();
   await loadEventTypeAdvanceOverrides();
+  await loadCancellationNoticeRules();
   await loadSchedulingSettings();
   await loadScopeCapacity();
 
   document.getElementById('saveHoursBtn')?.addEventListener('click', saveOperatingHours);
   document.getElementById('saveMinAdvanceBtn')?.addEventListener('click', saveMinAdvanceDays);
   document.getElementById('saveEventTypeAdvanceBtn')?.addEventListener('click', saveEventTypeAdvanceOverrides);
+  document.getElementById('saveCancellationNoticeBtn')?.addEventListener('click', saveCancellationNoticeRules);
+  document.getElementById('pr-cancellation-min-notice-enabled')?.addEventListener('change', (e) => {
+    const input = document.getElementById('pr-cancellation-min-notice-days');
+    if (input) input.disabled = !e.target.checked;
+  });
+  document.getElementById('pr-cancellation-request-window-enabled')?.addEventListener('change', (e) => {
+    const input = document.getElementById('pr-cancellation-request-window-days');
+    if (input) input.disabled = !e.target.checked;
+  });
   document.getElementById('saveCapacityBtn')?.addEventListener('click', saveSchedulingSettings);
   document.getElementById('saveScopeCapacityBtn')?.addEventListener('click', saveScopeCapacity);
 }
