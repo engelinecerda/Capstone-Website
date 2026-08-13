@@ -7,12 +7,6 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 
-// supabase-js's functions.invoke() sets `data` to null on any non-2xx
-// response — the actual JSON body the function returned (our friendly
-// "tied to N reservations" / "At least one admin is required" messages)
-// only lives on error.context, a raw Response that has to be read
-// separately. Without this, every failure path here would just show the
-// generic "Edge Function returned a non-2xx status code".
 async function extractFnError(fnErr, data) {
   if (data?.error) return data.error;
   if (fnErr?.context && typeof fnErr.context.json === 'function') {
@@ -734,7 +728,13 @@ document.addEventListener('keydown', e => {
 });
 
 // ── PASSWORD TOGGLE ──────────────────────────────────────────────
-document.addEventListener('click', e => {
+// Attached to the modal card itself, not document — the card's own
+// click listener above calls e.stopPropagation() (so clicks inside the
+// modal don't bubble to the overlay's click-outside-to-close handler),
+// which also blocks the event from ever reaching a document-level
+// delegated listener. Multiple listeners on the same node still all
+// fire regardless of stopPropagation(), so binding here works.
+document.querySelector('#accountModal [role="dialog"]').addEventListener('click', e => {
   const toggleBtn = e.target.closest('.password-toggle-btn');
   if (!toggleBtn) return;
   const input = document.getElementById(toggleBtn.dataset.target);
