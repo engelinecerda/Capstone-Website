@@ -404,6 +404,20 @@
         </div>
     </div>
 
+    <!-- Warning / Validation Modal -->
+    <div class="warning-modal-backdrop hidden" id="warning-modal-backdrop" aria-hidden="true">
+        <div class="warning-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="warning-modal-title">
+            <div class="warning-modal-icon" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="warning-modal-title" id="warning-modal-title">Almost there</h3>
+            <p class="warning-modal-message" id="warning-modal-message"></p>
+            <div class="warning-modal-actions">
+                <button type="button" class="warning-modal-btn" id="warning-modal-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
     <!-- FOOTER -->
     <footer class="footer-new">
         <div class="footer-new-grid">
@@ -668,6 +682,10 @@
     const agreementModalCloseBtn        = document.getElementById('agreement-modal-close-btn');
     const agreementModalFooterCloseBtn  = document.getElementById('agreement-modal-footer-close-btn');
     const agreementModalFinishBtn       = document.getElementById('agreement-modal-finish-btn');
+    const warningModalBackdrop    = document.getElementById('warning-modal-backdrop');
+    const warningModalTitle       = document.getElementById('warning-modal-title');
+    const warningModalMessage     = document.getElementById('warning-modal-message');
+    const warningModalOkBtn       = document.getElementById('warning-modal-ok-btn');
 
     // ── Signature state ────────────────────────────────────────────────────
     const signatureState = {
@@ -1087,6 +1105,21 @@ By signing below, the Client confirms that the reservation details above are acc
     function closePolicyModal() {
         policyModalBackdrop.classList.add('hidden');
         policyModalBackdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    // ── Warning modal ──────────────────────────────────────────────────────
+    function showWarningModal(message, title) {
+        if (!warningModalBackdrop) { alert(message); return; }
+        warningModalTitle.textContent = title || 'Almost there';
+        warningModalMessage.textContent = message;
+        warningModalBackdrop.classList.remove('hidden');
+        warningModalBackdrop.setAttribute('aria-hidden', 'false');
+        warningModalOkBtn?.focus();
+    }
+
+    function closeWarningModal() {
+        warningModalBackdrop.classList.add('hidden');
+        warningModalBackdrop.setAttribute('aria-hidden', 'true');
     }
 
     function agreeToPolicies() {
@@ -2729,28 +2762,28 @@ By signing below, the Client confirms that the reservation details above are acc
         if (id === 'rs1') {
             // 1A — Location
             if (!S.locationType) {
-                alert('Please choose whether your event is onsite or offsite.');
+                showWarningModal('Please choose whether your event is onsite or offsite.');
                 scrollToSection('sub-loc'); return false;
             }
 
             // 1B — Package
             if (S.locationType === 'onsite') {
                 if (!S.miniPackage) {
-                    alert('Please select a package before continuing.');
+                    showWarningModal('Please select a package before continuing.');
                     scrollToSection('sub-pkg'); return false;
                 }
             } else {
                 if (!S.offsiteCategory) {
-                    alert('Please select an offsite service category.');
+                    showWarningModal('Please select an offsite service category.');
                     scrollToSection('sub-pkg'); return false;
                 }
                 if (S.offsiteCategory === 'catering') {
                     if (!isCateringSelectionValid()) {
-                        alert('Please select at least 1 main dish, 1 pasta, and 1 dessert for your catering package.');
+                        showWarningModal('Please select at least 1 main dish, 1 pasta, and 1 dessert for your catering package.');
                         scrollToSection('sub-pkg'); return false;
                     }
                 } else if (!S.offsitePackage) {
-                    alert('Please select a specific package before continuing.');
+                    showWarningModal('Please select a specific package before continuing.');
                     scrollToSection('sub-pkg'); return false;
                 }
             }
@@ -2759,26 +2792,26 @@ By signing below, the Client confirms that the reservation details above are acc
             const raw = document.getElementById('guest-count')?.value.trim();
             const gc  = parseInt(raw, 10);
             if (!raw || isNaN(gc) || gc < 1) {
-                alert('Please enter a valid number of guests (at least 1).');
+                showWarningModal('Please enter a valid number of guests (at least 1).');
                 scrollToSection('sub-guests-type'); return false;
             }
             if (!validateGuestCountRange(gc)) {
                 const min = getSelectedPackageMinGuests();
                 const max = getSelectedPackageMaxGuests();
-                alert(`Guest count must be between ${min} and ${max} for this package.`);
+                showWarningModal(`Guest count must be between ${min} and ${max} for this package.`);
                 scrollToSection('sub-guests-type'); return false;
             }
             S.guestCount = String(gc);
 
             // 1C — Event type
             if (!S.eventType) {
-                alert('Please select your event type.');
+                showWarningModal('Please select your event type.');
                 scrollToSection('sub-guests-type'); return false;
             }
             if (S.eventType === 'Other') {
                 const otherText = document.getElementById('event-type-other')?.value.trim();
                 if (!otherText) {
-                    alert('Please describe your event type in the text field below.');
+                    showWarningModal('Please describe your event type in the text field below.');
                     scrollToSection('sub-guests-type'); return false;
                 }
                 S.eventTypeOther = otherText;
@@ -2788,7 +2821,7 @@ By signing below, the Client confirms that the reservation details above are acc
             if (S.locationType === 'offsite') {
                 const venueVal = document.getElementById('venue-location')?.value.trim();
                 if (!venueVal) {
-                    alert('Please search for your venue address or click the map to drop a pin.');
+                    showWarningModal('Please search for your venue address or click the map to drop a pin.');
                     scrollToSection('sub-addon-venue'); return false;
                 }
                 S.venueLocation = venueVal;
@@ -2797,23 +2830,23 @@ By signing below, the Client confirms that the reservation details above are acc
             // 1E — Date
             const ed = document.getElementById('event-date')?.value;
             if (!ed) {
-                alert('Please choose an available date from the calendar.');
+                showWarningModal('Please choose an available date from the calendar.');
                 scrollToSection('sub-date'); return false;
             }
             const d = new Date(ed), today = new Date(); today.setHours(0, 0, 0, 0);
             if (d < today) {
-                alert('Please select a future date.');
+                showWarningModal('Please select a future date.');
                 scrollToSection('sub-date'); return false;
             }
             if (isUnavailableDate(ed)) {
-                alert('The selected date is not available for this booking type. Please choose another date.');
+                showWarningModal('The selected date is not available for this booking type. Please choose another date.');
                 scrollToSection('sub-date'); return false;
             }
             S.eventDate = ed;
 
             // 1F — Time
             if (!S.time) {
-                alert('Please select a start time.');
+                showWarningModal('Please select a start time.');
                 scrollToSection('sub-time'); return false;
             }
 
@@ -2825,10 +2858,10 @@ By signing below, the Client confirms that the reservation details above are acc
             const phone    = document.getElementById('phone')?.value.trim();
             const email    = document.getElementById('email')?.value.trim();
             const requests = document.getElementById('requests')?.value.trim() || '';
-            if (!name || !email) { alert('Please fill in all contact details.'); return false; }
-            if (FORM_CONFIG.fieldRules.contact_phone_required && !phone) { alert('Please fill in all contact details.'); return false; }
-            if (FORM_CONFIG.fieldRules.special_requests_required && !requests) { alert('Please let us know your special requests before continuing.'); return false; }
-            if (!/^\S+@\S+\.\S+$/.test(email)) { alert('Please enter a valid email address.'); return false; }
+            if (!name || !email) { showWarningModal('Please fill in all contact details.'); return false; }
+            if (FORM_CONFIG.fieldRules.contact_phone_required && !phone) { showWarningModal('Please fill in all contact details.'); return false; }
+            if (FORM_CONFIG.fieldRules.special_requests_required && !requests) { showWarningModal('Please let us know your special requests before continuing.'); return false; }
+            if (!/^\S+@\S+\.\S+$/.test(email)) { showWarningModal('Please enter a valid email address.'); return false; }
             S.name = name; S.phone = phone; S.email = email;
             S.requests = requests;
             return true;
@@ -2997,6 +3030,9 @@ By signing below, the Client confirms that the reservation details above are acc
     policyModalAgree?.addEventListener('click', agreeToPolicies);
     policyModalBackdrop?.addEventListener('click', e => { if (e.target === policyModalBackdrop) closePolicyModal(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !policyModalBackdrop?.classList.contains('hidden')) closePolicyModal(); });
+    warningModalOkBtn?.addEventListener('click', closeWarningModal);
+    warningModalBackdrop?.addEventListener('click', e => { if (e.target === warningModalBackdrop) closeWarningModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !warningModalBackdrop?.classList.contains('hidden')) closeWarningModal(); });
 
     contractViewer?.addEventListener('scroll', () => {
         if (signatureState.agreementViewMethod) return;
@@ -3140,7 +3176,7 @@ By signing below, the Client confirms that the reservation details above are acc
             document.querySelector('.reservation-container').appendChild(msg);
 
         } catch (err) {
-            alert(err.message);
+            showWarningModal(err.message, 'Something went wrong');
             nextBtn.disabled = false; nextBtn.textContent = 'Submit';
         }
     }
