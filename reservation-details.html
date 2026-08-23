@@ -104,8 +104,8 @@
 
   <div class="account-modal-backdrop hidden" id="resubmit-contract-backdrop" aria-hidden="true">
     <div class="account-modal-card resubmit-contract-card" role="dialog" aria-modal="true" aria-labelledby="resubmit-contract-title">
-      <button type="button" class="account-modal-close" id="resubmit-contract-close" aria-label="Close">x</button>
-      <p class="account-modal-eyebrow">Re-upload contract</p>
+      <button type="button" class="account-modal-close" id="resubmit-contract-close" aria-label="Close re-upload dialog">&times;</button>
+      <p class="account-modal-eyebrow">Re-upload Contract</p>
       <h2 class="account-modal-title" id="resubmit-contract-title">Sign your corrected contract</h2>
       <p class="account-modal-copy">Review the contract, then sign below to submit the corrected version.</p>
 
@@ -113,12 +113,12 @@
         <i class="fa-solid fa-eye" aria-hidden="true"></i> View current contract
       </a>
 
-      <div class="signature-draw-panel" id="resubmit-signature-draw-panel">
+      <div class="signature-section">
         <canvas id="resubmit-signature-canvas" class="signature-canvas" aria-label="Draw your signature here"></canvas>
         <button type="button" class="signature-clear-btn" id="resubmit-signature-clear-btn">Clear</button>
+        <p class="signature-status" id="resubmit-signature-status" aria-live="polite"></p>
       </div>
 
-      <p class="signature-status" id="resubmit-signature-status" aria-live="polite"></p>
       <p class="account-modal-message" id="resubmit-contract-message"></p>
 
       <div class="account-modal-actions">

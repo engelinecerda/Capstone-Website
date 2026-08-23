@@ -523,26 +523,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--acc-amber-text);
+    font-size: 12.5px;
+    color: var(--acc-amber-text);   
     background-color: var(--acc-amber-bg);
     padding: 10px 12px;
     border-radius: 8px;
     line-height: 1.4;
 }
-
-.rd-inline-note-warning i {
-    flex-shrink: 0;
-    font-size: 13px;
-}
-
-.rd-contract-resubmission-note {
-    margin-top: 8px;
-}
-
-.rd-btn-resubmit {
-    margin-top: 8px;
-}
-
 /* ========================
    Buttons
 ======================== */
@@ -804,41 +791,18 @@
         font-size: 20px;
     }
 }
-/* ========================
-   Contract resubmission modal (signature capture)
-   Mirrors the signature styling used on reservations.html
-======================== */
-.resubmit-contract-card {
-    max-width: 480px;
-}
 
-.account-form-row {
-    margin: 14px 0 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.signature-mode-tabs { display: flex; gap: 8px; margin: 12px 0 10px; }
-.signature-mode-btn {
-    border: 1px solid #e0d0c0;
-    background: #fff;
-    color: #6B3A1F;
-    font-size: 12.5px;
-    font-weight: 600;
-    padding: 7px 14px;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-.signature-mode-btn.active { background: #6B3A1F; color: #fff; border-color: #6B3A1F; }
-.signature-mode-btn:not(.active):hover { background: #FFF8F0; }
-
+/* ============================================================
+   Resubmit-contract modal — signature capture
+   (ported from css/reservations.css's drawn-signature styles;
+   this page only needs the draw variant, not the type/tabs UI)
+   ============================================================ */
 .resubmit-contract-card .rd-btn-outline {
-    margin: 14px 0 16px;
+    margin-bottom: 20px;
 }
 
-.signature-draw-panel.hidden, .signature-type-panel.hidden { display: none; }
+.signature-section { margin-bottom: 4px; }
+
 .signature-canvas {
     width: 100%;
     height: 180px;
@@ -847,9 +811,11 @@
     background: #fff;
     touch-action: none;
     cursor: crosshair;
+    display: block;
 }
+
 .signature-clear-btn {
-    margin-top: 12px;
+    margin-top: 8px;
     border: 1px solid #e0d0c0;
     background: #fff;
     color: #6B3A1F;
@@ -858,33 +824,16 @@
     padding: 6px 14px;
     border-radius: 6px;
     cursor: pointer;
+    font-family: inherit;
 }
+
 .signature-clear-btn:hover { background: #FFF8F0; }
 
-.signature-type-input {
-    width: 100%;
-    box-sizing: border-box;
-    border: 2px dashed #e0d0c0;
-    border-radius: 12px;
-    padding: 14px 16px;
-    font-size: 15px;
-    font-family: inherit;
-    background: #fff;
-}
-.signature-type-preview {
-    margin-top: 10px;
-    min-height: 56px;
-    font-family: 'Dancing Script', cursive;
-    font-size: 40px;
-    font-weight: 700;
-    color: #2A1408;
-    padding: 6px 4px;
-    border-bottom: 1px solid #e0d0c0;
-}
 .signature-status {
     min-height: 18px;
     margin-top: 8px;
     font-size: 12px;
     color: #7b6a5d;
 }
+
 .signature-status.error { color: #b42318; }

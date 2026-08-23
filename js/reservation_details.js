@@ -822,12 +822,20 @@ function openResubmitModal() {
         resubmitViewLink.href = contract.contract_url;
     }
 
+    // Unhide BEFORE sizing the canvas. resizeResubmitCanvas() reads
+    // resubmitCanvas.offsetWidth/offsetHeight to set the canvas's actual
+    // drawing-buffer dimensions — while the backdrop still has the
+    // 'hidden' class (display:none), both read as 0, so the canvas ends
+    // up 0x0 pixels internally. The dashed box still renders because
+    // that's just the wrapper's CSS border, but nothing drawn on a 0x0
+    // canvas can ever appear. Sizing must happen after the modal (and
+    // therefore the canvas) is actually laid out and visible.
+    resubmitBackdrop?.classList.remove('hidden');
+    resubmitBackdrop?.setAttribute('aria-hidden', 'false');
+
     initResubmitSignaturePad();
     resizeResubmitCanvas();
     if (resubmitState.pad) resubmitState.pad.clear();
-
-    resubmitBackdrop?.classList.remove('hidden');
-    resubmitBackdrop?.setAttribute('aria-hidden', 'false');
 }
 
 function closeResubmitModal() {
