@@ -412,6 +412,9 @@ function getReservationApprovalState(reservation) {
   if (!contract.hasFile) {
     return { canApprove: false, reason: 'The reservation cannot be approved until the customer uploads a signed contract.' };
   }
+  if (contract.key !== 'approved') {
+    return { canApprove: false, reason: 'The reservation cannot be approved until the contract has been verified.' };
+  }
   return { canApprove: true, reason: '' };
 }
 
