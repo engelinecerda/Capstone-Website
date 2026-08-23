@@ -910,11 +910,22 @@ Deno.serve(async (req: Request) => {
       resourceType: 'image',
     });
 
-    const { data: existingContract } = await supabase
+    const { data: existingContract, error: existingContractError } = await supabase
       .from('reservation_contracts')
       .select('reservation_id')
       .eq('reservation_id', reservation.reservation_id)
       .maybeSingle();
+
+    // Unlike the previous version of this check, the error is no longer
+    // silently discarded. Before 20260824_fix_contract_resubmission_immutability.sql,
+    // a swallowed error here (e.g. from a duplicate-row PGRST116) made
+    // isResubmission silently evaluate to false, which caused this function
+    // to INSERT a new row instead of UPDATEing the existing one every time —
+    // that's how reservation_contracts ended up with duplicate rows for a
+    // single reservation_id in the first place. Now that reservation_id is
+    // guaranteed unique at the DB level, this should never actually error in
+    // practice, but we still fail loudly instead of silently if it ever does.
+    if (existingContractError) throw existingContractError;
 
     const isResubmission = Boolean(existingContract);
 
@@ -933,16 +944,23 @@ Deno.serve(async (req: Request) => {
         : { review_notes: null, reviewed_at: null }),
     };
 
-    // upsert on the reservation_id unique constraint (see
-    // 20260824_fix_contract_resubmission_immutability.sql) instead of a
-    // manual check-then-insert/update branch — that older pattern raced
-    // under concurrent/retried requests and could create duplicate rows for
-    // the same reservation_id, which then broke every .maybeSingle() read
-    // of this table for that reservation (PGRST116). A single upsert is
-    // atomic: at most one row per reservation_id, always.
-    const { error: contractInsertError } = await supabase
-      .from('reservation_contracts')
-      .upsert(contractPayload, { onConflict: 'reservation_id' });
+    // Explicit update-vs-insert branch rather than .upsert(onConflict:...) —
+    // PostgREST's upsert conflict-target resolution can silently miss a
+    // constraint that was just dropped/recreated (schema cache staleness)
+    // and fall back to a bare INSERT, which then fails with "duplicate key
+    // value violates unique constraint" on a genuine resubmission. This
+    // explicit branch doesn't depend on that resolution at all — it relies
+    // only on the existingContract check above (now error-checked) and the
+    // protect_signed_contract_fields trigger allowing contract_url to change
+    // when resubmitted_at is set in the same UPDATE.
+    const { error: contractInsertError } = isResubmission
+      ? await supabase
+          .from('reservation_contracts')
+          .update(contractPayload)
+          .eq('reservation_id', reservation.reservation_id)
+      : await supabase
+          .from('reservation_contracts')
+          .insert(contractPayload);
 
     if (contractInsertError) throw contractInsertError;
 
