@@ -933,14 +933,16 @@ Deno.serve(async (req: Request) => {
         : { review_notes: null, reviewed_at: null }),
     };
 
-    const { error: contractInsertError } = isResubmission
-      ? await supabase
-          .from('reservation_contracts')
-          .update(contractPayload)
-          .eq('reservation_id', reservation.reservation_id)
-      : await supabase
-          .from('reservation_contracts')
-          .insert(contractPayload);
+    // upsert on the reservation_id unique constraint (see
+    // 20260824_fix_contract_resubmission_immutability.sql) instead of a
+    // manual check-then-insert/update branch — that older pattern raced
+    // under concurrent/retried requests and could create duplicate rows for
+    // the same reservation_id, which then broke every .maybeSingle() read
+    // of this table for that reservation (PGRST116). A single upsert is
+    // atomic: at most one row per reservation_id, always.
+    const { error: contractInsertError } = await supabase
+      .from('reservation_contracts')
+      .upsert(contractPayload, { onConflict: 'reservation_id' });
 
     if (contractInsertError) throw contractInsertError;
 
