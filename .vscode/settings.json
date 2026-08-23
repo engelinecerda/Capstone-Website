@@ -1,4 +1,8 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "liveServer.settings.port": 5502
+    "liveServer.settings.port": 5502,
+    "deno.enablePaths": ["supabase/functions"],
+    "deno.enable": false,
+    "deno.lint": true,
+    "deno.unstable": true
 }

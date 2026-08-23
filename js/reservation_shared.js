@@ -263,6 +263,20 @@ export function computeContractMeta(contract) {
         };
     }
 
+    if (reviewStatus === 'resubmission_requested') {
+        return {
+            label: 'Resubmission needed',
+            key: 'resubmission_requested',
+            statusKey: 'resubmission_requested',
+            verification: 'The venue asked you to re-upload a corrected contract',
+            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
+            resubmittedAt,
+            note: contract?.review_notes || '',
+            hasFile: Boolean(contract?.contract_url),
+            contract
+        };
+    }
+
     if (reviewStatus === 'pending_review' || contract?.contract_url) {
         return {
             label: 'Pending review',

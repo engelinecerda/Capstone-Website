@@ -35,6 +35,14 @@ const contractReviewSection = document.getElementById('contractReviewSection');
 const contractActionsSection = document.getElementById('contractActionsSection');
 const contractDetailsMessage = document.getElementById('contractDetailsMessage');
 
+const resubmissionReasonModal = document.getElementById('resubmissionReasonModal');
+const resubmissionReasonClose = document.getElementById('resubmissionReasonClose');
+const resubmissionReasonCancel = document.getElementById('resubmissionReasonCancel');
+const resubmissionReasonSubmit = document.getElementById('resubmissionReasonSubmit');
+const resubmissionReasonInput = document.getElementById('resubmissionReasonInput');
+const resubmissionReasonMessage = document.getElementById('resubmissionReasonMessage');
+let resubmissionReasonReservationId = null;
+
 let contractsCache = [];
 let contractsFiltered = [];
 let contractsCurrentPage = 1;
@@ -260,6 +268,13 @@ function getReservationApprovalState(reservation) {
     return {
       canApprove: false,
       reason: 'The reservation cannot be approved until the customer uploads a signed contract.'
+    };
+  }
+
+  if (contract.key !== 'approved') {
+    return {
+      canApprove: false,
+      reason: 'The reservation cannot be approved until the contract has been verified.'
     };
   }
 
@@ -678,6 +693,7 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
   `;
 
   const showReservationActions = currentRole !== 'admin' && ['pending', 'resubmission_requested'].includes(reservationStatus.key);
+  const canRequestResubmission = contractRecord?.contract_url && contract.key !== 'approved';
 
   contractActionsSection.innerHTML = (currentRole === 'admin' || !showReservationActions) ? '' : `
     <div class="details-action-row">
@@ -689,6 +705,13 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
         title="${escapeHtml(approvalState.canApprove ? 'Approve the linked reservation.' : approvalState.reason)}"
       >Approve Reservation</button>
       <button class="action-btn decline" data-action="decline-reservation" data-reservation-id="${reservation.reservation_id}">Decline Reservation</button>
+      <button
+        class="action-btn request"
+        data-action="request-resubmission"
+        data-reservation-id="${reservation.reservation_id}"
+        ${canRequestResubmission ? '' : 'disabled'}
+        title="${escapeHtml(canRequestResubmission ? 'Ask the customer to re-upload a corrected contract.' : 'The contract is already verified.')}"
+      >Request Resubmission</button>
     </div>
   `;
 
@@ -704,6 +727,70 @@ function openContractDetailsModal(reservationId) {
   renderContractDetailsModal(reservationId);
   contractDetailsModal?.classList.remove('hidden');
   contractDetailsModal?.setAttribute('aria-hidden', 'false');
+}
+
+function openResubmissionReasonModal(reservationId) {
+  resubmissionReasonReservationId = reservationId;
+  if (resubmissionReasonInput) resubmissionReasonInput.value = '';
+  setResubmissionReasonMessage('');
+  resubmissionReasonModal?.classList.remove('hidden');
+  resubmissionReasonModal?.setAttribute('aria-hidden', 'false');
+  resubmissionReasonInput?.focus();
+}
+
+function closeResubmissionReasonModal() {
+  resubmissionReasonReservationId = null;
+  resubmissionReasonModal?.classList.add('hidden');
+  resubmissionReasonModal?.setAttribute('aria-hidden', 'true');
+  setResubmissionReasonMessage('');
+}
+
+function setResubmissionReasonMessage(message = '', isError = false) {
+  if (!resubmissionReasonMessage) return;
+  resubmissionReasonMessage.textContent = message;
+  resubmissionReasonMessage.classList.toggle('error', isError);
+}
+
+async function submitResubmissionRequest() {
+  const reservationId = resubmissionReasonReservationId;
+  if (!reservationId) return;
+
+  const notes = String(resubmissionReasonInput?.value || '').trim();
+  if (!notes) {
+    setResubmissionReasonMessage('Please enter a reason before sending.', true);
+    return;
+  }
+
+  const reservation = getReservationById(reservationId);
+  const previousStatus = reservation?.status || null;
+
+  resubmissionReasonSubmit.disabled = true;
+  setResubmissionReasonMessage('Sending request...');
+
+  try {
+    const now = new Date().toISOString();
+    const { error: contractError } = await supabase
+      .from('reservation_contracts')
+      .update({
+        review_status: 'resubmission_requested',
+        review_notes: notes,
+        reviewed_at: now
+      })
+      .eq('reservation_id', reservationId);
+    if (contractError) throw contractError;
+
+    await updateReservationStatus(reservationId, 'resubmission_requested', previousStatus);
+
+    closeResubmissionReasonModal();
+    contractDetailsFlash = { message: 'Resubmission requested. The customer will be asked to re-upload the contract.', isError: false };
+    await loadData();
+    setMessage(tableMessage, 'Resubmission requested. The customer will be asked to re-upload the contract.');
+    renderContractDetailsModal(reservationId);
+  } catch (error) {
+    setResubmissionReasonMessage(error.message, true);
+  } finally {
+    resubmissionReasonSubmit.disabled = false;
+  }
 }
 
 async function performContractAction(action, button) {
@@ -723,6 +810,19 @@ async function performContractAction(action, button) {
 
     await updateReservationStatus(reservationId, 'approved', previousStatus);
     return { message: 'Reservation approved.' };
+  }
+
+  if (action === 'request-resubmission') {
+    const contract = getContractReviewMeta(reservation);
+    if (!contract.contract?.contract_url) {
+      throw new Error('No contract file has been uploaded yet.');
+    }
+    if (contract.key === 'approved') {
+      throw new Error('This contract is already verified.');
+    }
+
+    openResubmissionReasonModal(reservationId);
+    return null;
   }
 
   if (action === 'decline-reservation') {
@@ -803,6 +903,10 @@ function wireModals() {
     try {
       setContractDetailsMessage('Updating contract...');
       const result = await performContractAction(action, button);
+      if (result === null) {
+        setContractDetailsMessage('');
+        return;
+      }
       contractDetailsFlash = { message: result.message || 'Updated.', isError: false };
       await loadData();
       setMessage(tableMessage, result.message || 'Updated.');
@@ -812,9 +916,21 @@ function wireModals() {
     }
   });
 
+  resubmissionReasonClose?.addEventListener('click', closeResubmissionReasonModal);
+  resubmissionReasonCancel?.addEventListener('click', closeResubmissionReasonModal);
+  resubmissionReasonSubmit?.addEventListener('click', submitResubmissionRequest);
+  resubmissionReasonModal?.addEventListener('click', (event) => {
+    if (event.target === resubmissionReasonModal) {
+      closeResubmissionReasonModal();
+    }
+  });
+
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && activeContractReservationId) {
       closeContractDetailsModal();
+    }
+    if (event.key === 'Escape' && resubmissionReasonReservationId) {
+      closeResubmissionReasonModal();
     }
   });
 }

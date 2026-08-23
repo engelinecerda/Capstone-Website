@@ -910,23 +910,51 @@ Deno.serve(async (req: Request) => {
       resourceType: 'image',
     });
 
-    const { error: contractInsertError } = await supabase
+    const { data: existingContract } = await supabase
       .from('reservation_contracts')
-      .insert({
-        reservation_id: reservation.reservation_id,
-        template_id: template?.template_id || null,
-        template_version_no: template?.version_no || null,
-        contract_type: template?.contract_type || 'package_contract',
-        contract_url: contractUrl,
-        page_count: contractPageCount ?? null,
-        rendered_body: mergedBody,
-        review_status: 'pending_review',
-        review_notes: null,
-        reviewed_at: null,
-        verified_date: null,
-      });
+      .select('reservation_id')
+      .eq('reservation_id', reservation.reservation_id)
+      .maybeSingle();
+
+    const isResubmission = Boolean(existingContract);
+
+    const contractPayload = {
+      reservation_id: reservation.reservation_id,
+      template_id: template?.template_id || null,
+      template_version_no: template?.version_no || null,
+      contract_type: template?.contract_type || 'package_contract',
+      contract_url: contractUrl,
+      page_count: contractPageCount ?? null,
+      rendered_body: mergedBody,
+      review_status: 'pending_review',
+      verified_date: null,
+      ...(isResubmission
+        ? { resubmitted_at: new Date().toISOString() }
+        : { review_notes: null, reviewed_at: null }),
+    };
+
+    const { error: contractInsertError } = isResubmission
+      ? await supabase
+          .from('reservation_contracts')
+          .update(contractPayload)
+          .eq('reservation_id', reservation.reservation_id)
+      : await supabase
+          .from('reservation_contracts')
+          .insert(contractPayload);
 
     if (contractInsertError) throw contractInsertError;
+
+    if (isResubmission) {
+      // Only move it out of the "waiting on customer" state — never
+      // overwrite a status that isn't specifically resubmission_requested
+      // (e.g. leave an already-declined or already-approved reservation
+      // exactly as it is).
+      await supabase
+        .from('reservations')
+        .update({ status: 'pending' })
+        .eq('reservation_id', reservation.reservation_id)
+        .eq('status', 'resubmission_requested');
+    }
 
     const { error: signatureInsertError } = await supabase
       .from('contract_signatures')
