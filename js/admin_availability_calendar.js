@@ -27,6 +27,7 @@ const statClosedDays = document.getElementById('statClosedDays');
 const dayPanelDate = document.getElementById('dayPanelDate');
 const dayPanelStatusPill = document.getElementById('dayPanelStatusPill');
 const dayPanelCount = document.getElementById('dayPanelCount');
+const dayPanelReason = document.getElementById('dayPanelReason');
 const dayPanelBookings = document.getElementById('dayPanelBookings');
 const dayPanelFooter = document.getElementById('dayPanelFooter');
 const dayPanelActionBtn = document.getElementById('dayPanelActionBtn');
@@ -42,6 +43,7 @@ const blackoutModalTitle = document.getElementById('blackoutModalTitle');
 const blackoutModalCopy = document.getElementById('blackoutModalCopy');
 const blackoutModalWarning = document.getElementById('blackoutModalWarning');
 const blackoutModalMessage = document.getElementById('blackoutModalMessage');
+const blackoutReasonInput = document.getElementById('blackoutReasonInput');
 
 const CAPACITY_BLOCKING_STATUSES = new Set([
   'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
@@ -284,6 +286,17 @@ function renderDayPanel() {
       : 'No bookings on this date';
   }
 
+  if (dayPanelReason) {
+    const reason = closed ? (closedDateReasons.get(iso) || '') : '';
+    if (reason) {
+      dayPanelReason.textContent = `Reason: ${reason}`;
+      dayPanelReason.classList.remove('hidden');
+    } else {
+      dayPanelReason.textContent = '';
+      dayPanelReason.classList.add('hidden');
+    }
+  }
+
   if (dayPanelBookings) {
     dayPanelBookings.innerHTML = bookings.map((reservation) => {
       const status = formatStatusPill(getEffectiveReservationStatus(reservation));
@@ -365,12 +378,14 @@ function renderClosedDatesList() {
     const subText = bookingCount > 0
       ? `${bookingCount} existing booking${bookingCount !== 1 ? 's' : ''}`
       : 'No bookings';
+    const reason = closedDateReasons.get(iso) || '';
     const reopenBtn = isReadOnly ? '' : `<button type="button" class="closed-date-reopen-btn" data-date="${escapeHtml(iso)}">Reopen</button>`;
     return `
       <div class="closed-date-row" data-date="${escapeHtml(iso)}">
         <div class="closed-date-info">
           <span class="closed-date-name">${escapeHtml(formatClosedListDate(iso))}</span>
           <span class="closed-date-sub${bookingCount > 0 ? ' amber' : ''}">${escapeHtml(subText)}</span>
+          ${reason ? `<span class="closed-date-reason">${escapeHtml(reason)}</span>` : ''}
         </div>
         ${reopenBtn}
       </div>
@@ -407,6 +422,7 @@ function openBlackoutModal(dateIso) {
     }
   }
   setModalMessage('');
+  if (blackoutReasonInput) blackoutReasonInput.value = closedDateReasons.get(dateIso) || '';
   blackoutModal?.classList.remove('hidden');
   blackoutModal?.setAttribute('aria-hidden', 'false');
 }
@@ -422,13 +438,15 @@ async function confirmCloseDate() {
     if (!dateColumn) throw new Error('Unable to determine the blackout date column.');
     const reasonColumn = await resolveBlackoutReasonColumn(supabase, blackoutColumnCache);
 
+    const enteredReason = blackoutReasonInput?.value.trim() || '';
     const payload = { [dateColumn]: pendingCloseDate, created_by: adminSession?.user?.id || null };
-    if (reasonColumn) payload[reasonColumn] = DEFAULT_CLOSE_REASON;
+    if (reasonColumn) payload[reasonColumn] = enteredReason || DEFAULT_CLOSE_REASON;
 
     const { error } = await supabase.from('calendar_blackouts').upsert(payload, { onConflict: dateColumn });
     if (error) throw error;
 
     closedDates.add(pendingCloseDate);
+    closedDateReasons.set(pendingCloseDate, enteredReason || DEFAULT_CLOSE_REASON);
     const closedIso = pendingCloseDate;
     closeBlackoutModal();
     afterAvailabilityChange(`Closed ${formatBlackoutDate(closedIso)}.`);
@@ -448,6 +466,7 @@ async function reopenDate(dateIso) {
     if (error) throw error;
 
     closedDates.delete(dateIso);
+    closedDateReasons.delete(dateIso);
     afterAvailabilityChange(`Reopened ${formatBlackoutDate(dateIso)}.`);
   } catch (error) {
     setMessage(calendarMessage, `Failed to reopen date: ${getBlackoutSchemaHint(error)}`, true);

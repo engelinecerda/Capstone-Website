@@ -109,6 +109,7 @@
               <span class="status-pill" id="dayPanelStatusPill"></span>
             </div>
             <p class="day-panel-count" id="dayPanelCount">No bookings on this date</p>
+            <p class="day-panel-reason hidden" id="dayPanelReason"></p>
             <div class="day-panel-bookings" id="dayPanelBookings"></div>
             <div class="day-panel-footer" id="dayPanelFooter">
               <button type="button" class="day-panel-action" id="dayPanelActionBtn"></button>
@@ -134,6 +135,11 @@
       <h2 class="modal-title" id="blackoutModalTitle">Close this date?</h2>
       <p class="modal-copy" id="blackoutModalCopy">Customers will not be able to book this date.</p>
       <p class="modal-warning" id="blackoutModalWarning" hidden></p>
+
+      <div class="modal-field">
+        <label class="modal-label" for="blackoutReasonInput">Reason for closure <span class="modal-label-hint">(shown to customers)</span></label>
+        <textarea id="blackoutReasonInput" class="modal-textarea" rows="3" placeholder="e.g. Private event, Maintenance, Holiday"></textarea>
+      </div>
 
       <p class="modal-message" id="blackoutModalMessage"></p>
 
