@@ -27,6 +27,7 @@ import {
     getCancellationBlockReason,
     getCancellationFee
 } from './reservation_shared.js';
+import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -40,6 +41,25 @@ const reservationId = new URLSearchParams(window.location.search).get('reservati
 if (!reservationId) {
     window.location.href = '/account.html?section=reservations';
 }
+
+// Cancel-reservation modal — same markup, classes, and behavior as the
+// modal on account.html (built into this page directly instead of
+// redirecting there, since this is a separate static page with its own
+// DOM and can't reach account.html's modal).
+const cancelReservationBackdrop = document.getElementById('cancel-reservation-backdrop');
+const cancelModalClose          = document.getElementById('cancel-modal-close');
+const cancelModalDismiss        = document.getElementById('cancel-modal-dismiss');
+const cancelModalConfirm        = document.getElementById('cancel-modal-confirm');
+const cancelModalMessage        = document.getElementById('cancel-modal-message');
+const cancelFeeAmount           = document.getElementById('cancel-fee-amount');
+const cancelReasonInput         = document.getElementById('cancel-reason-input');
+
+const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
+const submissionFeedbackClose    = document.getElementById('submission-feedback-close');
+const submissionFeedbackDismiss  = document.getElementById('submission-feedback-dismiss');
+const submissionFeedbackEyebrow  = document.getElementById('submission-feedback-eyebrow');
+const submissionFeedbackTitle    = document.getElementById('submission-feedback-title');
+const submissionFeedbackCopy     = document.getElementById('submission-feedback-copy');
 
 let pageData = null;
 
@@ -139,14 +159,15 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules, paymentRules] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
         loadReservationRules(supabase),
-        loadPaymentRules(supabase).catch(() => null)
+        loadPaymentRules(supabase).catch(() => null),
+        loadPolicyBodies(supabase, ['cancellation_policy']).catch(() => ({}))
     ]);
 
     pageData = {
@@ -158,7 +179,8 @@ async function loadPageData() {
         cancellationInfo,
         review,
         reservationRules,
-        paymentRules
+        paymentRules,
+        policyBodies
     };
 }
 
@@ -459,14 +481,13 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
 
     const latestRequest = rescheduleRequests[0] || null;
     const openRescheduleUrl = `/account.html?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
-    const openCancelUrl = `/account.html?section=reservations&open=cancel&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
     // A block reason is only ever shown for the time-based rules (min notice
     // / request window) — computeCanCancel already returns false for other
     // reasons (wrong status, open fee) without a matching reason string, so
     // cancelMarkup naturally renders nothing in those cases, same as before.
     const cancelMarkup = canCancel
-        ? `<a class="rd-cancel-link" href="${escapeHtml(openCancelUrl)}">Cancel reservation</a>`
+        ? `<button type="button" class="rd-cancel-link" data-action="open-cancel">Cancel reservation</button>`
         : (cancelBlockReason
             ? `<span class="rd-cancel-blocked" title="${escapeHtml(cancelBlockReason)}">${escapeHtml(cancelBlockReason)}</span>`
             : '');
@@ -614,6 +635,109 @@ function render() {
     `;
 }
 
+function setCancelModalMessage(message, isError = false) {
+    if (!cancelModalMessage) return;
+    cancelModalMessage.textContent = message || '';
+    cancelModalMessage.className = 'account-modal-message' + (isError ? ' error' : '');
+}
+
+function closeCancelModal() {
+    cancelReservationBackdrop?.classList.add('hidden');
+    cancelReservationBackdrop?.setAttribute('aria-hidden', 'true');
+    if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
+    setCancelModalMessage('');
+}
+
+// Swaps the hardcoded fallback copy inside the policy block for the
+// admin-saved override, if one exists — same "override only when present"
+// contract as the cancel modal on account.html. Leaves the fallback markup
+// untouched when there's nothing saved yet, or the fetch failed.
+function applyPolicyOverride(elId, settingKey) {
+    const el = document.getElementById(elId);
+    const body = pageData?.policyBodies?.[settingKey];
+    if (el && body) el.innerHTML = renderPolicyText(body);
+}
+
+function openCancelModal() {
+    if (!pageData?.reservation) return;
+    const fee = getCancellationFee(pageData.reservation, pageData.paymentRules);
+    if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    if (cancelReasonInput) cancelReasonInput.value = '';
+    applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
+    setCancelModalMessage('');
+    cancelReservationBackdrop?.classList.remove('hidden');
+    cancelReservationBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function openSubmissionFeedbackModal({
+    eyebrow = 'Submitted',
+    title = 'Submission Received',
+    copy = 'Your submission has been received.'
+} = {}) {
+    if (submissionFeedbackEyebrow) submissionFeedbackEyebrow.textContent = eyebrow;
+    if (submissionFeedbackTitle) submissionFeedbackTitle.textContent = title;
+    if (submissionFeedbackCopy) submissionFeedbackCopy.textContent = copy;
+    submissionFeedbackBackdrop?.classList.remove('hidden');
+    submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeSubmissionFeedbackModal() {
+    submissionFeedbackBackdrop?.classList.add('hidden');
+    submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+async function submitCancellationRequest() {
+    if (!pageData?.reservation) return;
+    const reservation = pageData.reservation;
+
+    const reason = cancelReasonInput?.value.trim() || '';
+    if (!reason) {
+        setCancelModalMessage('Please tell us why you\'re cancelling this reservation.', true);
+        return;
+    }
+
+    if (cancelModalConfirm) cancelModalConfirm.setAttribute('disabled', 'true');
+    setCancelModalMessage('Submitting your cancellation request...');
+
+    try {
+        // Same two-gate flow as account.js's cancel modal: this only files
+        // the request. js/admin_reservation_details.js creates the
+        // cancellation_fee payment row and flips the status to
+        // 'cancellation_approved' once a manager approves it.
+        const previousStatus = reservation.status;
+
+        const { error: statusError } = await supabase
+            .from('reservations')
+            .update({ status: 'cancellation_requested', cancellation_reason: reason })
+            .eq('reservation_id', reservationId);
+
+        if (statusError) throw statusError;
+
+        const { error: historyError } = await supabase
+            .from('reservation_status')
+            .insert({
+                reservation_id: reservationId,
+                previous_status: previousStatus,
+                new_status: 'cancellation_requested',
+                changed_at: new Date().toISOString()
+            });
+
+        if (historyError) throw historyError;
+
+        closeCancelModal();
+        await loadPageData();
+        render();
+        openSubmissionFeedbackModal({
+            eyebrow: 'Request Submitted',
+            title: 'Cancellation Request Sent',
+            copy: 'Our team will review your request. You\'ll be notified once a decision is made, and if approved, you\'ll be asked to pay the cancellation fee to finalize it.'
+        });
+    } catch (error) {
+        if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
+        setCancelModalMessage(`Failed to submit cancellation: ${error.message}`, true);
+    }
+}
+
 async function init() {
     try {
         await loadPageData();
@@ -628,7 +752,29 @@ pageContainer?.addEventListener('click', async (event) => {
     if (payBtn && !payBtn.disabled) {
         const url = payBtn.dataset.paymentUrl;
         if (url) window.location.href = url;
+        return;
     }
+
+    const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
+    if (cancelTriggerBtn) {
+        openCancelModal();
+    }
+});
+
+cancelModalClose?.addEventListener('click', closeCancelModal);
+cancelModalDismiss?.addEventListener('click', closeCancelModal);
+cancelModalConfirm?.addEventListener('click', submitCancellationRequest);
+cancelReservationBackdrop?.addEventListener('click', (event) => {
+    if (event.target === cancelReservationBackdrop) closeCancelModal();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !cancelReservationBackdrop?.classList.contains('hidden')) closeCancelModal();
+});
+
+submissionFeedbackClose?.addEventListener('click', closeSubmissionFeedbackModal);
+submissionFeedbackDismiss?.addEventListener('click', closeSubmissionFeedbackModal);
+submissionFeedbackBackdrop?.addEventListener('click', (event) => {
+    if (event.target === submissionFeedbackBackdrop) closeSubmissionFeedbackModal();
 });
 
 pageContainer?.addEventListener('change', (event) => {
