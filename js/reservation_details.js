@@ -154,6 +154,7 @@ async function loadPageData() {
             reservation_id,
             reservation_number,
             user_id,
+            contact_name,
             event_type,
             event_date,
             event_time,
@@ -471,6 +472,11 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                     <span class="rd-contract-inset-title">Signed contract</span>
                     <span class="res-status ${escapeHtml(contractBadgeClass(contractMeta))}">${escapeHtml(contractMeta.label)}</span>
+                    ${contractMeta.resubmittedAt ? `
+                        <span class="res-status resubmitted" title="Corrected contract resubmitted ${escapeHtml(contractMeta.resubmittedAt)}">
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i> Resubmitted
+                        </span>
+                    ` : ''}
                 </div>
                 ${contract?.contract_url ? `
                     <a class="rd-btn-outline" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">
@@ -491,6 +497,22 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                         class="rd-btn-outline rd-btn-resubmit"
                         id="rd-resubmit-contract-btn"
                         data-reservation-id="${escapeHtml(reservation.reservation_id)}"
+                    >
+                        <i class="fa-solid fa-pen" aria-hidden="true"></i> Re-upload contract
+                    </button>
+                ` : (contractMeta.resubmittedAt && contractMeta.statusKey === 'pending_review') ? `
+                    <div class="rd-contract-resubmission-note">
+                        <p class="rd-inline-note">
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            Your corrected contract was resubmitted on ${escapeHtml(contractMeta.resubmittedAt)} and is awaiting review.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="rd-btn-outline rd-btn-resubmit"
+                        disabled
+                        aria-disabled="true"
+                        title="Already resubmitted — awaiting review"
                     >
                         <i class="fa-solid fa-pen" aria-hidden="true"></i> Re-upload contract
                     </button>
@@ -906,6 +928,7 @@ async function init() {
         await loadPageData();
         render();
     } catch (error) {
+        console.error('[reservation_details] failed to load:', error);
         pageContainer.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">We couldn't load this reservation. Please try again.</p>`;
     }
 }
