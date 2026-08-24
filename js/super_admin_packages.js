@@ -287,7 +287,6 @@ const cateringPrice30        = document.getElementById('cateringPrice30');
 const cateringPrice40        = document.getElementById('cateringPrice40');
 const cateringPrice50        = document.getElementById('cateringPrice50');
 
-const cateringDishDrawerScrim = document.getElementById('cateringDishDrawerScrim');
 const cateringDishDrawer      = document.getElementById('cateringDishDrawer');
 const cateringDishDrawerTitle = document.getElementById('cateringDishDrawerTitle');
 const cateringDishDrawerList  = document.getElementById('cateringDishDrawerList');
@@ -3501,7 +3500,7 @@ function openConfirmDeleteCateringCategory(categoryId) {
   openModal(deleteModal);
 }
 
-// ─── Dish Drawer (right-anchored, reuses tier-drawer styling) ─────────────────
+// ─── Dish Modal (same centered position/styling as the category edit modal) ──
 function openCateringDishDrawer(categoryId, triggerEl) {
   const cat = allCateringCategories.find(c => c.category_id === categoryId);
   if (!cat) return;
@@ -3514,11 +3513,7 @@ function openCateringDishDrawer(categoryId, triggerEl) {
   cateringNewDishInput.value = '';
   setModalMsg(cateringDishDrawerMessage, '');
 
-  cateringDishDrawerScrim.classList.remove('hidden');
-  cateringDishDrawer.classList.add('open');
-  cateringDishDrawer.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('tier-drawer-open');
-
+  openModal(cateringDishDrawer);
   renderCateringDishDrawerList();
 
   const trapHandler = trapFocus(cateringDishDrawer);
@@ -3531,21 +3526,18 @@ function openCateringDishDrawer(categoryId, triggerEl) {
 }
 
 function closeCateringDishDrawer() {
-  cateringDishDrawerScrim.classList.add('hidden');
-  cateringDishDrawer.classList.remove('open');
-  cateringDishDrawer.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('tier-drawer-open');
+  closeModal(cateringDishDrawer);
   if (cateringDishDrawer._cleanup) { cateringDishDrawer._cleanup(); cateringDishDrawer._cleanup = null; }
   cateringDishDrawerCategoryId = null;
   cateringDishDrawerCategoryName = '';
-  renderCateringTables(); // refresh dish counts on the row behind the drawer
+  renderCateringTables(); // refresh dish counts on the row behind the modal
   if (cateringDishDrawerTriggerEl && document.body.contains(cateringDishDrawerTriggerEl)) cateringDishDrawerTriggerEl.focus();
   cateringDishDrawerTriggerEl = null;
 }
 
 cateringDishDrawerClose.addEventListener('click', closeCateringDishDrawer);
 cateringDishDrawerDone.addEventListener('click', closeCateringDishDrawer);
-cateringDishDrawerScrim.addEventListener('click', closeCateringDishDrawer);
+cateringDishDrawer.addEventListener('click', e => { if (e.target === cateringDishDrawer) closeCateringDishDrawer(); });
 
 function renderCateringDishDrawerList() {
   const dishes = dishesForCategory(cateringDishDrawerCategoryId);
@@ -3670,7 +3662,7 @@ document.addEventListener('keydown', e => {
   if (!badgeTypeModal.classList.contains('hidden')) closeModal(badgeTypeModal);
   if (!deleteModal.classList.contains('hidden'))   closeModal(deleteModal);
   if (!cateringCategoryModal.classList.contains('hidden')) closeModal(cateringCategoryModal);
-  if (cateringDishDrawer.classList.contains('open')) closeCateringDishDrawer();
+  if (!cateringDishDrawer.classList.contains('hidden')) closeCateringDishDrawer();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

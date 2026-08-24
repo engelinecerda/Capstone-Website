@@ -6,6 +6,7 @@ import { applyRoleVisibility } from './session_validation.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
     getEffectiveReservationStatus,
+    getReservationStatusMeta,
     syncCompletedReservations
 } from './reservation_status.js';
 import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
@@ -76,19 +77,6 @@ function formatDate(value) {
         month: 'short',
         day: 'numeric'
     });
-}
-
-function formatStatusLabel(status) {
-    const normalized = String(status || 'pending').toLowerCase();
-    const labels = {
-        pending: 'Pending',
-        approved: 'Approved',
-        declined: 'Declined',
-        completed: 'Completed',
-        cancelled: 'Cancelled',
-        rescheduled: 'Rescheduled'
-    };
-    return labels[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function setReportsMessage(message, isError = false) {
@@ -214,7 +202,7 @@ function renderTable(reservations) {
                     <strong>${escapeHtml(getPackageName(reservation))}</strong>
                     <span>${escapeHtml(reservation?.package?.package_type || 'Package')}</span>
                 </td>
-                <td><span class="reports-status-chip ${escapeHtml(status)}">${escapeHtml(formatStatusLabel(status))}</span></td>
+                <td><span class="status-pill ${escapeHtml(getReservationStatusMeta(status).key)}">${escapeHtml(getReservationStatusMeta(status).label)}</span></td>
                 <td><strong>${escapeHtml(formatCurrency(reservation?.total_price || 0))}</strong></td>
             </tr>
         `;
@@ -299,7 +287,7 @@ function exportReportsPdf() {
             reservation?.event_type || 'Reservation',
             `${formatDate(reservation?.event_date)}\n${reservation?.event_time || 'No time selected'}`,
             getPackageName(reservation),
-            formatStatusLabel(getEffectiveReservationStatus(reservation)),
+            getReservationStatusMeta(getEffectiveReservationStatus(reservation)).label,
             formatCurrency(reservation?.total_price || 0)
         ])),
         styles: {

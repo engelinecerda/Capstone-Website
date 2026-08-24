@@ -391,6 +391,10 @@ body {
 .btn-primary,
 .primary-btn,
 .header-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   height: 36px;
   border: none;
   background: var(--btn-primary-bg);

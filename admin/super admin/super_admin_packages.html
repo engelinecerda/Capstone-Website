@@ -863,33 +863,34 @@
     </div>
   </div>
 
-  <!-- ── CATERING DISH DRAWER (right-anchored, reuses tier-drawer styling) ── -->
-  <div class="tier-drawer-scrim hidden" id="cateringDishDrawerScrim"></div>
-  <aside class="tier-drawer" id="cateringDishDrawer" role="dialog" aria-modal="true" aria-labelledby="cateringDishDrawerTitle" aria-hidden="true">
-    <div class="tier-drawer-header">
-      <div>
-        <p class="tier-drawer-eyebrow">Dishes</p>
-        <h2 class="tier-drawer-title" id="cateringDishDrawerTitle">Category name</h2>
-      </div>
-      <button type="button" class="modal-close" id="cateringDishDrawerClose" aria-label="Close dishes drawer">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="tier-drawer-body">
-      <div id="cateringDishDrawerList"><p class="modal-hint">No dishes yet.</p></div>
-      <div class="modal-field" style="margin-top:14px;">
-        <label class="modal-label" for="cateringNewDishInput">Add a dish</label>
-        <div class="modal-row">
-          <input type="text" id="cateringNewDishInput" class="modal-input" placeholder="E.g., Chicken ala King">
-          <button type="button" class="btn-cancel" id="cateringAddDishBtn" style="white-space:nowrap;">+ Add</button>
+  <!-- ── CATERING DISH MODAL (same position/styling as the category edit modal) ── -->
+  <div class="modal-overlay hidden" id="cateringDishDrawer" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cateringDishDrawerTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="cateringDishDrawerTitle">Category name</h2>
+          <p class="modal-sub">Dishes customers can pick from in this category</p>
         </div>
+        <button type="button" class="modal-close" id="cateringDishDrawerClose" aria-label="Close dishes drawer">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-      <p class="modal-message hidden" id="cateringDishDrawerMessage"></p>
+      <div class="modal-body">
+        <div id="cateringDishDrawerList"><p class="modal-hint">No dishes yet.</p></div>
+        <div class="modal-field" style="margin-top:14px;">
+          <label class="modal-label" for="cateringNewDishInput">Add a dish</label>
+          <div class="modal-row">
+            <input type="text" id="cateringNewDishInput" class="modal-input" placeholder="E.g., Chicken ala King">
+            <button type="button" class="btn-cancel" id="cateringAddDishBtn" style="white-space:nowrap;">+ Add</button>
+          </div>
+        </div>
+        <p class="modal-message hidden" id="cateringDishDrawerMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="cateringDishDrawerDone">Done</button>
+      </div>
     </div>
-    <div class="tier-drawer-footer">
-      <button type="button" class="btn-primary" id="cateringDishDrawerDone">Done</button>
-    </div>
-  </aside>
+  </div>
 
   <!-- ── DELETE / REASSIGN MODAL (category delete, package delete, venue delete) ── -->
   <div class="modal-overlay hidden" id="deleteModal" aria-hidden="true">
