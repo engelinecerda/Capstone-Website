@@ -13,7 +13,6 @@ const sidebarRolePill = document.getElementById('sidebarRolePill');
 const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const logoutBtn = document.getElementById('logoutBtn');
-const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
 const dashboardMessage = document.getElementById('dashboardMessage');
 const recentReservationsBody = document.getElementById('recentReservationsBody');
 const demandYearSelect = document.getElementById('demandYear');
@@ -558,11 +557,19 @@ async function loadPaymentsTodayStat() {
     }
 }
 
-async function loadDashboard() {
-    setDashboardMessage('Loading reservations...');
-    updateStats([]);
-    renderReservationsTable([], {});
-    renderMonthlyChart([]);
+// silent=true is used by the auto-refresh triggers (focus/visibility, bfcache
+// restore, background poll). Unlike the manual/initial load, it must not
+// blank the stats/table/chart before fetching (that produced a visible
+// flash-to-zero on every refresh) and it skips the package/forecast calls,
+// which are expensive (the forecast hits the Render backend, which can have
+// a slow cold start) and not time-sensitive enough to re-run every 60s.
+async function loadDashboard({ silent = false } = {}) {
+    if (!silent) {
+        setDashboardMessage('Loading reservations...');
+        updateStats([]);
+        renderReservationsTable([], {});
+        renderMonthlyChart([]);
+    }
     loadPaymentsTodayStat();
 
     let reservationsCount = 0;
@@ -583,37 +590,42 @@ async function loadDashboard() {
             renderReservationsTable(reservations, contractsByReservationId);
         } catch (error) {
             hasError = true;
-            setDashboardMessage('Failed to load reservations. Please try again.', true);
+            if (silent) {
+                console.warn('Auto-refresh failed, keeping last loaded dashboard data:', error.message);
+            } else {
+                setDashboardMessage('Failed to load reservations. Please try again.', true);
+            }
         }
     })();
 
-    const packagePromise = loadPackages()
-        .then((data) => renderPackageChart(data))
-        .catch(() => renderPackageChart([]));
+    const otherPromises = silent ? [] : [
+        loadPackages()
+            .then((data) => renderPackageChart(data))
+            .catch(() => renderPackageChart([])),
+        loadForecast()
+            .then(async (data) => {
+                fullData = Array.isArray(data) ? data : [];
+                if (demandYearSelect && fullData.length) {
+                    const years = [...new Set(fullData.map((d) => d.year))].sort();
+                    demandYearSelect.innerHTML = '';
+                    years.forEach((year) => {
+                        const option = document.createElement('option');
+                        option.value = year;
+                        option.textContent = year;
+                        demandYearSelect.appendChild(option);
+                    });
+                    const currentYear = new Date().getFullYear().toString();
+                    demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
+                }
+                const selectedYear = demandYearSelect?.value;
+                if (selectedYear) renderDemandChart(selectedYear);
+            })
+            .catch(() => {})
+    ];
 
-    const forecastPromise = loadForecast()
-        .then(async (data) => {
-            fullData = Array.isArray(data) ? data : [];
-            if (demandYearSelect && fullData.length) {
-                const years = [...new Set(fullData.map((d) => d.year))].sort();
-                demandYearSelect.innerHTML = '';
-                years.forEach((year) => {
-                    const option = document.createElement('option');
-                    option.value = year;
-                    option.textContent = year;
-                    demandYearSelect.appendChild(option);
-                });
-                const currentYear = new Date().getFullYear().toString();
-                demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
-            }
-            const selectedYear = demandYearSelect?.value;
-            if (selectedYear) renderDemandChart(selectedYear);
-        })
-        .catch(() => {});
+   await Promise.allSettled([fastPath, ...otherPromises]);
 
-    await Promise.allSettled([fastPath, packagePromise, forecastPromise]);
-
-    if (!hasError) {
+   if (!hasError && !silent) {
         setDashboardMessage(
             reservationsCount
                 ? `Showing ${Math.min(reservationsCount, 10)} of ${reservationsCount} reservation(s).`
@@ -731,7 +743,26 @@ generateForecastBtn?.addEventListener('click', async () => {
     }
 });
 
-refreshDashboardBtn?.addEventListener('click', async () => { await loadDashboard(); });
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+    const now = Date.now();
+    if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+    lastAutoRefreshAt = now;
+    loadDashboard({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 monthlyYearSelect?.addEventListener('change', () => { renderMonthlyChart(fullReservations, monthlyYearSelect.value); });
 

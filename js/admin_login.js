@@ -96,9 +96,12 @@ adminLoginForm?.addEventListener('submit', async (event) => {
     });
 
     if (error) {
+        supabase.rpc('record_failed_admin_login', { p_email: email }).catch(() => {});
         setMessage('Invalid email or password.', 'error');
         return;
     }
+
+    supabase.rpc('clear_my_login_failures').catch(() => {});
 
     // CHECK STATUS
     const { data: profileCheck, error: lockError } = await supabase

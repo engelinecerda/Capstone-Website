@@ -18,7 +18,6 @@ const prevMonthBtn = document.getElementById('prevMonth');
 const nextMonthBtn = document.getElementById('nextMonth');
 const calendarGrid = document.getElementById('calendarGrid');
 const calendarMessage = document.getElementById('calendarMessage');
-const refreshBtn = document.getElementById('refreshBtn');
 
 const statOpenDays = document.getElementById('statOpenDays');
 const statBookingDays = document.getElementById('statBookingDays');
@@ -494,8 +493,11 @@ function goToReservationDetails(reservationId) {
 /* Month loading                                                      */
 /* ---------------------------------------------------------------- */
 
-async function loadMonth() {
-  setMessage(calendarMessage, '');
+async function loadMonth({ silent = false } = {}) {
+  if (!silent) {
+    setMessage(calendarMessage, '');
+  }
+
   try {
     const range = getCalendarRange(currentMonth);
     const [reservations, blackoutData] = await Promise.all([
@@ -517,6 +519,10 @@ async function loadMonth() {
     renderMonthStats();
     renderClosedDatesList();
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded availability data:', error.message || error);
+      return;
+    }
     setMessage(calendarMessage, `Failed to load availability: ${error.message || error}`, true);
   }
 }
@@ -581,7 +587,26 @@ wireCalendarNav();
 wireBlackoutModal();
 wireDayPanelBookingLinks();
 wireClosedDatesList();
-refreshBtn?.addEventListener('click', () => loadMonth());
+
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadMonth({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 validateAdminSession({
   onSuccess: async ({ session, profile }) => {

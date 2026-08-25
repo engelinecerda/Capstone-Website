@@ -495,9 +495,24 @@ confirmBackupOk?.addEventListener('click', async () => {
     const skippedNote = skipped.length ? ` (${skipped.length} table(s) could not be read and were skipped: ${skipped.join(', ')})` : '';
     setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}${skippedNote}`, skipped.length ? 'error' : 'success');
 
+     await supabase.rpc('notify_admins', {
+      p_type: 'admin_backup_completed',
+      p_title: 'Backup completed',
+      p_body: `Backup created and saved to Google Drive: ${uploaded.name}${skippedNote}`,
+      p_link: '/admin/super%20admin/super_admin_backup.html'
+    }).catch(() => {});
+
   } catch (err) {
     setModalMsg(confirmBackupMessage, `Backup failed: ${err.message}`);
     hideProgress(backupProgressWrap);
+    
+    await supabase.rpc('notify_admins', {
+      p_type: 'admin_backup_failed',
+      p_title: 'Backup failed',
+      p_body: `The scheduled backup did not complete: ${err.message}`,
+      p_link: '/admin/super%20admin/super_admin_backup.html'
+    }).catch(() => {});
+
   } finally {
     confirmBackupOk.disabled    = false;
     confirmBackupCancel.disabled = false;

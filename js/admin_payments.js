@@ -5,7 +5,7 @@ import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource } from './reservation_shared.js';
 import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
@@ -16,7 +16,6 @@ const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
-const refreshBtn = document.getElementById('refreshBtn');
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
 const paymentsPagination = document.getElementById('paymentsPagination');
@@ -468,7 +467,10 @@ function renderTable(list) {
   }).join('');
 }
 
-function filterAndRender() {
+
+
+
+function filterAndRender({ resetPage = true } = {}) {
   const term = String(searchInput?.value || '').trim().toLowerCase();
   const status = statusDropdown?.value || 'all';
   const filtered = paymentsCache.filter((payment) => (
@@ -478,7 +480,11 @@ function filterAndRender() {
   ));
   renderStats(paymentsCache);
   paymentsFiltered = filtered;
-  paymentsCurrentPage = 1;
+  if (resetPage) {
+      paymentsCurrentPage = 1;
+    } else {
+      paymentsCurrentPage = Math.min(paymentsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
+    }
   renderPaymentsPage();
   if (!filtered.length) {
     setMessage(tableMessage, 'No payment submissions match the current filter.');
@@ -842,9 +848,7 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   reviewActions.push('<button type="button" class="modal-btn modal-btn-secondary" id="paymentDetailsDismiss">Close</button>');
 
   if (currentRole !== 'admin' && String(payment.payment_status || '').toLowerCase() === 'pending_review') {
-    // Pending café-issued rows never reach this modal — the queue shows
-    // "Record payment" for those instead (see renderTable), so a pending
-    // row that gets here for review/approve is always customer_submitted.
+  
     if (rejectReasonPaymentId === payment.payment_id) {
       reviewActions.push(`
         <div class="reject-reason-inline">
@@ -1120,8 +1124,10 @@ function wireRecordPaymentModal() {
   });
 }
 
-async function loadData() {
-  setMessage(tableMessage, 'Loading payment submissions...');
+  async function loadData({ silent = false } = {}) {
+  if (!silent) {
+    setMessage(tableMessage, 'Loading payment submissions...');
+  }
   try {
     paymentsCache = await fetchPayments();
     reservationMap = await fetchReservationsForPayments(
@@ -1142,8 +1148,8 @@ async function loadData() {
 
     await refreshSidebarBadges();
 
-    filterAndRender();
-    if (activePaymentReviewId) {
+     filterAndRender({ resetPage: !silent });
+     if (!silent && activePaymentReviewId) {
       if (getPaymentById(activePaymentReviewId)) {
         renderPaymentReviewModal(activePaymentReviewId);
       } else {
@@ -1151,6 +1157,10 @@ async function loadData() {
       }
     }
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded payments:', error.message);
+      return;
+    }
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
     await refreshSidebarBadges();
     renderTable([]);
@@ -1273,7 +1283,25 @@ function wireModals() {
   });
 }
 
-refreshBtn?.addEventListener('click', loadData);
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadData({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 
 wireLogoutButton();
@@ -1285,7 +1313,7 @@ validateAdminSession({
     adminSession = session;
     currentRole = profile.role;
 
-    // Setup inactivity (same as homepage)
+  
     setupInactivityLogout(profile.role);
     const avatarEl = document.getElementById('sidebarAvatar');
     if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
@@ -1301,13 +1329,11 @@ validateAdminSession({
       document.body.classList.remove('is-super-admin');
     }
 
-    // Attach UI event listeners
     wireFilters();
     wireTableActions();
     wireModals();
     wireRecordPaymentModal();
 
-    // Load data ONCE
     await loadData();
   }
 });

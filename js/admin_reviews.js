@@ -5,13 +5,12 @@ import { markAdminReviewsSeen, refreshAdminSidebarCounts } from './admin_sidebar
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
-const refreshReviewsBtn = document.getElementById('refreshReviewsBtn');
 const searchInput = document.getElementById('searchInput');
 const reviewsMessage = document.getElementById('reviewsMessage');
 const reviewsBody = document.getElementById('reviewsBody');
@@ -180,7 +179,7 @@ function updateStats(reviews) {
   if (statCommentedReviews) statCommentedReviews.textContent = String(commentedReviews);
 }
 
-function applyFilters() {
+function applyFilters({ resetPage = true } = {}) {
   const query = (searchInput?.value || '').trim().toLowerCase();
   const filteredReviews = !query
     ? allReviews
@@ -203,7 +202,11 @@ function applyFilters() {
     });
 
   reviewsFiltered = filteredReviews;
-  reviewsCurrentPage = 1;
+  if (resetPage) {
+    reviewsCurrentPage = 1;
+  } else {
+    reviewsCurrentPage = Math.min(reviewsCurrentPage, getTotalPages(filteredReviews.length, PAGE_SIZE));
+  }
   renderReviewsPage();
 
   const summaryText = filteredReviews.length
@@ -310,8 +313,10 @@ function mergeReviewsWithContext(reviews, profiles, reservations) {
   });
 }
 
-async function loadReviews() {
-  setReviewsMessage('Loading reviews...');
+async function loadReviews({ silent = false } = {}) {
+  if (!silent) {
+    setReviewsMessage('Loading reviews...');
+  }
 
   try {
     if (adminSession?.user?.id) {
@@ -336,10 +341,15 @@ async function loadReviews() {
       paymentBadgeEl: navPaymentCount,
       contractBadgeEl: navContractCount,
       reviewBadgeEl: navReviewCount
-    });
+    }).catch(() => {});
 
-    applyFilters();
+    applyFilters({ resetPage: !silent });
+
   } catch (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded reviews:', error.message);
+      return;
+    }
     allReviews = [];
     updateStats([]);
     renderReviews([]);
@@ -364,10 +374,8 @@ watchAuthState();
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {
 
-    // Save session (you use this later)
     adminSession = session;
 
-    // Setup inactivity
     setupInactivityLogout(profile.role);
     const avatarEl = document.getElementById('sidebarAvatar');
     if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
@@ -376,11 +384,28 @@ validateAdminSession({
     initManagerNotificationBell(supabase, session.user.id);
     initAdminNav({ role: profile.role });
 
-    // Wire UI
-    searchInput?.addEventListener('input', applyFilters);
-    refreshReviewsBtn?.addEventListener('click', loadReviews);
+    searchInput?.addEventListener('input', () => applyFilters());
 
-    // Load data
     await loadReviews();
   }
 });
+
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadReviews({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);

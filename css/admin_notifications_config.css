@@ -60,22 +60,24 @@
 }
 .trigger-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
-/* Toggle switch (on/off, matches the .pm2-toggle track/thumb convention
-   already established for other admin config toggles in this codebase). */
-.pm2-toggle { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
-.pm2-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pm2-toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+.pm2-toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.pm2-toggle input:disabled { cursor: not-allowed; }
 .pm2-toggle-track {
-  width: 36px; height: 20px; border-radius: 999px; background: var(--neutral);
-  position: relative; transition: background .15s;
+  position: absolute; inset: 0; box-sizing: border-box;
+  background: #D8D3CD; border: 1px solid var(--btn-secondary-border);
+  border-radius: 999px; transition: background .15s ease, border-color .15s ease;
 }
-.pm2-toggle-track::after {
+.pm2-toggle-track::before { 
   content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-  border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  border-radius: 50%; background: #fff; transition: transform .15s ease; box-shadow: 0 1px 2px rgba(0,0,0,.2);
 }
-.pm2-toggle input:checked + .pm2-toggle-track { background: var(--approved); }
-.pm2-toggle input:checked + .pm2-toggle-track::after { transform: translateX(16px); }
-.pm2-toggle input:disabled + .pm2-toggle-track { opacity: .5; cursor: not-allowed; }
-.pm2-toggle input:focus-visible + .pm2-toggle-track { outline: 2px solid var(--input-focus); outline-offset: 2px; }
+.pm2-toggle input:checked + .pm2-toggle-track { background: var(--active-bg); border-color: var(--active-bg); }
+.pm2-toggle input:checked + .pm2-toggle-track::before { transform: translateX(16px); }
+/* Required/locked triggers render checked + disabled — muted espresso, not a
+   normal enabled toggle, so it visually reads as "on but not yours to change." */
+.pm2-toggle input:disabled + .pm2-toggle-track { opacity: .55; }
+.pm2-toggle input:focus-visible + .pm2-toggle-track { outline: 2px solid var(--active-bg); outline-offset: 2px; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -177,7 +179,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-cancel, .btn-outline-sm, .modal-close, .pm2-toggle-track, .pm2-toggle-track::after, .token-chip {
+    .btn-cancel, .btn-outline-sm, .modal-close, .pm2-toggle-track, .pm2-toggle-track::before, .token-chip {
     transition: none !important;
   }
 }

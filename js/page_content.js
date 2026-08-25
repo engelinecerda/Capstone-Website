@@ -4,6 +4,17 @@
 // page; the page's existing hardcoded markup stays on screen if a fetch
 // fails or a row is missing.
 
+export function revealConfigContent(...elements) {
+  elements.forEach((el) => el?.classList.remove('cfg-loading'));
+}
+
+export function withConfigTimeout(fetchPromise, timeoutValue, ms = 6000) {
+  return Promise.race([
+    fetchPromise,
+    new Promise((resolve) => setTimeout(() => resolve(timeoutValue), ms)),
+  ]);
+}
+
 export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}) {
   try {
     const { data, error } = await supabase

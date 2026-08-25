@@ -1,8 +1,5 @@
-// home_content.js — wires index.html's hero, gallery, Our Story teaser,
-// What We Offer services, and Find Us locations to Page Content /
-// Business Profile.
 import { customerSupabase as supabase } from './supabase.js';
-import { loadPageHeader, loadGalleryImages, loadAboutSections } from './page_content.js';
+import { loadPageHeader, loadGalleryImages, loadAboutSections, revealConfigContent, withConfigTimeout } from './page_content.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 
 function escapeHtml(str) {
@@ -10,33 +7,50 @@ function escapeHtml(str) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
+
+async function initHero() {
+  const headingEl = document.querySelector('.hero-title');
+  const subEl = document.querySelector('.hero-sub');
+  try {
+    await withConfigTimeout(
+      loadPageHeader(supabase, 'home', {
+        imgEl: document.querySelector('.hero-bg'),
+        headingEl,
+        subEl
+      }),
+      undefined
+    );
+  } finally {
+    revealConfigContent(headingEl, subEl);
+  }
+}
+
 async function initGallery() {
-  const grid = document.querySelector('.gallery-grid');
-  if (!grid) return;
+  try {
+    const images = await withConfigTimeout(loadGalleryImages(supabase), []);
+    if (!images.length) return; 
 
-  const images = await loadGalleryImages(supabase);
-  if (!images.length) return; // keep the existing hardcoded 6 images as fallback
-
-  // The mosaic layout (css/home.css .gi1-.gi6) is a fixed 6-tile grid — show
-  // up to the 6 highest-priority active photos in that same mosaic shape.
-  grid.innerHTML = images.slice(0, 6).map((img, i) => `
-    <div class="g-item gi${i + 1}">
-      <img src="${escapeHtml(img.image_url)}" alt="${escapeHtml(img.alt_text)}">
-    </div>`).join('');
+    grid.innerHTML = images.slice(0, 6).map((img, i) => `
+      <div class="g-item gi${i + 1}">
+        <img src="${escapeHtml(img.image_url)}" alt="${escapeHtml(img.alt_text)}">
+      </div>`).join('');
+  } finally {
+    revealConfigContent(grid);
+  }
 }
 
 async function initOurStoryTeaser() {
   const target = document.querySelector('.about-text');
   if (!target) return;
 
-  const sections = await loadAboutSections(supabase);
-  const teaser = sections.find(s => s.section_key === 'home_teaser');
-  if (!teaser || !teaser.body) return; // keep the existing hardcoded paragraphs as fallback
-
-  // Only the 2 <p class="about-body"> paragraphs are dynamic — the eyebrow,
-  // headline, and pull-quote stay fixed page chrome (same boundary as
-  // About's own section headlines).
   const existingParas = target.querySelectorAll('.about-body');
+  const sections = await withConfigTimeout(loadAboutSections(supabase), []);
+  const teaser = sections.find(s => s.section_key === 'home_teaser');
+  if (!teaser || !teaser.body) {
+    revealConfigContent(...existingParas); // still in the DOM, untouched — reveal the fallback
+    return;
+  }
+
   const rendered = renderPolicyBlocks(parsePolicyBody(teaser.body));
   const wrapper = document.createElement('div');
   wrapper.innerHTML = rendered;
@@ -55,11 +69,14 @@ async function initServices() {
   if (!grid) return;
 
   try {
-    const { data, error } = await supabase
-      .from('landing_service')
-      .select('image_url, title, description, link_url, link_label')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+    const { data, error } = await withConfigTimeout(
+      supabase
+        .from('landing_service')
+        .select('image_url, title, description, link_url, link_label')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+      { data: null, error: null }
+    );
     if (error || !data || !data.length) return; // keep the 3 hardcoded cards as fallback
 
     grid.innerHTML = data.map((s, i) => `
@@ -74,6 +91,8 @@ async function initServices() {
       </div>`).join('');
   } catch (err) {
     // Falls back to the static homepage content already in the HTML.
+  } finally {
+    revealConfigContent(grid);
   }
 }
 
@@ -115,11 +134,6 @@ async function initLocations() {
   }
 }
 
-loadPageHeader(supabase, 'home', {
-  imgEl: document.querySelector('.hero-bg'),
-  headingEl: document.querySelector('.hero-title'),
-  subEl: document.querySelector('.hero-sub')
-});
 initGallery();
 initOurStoryTeaser();
 initServices();

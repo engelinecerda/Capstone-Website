@@ -9,7 +9,7 @@ import {
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
 import { getPaymentStatusPillMeta } from './reservation_shared.js';
-import { PAGE_SIZE, paginate, renderPagination } from './pagination.js';
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -17,7 +17,6 @@ const reservationsPagination = document.getElementById('reservationsPagination')
 const searchInput = document.getElementById('searchInput');
 const statusDropdown = document.getElementById('statusDropdown');
 const chipsRow = document.getElementById('chipsRow');
-const refreshBtn = document.getElementById('refreshBtn');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
 const navPaymentCount = document.getElementById('navPaymentCount');
@@ -475,7 +474,12 @@ function renderTable(list) {
   }).join('');
 }
 
-function filterAndRender() {
+
+
+
+
+
+function filterAndRender({ resetPage = true } = {}) {
   const term = searchInput?.value.trim().toLowerCase();
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
@@ -489,7 +493,11 @@ function filterAndRender() {
   );
   renderStats(reservationsCache);
   reservationsFiltered = filtered;
-  reservationsCurrentPage = 1;
+  if (resetPage) {
+    reservationsCurrentPage = 1;
+  } else {
+    reservationsCurrentPage = Math.min(reservationsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
+  }
   renderReservationsPage();
   setMessage(tableMessage, filtered.length ? '' : getEmptyFilterMessage(status), false);
 }
@@ -736,38 +744,51 @@ async function fetchReservationContracts(reservationIds) {
   throw error;
 }
 
-async function loadData() {
-  setMessage(tableMessage, 'Loading reservations...');
-  try {
-    assignmentFeatureReady = true;
-    assignmentFeatureMessage = '';
 
-    reservationsCache = await fetchReservations();
-    staffDirectory = [];
-    assignmentMapByReservationId = {};
-    paymentSummaryMap = await fetchPaymentSummaries(
-      reservationsCache.map((reservation) => reservation.reservation_id).filter(Boolean)
-    ).catch(() => ({}));
+
+
+
+
+async function loadData({ silent = false } = {}) {
+  if (!silent) {
+    setMessage(tableMessage, 'Loading reservations...');
+  }
+  try {
+    let nextAssignmentFeatureReady = true;
+    let nextAssignmentFeatureMessage = '';
+
+    const freshReservations = await fetchReservations();
+    const freshReservationIds = freshReservations.map((r) => r.reservation_id).filter(Boolean);
+
+    const freshPaymentSummaryMap = await fetchPaymentSummaries(freshReservationIds).catch(() => ({}));
+
+    let freshStaffDirectory = [];
+    let freshAssignmentMap = {};
 
     try {
-      staffDirectory = await fetchStaffRoster();
+      freshStaffDirectory = await fetchStaffRoster();
     } catch (staffError) {
-      assignmentFeatureReady = false;
-      assignmentFeatureMessage = getStaffDirectoryHint(staffError);
+      nextAssignmentFeatureReady = false;
+      nextAssignmentFeatureMessage = getStaffDirectoryHint(staffError);
     }
 
-    if (assignmentFeatureReady) {
+    if (nextAssignmentFeatureReady) {
       try {
-        assignmentMapByReservationId = await fetchReservationAssignments(
-          reservationsCache.map((reservation) => reservation.reservation_id).filter(Boolean),
-          staffDirectory
-        );
+        freshAssignmentMap = await fetchReservationAssignments(freshReservationIds, freshStaffDirectory);
       } catch (assignmentError) {
-        assignmentFeatureReady = false;
-        assignmentFeatureMessage = getAssignmentSchemaHint(assignmentError);
-        assignmentMapByReservationId = {};
+        nextAssignmentFeatureReady = false;
+        nextAssignmentFeatureMessage = getAssignmentSchemaHint(assignmentError);
+        freshAssignmentMap = {};
       }
     }
+
+
+    reservationsCache = freshReservations;
+    paymentSummaryMap = freshPaymentSummaryMap;
+    staffDirectory = freshStaffDirectory;
+    assignmentMapByReservationId = freshAssignmentMap;
+    assignmentFeatureReady = nextAssignmentFeatureReady;
+    assignmentFeatureMessage = nextAssignmentFeatureMessage;
 
     await refreshAdminSidebarCounts({
       supabase,
@@ -775,13 +796,20 @@ async function loadData() {
       paymentBadgeEl: navPaymentCount,
       contractBadgeEl: navContractCount,
       reviewBadgeEl: navReviewCount
-    });
+    }).catch(() => {});
     renderStats(reservationsCache);
-    filterAndRender();
+    filterAndRender({ resetPage: !silent });  
     if (!assignmentFeatureReady) {
       setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
     }
   } catch (err) {
+    if (silent) {
+      // Quiet failure: keep whatever is already on screen; the next
+      // successful trigger (focus, poll, or the user changing a filter)
+      // resumes normal updates.
+      console.warn('Auto-refresh failed, keeping last loaded reservations:', err.message);
+      return;
+    }
     setMessage(tableMessage, `Failed to load: ${err.message}`, true);
     await refreshAdminSidebarCounts({
       supabase,
@@ -813,16 +841,30 @@ function escapeHtml(str) {
   }[m]));
 }
 
-/*logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectLogin();
-});*/
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
 
-refreshBtn?.addEventListener('click', loadData);
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadData({ silent: true });
+}
 
-/*supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') redirectLogin();
-});*/
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+// Browsers can restore this page from the back-forward cache (e.g. the
+// Manager hits Back after acting on reservation-details.html) without
+// re-running any module code — pageshow with event.persisted is the only
+// reliable signal for that case, so it's handled separately from a normal
+// on-mount load.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 function applyStatusFilterFromUrl() {
   const requestedStatus = new URLSearchParams(window.location.search).get('status');

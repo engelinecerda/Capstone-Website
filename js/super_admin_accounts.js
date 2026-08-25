@@ -28,9 +28,11 @@ let openCardMenuEl = null;       // currently-open kebab popover element
 let lastFocusedTrigger = null;   // element to return focus to when a modal closes
 
 // ── LOAD ─────────────────────────────────────────────────────────
-async function loadAccounts() {
-  document.getElementById('accountsBody').innerHTML =
-    `<tr><td colspan="5"><div class="table-empty"><p style="color:var(--muted);">Loading accounts…</p></div></td></tr>`;
+async function loadAccounts({ silent = false } = {}) {
+  if (!silent) {
+    document.getElementById('accountsBody').innerHTML =
+      `<tr><td colspan="5"><div class="table-empty"><p style="color:var(--muted);">Loading accounts…</p></div></td></tr>`;
+  } 
 
   const { data, error } = await supabase
     .from('profiles')
@@ -39,21 +41,21 @@ async function loadAccounts() {
     .order('date_registered', { ascending: false });
 
   if (error) {
+    if (silent) {
+      console.warn('Auto-refresh failed, keeping last loaded accounts:', error.message);
+      return;
+    }
     document.getElementById('accountsBody').innerHTML =
       `<tr><td colspan="5"><div class="table-empty"><p>Failed to load accounts</p><span>${error.message}</span></div></td></tr>`;
     return;
   }
 
-  // Real status, derived from real data — no in-memory overrides. Locked
-  // accounts are deactivated; an account that has never signed in (no
-  // last_sign_in_at) is still on its invite, waiting for the password-setup
-  // email to be completed; anything else is active.
   allAccounts = (data || []).map(a => ({
     ...a,
     _status: a.is_locked ? 'deactivated' : (!a.last_sign_in_at ? 'invited' : 'active')
   }));
-  updateStats();
-  applyFilters();
+
+  applyFilters({ resetPage: !silent });
 }
 
 // ── STATS ────────────────────────────────────────────────────────
@@ -70,8 +72,8 @@ function updateStats() {
 }
 
 // ── FILTERS ──────────────────────────────────────────────────────
-function applyFilters() {
-  const q       = document.getElementById('searchInput').value.trim().toLowerCase();
+function applyFilters({ resetPage = true } = {}) {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const statusF = document.querySelector('#statusFilterSeg .seg-btn.active')?.dataset.status || '';
 
   filtered = allAccounts.filter(a => {
@@ -81,7 +83,11 @@ function applyFilters() {
     return matchQ && matchSt;
   });
 
-  currentPage = 1;
+  if (resetPage) {
+    currentPage = 1;
+  } else {
+    currentPage = Math.min(currentPage, Math.max(1, Math.ceil(filtered.length / PER_PAGE)));
+  }
   renderTable();
 }
 
@@ -244,7 +250,26 @@ document.getElementById('statusFilterSeg').addEventListener('click', e => {
   document.querySelectorAll('#statusFilterSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
   applyFilters();
 });
-document.getElementById('refreshBtn').addEventListener('click', loadAccounts);
+
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_DEBOUNCE_MS = 3000;
+const AUTO_REFRESH_POLL_MS = 60000;
+
+function triggerAutoRefresh() {
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
+  lastAutoRefreshAt = now;
+  loadAccounts({ silent: true });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
+});
+window.addEventListener('focus', triggerAutoRefresh);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) triggerAutoRefresh();
+});
+setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
 // ── FOCUS TRAP (shared by Account + Confirm modals) ───────────────
 function trapFocus(container) {
@@ -335,13 +360,6 @@ function openEditModal(a) {
   const roleSelect = document.getElementById('fieldRole');
   const staffRoleInput = document.getElementById('fieldStaffRole');
   const boardHint = document.getElementById('fieldRoleBoardHint');
-  // 'Staff' is now a permanent option in the base <select> (admin/super
-  // admin/super_admin_accounts.html), so a plain staff row just uses it
-  // directly — no more dynamic append for that case (it would now only
-  // duplicate the static option). The board account still gets its own
-  // distinct, disabled option; selected by reference (opt.selected) rather
-  // than roleSelect.value=, since that assignment would otherwise resolve
-  // to the static "Staff" option that now shares its value.
   roleSelect.querySelectorAll('option[data-dynamic]').forEach(o => o.remove());
 
   if (a.is_board_account) {
@@ -563,14 +581,6 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
   }
 }
 
-// ── PASSWORD RESET ───────────────────────────────────────────────
-/*async function sendPasswordReset(a) {
-  if (!a?.email) return;
-  const { error } = await supabase.auth.resetPasswordForEmail(a.email);
-  if (error) alert('Failed to send: ' + error.message);
-  else alert(`Password reset email sent to ${a.email}.`);
-}*/
-
 // ── DEACTIVATE / REACTIVATE ────────────────────────────────────────
 function openLockConfirm(a) {
   const isLocked = a._status === 'deactivated';
@@ -728,12 +738,6 @@ document.addEventListener('keydown', e => {
 });
 
 // ── PASSWORD TOGGLE ──────────────────────────────────────────────
-// Attached to the modal card itself, not document — the card's own
-// click listener above calls e.stopPropagation() (so clicks inside the
-// modal don't bubble to the overlay's click-outside-to-close handler),
-// which also blocks the event from ever reaching a document-level
-// delegated listener. Multiple listeners on the same node still all
-// fire regardless of stopPropagation(), so binding here works.
 document.querySelector('#accountModal [role="dialog"]').addEventListener('click', e => {
   const toggleBtn = e.target.closest('.password-toggle-btn');
   if (!toggleBtn) return;
