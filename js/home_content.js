@@ -134,6 +134,7 @@ async function initLocations() {
   }
 }
 
+initHero();
 initGallery();
 initOurStoryTeaser();
 initServices();
