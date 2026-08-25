@@ -41,7 +41,7 @@ Customers may request to reschedule their reservation depending on availability.
 In the event of cancellation, all payments made will remain non-refundable. Cancellation requests may still be recorded in the system for documentation and administrative purposes.
 
 7. Contract Submission
-Customers are required to submit a signed contract as part of the reservation process. The system may allow resubmission of contracts if revisions are requested by the administrator. Submitted contracts are subject to review and approval.
+Customers are required to submit a signed contract as part of the reservation process. Submitted contracts are subject to review and approval.
 
 8. Electronic Transactions and Signatures
 This system complies with Republic Act No. 8792, also known as the Electronic Commerce Act of 2000, which recognizes the legal validity of electronic data messages, electronic documents, and electronic signatures.

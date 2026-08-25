@@ -916,18 +916,14 @@ Deno.serve(async (req: Request) => {
       .eq('reservation_id', reservation.reservation_id)
       .maybeSingle();
 
-    // Unlike the previous version of this check, the error is no longer
-    // silently discarded. Before 20260824_fix_contract_resubmission_immutability.sql,
-    // a swallowed error here (e.g. from a duplicate-row PGRST116) made
-    // isResubmission silently evaluate to false, which caused this function
-    // to INSERT a new row instead of UPDATEing the existing one every time —
-    // that's how reservation_contracts ended up with duplicate rows for a
-    // single reservation_id in the first place. Now that reservation_id is
-    // guaranteed unique at the DB level, this should never actually error in
-    // practice, but we still fail loudly instead of silently if it ever does.
     if (existingContractError) throw existingContractError;
 
-    const isResubmission = Boolean(existingContract);
+    if (existingContract) {
+      return jsonResponse(
+        { success: false, error: 'A signed contract has already been submitted for this reservation.' },
+        409,
+      );
+    }
 
     const contractPayload = {
       reservation_id: reservation.reservation_id,
@@ -939,42 +935,15 @@ Deno.serve(async (req: Request) => {
       rendered_body: mergedBody,
       review_status: 'pending_review',
       verified_date: null,
-      ...(isResubmission
-        ? { resubmitted_at: new Date().toISOString() }
-        : { review_notes: null, reviewed_at: null }),
+      review_notes: null,
+      reviewed_at: null,
     };
 
-    // Explicit update-vs-insert branch rather than .upsert(onConflict:...) —
-    // PostgREST's upsert conflict-target resolution can silently miss a
-    // constraint that was just dropped/recreated (schema cache staleness)
-    // and fall back to a bare INSERT, which then fails with "duplicate key
-    // value violates unique constraint" on a genuine resubmission. This
-    // explicit branch doesn't depend on that resolution at all — it relies
-    // only on the existingContract check above (now error-checked) and the
-    // protect_signed_contract_fields trigger allowing contract_url to change
-    // when resubmitted_at is set in the same UPDATE.
-    const { error: contractInsertError } = isResubmission
-      ? await supabase
-          .from('reservation_contracts')
-          .update(contractPayload)
-          .eq('reservation_id', reservation.reservation_id)
-      : await supabase
-          .from('reservation_contracts')
-          .insert(contractPayload);
+    const { error: contractInsertError } = await supabase
+      .from('reservation_contracts')
+      .insert(contractPayload);
 
     if (contractInsertError) throw contractInsertError;
-
-    if (isResubmission) {
-      // Only move it out of the "waiting on customer" state — never
-      // overwrite a status that isn't specifically resubmission_requested
-      // (e.g. leave an already-declined or already-approved reservation
-      // exactly as it is).
-      await supabase
-        .from('reservations')
-        .update({ status: 'pending' })
-        .eq('reservation_id', reservation.reservation_id)
-        .eq('status', 'resubmission_requested');
-    }
 
     const { error: signatureInsertError } = await supabase
       .from('contract_signatures')

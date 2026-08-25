@@ -1861,7 +1861,7 @@ async function fetchContracts(reservationIds) {
 
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, resubmitted_at')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at')
         .in('reservation_id', reservationIds);
 
     if (error) {
@@ -1869,7 +1869,6 @@ async function fetchContracts(reservationIds) {
             isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
             || isReservationContractsColumnMissing(error, 'reviewed_at')
-            || isReservationContractsColumnMissing(error, 'resubmitted_at')
         ) {
             const fallback = await supabase
                 .from('reservation_contracts')

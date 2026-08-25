@@ -6,10 +6,9 @@ import { applyRoleVisibility } from './session_validation.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
     getEffectiveReservationStatus,
-    getReservationStatusMeta,
     syncCompletedReservations
 } from './reservation_status.js';
-import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js'; 
+import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -76,6 +75,19 @@ function formatDate(value) {
         month: 'short',
         day: 'numeric'
     });
+}
+
+function formatStatusLabel(status) {
+    const normalized = String(status || 'pending').toLowerCase();
+    const labels = {
+        pending: 'Pending',
+        approved: 'Approved',
+        declined: 'Declined',
+        completed: 'Completed',
+        cancelled: 'Cancelled',
+        rescheduled: 'Rescheduled'
+    };
+    return labels[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function setReportsMessage(message, isError = false) {
@@ -201,13 +213,16 @@ function renderTable(reservations) {
                     <strong>${escapeHtml(getPackageName(reservation))}</strong>
                     <span>${escapeHtml(reservation?.package?.package_type || 'Package')}</span>
                 </td>
-                <td><span class="status-pill ${escapeHtml(getReservationStatusMeta(status).key)}">${escapeHtml(getReservationStatusMeta(status).label)}</span></td>
+                <td><span class="reports-status-chip ${escapeHtml(status)}">${escapeHtml(formatStatusLabel(status))}</span></td>
                 <td><strong>${escapeHtml(formatCurrency(reservation?.total_price || 0))}</strong></td>
             </tr>
         `;
     }).join('');
 }
 
+// resetPage=false is used after an auto-refresh so a Manager mid-way
+// through the list isn't yanked back to page 1 every time; the page is
+// clamped instead, in case the refreshed data has fewer pages than before.
 function renderReports({ resetPage = true } = {}) {
     const filteredReservations = getFilteredReservations();
     renderSummary(filteredReservations);
@@ -234,6 +249,10 @@ function renderReportsTablePage() {
     });
 }
 
+// Column layout for the "Reservations" sheet — shared between the row
+// writer and the Summary sheet's formulas below (colLetter() derives each
+// formula's column reference from this same array, so the two can never
+// drift out of sync with each other).
 const RESV_COLUMNS = [
     { header: 'Customer Name', key: 'customerName', width: 24 },
     { header: 'Customer Email', key: 'customerEmail', width: 26 },
@@ -383,15 +402,15 @@ async function exportReportsExcel() {
         workbook.creator = 'ELI Coffee Events';
         workbook.created = new Date();
 
-     const resvRef = buildReservationsSheet(workbook, filteredReservations);
+        const resvRef = buildReservationsSheet(workbook, filteredReservations);
         buildSummarySheet(workbook, resvRef);
 
-    const buffer = await workbook.xlsx.writeBuffer();
+        const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
 
-    const fromValue = reportDateFrom?.value || '';
+        const fromValue = reportDateFrom?.value || '';
         const toValue = reportDateTo?.value || '';
         const periodPart = fromValue || toValue
             ? `${fromValue || 'start'}_to_${toValue || 'now'}`
@@ -476,6 +495,9 @@ async function validateAdminSession() {
     return session;
 }
 
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, and on failure it
+// keeps the last-good data and fails quietly instead of blanking the table.
 async function loadReports({ silent = false } = {}) {
     if (!silent) {
         setReportsMessage('Loading reservations...');
@@ -533,10 +555,14 @@ if (session) {
     await loadReports();
 }
 
+// Auto-refresh replaces the old manual Refresh button — see the matching
+// block in js/admin_reservations.js for the full rationale. Debounced so a
+// focus + visibilitychange pair (which fire together when switching back to
+// this tab) can't trigger a duplicate fetch.
 let lastAutoRefreshAt = 0;
 const AUTO_REFRESH_DEBOUNCE_MS = 3000;
 const AUTO_REFRESH_POLL_MS = 60000;
-    
+
 function triggerAutoRefresh() {
     const now = Date.now();
     if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;

@@ -371,10 +371,9 @@ function getPlannedArrivalDate(reservation) {
 function getContractReviewMeta(reservation) {
   const contract = reservation?.contracts?.[0] || null;
   const reviewStatus = String(contract?.review_status || '').toLowerCase();
-  const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
   if (!contract) {
-    return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', resubmittedAt: '', hasFile: false, contract };
+    return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', hasFile: false, contract };
   }
   if (reviewStatus === 'verified' || contract?.verified_date) {
     return {
@@ -383,7 +382,6 @@ function getContractReviewMeta(reservation) {
       verification: contract?.verified_date ? formatDateTime(contract.verified_date) : 'Verified',
       note: '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
       hasFile: Boolean(contract.contract_url),
       contract
     };
@@ -395,12 +393,11 @@ function getContractReviewMeta(reservation) {
       verification: 'Awaiting contract review',
       note: contract?.review_notes || '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
       hasFile: Boolean(contract.contract_url),
       contract
     };
   }
-  return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', resubmittedAt: '', hasFile: false, contract };
+  return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', hasFile: false, contract };
 }
 
 function contractStatus(res) {
@@ -442,7 +439,7 @@ async function getApprovalLimitMessage(reservation) {
 
 async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at, resubmitted_at';
+  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
   const { data, error } = await supabase.from('reservation_contracts').select(extendedSelect).in('reservation_id', reservationIds);
   if (!error) return data || [];
@@ -451,7 +448,6 @@ async function fetchReservationContracts(reservationIds) {
     isMissingColumnError(error, 'review_status')
     || isMissingColumnError(error, 'review_notes')
     || isMissingColumnError(error, 'reviewed_at')
-    || isMissingColumnError(error, 'resubmitted_at')
   ) {
     const fallback = await supabase.from('reservation_contracts').select(fallbackSelect).in('reservation_id', reservationIds);
     if (fallback.error) throw fallback.error;
@@ -693,7 +689,7 @@ function renderHeaderActions() {
 
   const buttons = [];
 
-  if (['pending', 'resubmission_requested'].includes(status)) {
+  if (status === 'pending') {
     buttons.push(`
       <button type="button" class="header-action-btn primary" data-action="approve" ${approvalState.canApprove ? '' : 'disabled'} title="${escapeHtml(approvalState.reason || 'Approve reservation')}">Approve</button>
       <button type="button" class="header-action-btn decline" data-action="decline">Decline</button>
@@ -1209,7 +1205,6 @@ function renderContract() {
 
   const rows = [dlRow(contract.key === 'approved' ? 'Verified' : 'Verification', contract.verification, { muted: contract.key !== 'approved' })];
   if (contract.reviewedAt && contract.reviewedAt !== contract.verification) rows.push(dlRow('Reviewed', contract.reviewedAt));
-  if (contract.resubmittedAt) rows.push(dlRow('Replacement submitted', contract.resubmittedAt));
   if (contract.note) rows.push(dlRow('Admin note', contract.note, { full: true }));
   if (!contract.hasFile) rows.push(dlRow('Status', 'No contract file uploaded yet.', { full: true, muted: true }));
   contractDetailsRows.innerHTML = rows.join('');

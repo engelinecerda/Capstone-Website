@@ -61,25 +61,6 @@ const submissionFeedbackEyebrow  = document.getElementById('submission-feedback-
 const submissionFeedbackTitle    = document.getElementById('submission-feedback-title');
 const submissionFeedbackCopy     = document.getElementById('submission-feedback-copy');
 
-// Contract resubmission modal — lets the customer re-sign and re-upload
-// after a manager requests resubmission, mirroring the draw/type signature
-// capture already used on reservations.html.
-const resubmitBackdrop      = document.getElementById('resubmit-contract-backdrop');
-const resubmitClose         = document.getElementById('resubmit-contract-close');
-const resubmitCancel        = document.getElementById('resubmit-contract-cancel');
-const resubmitSubmit        = document.getElementById('resubmit-contract-submit');
-const resubmitMessage       = document.getElementById('resubmit-contract-message');
-const resubmitViewLink      = document.getElementById('resubmit-contract-view-link');
-const resubmitCanvas        = document.getElementById('resubmit-signature-canvas');
-const resubmitClearBtn      = document.getElementById('resubmit-signature-clear-btn');
-const resubmitStatus        = document.getElementById('resubmit-signature-status');
-
-const resubmitState = {
-    pad: null,
-    agreementViewMethod: '',
-    agreementViewedAt: ''
-};
-
 let pageData = null;
 
 function isReservationContractsColumnMissing(error, columnName) {
@@ -91,7 +72,7 @@ function isReservationContractsColumnMissing(error, columnName) {
 async function fetchContract(id) {
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, resubmitted_at')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at')
         .eq('reservation_id', id)
         .maybeSingle();
 
@@ -100,7 +81,6 @@ async function fetchContract(id) {
             isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
             || isReservationContractsColumnMissing(error, 'reviewed_at')
-            || isReservationContractsColumnMissing(error, 'resubmitted_at')
         ) {
             const fallback = await supabase
                 .from('reservation_contracts')
@@ -375,7 +355,6 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
 function contractBadgeClass(contractMeta) {
     if (contractMeta.statusKey === 'verified') return 'approved';
     if (contractMeta.statusKey === 'missing') return 'completed';
-    if (contractMeta.statusKey === 'resubmission_requested') return 'resubmission_requested';
     return 'pending';
 }
 
@@ -472,11 +451,6 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                     <span class="rd-contract-inset-title">Signed contract</span>
                     <span class="res-status ${escapeHtml(contractBadgeClass(contractMeta))}">${escapeHtml(contractMeta.label)}</span>
-                    ${contractMeta.resubmittedAt ? `
-                        <span class="res-status resubmitted" title="Corrected contract resubmitted ${escapeHtml(contractMeta.resubmittedAt)}">
-                            <i class="fa-solid fa-rotate" aria-hidden="true"></i> Resubmitted
-                        </span>
-                    ` : ''}
                 </div>
                 ${contract?.contract_url ? `
                     <a class="rd-btn-outline" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">
@@ -485,38 +459,6 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                 ` : `
                     <p class="rd-inline-note">Your signed contract will appear here once submitted.</p>
                 `}
-                ${contractMeta.statusKey === 'resubmission_requested' ? `
-                    <div class="rd-contract-resubmission-note">
-                        <p class="rd-inline-note rd-inline-note-warning">
-                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                            ${escapeHtml(contractMeta.note || 'Please re-upload a corrected, signed contract.')}
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        class="rd-btn-outline rd-btn-resubmit"
-                        id="rd-resubmit-contract-btn"
-                        data-reservation-id="${escapeHtml(reservation.reservation_id)}"
-                    >
-                        <i class="fa-solid fa-pen" aria-hidden="true"></i> Re-upload contract
-                    </button>
-                ` : (contractMeta.resubmittedAt && contractMeta.statusKey === 'pending_review') ? `
-                    <div class="rd-contract-resubmission-note">
-                        <p class="rd-inline-note">
-                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
-                            Your corrected contract was resubmitted on ${escapeHtml(contractMeta.resubmittedAt)} and is awaiting review.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        class="rd-btn-outline rd-btn-resubmit"
-                        disabled
-                        aria-disabled="true"
-                        title="Already resubmitted — awaiting review"
-                    >
-                        <i class="fa-solid fa-pen" aria-hidden="true"></i> Re-upload contract
-                    </button>
-                ` : ''}
             </div>
 
             ${showPaymentCta ? `
@@ -796,133 +738,6 @@ async function submitCancellationRequest() {
     }
 }
 
-function setResubmitMessage(message = '', isError = false) {
-    if (!resubmitMessage) return;
-    resubmitMessage.textContent = message;
-    resubmitMessage.classList.toggle('error', isError);
-}
-
-function setResubmitStatus(message = '', isError = false) {
-    if (!resubmitStatus) return;
-    resubmitStatus.textContent = message;
-    resubmitStatus.classList.toggle('error', isError);
-}
-
-function resizeResubmitCanvas() {
-    if (!resubmitCanvas) return;
-    const data = resubmitState.pad && !resubmitState.pad.isEmpty() ? resubmitState.pad.toData() : null;
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    resubmitCanvas.width = resubmitCanvas.offsetWidth * ratio;
-    resubmitCanvas.height = resubmitCanvas.offsetHeight * ratio;
-    resubmitCanvas.getContext('2d').scale(ratio, ratio);
-    if (resubmitState.pad) {
-        resubmitState.pad.clear();
-        if (data) resubmitState.pad.fromData(data);
-    }
-}
-
-function initResubmitSignaturePad() {
-    if (!resubmitCanvas || resubmitState.pad || typeof SignaturePad === 'undefined') return;
-    resubmitState.pad = new SignaturePad(resubmitCanvas, { penColor: '#2A1408', backgroundColor: '#ffffff' });
-}
-
-async function getResubmitSignatureDataUrl() {
-    if (!resubmitState.pad || resubmitState.pad.isEmpty()) return null;
-    return resubmitState.pad.toDataURL('image/png');
-}
-
-function openResubmitModal() {
-    const { reservation, contract } = pageData || {};
-    if (!reservation) return;
-
-    resubmitState.agreementViewMethod = '';
-    resubmitState.agreementViewedAt = '';
-    setResubmitMessage('');
-    setResubmitStatus('');
-
-    if (contract?.contract_url && resubmitViewLink) {
-        resubmitViewLink.href = contract.contract_url;
-    }
-
-    // Unhide BEFORE sizing the canvas. resizeResubmitCanvas() reads
-    // resubmitCanvas.offsetWidth/offsetHeight to set the canvas's actual
-    // drawing-buffer dimensions — while the backdrop still has the
-    // 'hidden' class (display:none), both read as 0, so the canvas ends
-    // up 0x0 pixels internally. The dashed box still renders because
-    // that's just the wrapper's CSS border, but nothing drawn on a 0x0
-    // canvas can ever appear. Sizing must happen after the modal (and
-    // therefore the canvas) is actually laid out and visible.
-    resubmitBackdrop?.classList.remove('hidden');
-    resubmitBackdrop?.setAttribute('aria-hidden', 'false');
-
-    initResubmitSignaturePad();
-    resizeResubmitCanvas();
-    if (resubmitState.pad) resubmitState.pad.clear();
-}
-
-function closeResubmitModal() {
-    resubmitBackdrop?.classList.add('hidden');
-    resubmitBackdrop?.setAttribute('aria-hidden', 'true');
-}
-
-async function submitResubmission() {
-    const { reservation } = pageData || {};
-    if (!reservation) return;
-
-    const signerName = (reservation.contact_name || '').trim();
-    if (!signerName) {
-        setResubmitMessage('We could not determine your name from this reservation. Please contact the venue.', true);
-        return;
-    }
-
-    // Viewing the current contract at least once satisfies the same
-    // agreement-acknowledgement requirement the initial signing flow
-    // enforces server-side (agreement_view_method / agreement_viewed_at).
-    if (!resubmitState.agreementViewMethod) {
-        resubmitState.agreementViewMethod = 'opened_full_view';
-        resubmitState.agreementViewedAt = new Date().toISOString();
-    }
-
-    const signatureDataUrl = await getResubmitSignatureDataUrl();
-    if (!signatureDataUrl) {
-        setResubmitStatus('Please sign to continue.', true);
-        return;
-    }
-
-    resubmitSubmit.disabled = true;
-    setResubmitMessage('Submitting your signed contract...');
-
-    try {
-        const { data: result, error } = await supabase.functions.invoke('generate-signed-contract', {
-            body: {
-                reservation_id: reservation.reservation_id,
-                signature_data_url: signatureDataUrl,
-                signer_name: signerName,
-                signature_type: 'drawn',
-                agreement_view_method: resubmitState.agreementViewMethod,
-                agreement_viewed_at: resubmitState.agreementViewedAt
-            }
-        });
-
-        if (error || !result?.success) {
-            throw new Error(result?.error || 'We could not submit your signed contract. Please try again.');
-        }
-
-        closeResubmitModal();
-        await loadPageData();
-        render();
-        openSubmissionFeedbackModal({
-            eyebrow: 'Contract Submitted',
-            title: 'Signed Contract Received',
-            copy: 'Your corrected contract has been submitted and is being reviewed.'
-        });
-    } catch (error) {
-        setResubmitMessage(error.message, true);
-    } finally {
-        resubmitSubmit.disabled = false;
-    }
-}
-
 async function init() {
     try {
         await loadPageData();
@@ -945,11 +760,6 @@ pageContainer?.addEventListener('click', async (event) => {
     if (cancelTriggerBtn) {
         openCancelModal();
     }
-
-    const resubmitTriggerBtn = event.target.closest('#rd-resubmit-contract-btn');
-    if (resubmitTriggerBtn) {
-        openResubmitModal();
-    }
 });
 
 cancelModalClose?.addEventListener('click', closeCancelModal);
@@ -966,38 +776,6 @@ submissionFeedbackClose?.addEventListener('click', closeSubmissionFeedbackModal)
 submissionFeedbackDismiss?.addEventListener('click', closeSubmissionFeedbackModal);
 submissionFeedbackBackdrop?.addEventListener('click', (event) => {
     if (event.target === submissionFeedbackBackdrop) closeSubmissionFeedbackModal();
-});
-
-pageContainer?.addEventListener('change', (event) => {
-    const fileInput = event.target.closest('[data-field="replacement_contract"]');
-    if (!fileInput) return;
-    const filenameEl = pageContainer.querySelector('[data-contract-filename]');
-    const file = fileInput.files?.[0];
-    if (filenameEl) {
-        filenameEl.textContent = file?.name || 'No file chosen';
-    }
-});
-
-resubmitClose?.addEventListener('click', closeResubmitModal);
-resubmitCancel?.addEventListener('click', closeResubmitModal);
-resubmitSubmit?.addEventListener('click', submitResubmission);
-resubmitBackdrop?.addEventListener('click', (event) => {
-    if (event.target === resubmitBackdrop) closeResubmitModal();
-});
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !resubmitBackdrop?.classList.contains('hidden')) closeResubmitModal();
-});
-
-resubmitClearBtn?.addEventListener('click', () => {
-    resubmitState.pad?.clear();
-    setResubmitStatus('');
-});
-resubmitViewLink?.addEventListener('click', () => {
-    resubmitState.agreementViewMethod = 'opened_full_view';
-    resubmitState.agreementViewedAt = new Date().toISOString();
-});
-window.addEventListener('resize', () => {
-    if (!resubmitBackdrop?.classList.contains('hidden')) resizeResubmitCanvas();
 });
 
 init();

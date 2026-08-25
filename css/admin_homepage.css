@@ -42,8 +42,6 @@
   --cancelled-txt:#5F5E5A;
   --requested:    #FAEEDA;
   --requested-txt:#854F0B;
-  --resubmitted:  #EAF3DE;
-  --resubmitted-txt:#3B6D11;
 
   /* Status distribution segment colors */
   --seg-pending:    #BA7517;
@@ -823,16 +821,6 @@ body {
 .status-pill.rescheduled {
   background: var(--cancelled);
   color: var(--cancelled-txt);
-}
-
-.status-pill.resubmission_requested {
-  background: var(--requested);
-  color: var(--requested-txt);
-}
-
-.status-pill.resubmitted {
-  background: var(--resubmitted);
-  color: var(--resubmitted-txt);
 }
 
 /* ============================================================

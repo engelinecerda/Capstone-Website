@@ -624,7 +624,6 @@ table td {
 .status-pill.pending,
 .status-pill.pending_review,
 .status-pill.requested,
-.status-pill.resubmission_requested,
 .status-pill.cancellation_requested {
   background: var(--pending);
   color: var(--pending-txt);
@@ -632,8 +631,7 @@ table td {
 
 .status-pill.confirmed,
 .status-pill.approved,
-.status-pill.verified,
-.status-pill.resubmitted {
+.status-pill.verified {
   background: var(--approved);
   color: var(--approved-txt);
 }

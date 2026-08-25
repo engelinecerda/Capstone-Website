@@ -524,10 +524,10 @@ async function fetchContracts(reservationIds) {
     if (!reservationIds.length) return {};
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, resubmitted_at')
+        .select('reservation_id, contract_url, verified_date, review_status')
         .in('reservation_id', reservationIds);
     if (error) {
-        if (isReservationContractsColumnMissing(error, 'review_status') || isReservationContractsColumnMissing(error, 'resubmitted_at')) {
+        if (isReservationContractsColumnMissing(error, 'review_status')) {
             const fallback = await supabase
                 .from('reservation_contracts')
                 .select('reservation_id, contract_url, verified_date')

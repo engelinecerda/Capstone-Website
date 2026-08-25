@@ -715,7 +715,7 @@ async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
 async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
 
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at, resubmitted_at';
+  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
   const { data, error } = await supabase
     .from('reservation_contracts')
@@ -730,7 +730,6 @@ async function fetchReservationContracts(reservationIds) {
     isMissingColumnError(error, 'review_status')
     || isMissingColumnError(error, 'review_notes')
     || isMissingColumnError(error, 'reviewed_at')
-    || isMissingColumnError(error, 'resubmitted_at')
   ) {
     const fallback = await supabase
       .from('reservation_contracts')

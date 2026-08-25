@@ -1335,7 +1335,6 @@ body {
 }
 
 .res-status.pending,
-.res-status.resubmission_requested,
 .res-status.cancellation_requested {
     background-color: var(--acc-amber-bg);
     color: var(--acc-amber-text);

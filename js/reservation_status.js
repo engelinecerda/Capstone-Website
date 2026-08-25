@@ -3,8 +3,7 @@ export const BUSINESS_TIME_ZONE = 'Asia/Manila';
 const LEGACY_STATUS_MAP = {
     pending: 'pending_review',
     approved: 'confirmed',
-    rescheduled: 'confirmed',
-    resubmission_requested: 'for_contract_signing'
+    rescheduled: 'confirmed'
 };
 
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'declined']);

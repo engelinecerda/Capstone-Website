@@ -153,7 +153,6 @@ export function getReservationStatusMeta(status) {
         declined: 'Declined',
         completed: 'Completed',
         rescheduled: 'Rescheduled',
-        resubmission_requested: 'Resubmission Requested',
         cancellation_requested: 'Cancellation Requested',
         cancellation_approved: 'Cancellation Approved — Fee Due'
     };
@@ -247,7 +246,6 @@ export function resolvePaymentEvidenceSource(payment, paymentMethodMap = {}) {
 // on any page can use it.
 export function computeContractMeta(contract) {
     const reviewStatus = String(contract?.review_status || '').toLowerCase();
-    const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
     if (reviewStatus === 'verified' || contract?.verified_date) {
         return {
@@ -256,22 +254,7 @@ export function computeContractMeta(contract) {
             statusKey: 'verified',
             verification: `Verified ${formatDateTime(contract.verified_date)}`,
             reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-            resubmittedAt,
             note: '',
-            hasFile: Boolean(contract?.contract_url),
-            contract
-        };
-    }
-
-    if (reviewStatus === 'resubmission_requested') {
-        return {
-            label: 'Resubmission needed',
-            key: 'resubmission_requested',
-            statusKey: 'resubmission_requested',
-            verification: 'The venue asked you to re-upload a corrected contract',
-            reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-            resubmittedAt,
-            note: contract?.review_notes || '',
             hasFile: Boolean(contract?.contract_url),
             contract
         };
@@ -284,7 +267,6 @@ export function computeContractMeta(contract) {
             statusKey: 'pending_review',
             verification: 'Pending admin verification',
             reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-            resubmittedAt,
             note: contract?.review_notes || '',
             hasFile: Boolean(contract?.contract_url),
             contract
@@ -297,7 +279,6 @@ export function computeContractMeta(contract) {
         statusKey: 'missing',
         verification: 'No signed contract uploaded yet',
         reviewedAt: '',
-        resubmittedAt: '',
         note: '',
         hasFile: false,
         contract

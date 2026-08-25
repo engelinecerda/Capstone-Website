@@ -134,8 +134,7 @@ export const RESERVATION_RULES_DEFAULTS = {
     min_pax: 20,
     max_pax: 150,
     full_payment_days: 7,
-    auto_cancel_days: 5,
-    contract_resubmission_days: 3
+    auto_cancel_days: 5
 };
 
 // Mirrors the seed values in
