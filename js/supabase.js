@@ -1,5 +1,4 @@
-//supa
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+   import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
 const DEFAULT_SUPABASE_URL = 'https://gznemevovvcfjnuwsixl.supabase.co'
 const DEFAULT_SUPABASE_KEY = 'sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM'
@@ -57,9 +56,23 @@ function makeClient(storageKey) {
     })
 }
 
-export const customerSupabase = makeClient('eli-customer-auth')
-export const portalSupabase = makeClient('eli-portal-auth')
+function lazyClient(storageKey) {
+    let instance = null;
+    function getInstance() {
+        if (!instance) instance = makeClient(storageKey);
+        return instance;
+    }
+    return new Proxy({}, {
+        get(_target, prop, receiver) {
+            const client = getInstance();
+            const value = Reflect.get(client, prop, client);
+            return typeof value === 'function' ? value.bind(client) : value;
+        }
+    });
+}
+
+export const customerSupabase = lazyClient('eli-customer-auth')
+export const portalSupabase = lazyClient('eli-portal-auth')
 
 // Keep the public site on the customer session by default.
 export const supabase = customerSupabase
-

@@ -32,7 +32,7 @@
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
-            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Loading...</p>
           </div>
         </a>
         <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
@@ -58,6 +58,7 @@
           <div class="header-btn-group">
             <button type="button" class="btn-cancel" id="openVenuesBtn">Venues</button>
             <button type="button" class="btn-cancel" id="openBadgeTypesBtn">Badge Types</button>
+            <button type="button" class="btn-cancel" id="openCateringMenuBtn">Catering Menu</button>
             <button type="button" class="btn-cancel" id="addCategoryBtn">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New category
@@ -288,6 +289,96 @@
         </div>
       </div>
 
+      <!-- ============================================= -->
+      <!-- ========== CATERING MENU VIEW ================ -->
+      <!-- ============================================= -->
+      <div id="cateringMenuView" style="display:none;">
+        <div class="breadcrumb-bar">
+          <button type="button" class="btn-back" id="backToCategoriesFromCateringBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            Back to Inventory
+          </button>
+        </div>
+
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Catering Menu</h1>
+            <p class="page-sub">Food & drink categories the customer picks from when building a catering tray, plus pricing per pax bracket.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addCateringCategoryBtn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New category
+          </button>
+        </div>
+
+        <p class="page-message" id="cateringPageMessage"></p>
+
+        <div class="card" id="cateringPackagePickerCard">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Managing menu for</h2>
+              <p class="section-sub">Each catering-type package has its own set of categories, dishes, and pricing. Flag a package as catering-enabled from its Edit modal in Inventory.</p>
+            </div>
+          </div>
+          <div class="modal-field" style="max-width:420px;">
+            <select id="cateringPackageSelect" class="modal-input modal-select"></select>
+          </div>
+        </div>
+
+        <div class="card" id="activeCateringSection">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Active Categories</h2>
+              <p class="section-sub">Shown to customers in the buffet builder. Required categories must have a selection before checkout.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="pkg-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Required</th>
+                  <th>Dishes</th>
+                  <th>Price (20 / 30 / 40 / 50 pax)</th>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="activeCateringBody">
+                <tr class="empty-row"><td colspan="7">Loading catering menu...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="archivedCateringSection" style="display:none;">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Archived Categories</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="pkg-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Required</th>
+                  <th>Dishes</th>
+                  <th>Price (20 / 30 / 40 / 50 pax)</th>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="archivedCateringBody">
+                <tr class="empty-row"><td colspan="7">No archived categories.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
   </main>
 
@@ -465,6 +556,14 @@
         <div class="modal-field">
           <label class="modal-label">Before this can go active</label>
           <div id="pkgActivationChecklist" class="checklist-list"></div>
+        </div>
+
+        <div class="modal-field">
+          <label class="pkg-active-toggle-label">
+            <input type="checkbox" id="pkgUsesCateringMenuToggle">
+            <span>Uses the customizable catering menu (foods &amp; drinks)</span>
+          </label>
+          <span class="modal-hint">Enable this for packages that need a buffet/menu builder during booking. Manage the menu itself from Inventory &rarr; Catering Menu once saved.</span>
         </div>
 
         <div class="modal-field">
@@ -692,6 +791,103 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span id="badgeTypeModalSaveLabel">Add Badge Type</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CATERING CATEGORY ADD / EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="cateringCategoryModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cateringCategoryModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="cateringCategoryModalTitle">Add New Category</h2>
+          <p class="modal-sub" id="cateringCategoryModalSub">A selectable group in the buffet builder</p>
+        </div>
+        <button type="button" class="modal-close" id="cateringCategoryModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="cateringCatName">Category Name *</label>
+            <input type="text" id="cateringCatName" class="modal-input" placeholder="E.g., Chicken, Drinks">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="cateringCatIcon">Icon (optional)</label>
+            <input type="text" id="cateringCatIcon" class="modal-input" placeholder="Leave blank for none" maxlength="8">
+          </div>
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="cateringCatTag">Selection Group *</label>
+            <select id="cateringCatTag" class="modal-input modal-select">
+              <option value="main">Main dish (customer picks one main-tagged category)</option>
+              <option value="pasta">Pasta</option>
+              <option value="dessert">Dessert</option>
+              <option value="rice">Rice</option>
+              <option value="drinks">Drinks</option>
+              <option value="addon">Other add-on</option>
+            </select>
+            <span class="modal-hint">Checkout requires at least one selection from the main, pasta, and dessert groups.</span>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="cateringCatSortOrder">Sort Order</label>
+            <input type="number" id="cateringCatSortOrder" class="modal-input" value="0" min="0">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="pkg-active-toggle-label">
+            <input type="checkbox" id="cateringCatRequired" checked>
+            <span>Required — customer must pick a dish from this category before checkout</span>
+          </label>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Price per pax bracket *</label>
+          <div class="modal-row modal-row-three" style="grid-template-columns:repeat(4,1fr);">
+            <input type="number" id="cateringPrice20" class="modal-input" placeholder="20 pax" min="0">
+            <input type="number" id="cateringPrice30" class="modal-input" placeholder="30 pax" min="0">
+            <input type="number" id="cateringPrice40" class="modal-input" placeholder="40 pax" min="0">
+            <input type="number" id="cateringPrice50" class="modal-input" placeholder="50 pax" min="0">
+          </div>
+        </div>
+        <p class="modal-message hidden" id="cateringCategoryModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="cateringCategoryModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="cateringCategoryModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="cateringCategoryModalSaveLabel">Add Category</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CATERING DISH MODAL (same position/styling as the category edit modal) ── -->
+  <div class="modal-overlay hidden" id="cateringDishDrawer" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cateringDishDrawerTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="cateringDishDrawerTitle">Category name</h2>
+          <p class="modal-sub">Dishes customers can pick from in this category</p>
+        </div>
+        <button type="button" class="modal-close" id="cateringDishDrawerClose" aria-label="Close dishes drawer">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="cateringDishDrawerList"><p class="modal-hint">No dishes yet.</p></div>
+        <div class="modal-field" style="margin-top:14px;">
+          <label class="modal-label" for="cateringNewDishInput">Add a dish</label>
+          <div class="modal-row">
+            <input type="text" id="cateringNewDishInput" class="modal-input" placeholder="E.g., Chicken ala King">
+            <button type="button" class="btn-cancel" id="cateringAddDishBtn" style="white-space:nowrap;">+ Add</button>
+          </div>
+        </div>
+        <p class="modal-message hidden" id="cateringDishDrawerMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="cateringDishDrawerDone">Done</button>
       </div>
     </div>
   </div>

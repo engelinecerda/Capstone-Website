@@ -33,12 +33,6 @@
   --rescheduled: #F1EFE8;
   --rescheduled-text: #5F5E5A;
   --rescheduled-border: #E2DED4;
-  --requested: #FAEEDA;
-  --requested-text: #854F0B;
-  --requested-border: #F0DCB8;
-  --resubmitted: #EAF3DE;
-  --resubmitted-text: #3B6D11;
-  --resubmitted-border: #CFE3BC;
 }
 
 html {
@@ -690,12 +684,6 @@ body {
   background: var(--declined);
   border-color: var(--declined-border);
   color: var(--declined-text);
-}
-
-.action-btn.request {
-  background: var(--requested);
-  border-color: var(--requested-border);
-  color: var(--requested-text);
 }
 
 .action-btn.view {

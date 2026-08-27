@@ -159,42 +159,6 @@
   color: var(--muted-2, var(--muted));
 }
 
-.reports-status-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.reports-status-chip.pending {
-  background: #FAEEDA;
-  color: #854F0B;
-}
-
-.reports-status-chip.approved {
-  background: #EAF3DE;
-  color: #3B6D11;
-}
-
-.reports-status-chip.completed {
-  background: #EFE8DD;
-  color: #4A2C17;
-}
-
-.reports-status-chip.cancelled,
-.reports-status-chip.declined {
-  background: #FCEBEB;
-  color: #A32D2D;
-}
-
-.reports-status-chip.rescheduled {
-  background: #F1EFE8;
-  color: #5F5E5A;
-}
-
 .reports-empty {
   padding: 30px 0;
   text-align: center;

@@ -391,6 +391,10 @@ body {
 .btn-primary,
 .primary-btn,
 .header-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   height: 36px;
   border: none;
   background: var(--btn-primary-bg);
@@ -620,15 +624,14 @@ table td {
 .status-pill.pending,
 .status-pill.pending_review,
 .status-pill.requested,
-.status-pill.resubmission_requested {
+.status-pill.cancellation_requested {
   background: var(--pending);
   color: var(--pending-txt);
 }
 
 .status-pill.confirmed,
 .status-pill.approved,
-.status-pill.verified,
-.status-pill.resubmitted {
+.status-pill.verified {
   background: var(--approved);
   color: var(--approved-txt);
 }
@@ -638,6 +641,11 @@ table td {
 .status-pill.overpaid {
   background: var(--declined);
   color: var(--declined-txt);
+}
+
+.status-pill.cancellation_approved {
+  background: var(--info);
+  color: var(--info-txt);
 }
 
 .status-pill.completed {
@@ -822,6 +830,7 @@ table td {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

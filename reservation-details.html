@@ -55,6 +55,53 @@
     </div>
   </div>
 
+  <div class="account-modal-backdrop hidden" id="cancel-reservation-backdrop" aria-hidden="true">
+    <div class="account-modal-card cancel-modal-card" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title">
+      <button type="button" class="account-modal-close" id="cancel-modal-close" aria-label="Close cancellation dialog">&times;</button>
+      <p class="account-modal-eyebrow">Important Notice</p>
+      <h2 class="account-modal-title" id="cancel-modal-title">Cancel Reservation</h2>
+
+      <div class="cancel-policy-block">
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="cancel-policy-body" id="cancel-policy-body">
+          <p class="cancel-policy-heading">Non-Refundable Policy</p>
+          <p class="cancel-policy-text">All payments already made for this reservation are strictly non-refundable. Cancelling will not reverse any amounts previously submitted or verified.</p>
+        </div>
+      </div>
+
+      <div class="cancel-fee-block">
+        <span class="cancel-fee-label">Cancellation Fee</span>
+        <strong class="cancel-fee-amount" id="cancel-fee-amount">&#8369;0</strong>
+        <p class="cancel-fee-note">This fee must be paid to complete the cancellation. You will be directed to the Payments section after confirming.</p>
+      </div>
+
+      <div class="cancel-reason-field">
+        <label class="cancel-reason-label" for="cancel-reason-input">Reason for cancellation</label>
+        <textarea class="cancel-reason-input" id="cancel-reason-input" rows="3" placeholder="Let us know why you're cancelling this reservation..." required></textarea>
+      </div>
+
+      <p class="account-modal-message" id="cancel-modal-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="cancel-modal-dismiss">Go Back</button>
+        <button type="button" class="account-modal-btn danger" id="cancel-modal-confirm">Confirm Cancellation</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
+    <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
+      <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
+      <div class="submission-feedback-icon" aria-hidden="true">&#10003;</div>
+      <p class="account-modal-eyebrow" id="submission-feedback-eyebrow">Submitted</p>
+      <h2 class="account-modal-title" id="submission-feedback-title">Submission Received</h2>
+      <p class="account-modal-copy" id="submission-feedback-copy">Your submission has been received.</p>
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn primary" id="submission-feedback-dismiss">Okay</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/js/navbar.js"></script>
   <script type="module" src="/js/reservation_details.js"></script>
 </body>

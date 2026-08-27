@@ -717,6 +717,10 @@
 }
 .inclusion-row button:hover, .reorder-btn:hover { color: var(--text); background: var(--btn-secondary-hover); }
 .inclusion-row button:disabled, .reorder-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.inclusion-row.is-archived-dish { opacity: 0.5; }
+.inclusion-row .dish-toggle-btn.is-hidden { color: var(--muted); }
+.inclusion-row .dish-toggle-btn.is-active { color: var(--success, #1a7f4b); }
 
 .checklist-item {
   display: flex;

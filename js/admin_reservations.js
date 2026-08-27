@@ -474,11 +474,11 @@ function renderTable(list) {
   }).join('');
 }
 
-// resetPage=true is for user-initiated filter changes (search/dropdown/chip
-// clicks) — jumping back to page 1 is expected there. Auto-refresh triggers
-// pass resetPage=false so a Manager mid-way through the list doesn't get
-// yanked back to page 1 every time a background refresh fires; the page is
-// clamped instead, in case the refreshed data has fewer pages than before.
+
+
+
+
+
 function filterAndRender({ resetPage = true } = {}) {
   const term = searchInput?.value.trim().toLowerCase();
   const dropdownStatus = statusDropdown?.value || 'all';
@@ -715,7 +715,7 @@ async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
 async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
 
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at, resubmitted_at';
+  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
   const { data, error } = await supabase
     .from('reservation_contracts')
@@ -730,7 +730,6 @@ async function fetchReservationContracts(reservationIds) {
     isMissingColumnError(error, 'review_status')
     || isMissingColumnError(error, 'review_notes')
     || isMissingColumnError(error, 'reviewed_at')
-    || isMissingColumnError(error, 'resubmitted_at')
   ) {
     const fallback = await supabase
       .from('reservation_contracts')
@@ -744,11 +743,11 @@ async function fetchReservationContracts(reservationIds) {
   throw error;
 }
 
-// silent=true is used by the auto-refresh triggers (focus/visibility, bfcache
-// restore, background poll): it skips the "Loading..." message so existing
-// rows stay on screen undisturbed, fetches into local variables first so a
-// failed refresh never touches what's already rendered, and on failure it
-// keeps the last-good data and fails quietly instead of blanking the table.
+
+
+
+
+
 async function loadData({ silent = false } = {}) {
   if (!silent) {
     setMessage(tableMessage, 'Loading reservations...');
@@ -764,6 +763,7 @@ async function loadData({ silent = false } = {}) {
 
     let freshStaffDirectory = [];
     let freshAssignmentMap = {};
+
     try {
       freshStaffDirectory = await fetchStaffRoster();
     } catch (staffError) {
@@ -781,8 +781,7 @@ async function loadData({ silent = false } = {}) {
       }
     }
 
-    // Commit only after every fetch has settled, so a mid-refresh failure
-    // (caught below) never leaves the page half-updated.
+
     reservationsCache = freshReservations;
     paymentSummaryMap = freshPaymentSummaryMap;
     staffDirectory = freshStaffDirectory;
@@ -798,7 +797,7 @@ async function loadData({ silent = false } = {}) {
       reviewBadgeEl: navReviewCount
     }).catch(() => {});
     renderStats(reservationsCache);
-    filterAndRender({ resetPage: !silent });
+    filterAndRender({ resetPage: !silent });  
     if (!assignmentFeatureReady) {
       setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
     }
@@ -841,24 +840,6 @@ function escapeHtml(str) {
   }[m]));
 }
 
-/*logoutBtn?.addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  redirectLogin();
-});*/
-
-/*supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') redirectLogin();
-});*/
-
-// Auto-refresh replaces the old manual Refresh button: reservations and
-// their status/payment/staff data can change from elsewhere (an action on
-// reservation-details.html, another manager's session, a customer
-// cancellation) with no in-page event to hook, so freshness comes from
-// re-fetching whenever the Manager is plausibly looking at the page again,
-// plus a quiet background poll for changes that arrive while they're
-// already looking at it. All triggers funnel through one debounced entry
-// point so a focus + visibilitychange pair (which fire together when
-// switching back to this tab) can't cause a duplicate fetch.
 let lastAutoRefreshAt = 0;
 const AUTO_REFRESH_DEBOUNCE_MS = 3000;
 const AUTO_REFRESH_POLL_MS = 60000;

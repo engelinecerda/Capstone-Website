@@ -5,9 +5,10 @@ import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { fetchDateAvailability, getBookingScope as getSharedBookingScope } from './reservation_availability.js';
-import { getPaymentStatusPillMeta } from './reservation_shared.js';
+import { getPaymentStatusPillMeta, getCancellationFee } from './reservation_shared.js';
 import { recordInCafePayment, uploadPaymentReceipt, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
+import { loadPaymentRules } from './customer_payments.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -32,6 +33,8 @@ const detailsFlashMessage = document.getElementById('detailsFlashMessage');
 
 const rescheduleReviewPanel = document.getElementById('rescheduleReviewPanel');
 const rescheduleReviewRows = document.getElementById('rescheduleReviewRows');
+const cancellationReviewPanel = document.getElementById('cancellationReviewPanel');
+const cancellationReviewRows = document.getElementById('cancellationReviewRows');
 const rescheduleApproveBtn = document.getElementById('rescheduleApproveBtn');
 const rescheduleRejectBtn = document.getElementById('rescheduleRejectBtn');
 
@@ -135,6 +138,7 @@ let assignmentSearchTerm = '';
 let recordPaymentMethods = [];
 let recordPaymentFile = null;
 let receiptViewerZoom = 100;
+let currentPaymentRules = null;
 
 /* ---------------------------------------------------------------- */
 /* Formatters (mirrors js/admin_reservations.js)                     */
@@ -318,12 +322,34 @@ function getPaymentTypeLabel(type) {
 }
 
 function getPaymentMethodLabel(method) {
-  return PAYMENT_METHOD_LABELS[method] || method || 'Method';
+  return PAYMENT_METHOD_LABELS[method] || method || 'Not yet submitted';
 }
 
 function getLatestOpenRescheduleRequest(reservation) {
   return getReservationRescheduleRequests(reservation)
     .find((request) => ['pending', 'approved_pending_payment'].includes(String(request.status || '').toLowerCase())) || null;
+}
+
+function getReservationCancellationFeePayment(reservation) {
+  return getReservationPayments(reservation)
+    .filter((payment) => payment.payment_type === 'cancellation_fee')
+    .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+}
+
+// Reads what the reservation's status was right before the customer's
+// cancellation request (logged by js/account.js at request time) so
+// rejecting a request restores the exact prior state instead of guessing.
+async function findReservationCancellationRevertStatus(reservationId) {
+  const { data, error } = await supabase
+    .from('reservation_status')
+    .select('previous_status, changed_at')
+    .eq('reservation_id', reservationId)
+    .eq('new_status', 'cancellation_requested')
+    .order('changed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.previous_status || 'approved';
 }
 
 // The customer's chosen pay-at-café arrival date lives on the payment row
@@ -345,10 +371,9 @@ function getPlannedArrivalDate(reservation) {
 function getContractReviewMeta(reservation) {
   const contract = reservation?.contracts?.[0] || null;
   const reviewStatus = String(contract?.review_status || '').toLowerCase();
-  const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
   if (!contract) {
-    return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', resubmittedAt: '', hasFile: false, contract };
+    return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', hasFile: false, contract };
   }
   if (reviewStatus === 'verified' || contract?.verified_date) {
     return {
@@ -357,7 +382,6 @@ function getContractReviewMeta(reservation) {
       verification: contract?.verified_date ? formatDateTime(contract.verified_date) : 'Verified',
       note: '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
       hasFile: Boolean(contract.contract_url),
       contract
     };
@@ -369,12 +393,11 @@ function getContractReviewMeta(reservation) {
       verification: 'Awaiting contract review',
       note: contract?.review_notes || '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
       hasFile: Boolean(contract.contract_url),
       contract
     };
   }
-  return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', resubmittedAt: '', hasFile: false, contract };
+  return { key: 'default', label: 'Contract missing', verification: 'No contract file uploaded yet', note: '', reviewedAt: '', hasFile: false, contract };
 }
 
 function contractStatus(res) {
@@ -385,6 +408,9 @@ function getReservationApprovalState(reservation) {
   const contract = getContractReviewMeta(reservation);
   if (!contract.hasFile) {
     return { canApprove: false, reason: 'The reservation cannot be approved until the customer uploads a signed contract.' };
+  }
+  if (contract.key !== 'approved') {
+    return { canApprove: false, reason: 'The reservation cannot be approved until the contract has been verified.' };
   }
   return { canApprove: true, reason: '' };
 }
@@ -413,7 +439,7 @@ async function getApprovalLimitMessage(reservation) {
 
 async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at, resubmitted_at';
+  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
   const { data, error } = await supabase.from('reservation_contracts').select(extendedSelect).in('reservation_id', reservationIds);
   if (!error) return data || [];
@@ -422,7 +448,6 @@ async function fetchReservationContracts(reservationIds) {
     isMissingColumnError(error, 'review_status')
     || isMissingColumnError(error, 'review_notes')
     || isMissingColumnError(error, 'reviewed_at')
-    || isMissingColumnError(error, 'resubmitted_at')
   ) {
     const fallback = await supabase.from('reservation_contracts').select(fallbackSelect).in('reservation_id', reservationIds);
     if (fallback.error) throw fallback.error;
@@ -484,6 +509,8 @@ async function fetchReservationDetail(idParam) {
   const baseSelect = `
     reservation_id,
     reservation_number,
+    user_id,
+    cancellation_reason,
     contact_name,
     contact_email,
     contact_phone,
@@ -652,6 +679,8 @@ function renderHeaderActions() {
   const activeRescheduleRequest = getLatestOpenRescheduleRequest(reservation);
   const hasOpenReschedule = Boolean(activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'pending');
 
+  renderCancellationReviewPanel(reservation, status);
+
   if (currentRole === 'admin') {
     detailsHeaderActions.innerHTML = '';
     rescheduleReviewPanel.classList.add('hidden');
@@ -660,7 +689,7 @@ function renderHeaderActions() {
 
   const buttons = [];
 
-  if (['pending', 'resubmission_requested'].includes(status)) {
+  if (status === 'pending') {
     buttons.push(`
       <button type="button" class="header-action-btn primary" data-action="approve" ${approvalState.canApprove ? '' : 'disabled'} title="${escapeHtml(approvalState.reason || 'Approve reservation')}">Approve</button>
       <button type="button" class="header-action-btn decline" data-action="decline">Decline</button>
@@ -668,7 +697,20 @@ function renderHeaderActions() {
   } else if (status === 'approved') {
     buttons.push(`<button type="button" class="header-action-btn primary" data-action="mark-completed">Mark completed</button>`);
   } else if (status === 'cancellation_requested') {
-    buttons.push(`<button type="button" class="header-action-btn primary" data-action="confirm-cancellation">Process cancellation</button>`);
+    buttons.push(`
+      <button type="button" class="header-action-btn primary" data-action="approve-cancellation">Approve request</button>
+      <button type="button" class="header-action-btn decline" data-action="reject-cancellation">Reject request</button>
+    `);
+  } else if (status === 'cancellation_approved') {
+    const feePayment = getReservationCancellationFeePayment(reservation);
+    const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
+    if (feeStatus === 'approved') {
+      buttons.push(`<button type="button" class="header-action-btn primary" data-action="finalize-cancellation">Finalize cancellation</button>`);
+    } else if (feePayment) {
+      buttons.push(`<span class="header-action-note">Cancellation fee ${escapeHtml(feeStatus === 'rejected' ? 'was rejected — awaiting resubmission' : 'is pending review')}</span>`);
+    } else {
+      buttons.push(`<span class="header-action-note">Waiting for the customer to pay the cancellation fee</span>`);
+    }
   }
 
   if (hasOpenReschedule) {
@@ -691,6 +733,25 @@ function renderRescheduleReviewPanel(request) {
   ].join('');
   rescheduleApproveBtn.dataset.requestId = request.reschedule_request_id;
   rescheduleRejectBtn.dataset.requestId = request.reschedule_request_id;
+}
+
+// Visible for both roles (unlike the reschedule panel) since this is
+// read-only context, not an action — Admin still can't approve/reject the
+// request itself, but seeing why the customer wants to cancel shouldn't
+// require Manager access. Stays visible through cancellation_approved too,
+// since the reason is still relevant context while the fee is outstanding.
+function renderCancellationReviewPanel(reservation, status) {
+  const isCancellationInProgress = ['cancellation_requested', 'cancellation_approved'].includes(status);
+  if (!isCancellationInProgress) {
+    cancellationReviewPanel.classList.add('hidden');
+    return;
+  }
+  cancellationReviewRows.innerHTML = dlRow(
+    'Cancellation reason',
+    reservation.cancellation_reason || 'No reason provided',
+    { full: true, muted: !reservation.cancellation_reason }
+  );
+  cancellationReviewPanel.classList.remove('hidden');
 }
 
 function renderBookingDetails() {
@@ -1144,7 +1205,6 @@ function renderContract() {
 
   const rows = [dlRow(contract.key === 'approved' ? 'Verified' : 'Verification', contract.verification, { muted: contract.key !== 'approved' })];
   if (contract.reviewedAt && contract.reviewedAt !== contract.verification) rows.push(dlRow('Reviewed', contract.reviewedAt));
-  if (contract.resubmittedAt) rows.push(dlRow('Replacement submitted', contract.resubmittedAt));
   if (contract.note) rows.push(dlRow('Admin note', contract.note, { full: true }));
   if (!contract.hasFile) rows.push(dlRow('Status', 'No contract file uploaded yet.', { full: true, muted: true }));
   contractDetailsRows.innerHTML = rows.join('');
@@ -1273,6 +1333,13 @@ function wireHeaderActions() {
     if (!button) return;
     const action = button.dataset.action;
 
+    // Defense-in-depth — renderHeaderActions() already empties this
+    // container entirely for currentRole === 'admin', so this branch is
+    // unreachable in normal use, but it matches the same double-guard
+    // pattern already used elsewhere in this file (see
+    // openRecordPaymentModal/saveRecordPayment).
+    if (currentRole === 'admin') return;
+
     if (action === 'toggle-reschedule') {
       rescheduleReviewPanel.classList.toggle('hidden');
       return;
@@ -1299,8 +1366,72 @@ function wireHeaderActions() {
       } else if (action === 'mark-completed') {
         await updateReservationStatus(reservation.reservation_id, 'completed', previousStatus);
         await reloadAndRender('Reservation marked completed.');
-      } else if (action === 'confirm-cancellation') {
+
+      } else if (action === 'approve-cancellation') {
+        await updateReservationStatus(reservation.reservation_id, 'cancellation_approved', previousStatus);
+
+        // Fee amount now respects whatever an admin configured in the
+        // Payment Rules panel (system_settings.payment_rules), loaded once
+        // at init() into module-level `currentPaymentRules`. The original
+        // hardcoded-default call is kept below, commented, so this is a
+        // one-line revert if the configured-amount behavior ever needs to
+        // be rolled back.
+        // const cancellationFeeAmount = getCancellationFee(reservation);
+        const cancellationFeeAmount = getCancellationFee(reservation, currentPaymentRules);
+
+        const { error: feeError } = await supabase.from('payment').insert({
+          reservation_id: reservation.reservation_id,
+          payment_type: 'cancellation_fee',
+          amount: cancellationFeeAmount,
+          payment_status: 'pending_review',
+          submitted_at: new Date().toISOString()
+        });
+        if (feeError) throw feeError;
+
+        await reloadAndRender('Cancellation request approved. The customer can now pay the cancellation fee.');
+
+      } else if (action === 'reject-cancellation') {
+        const revertStatus = await findReservationCancellationRevertStatus(reservation.reservation_id);
+        await updateReservationStatus(reservation.reservation_id, revertStatus, previousStatus);
+
+        // Explicit insert rather than relying on the reservation-status DB
+        // trigger — NEW.status after a revert (e.g. 'approved') is
+        // indistinguishable at the trigger level from a normal transition
+        // into that same status, so the trigger's existing 'approved'
+        // branch would fire its own "Reservation confirmed" notification
+        // instead of a rejection-specific one. This mirrors the plain
+        // (non-templated) insert pattern already used for the reschedule
+        // "rejected" case in notify_customer_on_reschedule_review().
+        if (reservation.user_id) {
+          await supabase.from('notifications').insert({
+            user_id: reservation.user_id,
+            type: 'reservation_status',
+            title: 'Cancellation Request Declined',
+            body: 'Your cancellation request was not approved. Your reservation remains active — contact us if you have any questions.',
+            link: '/account.html'
+          });
+        }
+
+        await reloadAndRender('Cancellation request rejected. Reservation restored.');
+
+      } else if (action === 'finalize-cancellation') {
+        const feePayment = getReservationCancellationFeePayment(reservation);
+        const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
+        if (!feePayment || feeStatus !== 'approved') {
+          throw new Error('The cancellation fee must be approved on the Payments page before finalizing.');
+        }
+
         await updateReservationStatus(reservation.reservation_id, 'cancelled', previousStatus);
+
+        const { error: cancellationError } = await supabase.from('reservation_cancellations').insert({
+          reservation_id: reservation.reservation_id,
+          user_id: reservation.user_id,
+          previous_status: previousStatus,
+          reason: reservation.cancellation_reason || null,
+          cancelled_at: new Date().toISOString()
+        });
+        if (cancellationError) throw cancellationError;
+
         await reloadAndRender('Reservation has been cancelled.');
       }
     } catch (error) {
@@ -1602,6 +1733,7 @@ async function init() {
   }
 
   try {
+    currentPaymentRules = await loadPaymentRules(supabase).catch(() => null);
     const reservation = await fetchReservationDetail(idParam);
     if (!reservation) {
       showError('This reservation could not be found.');

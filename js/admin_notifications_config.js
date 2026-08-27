@@ -280,7 +280,7 @@ async function loadLog() {
   try {
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, trigger_code, channel, status, created_at, sent_at, user_id')
+      .select('id, trigger_code, channel, status, created_at, sent_at, user_id, error_message')
       .not('trigger_code', 'is', null)
       .order('created_at', { ascending: false })
       .limit(200);
@@ -288,7 +288,7 @@ async function loadLog() {
     logRows = data || [];
     renderLog();
   } catch (err) {
-    logTableBody.innerHTML = `<tr class="log-empty"><td colspan="5">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    logTableBody.innerHTML = `<tr class="log-empty"><td colspan="6">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -302,7 +302,7 @@ function renderLog() {
   );
 
   if (!filtered.length) {
-    logTableBody.innerHTML = '<tr class="log-empty"><td colspan="5">No notifications yet. They\'ll appear here once one of the triggers above fires.</td></tr>';
+    logTableBody.innerHTML = '<tr class="log-empty"><td colspan="6">No notifications yet. They\'ll appear here once one of the triggers above fires.</td></tr>';
     return;
   }
 
@@ -314,6 +314,7 @@ function renderLog() {
       <td>${r.channel === 'email' ? 'Email' : 'In-app'}</td>
       <td>${fmtDate(r.sent_at || r.created_at)}</td>
       <td><span class="status-pill ${r.status}">${escapeHtml(r.status)}</span></td>
+      <td class="log-reason" title="${escapeHtml(r.error_message || '')}">${r.status === 'failed' ? escapeHtml(r.error_message || 'Unknown error') : ''}</td>
     </tr>`;
   }).join('');
 }

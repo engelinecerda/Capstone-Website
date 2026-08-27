@@ -5,6 +5,7 @@ import {
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails,
     isReservationPaymentEnabled,
+    loadPaymentRules,
     loadReservationRules
 } from './customer_payments.js';
 import {
@@ -22,8 +23,11 @@ import {
     getRescheduleStatusMeta,
     computeContractMeta,
     computeCanReschedule,
-    computeCanCancel
+    computeCanCancel,
+    getCancellationBlockReason,
+    getCancellationFee
 } from './reservation_shared.js';
+import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -38,6 +42,25 @@ if (!reservationId) {
     window.location.href = '/account.html?section=reservations';
 }
 
+// Cancel-reservation modal — same markup, classes, and behavior as the
+// modal on account.html (built into this page directly instead of
+// redirecting there, since this is a separate static page with its own
+// DOM and can't reach account.html's modal).
+const cancelReservationBackdrop = document.getElementById('cancel-reservation-backdrop');
+const cancelModalClose          = document.getElementById('cancel-modal-close');
+const cancelModalDismiss        = document.getElementById('cancel-modal-dismiss');
+const cancelModalConfirm        = document.getElementById('cancel-modal-confirm');
+const cancelModalMessage        = document.getElementById('cancel-modal-message');
+const cancelFeeAmount           = document.getElementById('cancel-fee-amount');
+const cancelReasonInput         = document.getElementById('cancel-reason-input');
+
+const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
+const submissionFeedbackClose    = document.getElementById('submission-feedback-close');
+const submissionFeedbackDismiss  = document.getElementById('submission-feedback-dismiss');
+const submissionFeedbackEyebrow  = document.getElementById('submission-feedback-eyebrow');
+const submissionFeedbackTitle    = document.getElementById('submission-feedback-title');
+const submissionFeedbackCopy     = document.getElementById('submission-feedback-copy');
+
 let pageData = null;
 
 function isReservationContractsColumnMissing(error, columnName) {
@@ -49,7 +72,7 @@ function isReservationContractsColumnMissing(error, columnName) {
 async function fetchContract(id) {
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, resubmitted_at')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at')
         .eq('reservation_id', id)
         .maybeSingle();
 
@@ -58,7 +81,6 @@ async function fetchContract(id) {
             isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
             || isReservationContractsColumnMissing(error, 'reviewed_at')
-            || isReservationContractsColumnMissing(error, 'resubmitted_at')
         ) {
             const fallback = await supabase
                 .from('reservation_contracts')
@@ -112,6 +134,7 @@ async function loadPageData() {
             reservation_id,
             reservation_number,
             user_id,
+            contact_name,
             event_type,
             event_date,
             event_time,
@@ -136,13 +159,15 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
-        loadReservationRules(supabase)
+        loadReservationRules(supabase),
+        loadPaymentRules(supabase).catch(() => null),
+        loadPolicyBodies(supabase, ['cancellation_policy']).catch(() => ({}))
     ]);
 
     pageData = {
@@ -153,7 +178,9 @@ async function loadPageData() {
         paymentsByReservationId,
         cancellationInfo,
         review,
-        reservationRules
+        reservationRules,
+        paymentRules,
+        policyBodies
     };
 }
 
@@ -166,6 +193,19 @@ function getLatestApprovedPaymentDate(payments) {
 
 function getCancellationFeePayment(payments) {
     return (payments || []).find((payment) => payment.payment_type === 'cancellation_fee') || null;
+}
+
+// True only while the reservation is sitting in cancellation_approved with
+// no cancellation_fee payment yet submitted, or with one that was rejected
+// (needs resubmission). Once a cancellation_fee payment is pending_review
+// or approved, this goes false — matches the same "hasPendingCancellationFee"
+// gating customer_payments.js's getAvailablePaymentOptions() already uses
+// to decide whether to offer the fee as a payment option.
+function isCancellationFeeOwed(reservation, payments) {
+    if (String(reservation?.status || '').toLowerCase() !== 'cancellation_approved') return false;
+    const feePayment = getCancellationFeePayment(payments);
+    const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
+    return !feePayment || feeStatus === 'rejected';
 }
 
 // Four-step stepper: Submitted -> Verification -> Payment -> Confirmed.
@@ -367,8 +407,15 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl) {
-    const paymentDone = balance.remainingBalance <= 0;
+function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null) {
+    // balance.remainingBalance only tracks the base package price — it goes
+    // to 0 the moment the package itself is paid off, regardless of whether
+    // a *cancellation* fee is now separately owed on top of that. Without
+    // the cancellationFeeOwed check, a fully-paid reservation that later
+    // moves to cancellation_approved reads as paymentDone forever and the
+    // CTA below never renders, even though the customer still owes money.
+    const baseBalancePaid = balance.remainingBalance <= 0;
+    const paymentDone = baseBalancePaid && !cancellationFeeOwed;
     const verificationDone = isReservationPaymentEnabled(reservation);
     const hideActions = ['cancelled', 'declined', 'completed'].includes(effectiveStatus);
     const showPaymentCta = !hideActions && !paymentDone;
@@ -388,9 +435,15 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     <span>${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</span>
                 </div>
                 <div class="rd-receipt-row rd-receipt-total">
-                    <span>${paymentDone ? 'Paid in full' : `Balance due by ${escapeHtml(balance.dueDateLabel)}`}</span>
-                    <span>${escapeHtml(paymentDone ? formatCurrency(0) : formatCurrency(balance.remainingBalance))}</span>
+                    <span>${baseBalancePaid ? 'Paid in full' : `Balance due by ${escapeHtml(balance.dueDateLabel)}`}</span>
+                    <span>${escapeHtml(baseBalancePaid ? formatCurrency(0) : formatCurrency(balance.remainingBalance))}</span>
                 </div>
+                ${cancellationFeeOwed ? `
+                    <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
+                        <span>Cancellation fee due</span>
+                        <span>${escapeHtml(formatCurrency(getCancellationFee(reservation, paymentRules)))}</span>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="rd-contract-inset">
@@ -415,7 +468,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} Continue payment
+                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : 'Continue payment'}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your contract is verified</p>` : ''}
             ` : ''}
@@ -423,14 +476,23 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     `;
 }
 
-function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus) {
+function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason = null) {
     if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return '';
 
     const latestRequest = rescheduleRequests[0] || null;
     const openRescheduleUrl = `/account.html?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
-    const openCancelUrl = `/account.html?section=reservations&open=cancel&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
-    if (!latestRequest && !canReschedule && !canCancel) return '';
+    // A block reason is only ever shown for the time-based rules (min notice
+    // / request window) — computeCanCancel already returns false for other
+    // reasons (wrong status, open fee) without a matching reason string, so
+    // cancelMarkup naturally renders nothing in those cases, same as before.
+    const cancelMarkup = canCancel
+        ? `<button type="button" class="rd-cancel-link" data-action="open-cancel">Cancel reservation</button>`
+        : (cancelBlockReason
+            ? `<span class="rd-cancel-blocked" title="${escapeHtml(cancelBlockReason)}">${escapeHtml(cancelBlockReason)}</span>`
+            : '');
+
+    if (!latestRequest && !canReschedule && !canCancel && !cancelBlockReason) return '';
 
     if (!latestRequest) {
         return `
@@ -441,7 +503,7 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
                 </div>
                 <div class="rd-reschedule-row-actions">
                     ${canReschedule ? `<a class="rd-btn-outline" href="${escapeHtml(openRescheduleUrl)}">Request reschedule</a>` : ''}
-                    ${canCancel ? `<a class="rd-cancel-link" href="${escapeHtml(openCancelUrl)}">Cancel reservation</a>` : ''}
+                    ${cancelMarkup}
                 </div>
             </div>
         `;
@@ -467,10 +529,10 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
                     </div>
                 ` : ''}
             </dl>
-            ${(canReschedule || canCancel) ? `
+            ${(canReschedule || canCancel || cancelBlockReason) ? `
                 <div class="rd-reschedule-row-actions">
                     ${canReschedule ? `<a class="rd-btn-outline" href="${escapeHtml(openRescheduleUrl)}">Request reschedule</a>` : ''}
-                    ${canCancel ? `<a class="rd-cancel-link" href="${escapeHtml(openCancelUrl)}">Cancel reservation</a>` : ''}
+                    ${cancelMarkup}
                 </div>
             ` : ''}
         </section>
@@ -506,19 +568,21 @@ function buildReviewRow(effectiveStatus, review) {
 }
 
 function render() {
-    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules } = pageData;
+    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
     const effectiveStatus = getEffectiveReservationStatus(reservation);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const contractMeta = computeContractMeta(contract);
     const canReschedule = computeCanReschedule(reservation.status, rescheduleRequests);
-    const canCancel = computeCanCancel(reservation.status, payments);
+    const canCancel = computeCanCancel(reservation.status, payments, reservation, paymentRules);
+    const cancelBlockReason = getCancellationBlockReason(reservation, paymentRules);
     const isTerminalCancelled = ['cancelled', 'declined'].includes(effectiveStatus);
     const paymentUrl = buildCustomerPaymentUrl(reservationId);
+    const cancellationFeeOwed = isCancellationFeeOwed(reservation, payments);
 
     const showBalanceSummary = !isTerminalCancelled;
-    const paymentDone = balance.remainingBalance <= 0;
+    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed;
 
     pageContainer.innerHTML = `
         <section class="rd-header-card">
@@ -532,10 +596,14 @@ function render() {
                 </div>
                 ${showBalanceSummary ? `
                     <div class="rd-header-right">
-                        <span class="rd-balance-label">${paymentDone ? 'Paid in full' : 'Balance due'}</span>
+                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (paymentDone ? 'Paid in full' : 'Balance due')}</span>
                         <div class="rd-balance-amount-row">
-                            <strong class="rd-balance-amount">${escapeHtml(paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))}</strong>
-                            ${!paymentDone ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
+                            <strong class="rd-balance-amount">${escapeHtml(
+                                cancellationFeeOwed
+                                    ? formatCurrency(getCancellationFee(reservation, paymentRules))
+                                    : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))
+                            )}</strong>
+                            ${(!paymentDone && !cancellationFeeOwed) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
                         </div>
                     </div>
                 ` : ''}
@@ -559,12 +627,115 @@ function render() {
 
         <div class="rd-grid">
             ${buildEventDetailsPanel(reservation)}
-            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl)}
+            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules)}
         </div>
 
-        ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus)}
+        ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason)}
         ${buildReviewRow(effectiveStatus, review)}
     `;
+}
+
+function setCancelModalMessage(message, isError = false) {
+    if (!cancelModalMessage) return;
+    cancelModalMessage.textContent = message || '';
+    cancelModalMessage.className = 'account-modal-message' + (isError ? ' error' : '');
+}
+
+function closeCancelModal() {
+    cancelReservationBackdrop?.classList.add('hidden');
+    cancelReservationBackdrop?.setAttribute('aria-hidden', 'true');
+    if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
+    setCancelModalMessage('');
+}
+
+// Swaps the hardcoded fallback copy inside the policy block for the
+// admin-saved override, if one exists — same "override only when present"
+// contract as the cancel modal on account.html. Leaves the fallback markup
+// untouched when there's nothing saved yet, or the fetch failed.
+function applyPolicyOverride(elId, settingKey) {
+    const el = document.getElementById(elId);
+    const body = pageData?.policyBodies?.[settingKey];
+    if (el && body) el.innerHTML = renderPolicyText(body);
+}
+
+function openCancelModal() {
+    if (!pageData?.reservation) return;
+    const fee = getCancellationFee(pageData.reservation, pageData.paymentRules);
+    if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    if (cancelReasonInput) cancelReasonInput.value = '';
+    applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
+    setCancelModalMessage('');
+    cancelReservationBackdrop?.classList.remove('hidden');
+    cancelReservationBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function openSubmissionFeedbackModal({
+    eyebrow = 'Submitted',
+    title = 'Submission Received',
+    copy = 'Your submission has been received.'
+} = {}) {
+    if (submissionFeedbackEyebrow) submissionFeedbackEyebrow.textContent = eyebrow;
+    if (submissionFeedbackTitle) submissionFeedbackTitle.textContent = title;
+    if (submissionFeedbackCopy) submissionFeedbackCopy.textContent = copy;
+    submissionFeedbackBackdrop?.classList.remove('hidden');
+    submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeSubmissionFeedbackModal() {
+    submissionFeedbackBackdrop?.classList.add('hidden');
+    submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+async function submitCancellationRequest() {
+    if (!pageData?.reservation) return;
+    const reservation = pageData.reservation;
+
+    const reason = cancelReasonInput?.value.trim() || '';
+    if (!reason) {
+        setCancelModalMessage('Please tell us why you\'re cancelling this reservation.', true);
+        return;
+    }
+
+    if (cancelModalConfirm) cancelModalConfirm.setAttribute('disabled', 'true');
+    setCancelModalMessage('Submitting your cancellation request...');
+
+    try {
+        // Same two-gate flow as account.js's cancel modal: this only files
+        // the request. js/admin_reservation_details.js creates the
+        // cancellation_fee payment row and flips the status to
+        // 'cancellation_approved' once a manager approves it.
+        const previousStatus = reservation.status;
+
+        const { error: statusError } = await supabase
+            .from('reservations')
+            .update({ status: 'cancellation_requested', cancellation_reason: reason })
+            .eq('reservation_id', reservationId);
+
+        if (statusError) throw statusError;
+
+        const { error: historyError } = await supabase
+            .from('reservation_status')
+            .insert({
+                reservation_id: reservationId,
+                previous_status: previousStatus,
+                new_status: 'cancellation_requested',
+                changed_at: new Date().toISOString()
+            });
+
+        if (historyError) throw historyError;
+
+        closeCancelModal();
+        await loadPageData();
+        render();
+        openSubmissionFeedbackModal({
+            eyebrow: 'Request Submitted',
+            title: 'Cancellation Request Sent',
+            copy: 'Our team will review your request. You\'ll be notified once a decision is made, and if approved, you\'ll be asked to pay the cancellation fee to finalize it.'
+        });
+    } catch (error) {
+        if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
+        setCancelModalMessage(`Failed to submit cancellation: ${error.message}`, true);
+    }
 }
 
 async function init() {
@@ -572,6 +743,7 @@ async function init() {
         await loadPageData();
         render();
     } catch (error) {
+        console.error('[reservation_details] failed to load:', error);
         pageContainer.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">We couldn't load this reservation. Please try again.</p>`;
     }
 }
@@ -581,17 +753,29 @@ pageContainer?.addEventListener('click', async (event) => {
     if (payBtn && !payBtn.disabled) {
         const url = payBtn.dataset.paymentUrl;
         if (url) window.location.href = url;
+        return;
+    }
+
+    const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
+    if (cancelTriggerBtn) {
+        openCancelModal();
     }
 });
 
-pageContainer?.addEventListener('change', (event) => {
-    const fileInput = event.target.closest('[data-field="replacement_contract"]');
-    if (!fileInput) return;
-    const filenameEl = pageContainer.querySelector('[data-contract-filename]');
-    const file = fileInput.files?.[0];
-    if (filenameEl) {
-        filenameEl.textContent = file?.name || 'No file chosen';
-    }
+cancelModalClose?.addEventListener('click', closeCancelModal);
+cancelModalDismiss?.addEventListener('click', closeCancelModal);
+cancelModalConfirm?.addEventListener('click', submitCancellationRequest);
+cancelReservationBackdrop?.addEventListener('click', (event) => {
+    if (event.target === cancelReservationBackdrop) closeCancelModal();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !cancelReservationBackdrop?.classList.contains('hidden')) closeCancelModal();
+});
+
+submissionFeedbackClose?.addEventListener('click', closeSubmissionFeedbackModal);
+submissionFeedbackDismiss?.addEventListener('click', closeSubmissionFeedbackModal);
+submissionFeedbackBackdrop?.addEventListener('click', (event) => {
+    if (event.target === submissionFeedbackBackdrop) closeSubmissionFeedbackModal();
 });
 
 init();

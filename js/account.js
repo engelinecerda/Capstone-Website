@@ -46,6 +46,7 @@ import {
     getReservationLocationLabel,
     getCancellationFee,
     getRescheduleFee,
+    getCancellationBlockReason,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel
@@ -121,6 +122,7 @@ const cancelModalDismiss = document.getElementById('cancel-modal-dismiss');
 const cancelModalConfirm = document.getElementById('cancel-modal-confirm');
 const cancelModalMessage = document.getElementById('cancel-modal-message');
 const cancelFeeAmount = document.getElementById('cancel-fee-amount');
+const cancelReasonInput = document.getElementById('cancel-reason-input');
 const reviewPromptBackdrop = document.getElementById('review-prompt-backdrop');
 const reviewPromptClose = document.getElementById('review-prompt-close');
 const reviewPromptDismiss = document.getElementById('review-prompt-dismiss');
@@ -511,7 +513,7 @@ function hasPendingOrApprovedPayment(reservationId, paymentType) {
 }
 
 function isReservationPaymentEnabled(reservation) {
-    return ['approved', 'confirmed', 'rescheduled', 'completed'].includes(String(reservation?.status || '').toLowerCase());
+    return ['approved', 'confirmed', 'rescheduled', 'completed', 'cancellation_approved'].includes(String(reservation?.status || '').toLowerCase());
 }
 
 function getReservationFeeAmount(reservation, remainingBalance) {
@@ -598,6 +600,25 @@ function getAvailablePaymentOptions(reservation) {
                 }));
             }
         });
+
+    // Mirrors the same branch in customer_payments.js's shared
+    // getAvailablePaymentOptions() — without this, a reservation that's
+    // fully paid before being cancelled has remainingBalance === 0, so
+    // nothing above ever fires and the customer has no way to pay the
+    // cancellation fee from this list.
+    if (String(reservation?.status || '').toLowerCase() === 'cancellation_approved') {
+        const hasPendingCancellationFee = getReservationPayments(reservationId).some((payment) => (
+            payment.payment_type === 'cancellation_fee'
+            && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+        ));
+        if (!hasPendingCancellationFee) {
+            const cancellationFeeAmount = getCancellationFee(reservation, state.paymentRules);
+            options.push(buildPaymentOption(reservation, 'cancellation_fee', cancellationFeeAmount, {
+                displayLabel: 'Cancellation Fee',
+                displayDescription: 'Required fee to finalize the cancellation of your reservation.'
+            }));
+        }
+    }
 
     return options.filter((option) => option.amount > 0);
 }
@@ -855,7 +876,7 @@ function canRescheduleReservation(reservation) {
 }
 
 function canCancelReservation(reservation) {
-    return computeCanCancel(reservation?.status, getReservationPayments(reservation.reservation_id));
+    return computeCanCancel(reservation?.status, getReservationPayments(reservation.reservation_id), reservation, state.paymentRules);
 }
 
 // Submission itself now happens on the dedicated /payment.html page (same
@@ -876,9 +897,12 @@ function renderPaymentComposer(reservation) {
     }
 
     const balance = getReservationBalanceDetails(reservation);
-    const actionIntro = balance.hasPartialPayment
-        ? `This reservation is already confirmed. Settle the remaining balance by ${balance.dueDateLabel}.`
-        : 'Choose the payment that works for you to confirm this reservation.';
+    const isCancellationApproved = String(reservation?.status || '').toLowerCase() === 'cancellation_approved';
+    const actionIntro = isCancellationApproved
+        ? 'Your cancellation request was approved. Pay the cancellation fee to finalize it.'
+        : (balance.hasPartialPayment
+            ? `This reservation is already confirmed. Settle the remaining balance by ${balance.dueDateLabel}.`
+            : 'Choose the payment that works for you to confirm this reservation.');
 
     return `
         <div class="payment-composer-cta">
@@ -1837,7 +1861,7 @@ async function fetchContracts(reservationIds) {
 
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, resubmitted_at')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at')
         .in('reservation_id', reservationIds);
 
     if (error) {
@@ -1845,7 +1869,6 @@ async function fetchContracts(reservationIds) {
             isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
             || isReservationContractsColumnMissing(error, 'reviewed_at')
-            || isReservationContractsColumnMissing(error, 'resubmitted_at')
         ) {
             const fallback = await supabase
                 .from('reservation_contracts')
@@ -2409,6 +2432,7 @@ function openCancelModal(reservationId) {
     state.cancelModal.reservationId = reservationId;
     const fee = getCancellationFee(reservation, state.paymentRules);
     if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    if (cancelReasonInput) cancelReasonInput.value = '';
     applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
     setCancelModalMessage('');
     cancelReservationBackdrop?.classList.remove('hidden');
@@ -2420,29 +2444,54 @@ async function submitCancellationRequest() {
     const reservation = state.reservations.find((r) => String(r.reservation_id) === String(reservationId));
     if (!reservation) return;
 
+    const reason = cancelReasonInput?.value.trim() || '';
+    if (!reason) {
+        setCancelModalMessage('Please tell us why you\'re cancelling this reservation.', true);
+        return;
+    }
+
     if (cancelModalConfirm) cancelModalConfirm.setAttribute('disabled', 'true');
-    setCancelModalMessage('Processing your cancellation request...');
+    setCancelModalMessage('Submitting your cancellation request...');
 
     try {
-        // No `payment` row is inserted here. The customer hasn't chosen a
-        // payment_method (or submitted proof) yet at this point, and that
-        // column is NOT NULL — inserting a stub row here previously failed
-        // outright. Flipping the reservation to 'cancellation_requested' is
-        // enough: js/customer_payments.js's getPaymentOptionsForReservation()
-        // already offers a "Cancellation Fee" option on the payment page for
-        // any reservation in this status that has no pending/approved
-        // cancellation_fee payment yet, and the real row (with payment_method)
-        // gets created when the customer actually submits that payment.
+        // No `payment` row is inserted here — same reasoning as before
+        // (customer hasn't chosen a payment_method yet, and this reservation
+        // isn't even payable until a manager approves the request). This is
+        // now a two-gate flow instead of one: request -> manager approves or
+        // rejects -> only on approval does js/admin_reservation_details.js
+        // create the cancellation_fee row and flip status to
+        // 'cancellation_approved', which is what makes
+        // js/customer_payments.js's option builder actually offer the fee on
+        // the payment page. Nothing is payable at request time.
+        const previousStatus = reservation.status;
+
         const { error: statusError } = await supabase
             .from('reservations')
-            .update({ status: 'cancellation_requested' })
+            .update({ status: 'cancellation_requested', cancellation_reason: reason })
             .eq('reservation_id', reservationId);
 
         if (statusError) throw statusError;
 
+        // Logged so a manager rejecting this request later knows exactly
+        // which status to revert the reservation to, rather than guessing.
+        const { error: historyError } = await supabase
+            .from('reservation_status')
+            .insert({
+                reservation_id: reservationId,
+                previous_status: previousStatus,
+                new_status: 'cancellation_requested',
+                changed_at: new Date().toISOString()
+            });
+
+        if (historyError) throw historyError;
+
         closeCancelModal();
         await loadReservations();
-        window.location.href = buildCustomerPaymentUrl(reservationId);
+        openSubmissionFeedbackModal({
+            eyebrow: 'Request Submitted',
+            title: 'Cancellation Request Sent',
+            copy: 'Our team will review your request. You\'ll be notified once a decision is made, and if approved, you\'ll be asked to pay the cancellation fee to finalize it.'
+        });
     } catch (error) {
         if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
         setCancelModalMessage(`Failed to submit cancellation: ${error.message}`, true);

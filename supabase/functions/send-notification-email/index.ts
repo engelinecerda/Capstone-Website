@@ -5,8 +5,8 @@ const RESEND_API_KEY      = Deno.env.get('RESEND_API_KEY')!
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-// Update to your actual deployed site URL
-const SITE_URL = 'https://elicoffeeevents.com'
+// Verified Vercel domain — used to build absolute links in email bodies.
+const SITE_URL = 'https://elicoffee-events.cafe'
 
 // Notifications Configuration Phase 1: which types get emailed used to be
 // this hardcoded Set — now it's data-driven via notifications.channel,
@@ -90,7 +90,7 @@ serve(async (req: Request) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'ELI Coffee Events <onboarding@resend.dev>',
+        from: 'ELI Coffee Events <notifications@elicoffee-events.cafe>',
         to: [user.email],
         subject: notification.title,
         html,

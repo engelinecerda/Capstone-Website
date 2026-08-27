@@ -1,12 +1,13 @@
 /* admin_staff_roster.css - Staff Roster page.
    Reservations/Payments/Contracts component language (.card/.table-card/
-   .modal-*/.action-btn) comes from admin_reservations.css, linked directly
+   .modal-.action-btn) comes from admin_reservations.css, linked directly
    in admin/staff-roster.html rather than @import'd here - an @import at
    the top of this file was observed to make the browser parse zero rules
    from the entire stylesheet (confirmed via document.styleSheets[].cssRules
    in dev testing), so a direct <link> is used instead. Local form/toggle
    piece definitions below mirror admin_payment_options.css (those pieces
    aren't in manager-theme.css, only base colors are). */
+
 .staff-roster-stat-row {
   grid-template-columns: repeat(2, minmax(0, 220px));
 }
@@ -55,7 +56,11 @@
 
 .roster-name-cell { font-weight: 600; }
 .roster-muted { color: var(--muted); }
-.roster-actions-cell { display: flex; gap: 8px; }
+
+/* .roster-actions-cell stays a plain <td> — no display override here,
+   so its border-bottom collapses correctly with the rest of the row.
+   The flex layout for the buttons lives on the wrapper div inside it. */
+.roster-actions-inner { display: flex; gap: 8px; align-items: center; }
 
 /* ── Toggle switch (Active column) ───────────────────────────────────────── */
 .pm2-toggle {

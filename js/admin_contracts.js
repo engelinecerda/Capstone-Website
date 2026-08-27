@@ -187,8 +187,7 @@ function formatReservationStatus(status) {
     declined: 'Declined',
     completed: 'Completed',
     cancelled: 'Cancelled',
-    rescheduled: 'Rescheduled',
-    resubmission_requested: 'Resubmission Requested'
+    rescheduled: 'Rescheduled'
   };
 
   return {
@@ -200,7 +199,6 @@ function formatReservationStatus(status) {
 function getContractReviewMeta(reservation) {
   const contract = reservation?.contracts?.[0] || null;
   const reviewStatus = String(contract?.review_status || '').toLowerCase();
-  const resubmittedAt = contract?.resubmitted_at ? formatDateTime(contract.resubmitted_at) : '';
 
   if (!contract) {
     return {
@@ -209,7 +207,6 @@ function getContractReviewMeta(reservation) {
       verification: 'No contract file uploaded yet',
       note: '',
       reviewedAt: '',
-      resubmittedAt: '',
       hasFile: false,
       contract
     };
@@ -222,7 +219,6 @@ function getContractReviewMeta(reservation) {
       verification: contract?.verified_date ? formatDateTime(contract.verified_date) : 'Verified',
       note: '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
       hasFile: Boolean(contract.contract_url),
       contract
     };
@@ -235,7 +231,6 @@ function getContractReviewMeta(reservation) {
       verification: 'Awaiting contract review',
       note: contract?.review_notes || '',
       reviewedAt: contract?.reviewed_at ? formatDateTime(contract.reviewed_at) : '',
-      resubmittedAt,
       hasFile: Boolean(contract.contract_url),
       contract
     };
@@ -247,7 +242,6 @@ function getContractReviewMeta(reservation) {
     verification: 'No contract file uploaded yet',
     note: '',
     reviewedAt: '',
-    resubmittedAt: '',
     hasFile: false,
     contract
   };
@@ -262,13 +256,19 @@ function getReservationApprovalState(reservation) {
     };
   }
 
+  if (contract.key !== 'approved') {
+    return {
+      canApprove: false,
+      reason: 'The reservation cannot be approved until the contract has been verified.'
+    };
+  }
+
   return { canApprove: true, reason: '' };
 }
 
 function getContractActivityDate(reservation) {
   const contract = reservation?.contracts?.[0] || null;
-  return contract?.resubmitted_at
-    || contract?.reviewed_at
+  return contract?.reviewed_at
     || contract?.verified_date
     || reservation?.created_at
     || 0;
@@ -358,11 +358,9 @@ function renderTable(list) {
   contractsBody.innerHTML = list.map((reservation) => {
     const contract = getContractReviewMeta(reservation);
           const reservationStatus = formatReservationStatus(getEffectiveReservationStatus(reservation));
-    const reviewActivity = contract.resubmittedAt
-      ? `Replacement submitted ${escapeHtml(contract.resubmittedAt)}`
-      : contract.reviewedAt
-        ? `Reviewed ${escapeHtml(contract.reviewedAt)}`
-        : `Submitted ${escapeHtml(formatDateTime(reservation.created_at))}`;
+    const reviewActivity = contract.reviewedAt
+      ? `Reviewed ${escapeHtml(contract.reviewedAt)}`
+      : `Submitted ${escapeHtml(formatDateTime(reservation.created_at))}`;
     const eventSchedule = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
 
     return `
@@ -419,9 +417,6 @@ function syncActiveChip() {
   });
 }
 
-// resetPage=false is used after an auto-refresh so a Manager mid-way
-// through the list isn't yanked back to page 1 every time; the page is
-// clamped instead, in case the refreshed data has fewer pages than before.
 function filterAndRender({ resetPage = true } = {}) {
   const term = String(searchInput?.value || '').trim().toLowerCase();
   const status = statusDropdown?.value || 'all';
@@ -468,7 +463,7 @@ function renderContractsPage() {
 async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
 
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at, resubmitted_at';
+  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
 
   const { data, error } = await supabase
@@ -484,7 +479,6 @@ async function fetchReservationContracts(reservationIds) {
     isMissingColumnError(error, 'review_status')
     || isMissingColumnError(error, 'review_notes')
     || isMissingColumnError(error, 'reviewed_at')
-    || isMissingColumnError(error, 'resubmitted_at')
   ) {
     const fallback = await supabase
       .from('reservation_contracts')
@@ -654,7 +648,7 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
   contractDetailsMeta.innerHTML = [
     buildDetailCard('Reservation Number', reservation.reservation_number || 'Not assigned'),
     buildDetailCard('Event Schedule', `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`),
-    buildDetailCard('Latest Activity', contract.resubmittedAt || contract.reviewedAt || formatDateTime(getContractActivityDate(reservation))),
+    buildDetailCard('Latest Activity', contract.reviewedAt || formatDateTime(getContractActivityDate(reservation))),
     buildDetailCard('Reservation Submitted', formatDateTime(reservation.created_at))
   ].join('');
 
@@ -666,7 +660,6 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
     buildDetailCard('Reservation Status', `<span class="status-pill ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>`, { raw: true }),
     buildDetailCard('Contract Status', `<span class="status-pill ${escapeHtml(contract.key)}">${escapeHtml(contract.label)}</span>`, { raw: true }),
     (contract.reviewedAt && contract.reviewedAt !== contract.verification) ? buildDetailCard('Reviewed', contract.reviewedAt) : '',
-    contract.resubmittedAt ? buildDetailCard('Replacement Submitted', contract.resubmittedAt) : '',
     contract.note ? buildDetailCard('Latest Review Note', contract.note, { full: true }) : ''
   ].filter(Boolean).join('');
 
@@ -683,7 +676,7 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
     </div>
   `;
 
-  const showReservationActions = currentRole !== 'admin' && ['pending', 'resubmission_requested'].includes(reservationStatus.key);
+  const showReservationActions = currentRole !== 'admin' && reservationStatus.key === 'pending';
 
   contractActionsSection.innerHTML = (currentRole === 'admin' || !showReservationActions) ? '' : `
     <div class="details-action-row">
@@ -739,15 +732,11 @@ async function performContractAction(action, button) {
   return { message: '' };
 }
 
-// silent=true is used by the auto-refresh triggers: it skips the
-// "Loading..." message so existing rows stay on screen, never re-renders an
-// open contract details modal (a background refresh must not disturb a
-// Manager mid-review), and on failure keeps the last-good data and fails
-// quietly instead of blanking the table.
 async function loadData({ silent = false } = {}) {
   if (!silent) {
     setMessage(tableMessage, 'Loading contracts...');
   }
+  setMessage(tableMessage, 'Loading contracts...');
 
   try {
     const reservations = await fetchReservations();
@@ -760,7 +749,7 @@ async function loadData({ silent = false } = {}) {
 
     filterAndRender({ resetPage: !silent });
 
-    if (!silent && activeContractReservationId) {
+     if (!silent && activeContractReservationId) {
       if (getReservationById(activeContractReservationId)) {
         renderContractDetailsModal(activeContractReservationId);
       } else {
@@ -820,6 +809,10 @@ function wireModals() {
     try {
       setContractDetailsMessage('Updating contract...');
       const result = await performContractAction(action, button);
+      if (result === null) {
+        setContractDetailsMessage('');
+        return;
+      }
       contractDetailsFlash = { message: result.message || 'Updated.', isError: false };
       await loadData();
       setMessage(tableMessage, result.message || 'Updated.');
@@ -836,10 +829,6 @@ function wireModals() {
   });
 }
 
-// Auto-refresh replaces the old manual Refresh button — see the matching
-// block in js/admin_reservations.js for the full rationale. Debounced so a
-// focus + visibilitychange pair (which fire together when switching back to
-// this tab) can't trigger a duplicate fetch.
 let lastAutoRefreshAt = 0;
 const AUTO_REFRESH_DEBOUNCE_MS = 3000;
 const AUTO_REFRESH_POLL_MS = 60000;
@@ -860,7 +849,6 @@ window.addEventListener('pageshow', (event) => {
 });
 setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
 
-
 wireLogoutButton();
 watchAuthState();
 
@@ -869,7 +857,6 @@ validateAdminSession({
 
     currentRole = profile.role;
 
-    //  Set inactivity (super admin)
     setupInactivityLogout(profile.role);
     const avatarEl = document.getElementById('sidebarAvatar');
     if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
@@ -882,7 +869,6 @@ validateAdminSession({
     wireTableActions();
     wireModals();
     
-    // Load your data (ONLY ONCE)
     await loadData();
 
     const requestedReservationId = new URLSearchParams(window.location.search).get('reservation');

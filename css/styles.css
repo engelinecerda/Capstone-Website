@@ -9,6 +9,39 @@ html {
     overflow-y: scroll;
 }
 
+.cfg-loading {
+    position: relative;
+}
+.cfg-loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #F2EBE0 25%, #FAF8F4 37%, #F2EBE0 63%);
+    background-size: 400% 100%;
+    animation: cfgShimmer 1.4s ease infinite, cfgAutoReveal 0s linear 8s forwards;
+    pointer-events: none;
+}
+@keyframes cfgShimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+@keyframes cfgAutoReveal {
+    to {
+        animation: none;
+        background: none;
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cfg-loading::after {
+        animation: cfgAutoReveal 0s linear 8s forwards;
+    }
+}
+
+
 /* ========================
    Config-driven content skeleton
    Applied to any element whose real content is admin-configurable

@@ -910,21 +910,38 @@ Deno.serve(async (req: Request) => {
       resourceType: 'image',
     });
 
+    const { data: existingContract, error: existingContractError } = await supabase
+      .from('reservation_contracts')
+      .select('reservation_id')
+      .eq('reservation_id', reservation.reservation_id)
+      .maybeSingle();
+
+    if (existingContractError) throw existingContractError;
+
+    if (existingContract) {
+      return jsonResponse(
+        { success: false, error: 'A signed contract has already been submitted for this reservation.' },
+        409,
+      );
+    }
+
+    const contractPayload = {
+      reservation_id: reservation.reservation_id,
+      template_id: template?.template_id || null,
+      template_version_no: template?.version_no || null,
+      contract_type: template?.contract_type || 'package_contract',
+      contract_url: contractUrl,
+      page_count: contractPageCount ?? null,
+      rendered_body: mergedBody,
+      review_status: 'pending_review',
+      verified_date: null,
+      review_notes: null,
+      reviewed_at: null,
+    };
+
     const { error: contractInsertError } = await supabase
       .from('reservation_contracts')
-      .insert({
-        reservation_id: reservation.reservation_id,
-        template_id: template?.template_id || null,
-        template_version_no: template?.version_no || null,
-        contract_type: template?.contract_type || 'package_contract',
-        contract_url: contractUrl,
-        page_count: contractPageCount ?? null,
-        rendered_body: mergedBody,
-        review_status: 'pending_review',
-        review_notes: null,
-        reviewed_at: null,
-        verified_date: null,
-      });
+      .insert(contractPayload);
 
     if (contractInsertError) throw contractInsertError;
 

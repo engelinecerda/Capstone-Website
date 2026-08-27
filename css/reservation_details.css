@@ -519,6 +519,17 @@
     color: var(--acc-text-muted);
 }
 
+.rd-inline-note-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--acc-amber-text);   
+    background-color: var(--acc-amber-bg);
+    padding: 10px 12px;
+    border-radius: 8px;
+    line-height: 1.4;
+}
 /* ========================
    Buttons
 ======================== */
@@ -546,6 +557,21 @@
     border-color: var(--acc-espresso);
     background: var(--acc-cream);
     outline: none;
+}
+
+.rd-btn-outline:disabled {
+    color: #A79C8E;
+    border-color: #E5DBCC;
+    background: #EFEAE1;
+    cursor: not-allowed;
+    opacity: 0.6;
+    box-shadow: none;
+}
+
+.rd-btn-outline:disabled:hover,
+.rd-btn-outline:disabled:focus-visible {
+    border-color: #E5DBCC;
+    background: #EFEAE1;
 }
 
 .rd-btn-solid {
@@ -657,18 +683,25 @@
 .rd-cancel-link {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    gap: 8px;
     min-height: 40px;
-    padding: 0 4px;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--acc-border-tan);
+    background: #fff;
     color: var(--acc-terracotta);
     font-size: 13px;
     font-weight: 500;
+    font-family: inherit;
     text-decoration: none;
-    border-radius: 6px;
-    transition: background-color 0.15s ease;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .rd-cancel-link:hover,
 .rd-cancel-link:focus-visible {
+    border-color: var(--acc-terracotta);
     background: var(--acc-red-bg);
     outline: none;
 }
@@ -751,7 +784,8 @@
         justify-content: flex-start;
     }
 
-    .rd-btn-outline {
+    .rd-btn-outline,
+    .rd-cancel-link {
         width: 100%;
     }
 }

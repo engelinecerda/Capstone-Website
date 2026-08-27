@@ -551,6 +551,14 @@ async function ptSaveType(code) {
 // system_settings.reservation_rules, but that settings tab was removed
 // (see super_admin_settings.html) — it's DB-only until a UI need for it
 // comes back.
+//
+// cancellation_min_notice_days / cancellation_request_window_days moved to
+// the "Cancellation Notice Rules" card on Availability and Scheduling
+// (js/super_admin_settings.js) — this page no longer has inputs for them,
+// but they still live in this same system_settings.payment_rules JSON blob.
+// currentPaymentRulesConfig caches whatever was last loaded from the DB so
+// savePaymentRules() below can pass those two fields straight through
+// unchanged instead of wiping them out on every save from this page.
 const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,
@@ -559,10 +567,15 @@ const DEFAULT_PAYMENT_RULES = {
   cancellation_fee_onsite: 500,
   cancellation_fee_offsite: 2000,
   reschedule_fee: 3000,
-  service_charge_percent: 10
+  service_charge_percent: 10,
+  cancellation_min_notice_days: null,
+  cancellation_request_window_days: null
 };
 
+let currentPaymentRulesConfig = DEFAULT_PAYMENT_RULES;
+
 function populatePaymentRulesFields(config) {
+  currentPaymentRulesConfig = config;
   const maxInst = document.getElementById('pr-max-installments');
   const autoHold = document.getElementById('pr-auto-hold');
   const refundWindow = document.getElementById('pr-refund-window');
@@ -570,6 +583,7 @@ function populatePaymentRulesFields(config) {
   const cancelOnsite = document.getElementById('pr-cancellation-fee-onsite');
   const cancelOffsite = document.getElementById('pr-cancellation-fee-offsite');
   const rescheduleFee = document.getElementById('pr-reschedule-fee');
+
   if (maxInst) maxInst.value = config.max_installments ?? '';
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
   if (refundWindow) refundWindow.value = config.refund_window_days ?? '';
@@ -587,7 +601,11 @@ function readPaymentRulesFields() {
     currency: 'PHP',
     cancellation_fee_onsite: Number(document.getElementById('pr-cancellation-fee-onsite')?.value),
     cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value),
-    reschedule_fee: Number(document.getElementById('pr-reschedule-fee')?.value)
+    reschedule_fee: Number(document.getElementById('pr-reschedule-fee')?.value),
+    // Not editable on this page anymore — pass through whatever is
+    // currently saved so this page's save can't clobber the other page's card.
+    cancellation_min_notice_days: currentPaymentRulesConfig.cancellation_min_notice_days ?? null,
+    cancellation_request_window_days: currentPaymentRulesConfig.cancellation_request_window_days ?? null
   };
 }
 
@@ -632,6 +650,11 @@ async function savePaymentRules() {
     .eq('setting_key', 'payment_rules')
     .maybeSingle();
   const oldConfig = current ? { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) } : DEFAULT_PAYMENT_RULES;
+  // Re-sync the two fields this page no longer edits with whatever is
+  // freshest in the DB right before saving, in case the Availability and
+  // Scheduling page changed them since this page was loaded.
+  config.cancellation_min_notice_days = oldConfig.cancellation_min_notice_days ?? null;
+  config.cancellation_request_window_days = oldConfig.cancellation_request_window_days ?? null;
 
   showSettingsConfirm(
     'Change Payment Rules',

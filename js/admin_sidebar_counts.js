@@ -45,7 +45,6 @@ function countPendingContractReviews(contracts) {
 
     const reviewStatus = String(contract.review_status || '').toLowerCase();
     if (reviewStatus === 'verified' || contract.verified_date) return total;
-    if (reviewStatus === 'resubmission_requested') return total;
 
     if (reviewStatus === 'pending_review' || !reviewStatus) {
       return total + 1;

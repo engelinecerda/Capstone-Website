@@ -134,8 +134,7 @@ export const RESERVATION_RULES_DEFAULTS = {
     min_pax: 20,
     max_pax: 150,
     full_payment_days: 7,
-    auto_cancel_days: 5,
-    contract_resubmission_days: 3
+    auto_cancel_days: 5
 };
 
 // Mirrors the seed values in
@@ -411,7 +410,7 @@ export function getPaymentActionLabel(paymentType, reservation, amount, reschedu
 }
 
 export function isReservationPaymentEnabled(reservation) {
-    return ['approved', 'confirmed', 'rescheduled', 'completed', 'cancellation_requested'].includes(String(reservation?.status || '').toLowerCase());
+    return ['approved', 'confirmed', 'rescheduled', 'completed', 'cancellation_approved'].includes(String(reservation?.status || '').toLowerCase());
 }
 
 function buildPaymentOption(reservation, paymentType, amount, paymentsByReservationId, options = {}) {
@@ -571,7 +570,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             }
         });
 
-    if (String(reservation?.status || '').toLowerCase() === 'cancellation_requested') {
+    if (String(reservation?.status || '').toLowerCase() === 'cancellation_approved') {
         const hasPendingCancellationFee = getReservationPayments(paymentsByReservationId, reservationId).some((p) =>
             p.payment_type === 'cancellation_fee' &&
             ['pending_review', 'approved'].includes(String(p.payment_status || '').toLowerCase())
@@ -580,7 +579,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             const cancellationFeeAmount = getSharedCancellationFee(reservation, options.paymentRules);
             optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', cancellationFeeAmount, paymentsByReservationId, {
                 ...options,
-                displayDescription: 'Required fee to process the cancellation of your reservation.'
+                displayDescription: 'Required fee to finalize the cancellation of your reservation.'
             }));
         }
     }

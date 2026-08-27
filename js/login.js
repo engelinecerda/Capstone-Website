@@ -1,4 +1,7 @@
 import { customerSupabase as supabase } from './supabase.js';
+import { initPasswordToggles } from './password_toggle.js';
+
+initPasswordToggles();
 
 const form       = document.getElementById('login-form');
 const btn        = document.getElementById('login-btn');

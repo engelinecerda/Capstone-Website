@@ -168,6 +168,36 @@
   padding: 8px 0;
 }
 
+/* ============================================================
+   Close-date reason — modal label hint + day-panel reason line
+   ============================================================ */
+.modal-label-hint {
+  font-weight: 400;
+  font-size: 11.5px;
+  color: #8A7A6C;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.day-panel-reason {
+  margin: -4px 0 10px;
+  font-size: 12.5px;
+  color: #8A7A6C;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.day-panel-reason.hidden {
+  display: none !important;
+}
+
+.closed-date-reason {
+  font-size: 11px;
+  color: #8A7A6C;
+  font-style: italic;
+  margin-top: 2px;
+}
+
 @media (max-width: 480px) {
   .availability-stat-row {
     grid-template-columns: 1fr;
