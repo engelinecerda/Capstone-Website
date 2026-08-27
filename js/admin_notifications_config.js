@@ -7,6 +7,12 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
+import { renderPagination } from './pagination.js';
+
+// Own page size, not the shared pagination.js default (10) — that constant
+// is also used by other pages' client-side-sliced lists; this log pages at
+// the database instead (see loadLog()), so it's independent of those.
+const LOG_PAGE_SIZE = 20;
 
 // Reminders are the only triggers with a lead_days timing control — see
 // supabase/migrations/20260815_reminder_notifications.sql. The catalogue is
@@ -18,12 +24,15 @@ const REMINDER_TRIGGER_CODES = new Set(['payment_due', 'balance_due', 'event_rem
 // ── STATE ────────────────────────────────────────────────────────
 let triggers  = [];   // notification_trigger rows
 let templates = {};   // trigger_code -> notification_template row
-let logRows   = [];
+let logRows   = [];   // current page only — never the full table, see loadLog()
+let logCurrentPage = 1;
+let logTotalCount  = 0;
 let editingTriggerCode = null;
 
 // ── DOM refs ─────────────────────────────────────────────────────
 const triggerList     = document.getElementById('triggerList');
 const logTableBody    = document.getElementById('logTableBody');
+const logPaginationEl = document.getElementById('logPagination');
 const logTriggerFilter = document.getElementById('logTriggerFilter');
 const logStatusFilter  = document.getElementById('logStatusFilter');
 
@@ -276,37 +285,48 @@ function populateLogTriggerFilter() {
     triggers.map(t => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.label)}</option>`).join('');
 }
 
+// Server-side pagination: only the current page is ever fetched. Trigger/
+// status filters are applied as query predicates (not to an in-memory
+// array), so "showing X of Z" and the page count always reflect the full
+// filtered dataset, not just whatever page happens to be loaded.
 async function loadLog() {
+  const triggerF = logTriggerFilter.value;
+  const statusF = logStatusFilter.value;
+  const from = (logCurrentPage - 1) * LOG_PAGE_SIZE;
+  const to = from + LOG_PAGE_SIZE - 1;
+
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('notifications')
-      .select('id, trigger_code, channel, status, created_at, sent_at, user_id, error_message')
+      .select('id, trigger_code, channel, status, created_at, sent_at, user_id, error_message', { count: 'exact' })
       .not('trigger_code', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .order('created_at', { ascending: false });
+
+    if (triggerF) query = query.eq('trigger_code', triggerF);
+    if (statusF) query = query.eq('status', statusF);
+
+    const { data, error, count } = await query.range(from, to);
     if (error) throw error;
+
     logRows = data || [];
+    logTotalCount = count ?? 0;
     renderLog();
   } catch (err) {
     logTableBody.innerHTML = `<tr class="log-empty"><td colspan="6">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    logPaginationEl.innerHTML = '';
   }
 }
 
 function renderLog() {
-  const triggerF = logTriggerFilter.value;
-  const statusF = logStatusFilter.value;
-
-  const filtered = logRows.filter(r =>
-    (!triggerF || r.trigger_code === triggerF) &&
-    (!statusF || r.status === statusF)
-  );
-
-  if (!filtered.length) {
-    logTableBody.innerHTML = '<tr class="log-empty"><td colspan="6">No notifications yet. They\'ll appear here once one of the triggers above fires.</td></tr>';
+  if (!logRows.length) {
+    logTableBody.innerHTML = logCurrentPage > 1 || logTriggerFilter.value || logStatusFilter.value
+      ? '<tr class="log-empty"><td colspan="6">No notifications match this filter.</td></tr>'
+      : '<tr class="log-empty"><td colspan="6">No notifications yet. They\'ll appear here once one of the triggers above fires.</td></tr>';
+    logPaginationEl.innerHTML = '';
     return;
   }
 
-  logTableBody.innerHTML = filtered.map(r => {
+  logTableBody.innerHTML = logRows.map(r => {
     const trigger = triggers.find(t => t.code === r.trigger_code);
     return `<tr>
       <td>${escapeHtml(trigger?.label || r.trigger_code)}</td>
@@ -317,10 +337,20 @@ function renderLog() {
       <td class="log-reason" title="${escapeHtml(r.error_message || '')}">${r.status === 'failed' ? escapeHtml(r.error_message || 'Unknown error') : ''}</td>
     </tr>`;
   }).join('');
+
+  renderPagination(logPaginationEl, {
+    totalItems: logTotalCount,
+    currentPage: logCurrentPage,
+    pageSize: LOG_PAGE_SIZE,
+    onPageChange: (page) => {
+      logCurrentPage = page;
+      loadLog();
+    }
+  });
 }
 
-logTriggerFilter.addEventListener('change', renderLog);
-logStatusFilter.addEventListener('change', renderLog);
+logTriggerFilter.addEventListener('change', () => { logCurrentPage = 1; loadLog(); });
+logStatusFilter.addEventListener('change', () => { logCurrentPage = 1; loadLog(); });
 
 // ── KEYBOARD: Escape closes modal ──────────────────────────────
 document.addEventListener('keydown', e => {

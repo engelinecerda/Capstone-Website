@@ -978,6 +978,10 @@ table td {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .page-btn { transition: none !important; }
+}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
