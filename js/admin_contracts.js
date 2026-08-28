@@ -7,6 +7,7 @@ import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -26,13 +27,18 @@ const statTotalContracts = document.getElementById('statTotalContracts');
 
 const contractDetailsModal = document.getElementById('contractDetailsModal');
 const contractDetailsClose = document.getElementById('contractDetailsClose');
-const contractDetailsDismiss = document.getElementById('contractDetailsDismiss');
-const contractDetailsHero = document.getElementById('contractDetailsHero');
-const contractDetailsMeta = document.getElementById('contractDetailsMeta');
-const contractSummaryGrid = document.getElementById('contractSummaryGrid');
-const contractReviewSection = document.getElementById('contractReviewSection');
-const contractActionsSection = document.getElementById('contractActionsSection');
+const contractReviewAvatar = document.getElementById('contractReviewAvatar');
+const contractReviewName = document.getElementById('contractReviewName');
+const contractReviewStatusPill = document.getElementById('contractReviewStatusPill');
+const contractReviewMeta = document.getElementById('contractReviewMeta');
+const contractContextRows = document.getElementById('contractContextRows');
+const viewContractLink = document.getElementById('viewContractLink');
+const contractSignaturePanel = document.getElementById('contractSignaturePanel');
+const contractVerifyRows = document.getElementById('contractVerifyRows');
+const contractInlineActions = document.getElementById('contractInlineActions');
+const contractStatusRows = document.getElementById('contractStatusRows');
 const contractDetailsMessage = document.getElementById('contractDetailsMessage');
+const contractFooterActions = document.getElementById('contractFooterActions');
 
 let contractsCache = [];
 let contractsFiltered = [];
@@ -160,14 +166,21 @@ function getCustomerInitials(name, email = '') {
   return initials || String(email || 'C').charAt(0).toUpperCase();
 }
 
-function buildDetailCard(label, value, options = {}) {
-  const classes = ['detail-card'];
-  if (options.full) classes.push('full');
-  const valueClass = options.subtle ? 'detail-value subtle' : 'detail-value';
+// Definition-list row — mirrors the .dl-row pattern from
+// admin_reservation_details.css (see the CSS file for why it's a local
+// copy rather than a shared import). options.full stacks label above
+// value instead of a label-left/value-right split, for long values like
+// addresses; options.raw skips HTML-escaping for pre-built markup (e.g. a
+// status pill); options.muted applies the lighter .dl-value.muted color;
+// options.titleAttr adds a title="" (for ellipsis-truncated long values).
+function dlRow(label, value, options = {}) {
+  const valueClasses = ['dl-value'];
+  if (options.muted) valueClasses.push('muted');
+  const titleAttr = options.titleAttr ? ` title="${escapeHtml(options.titleAttr)}"` : '';
   return `
-    <div class="${classes.join(' ')}">
-      <span class="detail-label">${escapeHtml(label)}</span>
-      <div class="${valueClass}">${options.raw ? value : escapeHtml(value)}</div>
+    <div class="dl-row${options.full ? ' full' : ''}">
+      <span class="dl-label">${escapeHtml(label)}</span>
+      <span class="${valueClasses.join(' ')}"${titleAttr}>${options.raw ? value : escapeHtml(value)}</span>
     </div>
   `;
 }
@@ -564,42 +577,55 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   await logReservationStatusChange(reservationId, previousStatus, status);
 }
 
-function renderSignatureCheckPanel(contract) {
+const SIGNATURE_CHECK_ICON = {
+  detected: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  alert: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+};
+
+// Returns which of the two documented states (plus a transient third one —
+// upload has happened but the async verify-contract scan hasn't posted a
+// result yet) this contract's review_notes free-text implies. review_notes
+// is where the auto-verify Edge Function and the manual-verify path both
+// record their outcome — see getContractReviewMeta above and
+// handlePerformVerifyContract below.
+function getSignatureCheckState(contract) {
   const note = String(contract.contract?.review_notes || '');
-  let state = 'not-scanned';
-  if (/signature detected/i.test(note)) {
-    state = 'detected';
-  } else if (/no .*signature detected|not detected/i.test(note)) {
-    state = 'not-detected';
-  }
+  if (/signature detected/i.test(note)) return 'detected';
+  if (/no .*signature detected|not detected/i.test(note)) return 'not-detected';
+  return 'not-scanned';
+}
+
+function renderSignatureCheckPanel(contract) {
+  const state = getSignatureCheckState(contract);
 
   const copy = {
     detected: {
-      icon: '✓',
-      title: 'Signature check: detected',
-      sub: 'Automatic scan found a signature in the signature area.'
+      icon: SIGNATURE_CHECK_ICON.detected,
+      title: 'Signature detected — verified automatically',
+      sub: 'Open the contract to confirm it matches.'
     },
     'not-detected': {
-      icon: '✕',
-      title: 'Signature check: not detected',
-      sub: 'Automatic scan did not find a signature in the uploaded file.'
+      icon: SIGNATURE_CHECK_ICON.alert,
+      title: 'No signature detected',
+      sub: 'Review the contract and verify manually, or request a new upload.'
     },
     'not-scanned': {
-      icon: '•',
-      title: 'Signature check: not yet scanned',
-      sub: 'This contract has not been through the automatic signature scan yet.'
+      icon: SIGNATURE_CHECK_ICON.alert,
+      title: 'Signature check not yet complete',
+      sub: 'The automatic scan hasn’t finished yet. Open the contract and verify manually if needed.'
     }
   }[state];
 
-  return `
-    <div class="signature-check-panel state-${state}">
-      <span class="signature-check-icon">${copy.icon}</span>
-      <span class="signature-check-copy">
-        <span class="signature-check-title">${escapeHtml(copy.title)}</span>
-        <span class="signature-check-sub">${escapeHtml(copy.sub)}</span>
-      </span>
-    </div>
+  contractSignaturePanel.className = `signature-check-panel state-${state}`;
+  contractSignaturePanel.innerHTML = `
+    <span class="signature-check-icon">${copy.icon}</span>
+    <span class="signature-check-copy">
+      <span class="signature-check-title">${escapeHtml(copy.title)}</span>
+      <span class="signature-check-sub">${escapeHtml(copy.sub)}</span>
+    </span>
   `;
+
+  return state;
 }
 
 function setContractDetailsMessage(message = '', isError = false) {
@@ -630,65 +656,101 @@ function renderContractDetailsModal(reservationId = activeContractReservationId)
     ? 'Onsite - ELI Coffee'
     : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
 
-  contractDetailsHero.innerHTML = `
-    <div class="reservation-hero-main">
-      <span class="reservation-hero-avatar">${escapeHtml(getCustomerInitials(reservation.contact_name, reservation.contact_email))}</span>
-      <div class="reservation-hero-copy">
-        <div class="reservation-hero-name">${escapeHtml(reservation.contact_name || 'Unknown customer')}</div>
-        <div class="reservation-hero-sub">${escapeHtml(reservation.contact_email || 'No email on file')}</div>
-        <span class="reservation-hero-package">${escapeHtml(reservation.package?.package_name || 'Package pending')}</span>
-      </div>
+  // ── Sticky identity header ──────────────────────────────────────
+  contractReviewAvatar.textContent = getCustomerInitials(reservation.contact_name, reservation.contact_email);
+  contractReviewName.textContent = reservation.contact_name || 'Unknown customer';
+  contractReviewStatusPill.className = `status-pill ${escapeHtml(contract.key)}`;
+  contractReviewStatusPill.textContent = contract.label;
+  contractReviewMeta.textContent = [
+    reservation.reservation_number || 'No reservation number',
+    reservation.event_type || 'Event',
+    `${formatDate(reservation.event_date)} at ${reservation.event_time || 'no time selected'}`
+  ].join(' · ');
+
+  // ── Reservation context card ────────────────────────────────────
+  contractContextRows.innerHTML = `
+    <div class="dl-grid-2col">
+      ${dlRow('Event type', reservation.event_type || 'Event')}
+      ${dlRow('Guests', String(reservation.guest_count || 0))}
+      ${dlRow('Package', reservation.package?.package_name || 'Package pending')}
+      ${dlRow('Total price', formatCurrency(reservation.total_price))}
     </div>
-    <div class="detail-badge-stack">
-      <span class="status-pill ${escapeHtml(contract.key)}">${escapeHtml(contract.label)}</span>
-      <span class="status-pill ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>
-    </div>
+    ${dlRow('Location', location, { full: true, titleAttr: location })}
   `;
 
-  contractDetailsMeta.innerHTML = [
-    buildDetailCard('Reservation Number', reservation.reservation_number || 'Not assigned'),
-    buildDetailCard('Event Schedule', `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`),
-    buildDetailCard('Latest Activity', contract.reviewedAt || formatDateTime(getContractActivityDate(reservation))),
-    buildDetailCard('Reservation Submitted', formatDateTime(reservation.created_at))
+  // ── Contract card ────────────────────────────────────────────────
+  if (contractRecord?.contract_url) {
+    viewContractLink.href = contractRecord.contract_url;
+    viewContractLink.classList.remove('hidden');
+  } else {
+    viewContractLink.classList.add('hidden');
+  }
+
+  if (contractRecord?.contract_url) {
+    const signatureState = renderSignatureCheckPanel(contract);
+    contractSignaturePanel.classList.remove('hidden');
+
+    if (signatureState === 'detected') {
+      // TODO(contract-review): an "undo / flag as not verified" action for
+      // an auto-verified contract is intentionally deferred — see the
+      // implementation prompt this build was scoped from. When it's built,
+      // it attaches here (auto-verified branch of the Contract card,
+      // probably as a quiet text link next to the Verified row below) and
+      // needs a new state transition (verified -> pending_review) that
+      // doesn't exist yet in getContractReviewMeta/performContractAction.
+      contractVerifyRows.innerHTML = dlRow(
+        'Verified',
+        contract.reviewedAt || contract.verification || 'Just now',
+        { muted: true }
+      );
+      contractInlineActions.innerHTML = '';
+    } else {
+      contractVerifyRows.innerHTML = '';
+      contractInlineActions.innerHTML = currentRole === 'admin' ? '' : `
+        <button type="button" class="contract-action-btn primary" data-action="verify-contract" data-reservation-id="${reservation.reservation_id}">
+          Verify contract
+        </button>
+        <!-- Request resubmission intentionally omitted: the manager-side
+             "request resubmission" action and the customer-side re-upload
+             flow were removed at the database level in
+             supabase/migrations/20260825_remove_contract_resubmission.sql
+             (review_status is now constrained to just 'pending_review' /
+             'verified', and reservation_contracts.resubmitted_at was
+             dropped). Re-adding this button needs that schema decision
+             revisited first, not just a UI change. -->
+      `;
+    }
+  } else {
+    contractSignaturePanel.classList.add('hidden');
+    contractSignaturePanel.innerHTML = '';
+    contractVerifyRows.innerHTML = dlRow('Contract file', 'No contract file uploaded yet.', { muted: true });
+    contractInlineActions.innerHTML = '';
+  }
+
+  // ── Reservation card ─────────────────────────────────────────────
+  contractStatusRows.innerHTML = [
+    dlRow('Status', `<span class="status-pill ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>`, { raw: true }),
+    dlRow('Submitted', formatDateTime(reservation.created_at))
   ].join('');
 
-  contractSummaryGrid.innerHTML = [
-    buildDetailCard('Event Type', reservation.event_type || 'Event'),
-    buildDetailCard('Location', location),
-    buildDetailCard('Guests', String(reservation.guest_count || 0)),
-    buildDetailCard('Total Price', formatCurrency(reservation.total_price)),
-    buildDetailCard('Reservation Status', `<span class="status-pill ${escapeHtml(reservationStatus.key)}">${escapeHtml(reservationStatus.label)}</span>`, { raw: true }),
-    buildDetailCard('Contract Status', `<span class="status-pill ${escapeHtml(contract.key)}">${escapeHtml(contract.label)}</span>`, { raw: true }),
-    (contract.reviewedAt && contract.reviewedAt !== contract.verification) ? buildDetailCard('Reviewed', contract.reviewedAt) : '',
-    contract.note ? buildDetailCard('Latest Review Note', contract.note, { full: true }) : ''
-  ].filter(Boolean).join('');
-
-  contractReviewSection.innerHTML = `
-    ${contractRecord?.contract_url ? renderSignatureCheckPanel(contract) : ''}
-    <div class="details-grid compact-grid">
-      ${buildDetailCard(contract.key === 'approved' ? 'Verified' : 'Verification', contract.verification, { subtle: contract.key !== 'approved' })}
-      ${buildDetailCard('Contract File', contractRecord?.contract_url ? 'Uploaded and ready to open' : 'Missing', { subtle: !contractRecord?.contract_url })}
-    </div>
-    <div class="details-action-row">
-      ${contractRecord?.contract_url
-        ? `<a class="action-btn view" href="${contractRecord.contract_url}" target="_blank" rel="noopener noreferrer">View Contract</a>`
-        : '<span class="details-empty-inline">No contract file uploaded yet.</span>'}
-    </div>
-  `;
-
+  // ── Pinned footer ────────────────────────────────────────────────
   const showReservationActions = currentRole !== 'admin' && reservationStatus.key === 'pending';
 
-  contractActionsSection.innerHTML = (currentRole === 'admin' || !showReservationActions) ? '' : `
-    <div class="details-action-row">
-      <button
-        class="action-btn approve"
-        data-action="approve-reservation"
-        data-reservation-id="${reservation.reservation_id}"
-        ${approvalState.canApprove ? '' : 'disabled'}
-        title="${escapeHtml(approvalState.canApprove ? 'Approve the linked reservation.' : approvalState.reason)}"
-      >Approve Reservation</button>
-      <button class="action-btn decline" data-action="decline-reservation" data-reservation-id="${reservation.reservation_id}">Decline Reservation</button>
-    </div>
+  contractFooterActions.innerHTML = (currentRole === 'admin' || !showReservationActions) ? '' : `
+    <button
+      type="button"
+      class="contract-action-btn decline"
+      data-action="decline-reservation"
+      data-reservation-id="${reservation.reservation_id}"
+    >Decline</button>
+    <button
+      type="button"
+      class="contract-action-btn primary"
+      data-action="approve-reservation"
+      data-reservation-id="${reservation.reservation_id}"
+      ${approvalState.canApprove ? '' : 'disabled'}
+      title="${escapeHtml(approvalState.canApprove ? 'Approve the linked reservation.' : approvalState.reason)}"
+    >Approve reservation</button>
   `;
 
   if (contractDetailsFlash) {
@@ -729,6 +791,38 @@ async function performContractAction(action, button) {
     return { message: 'Reservation declined.' };
   }
 
+  if (action === 'verify-contract') {
+    if (!reservation) throw new Error('Reservation could not be found.');
+
+    const confirmed = window.confirm(
+      'Confirm you have opened the contract PDF and visually verified the signature is present and matches the client name.\n\n'
+      + 'This will mark the contract as verified, bypassing the automatic scan, and allow the reservation to be approved.'
+    );
+    if (!confirmed) return null;
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('reservation_contracts')
+      .update({
+        review_status: 'verified',
+        verified_date: now,
+        reviewed_at: now,
+        review_notes: 'Manually verified: signature confirmed by staff visual review (automatic scan did not detect it).'
+      })
+      .eq('reservation_id', reservationId);
+
+    if (error) throw error;
+
+    await logAudit({
+      action: 'Manually Verified Contract Signature',
+      category: 'contracts',
+      details: 'Automatic signature scan did not confirm a signature; verified manually after visual review.',
+      entityId: reservationId
+    });
+
+    return { message: 'Contract manually verified. The reservation can now be approved.' };
+  }
+
   return { message: '' };
 }
 
@@ -736,7 +830,6 @@ async function loadData({ silent = false } = {}) {
   if (!silent) {
     setMessage(tableMessage, 'Loading contracts...');
   }
-  setMessage(tableMessage, 'Loading contracts...');
 
   try {
     const reservations = await fetchReservations();
@@ -793,7 +886,6 @@ function wireTableActions() {
 
 function wireModals() {
   contractDetailsClose?.addEventListener('click', closeContractDetailsModal);
-  contractDetailsDismiss?.addEventListener('click', closeContractDetailsModal);
   contractDetailsModal?.addEventListener('click', async (event) => {
     if (event.target === contractDetailsModal) {
       closeContractDetailsModal();

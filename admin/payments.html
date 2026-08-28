@@ -125,23 +125,26 @@
 
   <!-- ── Payment Review Modal ── -->
   <div class="modal-backdrop hidden" id="paymentDetailsModal" aria-hidden="true">
-    <div class="modal-card payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="paymentDetailsTitle">
+    <div class="modal-card payment-review-modal" role="dialog" aria-modal="true" aria-labelledby="paymentDetailsTitle">
       <button type="button" class="modal-close" id="paymentDetailsClose" aria-label="Close payment details">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
-      <p class="modal-eyebrow">Payment Review</p>
-      <h2 class="modal-title" id="paymentDetailsTitle">Review Payment</h2>
+      <h2 class="modal-title" id="paymentDetailsTitle">Review payment</h2>
       <p class="modal-copy">Review the submission details and proof of payment before taking action.</p>
+
+      <div class="payment-review-amount-row" id="paymentAmountRow"></div>
+      <div id="paymentAmountStatus"></div>
+
       <div class="payment-review-layout">
         <section class="payment-review-pane">
           <div class="payment-review-pane-head">
-            <h3>Submission Summary</h3>
+            <h3>Submission details</h3>
           </div>
-          <div class="payment-review-summary" id="paymentDetailsGrid"></div>
+          <div class="dl-rows" id="paymentDetailsRows"></div>
         </section>
         <section class="payment-review-pane proof-pane">
           <div class="payment-review-pane-head">
-            <h3>Proof of Payment</h3>
+            <h3>Proof of payment</h3>
           </div>
           <div class="payment-proof-preview" id="paymentProofPreview"></div>
           <div class="proof-preview-actions" id="paymentProofActions"></div>

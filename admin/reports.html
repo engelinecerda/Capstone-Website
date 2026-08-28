@@ -50,9 +50,6 @@
         </div>
         <div class="reports-header-actions">
           <span id="managerNotifBell"></span>
-          <button type="button" class="refresh-btn" id="exportExcelBtn">
-            <i class="fa-solid fa-file-excel" aria-hidden="true"></i> Export to Excel
-          </button>
         </div>
       </div>
 
@@ -81,9 +78,14 @@
       <section class="reports-summary-grid" id="reportsSummary"></section>
 
       <section class="card reports-table-card">
-        <div>
-          <h2 class="card-title">Reservation List</h2>
-          <p class="card-sub">Filtered reservations that will be included in the Excel export.</p>
+        <div class="reports-table-head">
+          <div>
+            <h2 class="card-title">Reservation List</h2>
+            <p class="card-sub">Filtered reservations that will be included in the Excel export.</p>
+          </div>
+          <button type="button" class="refresh-btn" id="exportExcelBtn">
+            <i class="fa-solid fa-file-excel" aria-hidden="true"></i> Export to Excel
+          </button>
         </div>
         <div class="reports-table-wrap">
           <table class="reports-table">

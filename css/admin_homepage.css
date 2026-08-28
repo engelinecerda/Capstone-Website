@@ -354,6 +354,12 @@ body {
   margin-bottom: 16px;
 }
 
+/* Dashboard has 5 stat cards, not 4 — without this, the 5th card wraps
+   onto its own second row under the base 4-column .stat-grid. */
+.stat-grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .stat-card {
   background: var(--card-bg);
   border: 0.5px solid var(--border);

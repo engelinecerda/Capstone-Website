@@ -9,6 +9,7 @@ import { getPaymentStatusPillMeta, getCancellationFee } from './reservation_shar
 import { recordInCafePayment, uploadPaymentReceipt, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
+import { logAudit } from './audit_logger.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -1173,13 +1174,75 @@ function renderSignatureCheckPanel(contract) {
   }[state];
 
   signatureCheckPanel.className = `signature-check-panel state-${state}`;
+  // Manual override for whenever the automatic scan can't (or hasn't yet)
+  // confirmed a signature — approval is otherwise permanently blocked with
+  // no way for a Manager to unblock it after visually checking the PDF
+  // themselves (see getReservationApprovalState's canApprove gate). Manager-
+  // only, matching every other operational mutation on this page.
+  const showManualVerifyBtn = state !== 'detected' && currentRole === 'manager';
   signatureCheckPanel.innerHTML = `
     <span class="signature-check-icon">${copy.icon}</span>
     <span class="signature-check-copy">
       <span class="signature-check-title">${escapeHtml(copy.title)}</span>
       <span class="signature-check-sub">${escapeHtml(copy.sub)}</span>
+      ${showManualVerifyBtn ? `
+        <button type="button" class="signature-manual-verify-btn" data-action="manual-verify-contract">
+          I checked the contract — signature confirmed
+        </button>
+      ` : ''}
     </span>
   `;
+}
+
+async function handleManualVerifyContract() {
+  const reservation = currentReservation;
+  if (!reservation) return;
+
+  const confirmed = window.confirm(
+    'Confirm you have opened the contract PDF and visually verified the signature is present and matches the client name.\n\n' +
+    'This will mark the contract as verified, bypassing the automatic scan, and allow the reservation to be approved.'
+  );
+  if (!confirmed) return;
+
+  const button = signatureCheckPanel.querySelector('[data-action="manual-verify-contract"]');
+  if (button) button.setAttribute('disabled', 'true');
+
+  try {
+    setFlashMessage('Verifying contract...');
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('reservation_contracts')
+      .update({
+        review_status: 'verified',
+        verified_date: now,
+        reviewed_at: now,
+        review_notes: 'Manually verified: signature confirmed by staff visual review (automatic scan did not detect it).'
+      })
+      .eq('reservation_id', reservation.reservation_id);
+
+    if (error) throw error;
+
+    await logAudit({
+      action: 'Manually Verified Contract Signature',
+      category: 'contracts',
+      details: 'Automatic signature scan did not confirm a signature; verified manually after visual review.',
+      entityId: reservation.reservation_id
+    });
+
+    await reloadAndRender('Contract manually verified. The reservation can now be approved.');
+  } catch (error) {
+    setFlashMessage(error.message || 'Failed to verify contract.', true);
+    if (button) button.removeAttribute('disabled');
+  }
+}
+
+function wireSignatureCheckPanel() {
+  signatureCheckPanel.addEventListener('click', (event) => {
+    if (event.target.closest('[data-action="manual-verify-contract"]')) {
+      handleManualVerifyContract();
+    }
+  });
 }
 
 function renderContract() {
@@ -1755,6 +1818,7 @@ wireAssignmentModal();
 wireApprovalPrompt();
 wireReceiptViewer();
 wireRecordPaymentModal();
+wireSignatureCheckPanel();
 wireStickyHeaderScroll();
 wireBreadcrumb();
 wireLogoutButton();

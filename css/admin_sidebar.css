@@ -69,6 +69,25 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
 
 body.sidebar-open .sidebar-overlay { display: block; }
 
+/* ── LARGE DESKTOP (≥ 1600px) ──────────────────────────────────
+   Every other breakpoint in this file only scales the layout DOWN
+   for smaller screens. Nothing scaled UP for large monitors, so on
+   a big display .page-shell's 1200px cap just sits in a sea of
+   unused space while every page's hardcoded px text/spacing stays
+   the same physical size — reported as "looks small, harder to see"
+   on bigger screens. `zoom` scales .main's content (text, cards,
+   spacing) proportionally without having to touch every page's
+   individual px values. Modal overlays are siblings of .main (direct
+   children of <body>, see admin/**/*.html), not descendants, so they
+   render at normal scale and are unaffected. */
+@media (min-width: 1600px) {
+  .main { zoom: 1.12; }
+}
+
+@media (min-width: 2000px) {
+  .main { zoom: 1.25; }
+}
+
 /* ── TABLET (≤ 1024px) ───────────────────────────────────────── */
 @media (max-width: 1024px) {
   :root { --sidebar-w: 210px; }

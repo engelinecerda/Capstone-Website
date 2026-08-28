@@ -127,46 +127,49 @@
 
   <!-- ══ CONTRACT DETAILS MODAL ══ -->
   <div class="modal-backdrop hidden" id="contractDetailsModal" aria-hidden="true">
-    <div class="modal-card reservation-details-modal-card contract-details-modal-card" role="dialog" aria-modal="true" aria-labelledby="contractDetailsTitle">
-      <button type="button" class="modal-close" id="contractDetailsClose" aria-label="Close contract details">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <p class="modal-eyebrow">Contract Review</p>
-      <h2 class="modal-title" id="contractDetailsTitle">Contract Overview</h2>
-      <p class="modal-copy">Review the uploaded file and its automatic signature check, then update the linked reservation when it's ready.</p>
-
-      <div class="reservation-details-hero" id="contractDetailsHero"></div>
-      <div class="reservation-details-meta" id="contractDetailsMeta"></div>
-
-      <section class="details-section">
-        <div class="details-section-head">
-          <h3 class="details-section-title">Reservation Summary</h3>
-          <p class="details-section-copy">The customer and event context tied to this submitted contract.</p>
+    <div class="modal-card contract-review-modal" role="dialog" aria-modal="true" aria-labelledby="contractReviewName">
+      <header class="contract-review-header">
+        <div class="contract-review-header-left">
+          <span class="avatar" id="contractReviewAvatar"></span>
+          <div class="contract-review-header-copy">
+            <div class="contract-review-header-name-row">
+              <span class="contract-review-header-name" id="contractReviewName"></span>
+              <span class="status-pill" id="contractReviewStatusPill"></span>
+            </div>
+            <p class="contract-review-header-meta" id="contractReviewMeta"></p>
+          </div>
         </div>
-        <div class="details-grid" id="contractSummaryGrid"></div>
+        <button type="button" class="contract-review-close" id="contractDetailsClose" aria-label="Close contract review">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </header>
+
+      <section class="card contract-review-card">
+        <h3 class="card-title">Reservation context</h3>
+        <div class="dl-rows" id="contractContextRows"></div>
       </section>
 
-      <section class="details-section">
-        <div class="details-section-head">
-          <h3 class="details-section-title">Contract Review</h3>
-          <p class="details-section-copy">Contracts are verified automatically once a signature is detected on upload.</p>
+      <section class="card contract-review-card">
+        <div class="card-head-row">
+          <h3 class="card-title">Contract</h3>
+          <a class="card-head-link hidden" id="viewContractLink" href="#" target="_blank" rel="noopener noreferrer">View contract &rarr;</a>
         </div>
-        <div id="contractReviewSection"></div>
+        <div class="signature-check-panel" id="contractSignaturePanel"></div>
+        <div class="dl-rows" id="contractVerifyRows"></div>
+        <div class="contract-review-inline-actions" id="contractInlineActions"></div>
       </section>
 
-      <section class="details-section">
-        <div class="details-section-head">
-          <h3 class="details-section-title">Actions</h3>
-          <p class="details-section-copy">Approve or decline the linked reservation once the contract is verified.</p>
-        </div>
-        <div id="contractActionsSection"></div>
+      <section class="card contract-review-card">
+        <h3 class="card-title">Reservation</h3>
+        <div class="dl-rows" id="contractStatusRows"></div>
       </section>
 
       <p class="modal-message" id="contractDetailsMessage"></p>
 
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn-secondary" id="contractDetailsDismiss">Close</button>
-      </div>
+      <footer class="contract-review-footer">
+        <p class="contract-review-helper-note">Verify the contract before approving.</p>
+        <div class="contract-review-footer-actions" id="contractFooterActions"></div>
+      </footer>
     </div>
   </div>
 

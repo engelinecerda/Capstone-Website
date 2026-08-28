@@ -6,9 +6,10 @@ import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
-import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource } from './reservation_shared.js';
+import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource, getCancellationFee, getRescheduleFee } from './reservation_shared.js';
 import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
+import { loadPaymentRules } from './customer_payments.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -23,7 +24,9 @@ const paymentsPagination = document.getElementById('paymentsPagination');
 const paymentDetailsModal = document.getElementById('paymentDetailsModal');
 const paymentDetailsClose = document.getElementById('paymentDetailsClose');
 const paymentDetailsDismiss = document.getElementById('paymentDetailsDismiss');
-const paymentDetailsGrid = document.getElementById('paymentDetailsGrid');
+const paymentAmountRow = document.getElementById('paymentAmountRow');
+const paymentAmountStatus = document.getElementById('paymentAmountStatus');
+const paymentDetailsRows = document.getElementById('paymentDetailsRows');
 const paymentProofPreview = document.getElementById('paymentProofPreview');
 const paymentProofActions = document.getElementById('paymentProofActions');
 const paymentDetailsMessage = document.getElementById('paymentDetailsMessage');
@@ -55,11 +58,24 @@ const recordPaymentFileName = document.getElementById('recordPaymentFileName');
 const recordPaymentFileRemoveBtn = document.getElementById('recordPaymentFileRemoveBtn');
 const recordPaymentNotesInput = document.getElementById('recordPaymentNotesInput');
 
+// Covers both the coarse payment.payment_method enum (card/bancnet/
+// gcash_maya/cash) and the older per-provider values some rows still carry
+// (gcash/maya/bpi/bank/ewallet — see the backfill CASE statement in
+// 20260729_payment_method_evidence_and_snapshot.sql, the source of truth
+// for what values actually exist in the column). Rows normally display
+// payment.payment_method_label instead (a proper-cased snapshot written at
+// submission time — see getPaymentMethodLabel below), so this map is really
+// only reached for old rows from before that column existed.
 const PAYMENT_METHOD_LABELS = {
   card: 'Debit / Credit Card',
   bancnet: 'Bank Transfer',
   gcash_maya: 'E-Wallet',
-  cash: 'Cash'
+  cash: 'Cash',
+  gcash: 'GCash',
+  maya: 'Maya',
+  bpi: 'BPI',
+  bank: 'Bank Transfer',
+  ewallet: 'E-Wallet'
 };
 
 const PAYMENT_CHANNEL_LABELS = {
@@ -98,6 +114,7 @@ let activePaymentReviewId = null;
 let paymentReviewFlash = null;
 let rejectReasonPaymentId = null;
 let paymentProofZoomPercent = 100;
+let currentPaymentRules = null;
 const PAYMENT_PROOF_MIN_ZOOM = 50;
 const PAYMENT_PROOF_MAX_ZOOM = 300;
 const PAYMENT_PROOF_ZOOM_STEP = 25;
@@ -189,8 +206,14 @@ function getTodayDateKey() {
   return buildLocalDateKey(new Date());
 }
 
+// Falls back to a capitalized version of the raw value (never the raw
+// lowercase enum text) for any method string this map doesn't know about,
+// so a gap here reads as "Some_method" rather than "some_method" — never
+// literally raw-cased like "gcash".
 function getPaymentMethodLabel(method) {
-  return PAYMENT_METHOD_LABELS[method] || method || 'Method';
+  if (PAYMENT_METHOD_LABELS[method]) return PAYMENT_METHOD_LABELS[method];
+  if (!method) return 'No method recorded';
+  return String(method).charAt(0).toUpperCase() + String(method).slice(1);
 }
 
 function getPaymentChannelLabel(method) {
@@ -214,9 +237,12 @@ function getPaymentInfoSummary(payment) {
 
   return {
     main: infoLabel,
+    // formatCompactDate(null) returns the string 'No date' — feeding that
+    // straight into `Paid ${...}` produced the "Paid No date" empty state;
+    // check the raw value first instead.
     sub: isCafeIssued
       ? (arrivalDate ? `Arrival ${formatCompactDate(arrivalDate)}` : 'No arrival date set')
-      : `Paid ${formatCompactDate(payment.payment_date)}`
+      : (payment.payment_date ? `Paid ${formatCompactDate(payment.payment_date)}` : 'No payment date recorded')
   };
 }
 
@@ -336,14 +362,23 @@ function buildDetailCard(label, value, options = {}) {
   `;
 }
 
-function buildReviewSummaryItem(label, value, subvalue = '') {
+// Definition-list row — same .dl-row pattern used on the reservation-
+// details page and the redesigned contract review modal (see
+// css/admin_reservation_details.css / css/admin_contracts.css for the
+// source; copied locally here for the same reason those files did: this
+// one isn't shared across pages, so a cross-file CSS dependency isn't
+// worth it for a handful of rules). options.sub renders a second, muted
+// line stacked under the main value (for two-line facts like "package
+// name" + "event date"); options.raw skips HTML-escaping the value for
+// pre-built markup (e.g. an inline status pill).
+function dlRow(label, value, options = {}) {
+  const valueMarkup = options.sub
+    ? `<span class="dl-value-stack"><span class="dl-value-main">${options.raw ? value : escapeHtml(value)}</span><span class="dl-value-sub">${escapeHtml(options.sub)}</span></span>`
+    : (options.raw ? value : escapeHtml(value));
   return `
-    <div class="review-summary-item">
-      <div class="review-summary-label">${escapeHtml(label)}</div>
-      <div class="review-summary-copy">
-        <div class="review-summary-value">${escapeHtml(value)}</div>
-        ${subvalue ? `<div class="review-summary-sub">${escapeHtml(subvalue)}</div>` : ''}
-      </div>
+    <div class="dl-row">
+      <span class="dl-label">${escapeHtml(label)}</span>
+      <span class="dl-value">${valueMarkup}</span>
     </div>
   `;
 }
@@ -613,16 +648,14 @@ function getPaymentById(paymentId) {
 }
 
 // ── OCR helpers ─────────────────────────────────────────────────────────────
-function getOcrConfidenceMeta(confidence) {
-  const map = {
-    high:   { label: 'High confidence',   cls: 'ocr-badge-high' },
-    medium: { label: 'Medium confidence', cls: 'ocr-badge-medium' },
-    low:    { label: 'Low confidence',    cls: 'ocr-badge-low' },
-    failed: { label: 'OCR failed',        cls: 'ocr-badge-failed' }
-  };
-  return map[confidence] || { label: 'Not processed', cls: 'ocr-badge-none' };
-}
+const OCR_HINT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 
+// No confidence badge here on purpose: Cloud Vision's confidence score
+// measures character legibility, not whether the parser picked the right
+// field out of the receipt text — a badge next to a wrong value tells a
+// manager "trust this" when the real risk is field selection, not OCR
+// accuracy. These values are demoted to a hint block the manager verifies
+// against the image, never a claim of correctness.
 function buildOcrPanel(payment) {
   // Café-issued payments (cash/card confirmed at the counter) don't have a
   // proof image to OCR — skip the panel.
@@ -632,15 +665,18 @@ function buildOcrPanel(payment) {
   if (!payment.proof_url) return '';
 
   const ocr = payment.ocr_extracted;
+  const panelHead = `
+    <div class="ocr-panel-head">
+      <span class="ocr-panel-icon">${OCR_HINT_ICON}</span>
+      <span class="ocr-panel-title">Read automatically from the proof</span>
+    </div>
+  `;
 
   // OCR not yet run
   if (!ocr) {
     return `
       <div class="ocr-panel ocr-panel-none">
-        <div class="ocr-panel-head">
-          <span class="ocr-panel-title">OCR Extraction</span>
-          <span class="ocr-badge ocr-badge-none">Not processed</span>
-        </div>
+        ${panelHead}
         <p class="ocr-panel-note">OCR has not run for this payment yet.</p>
       </div>
     `;
@@ -650,41 +686,36 @@ function buildOcrPanel(payment) {
   if (ocr.error) {
     return `
       <div class="ocr-panel ocr-panel-failed">
-        <div class="ocr-panel-head">
-          <span class="ocr-panel-title">OCR Extraction</span>
-          <span class="ocr-badge ocr-badge-failed">Failed</span>
-        </div>
+        ${panelHead}
         <p class="ocr-panel-note">We couldn't read this image automatically: ${escapeHtml(ocr.error)}</p>
       </div>
     `;
   }
 
-  const confidence = getOcrConfidenceMeta(ocr.confidence);
-  const amountDisplay = ocr.amount
-    ? `\u20B1${Number(ocr.amount).toLocaleString()}`
-    : 'Not found';
+  // ocr.amount/ocr.reference_number/ocr.raw_text all come from the same
+  // stored ocr_extracted JSON (see supabase/functions/ocr-payment), so the
+  // summary fields below and the raw text in the <details> are guaranteed
+  // to agree — neither is independently re-derived here.
+  const amountDisplay = ocr.amount ? formatCurrency(ocr.amount) : 'Not detected';
 
   return `
     <div class="ocr-panel">
-      <div class="ocr-panel-head">
-        <span class="ocr-panel-title">\uD83D\uDD0D OCR Extraction</span>
-        <span class="ocr-badge ${escapeHtml(confidence.cls)}">${escapeHtml(confidence.label)}</span>
-      </div>
-      <p class="ocr-panel-note">Automatically read from the uploaded proof. Cross-check with the payment details above before approving.</p>
+      ${panelHead}
       <div class="ocr-fields">
         <div class="ocr-field">
-          <span class="ocr-field-label">Extracted Amount</span>
+          <span class="ocr-field-label">Amount</span>
           <span class="ocr-field-value ${ocr.amount ? '' : 'ocr-not-found'}">${escapeHtml(amountDisplay)}</span>
         </div>
         <div class="ocr-field">
-          <span class="ocr-field-label">Reference Number</span>
-          <span class="ocr-field-value ${ocr.reference_number ? '' : 'ocr-not-found'}">${escapeHtml(ocr.reference_number || 'Not found')}</span>
+          <span class="ocr-field-label">Reference</span>
+          <span class="ocr-field-value ${ocr.reference_number ? '' : 'ocr-not-found'}">${escapeHtml(ocr.reference_number || 'Not detected')}</span>
         </div>
         <div class="ocr-field">
-          <span class="ocr-field-label">Payment Date</span>
-          <span class="ocr-field-value ${ocr.payment_date ? '' : 'ocr-not-found'}">${escapeHtml(ocr.payment_date || 'Not found')}</span>
+          <span class="ocr-field-label">Date</span>
+          <span class="ocr-field-value ${ocr.payment_date ? '' : 'ocr-not-found'}">${escapeHtml(ocr.payment_date || 'Not detected')}</span>
         </div>
       </div>
+      <p class="ocr-panel-warning">Best guess only — always confirm against the receipt image.</p>
       ${ocr.raw_text ? `
         <details class="ocr-raw-details">
           <summary>View full extracted text</summary>
@@ -694,8 +725,7 @@ function buildOcrPanel(payment) {
     </div>
   `;
 }
-// ────────────────────────────────────────────────────────────────────────────
-
+// ───────────────────────────────────────────────────────────────────────────────
 async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') {
   if (currentRole === 'admin') {
     throw new Error('This action requires the Manager role.');
@@ -768,53 +798,121 @@ function closeReceiptModal() {
   receiptModal?.setAttribute('aria-hidden', 'true');
 }
 
+// "Expected this payment" only has a well-defined, system-configured value
+// for the two flat-fee payment types — cancellation_fee and reschedule_fee
+// both come from system_settings.payment_rules via the same
+// getCancellationFee/getRescheduleFee helpers the cancellation/reschedule
+// flows themselves use (js/reservation_shared.js), so the comparison here
+// can never disagree with what the customer was actually charged.
+// Everything else (reservation_fee/down_payment/full_payment/
+// partial_payment) is a variable amount negotiated per booking — there's
+// no fixed figure to compare against, so this returns null rather than
+// fabricating one.
+function getExpectedPaymentAmount(payment, reservation, paymentRules) {
+  if (payment.payment_type === 'cancellation_fee') {
+    return { amount: getCancellationFee(reservation, paymentRules), label: 'Cancellation fee' };
+  }
+  if (payment.payment_type === 'reschedule_fee') {
+    return { amount: getRescheduleFee(paymentRules), label: 'Reschedule fee' };
+  }
+  return { amount: null, label: 'No fixed amount for this payment type' };
+}
+
+const AMOUNT_MISMATCH_TOLERANCE_PHP = 1; // guards against float/rounding noise only, not a real allowance
+const AMOUNT_MISMATCH_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+function buildAmountComparison(payment, reservation, paymentRules) {
+  const expected = getExpectedPaymentAmount(payment, reservation, paymentRules);
+  const entered = Number(payment.amount) || 0;
+  const read = payment.ocr_extracted?.amount != null ? Number(payment.ocr_extracted.amount) : null;
+
+  const expectedMismatch = expected.amount != null && Math.abs(entered - expected.amount) > AMOUNT_MISMATCH_TOLERANCE_PHP;
+  const ocrMismatch = read != null && Math.abs(read - entered) > AMOUNT_MISMATCH_TOLERANCE_PHP;
+
+  return {
+    expected,
+    entered,
+    read,
+    expectedMismatch,
+    ocrMismatch,
+    hasMismatch: expectedMismatch || ocrMismatch,
+    hasAnyComparison: expected.amount != null || read != null
+  };
+}
+
+function renderAmountCards(comparison) {
+  const { expected, entered, read, expectedMismatch, ocrMismatch } = comparison;
+  return `
+    <div class="stat-card${expectedMismatch ? ' mismatch' : ''}">
+      <span class="stat-label">Expected this payment</span>
+      <div class="stat-value${expected.amount == null ? ' stat-value-muted' : ''}">${expected.amount != null ? escapeHtml(formatCurrency(expected.amount)) : 'No fixed amount'}</div>
+      <span class="stat-sub">${escapeHtml(expected.label)}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Customer entered</span>
+      <div class="stat-value">${escapeHtml(formatCurrency(entered))}</div>
+    </div>
+    <div class="stat-card${ocrMismatch ? ' mismatch' : ''}">
+      <span class="stat-label">Read from proof</span>
+      <div class="stat-value${read == null ? ' stat-value-muted' : ''}">${read != null ? escapeHtml(formatCurrency(read)) : 'Not detected'}</div>
+    </div>
+  `;
+}
+
+function renderAmountStatusLine(comparison) {
+  if (!comparison.hasAnyComparison) {
+    return '<p class="payment-review-amount-note">No reference amount to check this payment against.</p>';
+  }
+  if (comparison.hasMismatch) {
+    return `
+      <div class="payment-review-mismatch-banner">
+        ${AMOUNT_MISMATCH_ICON}
+        <span>Amounts don't match — check the proof carefully.</span>
+      </div>
+    `;
+  }
+  return '<p class="payment-review-match-note">Amounts match.</p>';
+}
+
 function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   const payment = getPaymentById(paymentId);
   if (!payment) return;
   activePaymentReviewId = paymentId;
   const reservation = getReservation(payment.reservation_id);
   const balance = getReservationBalanceSummary(payment.reservation_id);
-  const statusMeta = getStatusMeta(payment.payment_status);
   const paymentInfo = getPaymentInfoSummary(payment);
-  const paymentTypeSubvalue = payment.reschedule_request_id ? 'Linked to reschedule fee' : 'Reservation payment';
+  const paymentTypeSub = payment.reschedule_request_id ? 'Linked to reschedule fee' : 'Reservation payment';
   const proofExists = Boolean(payment.proof_url);
   const isCafeIssued = resolvePaymentEvidenceSource(payment, paymentMethodMap) === 'cafe_issued';
   const reviewActions = [];
   const receipt = getReceipt(payment.payment_id);
   const proofIsZoomed = paymentProofZoomPercent > 100;
 
-  paymentDetailsGrid.innerHTML = [
-    buildReviewSummaryItem('Reservation', reservation?.package?.package_name || 'Package pending', `${formatDate(reservation?.event_date)} at ${reservation?.event_time || 'No time selected'}`),
-    buildReviewSummaryItem('Customer', reservation?.contact_name || 'Unknown customer', reservation?.contact_email || 'No email on file'),
-    buildReviewSummaryItem('Total Amount', formatCurrency(balance.totalAmount)),
-    buildReviewSummaryItem('Approved Payments', formatCurrency(balance.approvedTotal)),
-    buildReviewSummaryItem(
-      'Remaining Balance',
-      balance.remainingBalance <= 0 ? 'Paid in Full' : formatCurrency(balance.remainingBalance),
-      balance.statusLabel
-    ),
-    buildReviewSummaryItem(
-      'Pay By',
-      balance.remainingBalance <= 0 ? 'Completed' : balance.dueDateLabel,
-      balance.remainingBalance <= 0
-        ? 'All required reservation payments are already cleared.'
-        : (balance.isPastDue ? 'The reservation balance is already overdue.' : 'Final balance is due one week before the event.')
-    ),
-    buildReviewSummaryItem('Amount', formatCurrency(payment.amount)),
-    buildReviewSummaryItem('Payment Type', getPaymentTypeLabel(payment.payment_type), paymentTypeSubvalue),
-    buildReviewSummaryItem('Payment Method', paymentInfo.main, paymentInfo.sub),
-    buildReviewSummaryItem('Submitted On', formatDateTime(payment.submitted_at)),
-    buildReviewSummaryItem(
-      isCafeIssued ? 'Arrival Date' : 'Paid On',
-      isCafeIssued ? formatDate(payment.cash_payment_date || payment.actual_payment_date) : formatDate(payment.payment_date)
-    ),
-    buildReviewSummaryItem(
-      'Reference Number',
-      isCafeIssued ? 'Not required for café-issued payments' : (payment.reference_number || 'Not provided')
-    ),
-    buildReviewSummaryItem('Status', statusMeta.label),
-    buildReviewSummaryItem('Notes', payment.notes || 'No notes provided.')
-  ].join('');
+  // ── Amount comparison strip ───────────────────────────────────────
+  const comparison = buildAmountComparison(payment, reservation, currentPaymentRules);
+  paymentAmountRow.innerHTML = renderAmountCards(comparison);
+  paymentAmountStatus.innerHTML = renderAmountStatusLine(comparison);
+
+  // ── Submission details (definition rows) ──────────────────────────
+  const balanceValue = balance.remainingBalance <= 0 ? 'Paid in full' : formatCurrency(balance.remainingBalance);
+  const balanceRaw = `${escapeHtml(balanceValue)}${balance.isPastDue ? ' <span class="status-pill overdue">Overdue</span>' : ''}`;
+
+  const detailRows = [
+    dlRow('Reservation', reservation?.package?.package_name || 'Package pending', { sub: `${formatDate(reservation?.event_date)} at ${reservation?.event_time || 'No time selected'}` }),
+    dlRow('Customer', reservation?.contact_name || 'Unknown customer', { sub: reservation?.contact_email || 'No email on file' }),
+    dlRow('Payment type', getPaymentTypeLabel(payment.payment_type), { sub: paymentTypeSub }),
+    dlRow('Method', paymentInfo.main, { sub: paymentInfo.sub }),
+    dlRow('Reference number', isCafeIssued ? 'Not required for café-issued payments' : (payment.reference_number || 'Not provided')),
+    dlRow('Submitted', formatDateTime(payment.submitted_at)),
+    dlRow('Balance', balanceRaw, { raw: true })
+  ];
+  // Only shown when there's actually a note to read — an always-present
+  // "No notes provided." row was exactly the kind of empty-state clutter
+  // this redesign is meant to remove.
+  if (payment.notes) {
+    detailRows.push(dlRow('Notes', payment.notes));
+  }
+  paymentDetailsRows.innerHTML = detailRows.join('');
 
   paymentProofPreview.innerHTML = proofExists ? `
     <div class="proof-preview-stage ${proofIsZoomed ? 'zoomed' : ''}">
@@ -836,10 +934,10 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
     <span class="proof-zoom-indicator">${paymentProofZoomPercent}%</span>
     <button type="button" class="modal-btn modal-btn-secondary" data-action="zoom-in" ${paymentProofZoomPercent >= PAYMENT_PROOF_MAX_ZOOM ? 'disabled' : ''}>+</button>
     <button type="button" class="modal-btn modal-btn-secondary" data-action="reset-proof-zoom" ${paymentProofZoomPercent === 100 ? 'disabled' : ''}>Fit</button>
-    <a class="modal-btn modal-btn-secondary proof-link-btn" href="${payment.proof_url}" target="_blank" rel="noopener noreferrer">Open Original</a>
+    <a class="modal-btn modal-btn-secondary proof-link-btn" href="${payment.proof_url}" target="_blank" rel="noopener noreferrer">Open original &rarr;</a>
   ` : '';
 
-  // Render OCR panel below the proof image
+  // Render the demoted OCR hint panel below the proof image
   const ocrPanelEl = document.getElementById('paymentOcrPanel');
   if (ocrPanelEl) {
     ocrPanelEl.innerHTML = buildOcrPanel(payment);
@@ -858,14 +956,14 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
           <textarea id="rejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Receipt image was unreadable">${escapeHtml(payment.rejection_reason || '')}</textarea>
         </div>
         <button type="button" class="modal-btn modal-btn-secondary" data-action="cancel-reject-payment" data-payment-id="${payment.payment_id}">Cancel</button>
-        <button type="button" class="modal-btn modal-btn-danger" data-action="confirm-reject-payment" data-payment-id="${payment.payment_id}">Confirm Rejection</button>
+        <button type="button" class="modal-btn modal-btn-outline-danger" data-action="confirm-reject-payment" data-payment-id="${payment.payment_id}">Confirm rejection</button>
       `);
     } else {
-      reviewActions.push(`<button type="button" class="modal-btn modal-btn-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject Payment</button>`);
-      reviewActions.push(`<button type="button" class="modal-btn modal-btn-success" data-action="approve-payment" data-payment-id="${payment.payment_id}">Approve Payment</button>`);
+      reviewActions.push(`<button type="button" class="modal-btn modal-btn-outline-danger" data-action="reject-payment" data-payment-id="${payment.payment_id}">Reject payment</button>`);
+      reviewActions.push(`<button type="button" class="modal-btn modal-btn-primary" data-action="approve-payment" data-payment-id="${payment.payment_id}">Approve payment</button>`);
     }
   } else if (receipt) {
-    reviewActions.push(`<button type="button" class="modal-btn modal-btn-secondary" data-action="view-receipt" data-payment-id="${payment.payment_id}">View Receipt</button>`);
+    reviewActions.push(`<button type="button" class="modal-btn modal-btn-secondary" data-action="view-receipt" data-payment-id="${payment.payment_id}">View receipt</button>`);
   }
 
   paymentReviewActions.innerHTML = reviewActions.join('');
@@ -1344,6 +1442,12 @@ validateAdminSession({
     wireTableActions();
     wireModals();
     wireRecordPaymentModal();
+
+    // Loaded once — used by the review modal's "Expected this payment"
+    // card for cancellation_fee/reschedule_fee payments (see
+    // getExpectedPaymentAmount). Rules change rarely enough that it's not
+    // worth re-fetching on every loadData()/auto-refresh call.
+    currentPaymentRules = await loadPaymentRules(supabase).catch(() => null);
 
     // Load data ONCE
     await loadData();

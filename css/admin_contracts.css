@@ -6,8 +6,288 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.contract-details-modal-card {
-  width: min(100%, 920px);
+/* ============================================================
+   Contract review modal — definition-list card layout, matching
+   the reservation-details page (see css/admin_reservation_details.css
+   for the source of .dl-rows / .card-head-* / .header-action-btn;
+   copied locally rather than @import'd since that file carries a lot
+   of unrelated page-specific CSS and this file already @imports
+   admin_reservations.css for the shared .signature-check-panel /
+   .status-pill / .modal-* / .avatar components).
+   ============================================================ */
+.contract-review-modal {
+  width: min(100%, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Sticky identity header ──────────────────────────────────── */
+.contract-review-header {
+  position: sticky;
+  top: -24px;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -24px -24px 0;
+  padding: 24px 24px 16px;
+  background: #FBF8F3;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.contract-review-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.contract-review-header-copy {
+  min-width: 0;
+}
+
+.contract-review-header-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contract-review-header-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.contract-review-header-meta {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: #8A7A6C;
+  letter-spacing: 0.01em;
+}
+
+.contract-review-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.contract-review-close:hover {
+  background: #F5EEE4;
+  color: var(--text);
+}
+
+/* ── Content cards ────────────────────────────────────────────── */
+.contract-review-card {
+  padding: 16px;
+}
+
+.contract-review-card .card-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+
+/* ── Definition-list rows (labels muted/sentence case, values 400-500) ── */
+.dl-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.dl-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
+}
+
+.dl-grid-2col .dl-row:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+
+.dl-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.dl-row:last-child {
+  border-bottom: none;
+}
+
+.dl-row.full {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dl-row.full .dl-value {
+  text-align: left;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-label {
+  font-size: 11px;
+  color: #7A6A5C;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+.dl-value {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+}
+
+.dl-value.muted {
+  color: #8A7A6C;
+  font-weight: 400;
+}
+
+/* ── Contract card: "View contract" link + signature panel ──────── */
+.card-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.card-head-row .card-title {
+  margin: 0;
+}
+
+.card-head-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: #3D1A0A;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.card-head-link:hover {
+  text-decoration: underline;
+}
+
+.card-head-link.hidden {
+  display: none;
+}
+
+/* Shared .signature-check-panel (admin_reservations.css) is already the
+   neutral #FAF6F0 inset with a colored icon per state — reused as-is.
+   Only the "not detected" icon color is tuned here (amber alert rather
+   than the shared declined-red) to match this surface's spec; scoped to
+   this modal so it doesn't affect the same class on reservation-details.html. */
+.contract-review-modal .signature-check-panel {
+  margin-bottom: 12px;
+}
+.contract-review-modal .signature-check-panel.state-not-detected .signature-check-icon {
+  color: #854F0B;
+}
+
+.contract-review-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.contract-review-inline-actions:empty {
+  display: none;
+}
+
+/* ── Action buttons (Verify / footer Decline / Approve) — copied from
+   admin_reservation_details.css's .header-action-btn, same reasoning
+   as the .dl-row copy above. ── */
+.contract-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 0.5px solid var(--btn-secondary-border, var(--border));
+  background: #FFFFFF;
+  color: #4A2C17;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.contract-action-btn:hover:not(:disabled) {
+  background: #F5EEE4;
+}
+
+.contract-action-btn.primary {
+  background: #3D1A0A;
+  border-color: #3D1A0A;
+  color: #FDF6EE;
+}
+
+.contract-action-btn.primary:hover:not(:disabled) {
+  background: #2A1208;
+}
+
+.contract-action-btn.decline {
+  color: #A32D2D;
+  border-color: #E9C9C9;
+}
+
+.contract-action-btn.decline:hover:not(:disabled) {
+  background: #FCEBEB;
+}
+
+.contract-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Pinned footer ────────────────────────────────────────────── */
+.contract-review-footer {
+  position: sticky;
+  bottom: -24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 -24px -24px;
+  padding: 14px 24px;
+  background: #FBF8F3;
+  border-top: 0.5px solid var(--border);
+}
+
+.contract-review-helper-note {
+  font-size: 10px;
+  color: #8A7A6C;
+  margin: 0;
+}
+
+.contract-review-footer-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .contract-activity-stack {
@@ -36,7 +316,7 @@
   display: block;
   margin-top: 8px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-2);
   line-height: 1.45;
 }
 
@@ -53,5 +333,23 @@
 @media (max-width: 900px) {
   .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* .modal-card's own padding drops to 20px at this breakpoint
+   (admin_reservations.css) — match it so the sticky header/footer's
+   edge-to-edge negative margins stay flush with the card's rounded
+   corners instead of overshooting by 4px. */
+@media (max-width: 720px) {
+  .contract-review-header {
+    top: -20px;
+    margin: -20px -20px 0;
+    padding: 20px 20px 16px;
+  }
+
+  .contract-review-footer {
+    bottom: -20px;
+    margin: 0 -20px -20px;
+    padding: 14px 20px;
   }
 }

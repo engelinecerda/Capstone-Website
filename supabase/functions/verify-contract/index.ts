@@ -36,10 +36,13 @@ const SIGNATURE_LABELS = new Set([
   'note',
 ]);
 
+type VisionVertex = { x?: number; y?: number };
+
 type VisionBlock = {
   blockType?: string;
   confidence?: number;
   paragraphs?: VisionParagraph[];
+  boundingBox?: { vertices?: VisionVertex[] };
 };
 
 type VisionParagraph = {
@@ -84,6 +87,30 @@ function toImageUrl(contractUrl: string, page = 1): string {
       .replace(/\.pdf$/i, '.jpg');
   }
   return contractUrl;
+}
+
+/**
+ * True if a text block's bounding box is meaningfully tilted rather than
+ * axis-aligned. Contract pages are rendered programmatically (buildContractPdf
+ * → Cloudinary image conversion), so every printed line is a perfectly
+ * horizontal rectangle — Vision confirms this empirically (0.0°–0.3° on real
+ * contracts). A handwritten/cursive signature stroke is the one thing that
+ * produces a rotated OCR block, since Vision still tries to box it as "text"
+ * but follows the ink's natural slant. This is a much more reliable signal
+ * than OCR confidence, which can land on either side of a threshold by
+ * chance (a real signature was seen scoring 0.824, just above the old 0.80
+ * cutoff) and than LABEL_DETECTION, which is tuned for photographed scenes
+ * and never returns handwriting/signature labels for a document screenshot.
+ */
+function isSkewedBlock(vertices: VisionVertex[] | undefined): boolean {
+  if (!vertices || vertices.length < 2) return false;
+  const [p0, p1] = vertices;
+  const dx = (p1.x ?? 0) - (p0.x ?? 0);
+  const dy = (p1.y ?? 0) - (p0.y ?? 0);
+  if (dx === 0 && dy === 0) return false;
+  const angleDeg = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI);
+  const deviationFromHorizontal = Math.min(angleDeg, Math.abs(180 - angleDeg));
+  return deviationFromHorizontal > 5;
 }
 
 /**
@@ -167,8 +194,15 @@ async function detectSignature(
   );
   const hasLowConfidenceWord = lowConfidenceWords.length > 0;
 
-  const signed = hasSignatureLabel || hasLowConfidenceBlock || hasLowConfidenceWord;
-  const confidence: 'high' | 'medium' | 'none' = hasSignatureLabel
+  // A block whose blockType is TEXT but whose box is rotated — see
+  // isSkewedBlock() for why this is the most reliable of the four signals.
+  const skewedBlocks = blocks.filter(
+    (b) => b.blockType === 'TEXT' && isSkewedBlock(b.boundingBox?.vertices),
+  );
+  const hasSkewedBlock = skewedBlocks.length > 0;
+
+  const signed = hasSignatureLabel || hasLowConfidenceBlock || hasLowConfidenceWord || hasSkewedBlock;
+  const confidence: 'high' | 'medium' | 'none' = (hasSignatureLabel || hasSkewedBlock)
     ? 'high'
     : (hasLowConfidenceBlock || hasLowConfidenceWord)
     ? 'medium'
@@ -181,6 +215,8 @@ async function detectSignature(
     hasLowConfidenceBlock,
     hasLowConfidenceWord,
     hasSignatureLabel,
+    hasSkewedBlock,
+    skewedBlockCount: skewedBlocks.length,
   };
 
   return { signed, confidence, detectedLabels: detectedLabels.slice(0, 15), debugInfo };
@@ -229,6 +265,23 @@ Deno.serve(async (req: Request) => {
     console.log('verify-contract detection result', { reservation_id, signed, confidence, detectedLabels });
 
     if (!signed) {
+      // Persist the negative result — this trigger fires via pg_net's
+      // fire-and-forget http_post, so nothing else ever reads this
+      // response. Without writing it back, review_notes stays empty and
+      // the admin UI's regex-based state (js/admin_reservation_details.js's
+      // renderSignatureCheckPanel) defaults to "not yet scanned" forever,
+      // indistinguishable from a scan that never ran at all. review_status
+      // stays 'pending_review' — this is not a rejection, just an
+      // inconclusive automatic check; a Manager can still verify manually.
+      await supabase
+        .from('reservation_contracts')
+        .update({
+          reviewed_at: new Date().toISOString(),
+          review_notes: `Automatic scan: signature not detected (confidence: ${confidence}). Open the contract to check manually.`,
+        })
+        .eq('reservation_id', reservation_id)
+        .not('contract_url', 'is', null);
+
       return jsonResponse({
         verified: false,
         reason: 'No handwritten signature detected in the uploaded contract.',
@@ -270,6 +323,25 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     console.error('verify-contract error', { reservation_id, error: String(err) });
+
+    // Same reasoning as the !signed branch above — without this, a Vision
+    // API failure (bad image URL, quota, network) leaves review_notes empty
+    // and the contract stuck reading "not yet scanned" forever, with no
+    // trail explaining why the scan never resolved. Best-effort: if this
+    // write itself fails, the error response below still goes out.
+    if (reservation_id) {
+      try {
+        await supabase
+          .from('reservation_contracts')
+          .update({
+            reviewed_at: new Date().toISOString(),
+            review_notes: `Automatic scan could not complete (${String((err as Error).message)}). Signature not detected automatically — open the contract to check manually.`,
+          })
+          .eq('reservation_id', reservation_id)
+          .not('contract_url', 'is', null);
+      } catch { /* best-effort only, the 500 response below still reports the real error */ }
+    }
+
     return jsonResponse({ verified: false, error: String((err as Error).message) }, 500);
   }
 });

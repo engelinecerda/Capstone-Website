@@ -62,8 +62,17 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+// Matches how currency reads elsewhere in the admin portal: no ".00" tacked
+// onto whole amounts ("₱16,999", not "₱16,999.00"), but exactly two
+// decimal places — rounded, not truncated — whenever there are cents
+// ("₱8,798.90", not "₱8,798.9").
 function formatCurrency(value) {
-    return `PHP ${Number(value || 0).toLocaleString()}`;
+    const amount = Number(value || 0);
+    const hasCents = Math.round(amount * 100) % 100 !== 0;
+    return `₱${amount.toLocaleString('en-PH', {
+        minimumFractionDigits: hasCents ? 2 : 0,
+        maximumFractionDigits: 2
+    })}`;
 }
 
 function formatDate(value) {
@@ -77,6 +86,12 @@ function formatDate(value) {
     });
 }
 
+// Kept exactly as before (including its "short legacy set only" label
+// gaps — falls through to a raw capitalize-first-letter fallback for
+// anything else, e.g. "Pending_review") for the one remaining caller:
+// buildReservationsSheet's Excel export, which this task explicitly
+// leaves untouched. The reservation table below uses getStatusPillMeta
+// instead — see that function for why.
 function formatStatusLabel(status) {
     const normalized = String(status || 'pending').toLowerCase();
     const labels = {
@@ -88,6 +103,34 @@ function formatStatusLabel(status) {
         rescheduled: 'Rescheduled'
     };
     return labels[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+// getEffectiveReservationStatus() (reservation_status.js) normalizes into
+// the newer granular vocabulary (e.g. 'pending_review', 'confirmed'), not
+// just the short legacy set formatStatusLabel above knows about — this is
+// what the reservation table (not the export) uses instead, so the table
+// doesn't show "Pending_review". The returned key is used as-is
+// (underscore intact) as the .status-pill class — every value
+// getEffectiveReservationStatus can return already has a matching rule in
+// manager-theme.css (.status-pill.pending_review, .confirmed, etc.) — only
+// the label is cleaned up for display.
+function getStatusPillMeta(status) {
+    const key = String(status || 'pending_review').toLowerCase();
+    const spaced = key.replace(/_/g, ' ');
+    const label = spaced.charAt(0).toUpperCase() + spaced.slice(1);
+    return { key, label };
+}
+
+// Cleans up a raw underscored enum value (e.g. location_type: 'onsite',
+// package_type: 'full_package') into sentence case for display — same
+// underscore-to-space-plus-capitalize treatment as getStatusPillMeta's
+// label, kept separate since these aren't status values and don't need a
+// pill class.
+function formatEnumLabel(value) {
+    if (!value) return '';
+    const spaced = String(value).toLowerCase().replace(/_/g, ' ').trim();
+    if (!spaced) return '';
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function setReportsMessage(message, isError = false) {
@@ -194,27 +237,29 @@ function renderTable(reservations) {
     }
 
     reportsTableBody.innerHTML = reservations.map((reservation) => {
-        const status = getEffectiveReservationStatus(reservation);
+        const status = getStatusPillMeta(getEffectiveReservationStatus(reservation));
+        const locationLabel = formatEnumLabel(reservation?.location_type) || 'Location not set';
+        const packageTypeLabel = formatEnumLabel(reservation?.package?.package_type) || 'Package';
         return `
             <tr>
                 <td>
-                    <strong>${escapeHtml(getCustomerName(reservation))}</strong>
-                    <span>${escapeHtml(getCustomerEmail(reservation))}</span>
+                    <span class="table-main">${escapeHtml(getCustomerName(reservation))}</span>
+                    <span class="table-sub">${escapeHtml(getCustomerEmail(reservation))}</span>
                 </td>
                 <td>
-                    <strong>${escapeHtml(reservation?.event_type || 'Reservation')}</strong>
-                    <span>${escapeHtml(reservation?.location_type || 'Location not set')}</span>
+                    <span class="table-main">${escapeHtml(reservation?.event_type || 'Reservation')}</span>
+                    <span class="table-sub">${escapeHtml(locationLabel)}</span>
                 </td>
                 <td>
-                    <strong>${escapeHtml(formatDate(reservation?.event_date))}</strong>
-                    <span>${escapeHtml(reservation?.event_time || 'No time selected')}</span>
+                    <span class="table-main date-cell">${escapeHtml(formatDate(reservation?.event_date))}</span>
+                    <span class="table-sub">${escapeHtml(reservation?.event_time || 'No time selected')}</span>
                 </td>
                 <td>
-                    <strong>${escapeHtml(getPackageName(reservation))}</strong>
-                    <span>${escapeHtml(reservation?.package?.package_type || 'Package')}</span>
+                    <span class="table-main">${escapeHtml(getPackageName(reservation))}</span>
+                    <span class="table-sub">${escapeHtml(packageTypeLabel)}</span>
                 </td>
-                <td><span class="reports-status-chip ${escapeHtml(status)}">${escapeHtml(formatStatusLabel(status))}</span></td>
-                <td><strong>${escapeHtml(formatCurrency(reservation?.total_price || 0))}</strong></td>
+                <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+                <td><span class="table-main">${escapeHtml(formatCurrency(reservation?.total_price || 0))}</span></td>
             </tr>
         `;
     }).join('');

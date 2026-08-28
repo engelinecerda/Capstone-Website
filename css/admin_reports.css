@@ -118,6 +118,21 @@
   gap: 16px;
 }
 
+.reports-table-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.reports-table-head .refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .reports-table-wrap {
   overflow-x: auto;
 }
@@ -145,19 +160,10 @@
   border-bottom: 0.5px solid var(--border);
 }
 
-.reports-table td strong {
-  display: block;
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.reports-table td span {
-  display: block;
-  margin-top: 3px;
-  font-size: 11.5px;
-  color: var(--muted-2, var(--muted));
-}
+/* Row typography now comes from the shared .table-main/.table-sub/
+   .date-cell classes (manager-theme.css, loaded on this page) — the same
+   ones the Reviews module uses — instead of a local <strong>/<span>-based
+   copy of the same values, so the two modules can't drift apart again. */
 
 .reports-empty {
   padding: 30px 0;
@@ -181,6 +187,15 @@
 
   .reports-header-actions {
     width: 100%;
+  }
+
+  .reports-table-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reports-table-head .refresh-btn {
+    justify-content: center;
   }
 
   .reports-summary-grid {

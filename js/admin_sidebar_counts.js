@@ -1,5 +1,3 @@
-import { initAdminNotificationBell } from './notifications.js';
-
 function isMissingContractColumn(error, columnName) {
   const message = error?.message || '';
   return message.includes(`Could not find the '${columnName}' column`)
@@ -199,13 +197,6 @@ export function initAdminSidebarBadges(supabase) {
   // Refresh when tab regains focus
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refresh();
-  });
-
-  // Notification bell — runs alongside sidebar badge counts
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    if (session?.user) {
-      initAdminNotificationBell(supabase, session.user.id);
-    }
   });
 
   injectSidebarHamburger();

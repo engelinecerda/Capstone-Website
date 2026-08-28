@@ -1,10 +1,10 @@
 // admin_notifications.js — Manager/Admin full notification history page.
 // UI replacement of the old first-version page only — same notifications
-// table/RLS the sidebar bell already reads (js/notifications.js's
-// initAdminNotificationBell), same channel='in_app' scoping, no new
-// endpoints. Layout mirrors js/customer_notifications_page.js (dot/title/
-// preview/time rows, tab filter, mark-all, client-side pagination) but
-// wired to the Manager session/nav/sidebar-badge system instead.
+// table/RLS the header bell already reads (js/manager_notification_bell.js),
+// same channel='in_app' scoping, no new endpoints. Layout mirrors
+// js/customer_notifications_page.js (dot/title/preview/time rows, tab
+// filter, mark-all, client-side pagination) but wired to the Manager
+// session/nav/sidebar-badge system instead.
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';

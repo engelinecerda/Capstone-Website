@@ -17,17 +17,15 @@
 
 .payments-table th {
   font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 500;
   color: var(--muted);
   padding-top: 0;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
 }
 
 .payments-table tbody td {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid #EFE8DD;
 }
 
 .payments-table tbody td:first-child {
@@ -52,7 +50,9 @@
 .payment-cell-main {
   display: block;
   font-size: 13px;
-  font-weight: 700;
+  /* 400, not 500 — matches Customers' .table-main exactly (see the same
+     note on .table-main in css/admin_reservations.css). */
+  font-weight: 400;
   color: var(--text);
   word-break: break-word;
 }
@@ -61,7 +61,7 @@
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-2);
   word-break: break-word;
 }
 
@@ -90,9 +90,13 @@
   font-size: 11px;
 }
 
+/* The default (no status yet) state reads as muted secondary text, same
+   as .payment-cell-sub — the .pending/.unpaid/.approved variants below
+   still get their own status color (functioning like an inline pill,
+   which this task explicitly leaves alone), just no longer bold. */
 .payment-balance-amount {
-  font-weight: 500;
-  color: var(--text);
+  font-weight: 400;
+  color: var(--muted-2);
 }
 
 .payment-balance-due {
@@ -108,10 +112,6 @@
 .payment-status-stack {
   display: grid;
   gap: 6px;
-}
-
-.payment-mode-stack.compact .payment-cell-main {
-  font-weight: 600;
 }
 
 .payment-amount-cell .payment-cell-main {
@@ -196,52 +196,72 @@
 }
 
 .payment-review-pane-head h3 {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #8a6a4f;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
 }
 
-.payment-review-summary {
-  display: grid;
+/* ── Definition-list rows — local copy of the same .dl-row pattern used
+   on the reservation-details page and the redesigned contract review
+   modal (see css/admin_reservation_details.css / css/admin_contracts.css
+   for the source; not shared cross-file for the same reason those two
+   don't share it either). options.sub in the JS dlRow() helper renders a
+   second muted line via .dl-value-stack, for two-line facts like
+   "package name" + "event date". ── */
+.dl-rows {
+  display: flex;
+  flex-direction: column;
 }
 
-.review-summary-item {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid #FBF8F3;
+.dl-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--border);
 }
 
-.review-summary-item:first-child {
-  border-top: none;
+.dl-row:first-child {
   padding-top: 0;
 }
 
-.review-summary-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #7f6d5e;
+.dl-row:last-child {
+  border-bottom: none;
 }
 
-.review-summary-copy {
-  min-width: 0;
+.dl-label {
+  font-size: 11px;
+  color: #7A6A5C;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+  padding-top: 1px;
 }
 
-.review-summary-value {
-  font-size: 14px;
-  font-weight: 700;
+.dl-value {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text);
-  line-height: 1.45;
+  text-align: right;
 }
 
-.review-summary-sub {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.45;
+.dl-value-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.dl-value-main {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.dl-value-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8A7A6C;
 }
 
 .details-grid {
@@ -362,6 +382,80 @@
   width: min(100%, 1080px);
 }
 
+/* Separate width class from .payment-modal-card (shared with the Receipt
+   and Record Payment modals — not touched) since this modal's new layout
+   is narrower: an amount-comparison strip plus a two-column body, not the
+   old wide 15-row-vs-proof-image split. */
+.payment-review-modal {
+  width: min(100%, 920px);
+}
+
+/* ── Amount comparison strip (top of modal) ─────────────────────────
+   Reuses .stat-card/.stat-label/.stat-value (manager-theme.css) — the
+   same white/0.5px-border/10px-radius card used for KPIs everywhere else
+   — in a 3-column row instead of .stat-row's default 4. */
+.payment-review-amount-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 10px;
+}
+
+.payment-review-amount-row .stat-value {
+  font-size: 19px;
+}
+
+.payment-review-amount-row .stat-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.stat-value-muted {
+  color: #8A7A6C;
+  font-weight: 400;
+  font-size: 15px !important;
+}
+
+.stat-card.mismatch {
+  border-color: var(--declined-border, #F3C9C9);
+}
+
+.stat-card.mismatch .stat-value {
+  color: var(--declined-text, #A32D2D);
+}
+
+.payment-review-mismatch-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--declined, #FCEBEB);
+  border: 0.5px solid var(--declined-border, #F3C9C9);
+  color: var(--declined-text, #A32D2D);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.payment-review-mismatch-banner svg {
+  flex-shrink: 0;
+}
+
+.payment-review-match-note,
+.payment-review-amount-note {
+  margin-bottom: 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.status-pill.overdue {
+  background: var(--declined, #FCEBEB);
+  color: var(--declined-text, #A32D2D);
+}
+
 .review-modal-actions {
   margin-top: 18px;
   justify-content: flex-end;
@@ -377,14 +471,17 @@
   min-height: 56px;
 }
 
-.modal-btn-danger {
-  background: #dc4c3f;
-  color: #fff;
+/* Bordered destructive — not a filled red — for Reject payment /
+   Confirm rejection. Approve payment reuses the existing
+   .modal-btn-primary (already #3D1A0A) unchanged. */
+.modal-btn-outline-danger {
+  background: transparent;
+  border: 0.5px solid #E9C9C9;
+  color: #A32D2D;
 }
 
-.modal-btn-success {
-  background: #3f9348;
-  color: #fff;
+.modal-btn-outline-danger:hover {
+  background: #FCEBEB;
 }
 
 .proof-link-btn {
@@ -489,13 +586,20 @@
 
 @media (max-width: 900px) {
   .payment-review-layout,
-  .details-grid {
+  .details-grid,
+  .payment-review-amount-row {
     grid-template-columns: 1fr;
   }
 
-  .review-summary-item {
-    grid-template-columns: 1fr;
-    gap: 6px;
+  .dl-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dl-value,
+  .dl-value-stack {
+    text-align: left;
+    align-items: flex-start;
   }
 
   .proof-preview-stage {
@@ -525,39 +629,36 @@
 .ocr-panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
-  gap: 10px;
+}
+
+.ocr-panel-icon {
+  display: inline-flex;
+  color: #8a7060;
+  flex-shrink: 0;
 }
 
 .ocr-panel-title {
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 500;
   color: #5A2E16;
 }
-
-.ocr-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 99px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.ocr-badge-high   { background: #d1fae5; color: #065f46; }
-.ocr-badge-medium { background: #fef3c7; color: #92400e; }
-.ocr-badge-low    { background: #fee2e2; color: #991b1b; }
-.ocr-badge-failed { background: #fee2e2; color: #991b1b; }
-.ocr-badge-none   { background: #FBF8F3; color: #7d6b5b; }
 
 .ocr-panel-note {
   font-size: 12px;
   color: #8a7060;
   margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* The "verify against the image" reminder — deliberately the least
+   visually prominent line in the panel, since the numbers above it are
+   hints, not the point of emphasis. */
+.ocr-panel-warning {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #9b8878;
   line-height: 1.5;
 }
 

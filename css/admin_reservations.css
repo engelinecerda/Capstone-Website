@@ -13,6 +13,7 @@
   --line: #E8DFD3;
   --text: #1A1A1A;
   --muted: #7A6A5C;
+  --muted-2: #8A7A6C;
   --font: 'Inter', sans-serif;
   --shadow: 0 1px 2px rgba(42, 18, 8, 0.04);
   --pending: #FAEEDA;
@@ -160,73 +161,18 @@ body {
   margin-bottom: 16px;
 }
 
-.filters-bar,
+/* .filters-bar / .search-wrap / .search-icon / .filter-select-wrap /
+   .filters-bar select are now canonical in manager-theme.css so
+   Reservations, Payments, Contracts, and Customers all render the exact
+   same bordered search/toolbar row — see that file's "SEARCH / TOOLBAR
+   ROW" section. Do not redefine them here. */
+
 .refresh-panel-btn,
 .table-card,
 .calendar-card {
   background: var(--panel-bg);
   border: 1px solid var(--border);
   box-shadow: none;
-}
-
-.filters-bar {
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-}
-
-.search-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 2px;
-}
-
-.search-icon {
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.search-wrap input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  outline: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-}
-
-.filter-select-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 14px;
-  border-left: 1px solid var(--border);
-}
-
-.filter-icon {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.filters-bar select {
-  min-width: 168px;
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 10px;
-  padding: 9px 12px;
-  font: inherit;
-  font-weight: 600;
-  color: var(--text);
 }
 
 .refresh-panel-btn {
@@ -428,7 +374,13 @@ body {
 .table-main {
   display: block;
   font-size: 13px;
-  font-weight: 600;
+  /* 400, not 500 — matches the Customers module's .table-main exactly
+     (it has no local weight override anywhere, so it renders at the
+     browser default/inherited 400). This file's copy previously set 500,
+     which read as visibly heavier next to Customers when placed side by
+     side — see the Reservations/Payments/Contracts typography
+     standardization task. */
+  font-weight: 400;
   color: var(--text);
   word-break: break-word;
 }
@@ -437,22 +389,22 @@ body {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-2);
   word-break: break-word;
 }
 
 .table-meta {
   margin-top: 4px;
   font-size: 12px;
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--muted-2);
+  font-weight: 400;
   word-break: break-word;
 }
 
 .table-reservation-number {
   display: block;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.02em;
   color: var(--primary, #3D1A0A);
   word-break: break-word;
@@ -470,15 +422,16 @@ body {
 
 .table-date-main {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--text);
   word-break: break-word;
+  white-space: nowrap;
 }
 
 .table-date-time {
   font-size: 12px;
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--muted-2);
+  font-weight: 400;
   word-break: break-word;
 }
 
@@ -581,6 +534,40 @@ body {
 
 .signature-check-panel.state-not-scanned .signature-check-icon {
   color: #8A7A6C;
+}
+
+/* Manual override — shown only when the automatic scan hasn't confirmed a
+   signature, so a Manager isn't permanently blocked from approving after
+   visually checking the PDF themselves. */
+.signature-manual-verify-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--active-bg, #4A2C17);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--active-bg, #4A2C17);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.signature-manual-verify-btn:hover:not(:disabled) {
+  background: var(--active-bg, #4A2C17);
+  color: #fff;
+}
+
+.signature-manual-verify-btn:focus-visible {
+  outline: 2px solid var(--active-bg, #4A2C17);
+  outline-offset: 2px;
+}
+
+.signature-manual-verify-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 
 .soft-pill {

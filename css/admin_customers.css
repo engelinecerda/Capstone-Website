@@ -66,55 +66,22 @@ body {
   margin-bottom: 16px;
 }
 
-.stat-card,
 .card,
-.search-panel,
 .refresh-btn {
   background: var(--panel-bg);
   border: 0.5px solid var(--border);
 }
 
-.stat-sub {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 4px;
-  line-height: 1.5;
-}
+/* .stat-card/.stat-sub and .filters-bar/.search-wrap/.search-icon are
+   canonical in manager-theme.css (loaded on this page) — not redefined
+   here, so the KPI cards and search row render identically to Payments,
+   Contracts, and Reservations instead of drifting on their own colors. */
 
 .toolbar-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
   margin-bottom: 16px;
-}
-
-.search-panel {
-  border-radius: 8px;
-  padding: 0 12px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #FBF8F3;
-  border-color: #E2D8CB;
-}
-
-.search-icon {
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.search-panel input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  outline: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
 }
 
 .table-head {

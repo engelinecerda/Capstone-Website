@@ -388,6 +388,7 @@
 .modal-overlay.hidden { display: none; }
 
 .modal {
+  position: relative;
   background: var(--card-bg);
   border-radius: 14px;
   border: 0.5px solid var(--border);
@@ -572,7 +573,20 @@
 }
 .image-preview.hidden { display: none; }
 
-.file-input-hidden { position: absolute; opacity: 0; pointer-events: none; }
+/* Pinned to the modal's own top-left (not "auto") and shrunk to 1px so that
+   when the browser returns focus here after the native file picker closes,
+   any scroll-into-view it performs stays inside the visible modal instead of
+   jumping to the top of the full-page .modal-overlay scroll container. */
+.file-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
 
 .choose-file-btn {
   display: inline-flex;
