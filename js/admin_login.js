@@ -101,7 +101,11 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         return;
     }
 
-    supabase.rpc('clear_my_login_failures').catch(() => {});
+    try {
+        await supabase.rpc('clear_my_login_failures');
+    } catch (_) {
+        // best-effort only, never block login on this
+    }
 
     // CHECK STATUS
     const { data: profileCheck, error: lockError } = await supabase
