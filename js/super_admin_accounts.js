@@ -691,6 +691,10 @@ function openBoardResetConfirm(a) {
       return;
     }
 
+    // Never include the password itself here — audit trail records that the
+    // shared credential was rotated and by whom, not what it was rotated to.
+    await logAudit({ action: 'Reset Board Password', category: 'accounts', details: `Shared board account password was reset (${displayName(a)})`, entityId: a.user_id });
+
     msg.className = 'modal-message success';
     msg.textContent = `New password: ${data.password} — copy this now, it will not be shown again.`;
   };
