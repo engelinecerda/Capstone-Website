@@ -335,7 +335,7 @@ document.getElementById('addAccountBtn').addEventListener('click', () => {
 
 function openAddModal() {
   document.getElementById('accountModalTitle').textContent = 'Invite User';
-  document.getElementById('accountModalSub').textContent   = 'Create a new Manager portal account';
+  document.getElementById('accountModalSub').textContent   = 'Create a new Manager account';
   document.getElementById('accountModalTabs').style.display = 'none';
   document.getElementById('addModeExtra').style.display     = 'block';
   document.getElementById('tab-info').classList.add('active');
@@ -530,10 +530,10 @@ async function handleUpdateAccount(a) {
 
 // ── ROLE CHANGE CONFIRMATION ────────────────────────────────────────
 function openRoleChangeConfirm(a, fields) {
-  document.getElementById('confirmTitle').textContent = 'Change Portal Role';
+  document.getElementById('confirmTitle').textContent = 'Change Role';
   document.getElementById('confirmSub').textContent   = displayName(a);
   document.getElementById('confirmBody').textContent  =
-    `This changes ${displayName(a)}'s portal role from ${formatRoleLabel(a.role)} to ${formatRoleLabel(fields.role)}.`;
+    `This changes ${displayName(a)}'s role from ${formatRoleLabel(a.role)} to ${formatRoleLabel(fields.role)}.`;
   document.getElementById('confirmOk').onclick = async () => {
     closeConfirmModal();
     await saveAccountUpdate(a, fields);
@@ -630,7 +630,7 @@ function openLockConfirm(a) {
   document.getElementById('confirmTitle').textContent = isLocked ? 'Reactivate Account' : 'Deactivate Account';
   document.getElementById('confirmSub').textContent   = displayName(a);
   document.getElementById('confirmBody').textContent  = isLocked
-    ? `This will restore portal access for ${displayName(a)}.`
+    ? `This will restore access for ${displayName(a)}.`
     : `This will prevent ${displayName(a)} from signing in until reactivated. Their history stays intact.`;
   document.getElementById('confirmOk').onclick = async () => {
     const newLocked = !isLocked;
