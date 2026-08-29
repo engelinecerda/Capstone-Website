@@ -52,6 +52,7 @@ import {
     computeCanCancel
 } from './reservation_shared.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const PAYMENT_METHODS = {
     card: {
@@ -2007,8 +2008,8 @@ async function fetchReviews(reservationIds) {
     }, {});
 }
 
-async function loadReservations() {
-    if (reservationsList) {
+async function loadReservations({ silent = false } = {}) {
+    if (!silent && reservationsList) {
         reservationsList.innerHTML = '<p style="color:#888;text-align:center;padding:40px 0;">Loading...</p>';
     }
 
@@ -2086,12 +2087,18 @@ async function loadReservations() {
         state.receiptsByPaymentId = await fetchSharedReceipts(supabase, paymentIds);
         renderReservations();
         renderPaymentsModule();
-        maybeAutoOpenReservationModal();
+        if (!silent) {
+            maybeAutoOpenReservationModal();
+        }
         if (!state.reviewPromptEvaluated) {
             state.reviewPromptEvaluated = true;
             openEligibleReviewPrompt();
         }
     } catch (error) {
+        if (silent) {
+            console.error('[account] silent auto-refresh of reservations failed:', error);
+            return;
+        }
         if (reservationsList) {
             const reviewFeatureMessage = getReviewFeatureErrorMessage(error);
             reservationsList.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations: ${escapeHtml(reviewFeatureMessage)}.</p>`;
@@ -3313,3 +3320,5 @@ await Promise.all([
     loadProfile(),
     loadReservations()
 ]);
+
+initAutoRefresh(() => loadReservations({ silent: true }));

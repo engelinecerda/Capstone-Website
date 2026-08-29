@@ -28,6 +28,7 @@ import {
     getCancellationFee
 } from './reservation_shared.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -779,6 +780,18 @@ submissionFeedbackBackdrop?.addEventListener('click', (event) => {
 });
 
 init();
+
+initAutoRefresh(async () => {
+    try {
+        await loadPageData();
+        render();
+    } catch (error) {
+        // A background refresh failure shouldn't blow away a page the
+        // customer is already looking at with an error screen — just log
+        // it and leave the last-good render in place.
+        console.error('[reservation_details] silent auto-refresh failed:', error);
+    }
+});
 
 supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
