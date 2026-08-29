@@ -1,4 +1,7 @@
 import { portalSupabase as supabase } from './supabase.js';
+import { initPasswordToggles } from './password_toggle.js';
+
+initPasswordToggles();
 
 const form = document.getElementById('portal-reset-password-form');
 const message = document.getElementById('portal-reset-password-msg');

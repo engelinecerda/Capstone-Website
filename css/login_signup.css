@@ -314,29 +314,13 @@
 }
 
 /* ================================================
-   Options Row (Remember me + Forgot password)
+   Options Row (Forgot password)
 ================================================ */
 .options {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     margin-bottom: 28px;
-}
-
-.options label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-mid, #5A3420);
-    cursor: pointer;
-}
-
-.options input[type="checkbox"] {
-    width: auto;
-    margin: 0;
-    accent-color: var(--brown-primary, #3D1A0A);
-    cursor: pointer;
 }
 
 .forgot {
