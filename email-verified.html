@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verified — ELI Coffee Events Cafe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/home.css" />
+    <link rel="stylesheet" href="/css/email_verified.css" />
+    <style>.hidden { display: none !important; }</style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="navbar__container">
+            <a href="/index.html" id="navbar__logo">
+                <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
+            </a>
+            <div class="navbar__toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <div class="navbar__topbar-right" id="navTopbarRight"></div>
+            <ul class="navbar__menu">
+                <li class="nav-drawer-header">
+                    <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
+                    <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">
+                        <i class="ti ti-x"></i>
+                    </button>
+                </li>
+                <li class="navbar__item"><a href="/index.html"        class="navbar__links">Home</a></li>
+                <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
+                <li class="navbar__item"><a href="/packages.html"     class="navbar__links">Packages</a></li>
+                <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+                <li class="navbar__item"><a href="/reviews.html"      class="navbar__links">Reviews</a></li>
+                <li class="navbar__item"><a href="/faqs.html"         class="navbar__links">FAQs</a></li>
+                <li class="navbar__item"><a href="/about.html"        class="navbar__links">About</a></li>
+                <li class="navbar__btn"></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="nav-overlay" id="nav-drawer-overlay"></div>
+
+    <main class="ev-page">
+        <div class="ev-card">
+
+            <!-- SUCCESS STATE -->
+            <div class="ev-state hidden" id="ev-state-success">
+                <div class="ev-icon-circle ev-icon-circle--success" aria-hidden="true">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <h1 class="ev-heading">Email verified</h1>
+                <p class="ev-body">Your email has been verified. You can now log in to your account.</p>
+                <a href="/login.html" class="ev-btn-primary">Go to login</a>
+                <div class="ev-close-tab-row hidden" id="ev-close-tab-row">
+                    <button type="button" class="ev-btn-text" id="ev-close-tab-btn">Close this tab</button>
+                </div>
+            </div>
+
+            <!-- FAILURE / EXPIRED STATE -->
+            <div class="ev-state hidden" id="ev-state-failure">
+                <div class="ev-icon-circle ev-icon-circle--failure" aria-hidden="true">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <h1 class="ev-heading" id="ev-failure-heading">Verification failed</h1>
+                <p class="ev-body" id="ev-failure-body">We couldn't verify your email with this link. It may have already been used, or it's invalid.</p>
+                <a href="/signup.html" class="ev-btn-primary">Resend verification email</a>
+                <div class="ev-secondary-row">
+                    <a href="/login.html" class="ev-btn-outline">Back to login</a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="/js/app.js"></script>
+    <script type="module" src="/js/email_verified.js"></script>
+    <script type="module" src="/js/navbar.js"></script>
+
+</body>
+</html>

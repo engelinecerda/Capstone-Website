@@ -57,7 +57,7 @@ form.addEventListener('submit', async function (e) {
 
     setLoading(true);
 
-    const emailRedirectTo = new URL('/login.html', window.location.href).href;
+    const emailRedirectTo = new URL('/email-verified', window.location.href).href;
 
     const { data, error } = await supabase.auth.signUp({
         email,

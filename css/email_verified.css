@@ -1,0 +1,189 @@
+/* email_verified.css — post-signup-verification landing page */
+
+:root {
+    --acc-espresso:      #4A2C17;
+    --acc-espresso-dark: #3A2110;
+    --acc-cream:         #FAF6F0;
+    --acc-cream-alt:     #FFFDFA;
+    --acc-border-tan:    #E5DBCC;
+    --acc-text:          #3E2418;
+    --acc-text-muted:    #8A7965;
+    --acc-terracotta:    #A34F2E;
+    --ev-green-bg:       #E1F5EE;
+    --ev-green-icon:     #085041;
+    --ev-red-bg:         #FCEBEB;
+    --ev-red-icon:       #791F1F;
+}
+
+.ev-page {
+    min-height: calc(100vh - 90px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--acc-cream);
+    padding: 48px 20px;
+    box-sizing: border-box;
+}
+
+.ev-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--acc-cream-alt);
+    border: 0.5px solid var(--acc-border-tan);
+    border-radius: 12px;
+    box-shadow: 0 10px 32px rgba(74, 44, 23, 0.08);
+    padding: 44px 36px 40px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.ev-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ev-icon-circle {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+.ev-icon-circle--success {
+    background: var(--ev-green-bg);
+    color: var(--ev-green-icon);
+}
+
+.ev-icon-circle--failure {
+    background: var(--ev-red-bg);
+    color: var(--ev-red-icon);
+}
+
+.ev-heading {
+    font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+    font-weight: 500;
+    font-size: 28px;
+    color: var(--acc-text);
+    margin: 0 0 10px;
+}
+
+.ev-body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--acc-text-muted);
+    margin: 0 0 28px;
+    max-width: 360px;
+}
+
+.ev-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 24px;
+    box-sizing: border-box;
+    background: var(--acc-espresso);
+    color: var(--acc-cream-alt);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.18s ease;
+}
+
+.ev-btn-primary:hover {
+    background: var(--acc-espresso-dark);
+}
+
+.ev-btn-primary:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 2px;
+}
+
+.ev-close-tab-row {
+    margin-top: 16px;
+}
+
+.ev-btn-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--acc-terracotta);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.ev-btn-text:hover {
+    color: var(--acc-espresso);
+}
+
+.ev-btn-text:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.ev-secondary-row {
+    margin-top: 14px;
+    width: 100%;
+}
+
+.ev-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 24px;
+    box-sizing: border-box;
+    background: transparent;
+    color: var(--acc-espresso);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--acc-border-tan);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.ev-btn-outline:hover {
+    border-color: var(--acc-espresso);
+    background: var(--acc-cream);
+}
+
+.ev-btn-outline:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    .ev-card {
+        padding: 36px 24px 32px;
+    }
+
+    .ev-heading {
+        font-size: 24px;
+    }
+}
