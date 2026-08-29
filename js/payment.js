@@ -376,6 +376,29 @@ function renderPaymentMethodButtons(reservation) {
     }).join('');
 }
 
+// Custom amount used to be <input type="number">, which lets mouse-wheel
+// scroll and ArrowUp/ArrowDown silently increment/decrement the value while
+// focused (the browser's native spinner behavior) — the single most common
+// cause of a typed value coming out wrong with no visible error. Switched to
+// a plain text input (see renderCustomAmountPanel) with this function doing
+// the actual digit filtering by hand: strip anything that isn't a digit or
+// a decimal point, collapse to at most one decimal point, and cap to 2
+// decimal places. No comma/peso formatting here — that stays display-only
+// (formatCurrency), never applied to the value the user is actively typing
+// into or the one stored in state.
+function sanitizeAmountInput(raw) {
+    let cleaned = String(raw || '').replace(/[^\d.]/g, '');
+
+    const firstDot = cleaned.indexOf('.');
+    if (firstDot !== -1) {
+        cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+        const [intPart, decPart] = cleaned.split('.');
+        cleaned = `${intPart}.${decPart.slice(0, 2)}`;
+    }
+
+    return cleaned;
+}
+
 function renderCustomAmountPanel(reservation, option) {
     if (!option || option.paymentType !== 'partial_payment') return '';
 
@@ -396,11 +419,9 @@ function renderCustomAmountPanel(reservation, option) {
             <label for="payment-custom-amount">Custom amount</label>
             <input
                 id="payment-custom-amount"
-                type="number"
-                min="${escapeHtml(option.minAmount)}"
-                max="${escapeHtml(option.maxAmount)}"
-                step="0.01"
+                type="text"
                 inputmode="decimal"
+                autocomplete="off"
                 placeholder="e.g. ${escapeHtml(option.minAmount)}"
                 data-field="customAmount"
                 value="${escapeHtml(raw)}"
@@ -1117,11 +1138,17 @@ paymentApp?.addEventListener('click', async (event) => {
 paymentApp?.addEventListener('input', (event) => {
     const field = event.target.dataset.field;
     if (!field || field === 'proofFile') return;
-    state.form[field] = event.target.value || '';
+
+    state.form[field] = field === 'customAmount'
+        ? sanitizeAmountInput(event.target.value)
+        : (event.target.value || '');
+
     if (field === 'customAmount') {
         renderReservationPaymentPage();
         // Re-focus + restore the caret so live-typing isn't interrupted by
         // the full re-render this state model relies on everywhere else.
+        // setSelectionRange throws on type="number" inputs (unsupported for
+        // that type) — this only works now that the field is type="text".
         const input = document.getElementById('payment-custom-amount');
         if (input) {
             input.focus();

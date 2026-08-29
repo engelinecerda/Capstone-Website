@@ -8,15 +8,20 @@ const CLOUDINARY_CONFIG = {
 };
 
 // Substring match against a method's free-text label, used only to derive
-// the legacy `payment.payment_method` mode string ('gcash'/'maya'/'bpi')
-// that validate_payment_submission() still checks reference-number formats
-// against, and that some admin display maps still key off. Methods that
-// don't match fall back to their DB `type` ('bank'/'ewallet'/'cash') — real
-// values, just not one of the three specially-formatted ones.
+// the legacy `payment.payment_method` mode string ('gcash'/'maya') that
+// validate_payment_submission() still checks reference-number formats
+// against, and that some admin display maps still key off. Bank transfer
+// is deliberately NOT matched here — it used to be ('bpi', matching the
+// row's old literal "BPI" label), which is exactly the bug this map used
+// to cause: a label match to one specific bank pinned the whole method to
+// that bank's reference-number format. It now falls through to the DB
+// `type` ('bank'), which is bank-agnostic by construction and stays
+// correct no matter what the row is labeled (Bank Transfer, Bank Deposit,
+// etc.) without another code change. 'ewallet'/'cash' fall through the
+// same way.
 const LEGACY_MODE_MATCH = [
     { match: 'gcash', key: 'gcash' },
     { match: 'maya',  key: 'maya' },
-    { match: 'bpi',   key: 'bpi' },
 ];
 
 function resolveLegacyModeKey(row) {
@@ -110,13 +115,22 @@ export const PAYMENT_STATUS_META = {
 
 // Reference-number format per remote method. These regexes MUST stay in
 // sync with validate_payment_submission() in
-// supabase/migrations/20260716_payment_overhaul.sql — that's the "one
-// client+server validation map" split across the two languages a browser
-// and Postgres actually share.
+// supabase/migrations/20260901_bank_transfer_generic_reference.sql (the
+// latest redefinition — originally 20260716_payment_overhaul.sql) —
+// that's the "one client+server validation map" split across the two
+// languages a browser and Postgres actually share.
+//
+// 'bank' (Bank Transfer) is intentionally generic, not tied to one bank's
+// numbering convention — the system has no way to know in advance which
+// bank a customer transferred from, so this only bounds it to "looks like
+// a real reference" (alphanumeric, optional hyphens, 6-30 characters),
+// wide enough to cover BPI's own old 10-13-character format as a subset.
+// GCash/Maya stay provider-specific since those are single-provider
+// methods with one knowable format.
 export const REFERENCE_NUMBER_PATTERNS = {
     gcash: { regex: /^\d{13}$/, hint: '13 digits', placeholder: 'e.g. 1234567890123' },
     maya: { regex: /^\d{12,13}$/, hint: '12–13 digits', placeholder: 'e.g. 123456789012' },
-    bpi: { regex: /^[A-Za-z0-9]{10,13}$/, hint: '10–13 letters/numbers', placeholder: 'e.g. AB1234567890' }
+    bank: { regex: /^[A-Za-z0-9-]{6,30}$/, hint: '6–30 letters, numbers, or hyphens', placeholder: 'e.g. TRX1234567890' }
 };
 
 export function validateReferenceNumber(method, value) {
