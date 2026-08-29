@@ -10,6 +10,7 @@ import {
 } from './reservation_availability.js';
 import { getPaymentStatusPillMeta } from './reservation_shared.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -840,30 +841,11 @@ function escapeHtml(str) {
   }[m]));
 }
 
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-  const now = Date.now();
-  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-  lastAutoRefreshAt = now;
-  loadData({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
 // Browsers can restore this page from the back-forward cache (e.g. the
 // Manager hits Back after acting on reservation-details.html) without
-// re-running any module code — pageshow with event.persisted is the only
-// reliable signal for that case, so it's handled separately from a normal
-// on-mount load.
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+// re-running any module code — pageshow with event.persisted (handled
+// inside initAutoRefresh) is the only reliable signal for that case.
+initAutoRefresh(() => loadData({ silent: true }));
 
 function applyStatusFilterFromUrl() {
   const requestedStatus = new URLSearchParams(window.location.search).get('status');

@@ -9,6 +9,7 @@ import {
     syncCompletedReservations
 } from './reservation_status.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -604,22 +605,4 @@ if (session) {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-    const now = Date.now();
-    if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-    lastAutoRefreshAt = now;
-    loadReports({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
-window.addEventListener('pageshow', (event) => {
-    if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+initAutoRefresh(() => loadReports({ silent: true }));
