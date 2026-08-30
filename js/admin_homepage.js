@@ -518,7 +518,24 @@ async function fetchReservations() {
         `)
         .order('created_at', { ascending: false });
     if (error) throw error;
-    return syncCompletedReservations({ supabase, reservations: data || [] });
+    const reservations = data || [];
+
+    const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
+    const { data: summaries } = reservationIds.length
+        ? await supabase
+            .from('reservation_payment_summary')
+            .select('reservation_id, outstanding_balance')
+            .in('reservation_id', reservationIds)
+        : { data: [] };
+    const balanceByReservationId = new Map(
+        (summaries || []).map((row) => [String(row.reservation_id), Number(row.outstanding_balance)])
+    );
+
+    return syncCompletedReservations({
+        supabase,
+        reservations,
+        getOutstandingBalance: (reservation) => balanceByReservationId.get(String(reservation?.reservation_id))
+    });
 }
 
 async function fetchContracts(reservationIds) {

@@ -156,14 +156,21 @@ function getReservationEventDateTime(reservation) {
   return eventDate;
 }
 
+// Completion requires the outstanding balance (from the module-level
+// paymentSummaryMap, same source paymentStatus() reads) to be confirmed
+// <= 0 — without a summary entry it never infers 'completed' on its own,
+// only reflects an already-persisted value. Event-passed-but-unpaid is
+// left entirely to the auto-cancel-overdue flow.
 function getEffectiveReservationStatus(reservation) {
   const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
   if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
     return normalizedStatus;
   }
 
+  const outstandingBalance = Number(paymentSummaryMap[reservation?.reservation_id]?.outstanding_balance);
+  const isPaidInFull = Number.isFinite(outstandingBalance) && outstandingBalance <= 0;
   const eventDateTime = getReservationEventDateTime(reservation);
-  if (eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
+  if (isPaidInFull && eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
     return 'completed';
   }
 

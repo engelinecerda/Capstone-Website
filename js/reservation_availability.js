@@ -280,8 +280,14 @@ export async function loadAdvanceNoticeRules(supabase) {
         }
 
         (eventTypeRows || []).forEach((row) => {
-            if (row?.name && Number.isFinite(Number(row.min_advance_days))) {
-                rules.eventTypeOverrides.set(row.name, Number(row.min_advance_days));
+            // row.min_advance_days is null for event types that inherit the
+            // site-wide default — Number(null) is 0 (not NaN), so a naive
+            // Number.isFinite(Number(x)) check was treating "no override" as
+            // an explicit 0-day override and silently erasing the notice
+            // window for every event type without one configured.
+            if (row?.name && row.min_advance_days !== null && row.min_advance_days !== undefined) {
+                const override = Number(row.min_advance_days);
+                if (Number.isFinite(override)) rules.eventTypeOverrides.set(row.name, override);
             }
         });
     } catch {

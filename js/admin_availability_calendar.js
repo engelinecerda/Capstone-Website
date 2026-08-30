@@ -92,26 +92,14 @@ function getReservationsForDate(dateIso) {
   return reservationsCache.filter((r) => formatDateKey(r.event_date) === dateIso);
 }
 
-function getReservationEventDateTime(reservation) {
-  const dateKey = formatDateKey(reservation?.event_date);
-  if (!dateKey) return null;
-  const eventDate = new Date(`${dateKey}T00:00:00`);
-  if (Number.isNaN(eventDate.getTime())) return null;
-  const timeValue = String(reservation?.event_time || '').trim();
-  const match = timeValue.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (match) {
-    eventDate.setHours(Number(match[1]), Number(match[2]), 0, 0);
-  }
-  return eventDate;
-}
-
+// This page doesn't fetch reservation_payment_summary, so it has no way
+// to confirm a reservation is paid in full — it no longer infers
+// 'completed' from the event date alone (that requires balance data, see
+// js/reservation_status.js). An already-persisted 'completed' status
+// still passes straight through above.
 function getEffectiveReservationStatus(reservation) {
   const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
   if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) return normalizedStatus;
-  const eventDateTime = getReservationEventDateTime(reservation);
-  if (eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
-    return 'completed';
-  }
   if (normalizedStatus === 'confirmed') return 'approved';
   return normalizedStatus;
 }

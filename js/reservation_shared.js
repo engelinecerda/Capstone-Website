@@ -20,7 +20,11 @@ export const RESCHEDULE_STATUS_META = {
     pending: { label: 'Pending Admin Review', key: 'pending' },
     approved_pending_payment: { label: 'Approved - Waiting for Fee', key: 'info' },
     rejected: { label: 'Rejected', key: 'rejected' },
-    completed: { label: 'Completed', key: 'approved' }
+    completed: { label: 'Completed', key: 'approved' },
+    // A cancellation request always supersedes an open reschedule — see
+    // supabase/migrations/20260907_cancellation_supersedes_reschedule.sql.
+    voided: { label: 'Voided - Cancellation Requested', key: 'cancelled' },
+    withdrawn: { label: 'Withdrawn', key: 'cancelled' }
 };
 
 export function escapeHtml(value) {
@@ -132,12 +136,19 @@ export function isReservationEventPast(reservation) {
     return eventMinutes <= currentMinutes;
 }
 
-export function getEffectiveReservationStatus(reservation) {
+// outstandingBalance must be explicitly supplied (from
+// reservation_payment_summary) for a past-event reservation to compute as
+// "completed" — without it this never infers completion on its own, it
+// only reflects an already-persisted 'completed' status. Event-passed-but-
+// unpaid reservations are handled entirely by the separate auto-cancel-
+// overdue flow, not this function.
+export function getEffectiveReservationStatus(reservation, outstandingBalance) {
     const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
     if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
         return normalizedStatus;
     }
-    if (isReservationEventPast(reservation) && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
+    const isPaidInFull = Number.isFinite(Number(outstandingBalance)) && Number(outstandingBalance) <= 0;
+    if (isPaidInFull && isReservationEventPast(reservation) && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
         return 'completed';
     }
     return normalizedStatus;

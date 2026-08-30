@@ -137,36 +137,57 @@ export function isReservationEventPast(reservation, timeZone = BUSINESS_TIME_ZON
     return eventMinutes <= currentMinutes;
 }
 
-export function shouldPersistCompletedStatus(reservation, timeZone = BUSINESS_TIME_ZONE) {
+// A reservation only auto-completes once the event has passed AND the
+// balance is fully paid (outstanding <= 0). outstandingBalance must be
+// explicitly supplied by the caller (from reservation_payment_summary,
+// the one authoritative balance source — see admin_reservation_details.js)
+// — when it's not available, this deliberately returns false rather than
+// guessing, so an event passing never silently marks an unpaid reservation
+// Completed. Event-passed-but-unpaid stays on whatever status it already
+// has and is handled entirely by the separate auto-cancel-overdue flow.
+function isPaidInFull(outstandingBalance) {
+    return Number.isFinite(Number(outstandingBalance)) && Number(outstandingBalance) <= 0;
+}
+
+export function shouldPersistCompletedStatus(reservation, { timeZone = BUSINESS_TIME_ZONE, outstandingBalance } = {}) {
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
     if (!COMPLETABLE_STATUSES.has(normalizedStatus)) {
+        return false;
+    }
+
+    if (!isPaidInFull(outstandingBalance)) {
         return false;
     }
 
     return isReservationEventPast(reservation, timeZone);
 }
 
-export function getEffectiveReservationStatus(reservation, timeZone = BUSINESS_TIME_ZONE) {
+export function getEffectiveReservationStatus(reservation, { timeZone = BUSINESS_TIME_ZONE, outstandingBalance } = {}) {
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
     if (TERMINAL_STATUSES.has(normalizedStatus)) {
         return normalizedStatus;
     }
 
-    if (shouldPersistCompletedStatus(reservation, timeZone)) {
+    if (shouldPersistCompletedStatus(reservation, { timeZone, outstandingBalance })) {
         return 'completed';
     }
 
     return normalizedStatus;
 }
 
-export async function syncCompletedReservations({ supabase, reservations, timeZone = BUSINESS_TIME_ZONE }) {
+// getOutstandingBalance(reservation) => number is required to persist
+// anything — without it this is a no-op, same "never guess" rule as above.
+export async function syncCompletedReservations({ supabase, reservations, timeZone = BUSINESS_TIME_ZONE, getOutstandingBalance }) {
     const items = Array.isArray(reservations) ? reservations : [];
-    if (!supabase || !items.length) {
+    if (!supabase || !items.length || typeof getOutstandingBalance !== 'function') {
         return items;
     }
 
     const candidateIds = items
-        .filter((reservation) => shouldPersistCompletedStatus(reservation, timeZone))
+        .filter((reservation) => shouldPersistCompletedStatus(reservation, {
+            timeZone,
+            outstandingBalance: getOutstandingBalance(reservation)
+        }))
         .map((reservation) => reservation?.reservation_id)
         .filter(Boolean);
 

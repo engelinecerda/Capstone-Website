@@ -1392,8 +1392,8 @@ function getReservationCardTone(statusKey, isPaymentEnabled, remainingBalance) {
 }
 
 function buildReservationCard(reservation, view) {
-    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
     const balance = getSharedReservationBalanceDetails(reservation, state.paymentsByReservationId, { formatDate });
+    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation, balance.remainingBalance));
     const packageName = getReservationPackageName(reservation);
     const location = getReservationLocationLabel(reservation);
     const paymentIsActionable = isSharedReservationPaymentEnabled(reservation) && balance.remainingBalance > 0;
@@ -1704,7 +1704,7 @@ function renderReservations() {
 function buildPaymentModuleCard(reservation) {
     const paymentSummary = getPaymentSummary(reservation);
     const balance = getReservationBalanceDetails(reservation);
-    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation));
+    const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation, balance.remainingBalance));
     const contract = getReservationContract(reservation.reservation_id);
     const isCompletedOverview = isCompletedPaymentOverview(reservation);
     const isPendingOverview = isPendingPaymentOverview(reservation);
@@ -2337,9 +2337,15 @@ function renderRescheduleCalendar() {
             String(date.getMonth() + 1).padStart(2, '0'),
             String(date.getDate()).padStart(2, '0')
         ].join('-');
-        const isPastOrToday = date <= today;
+        // date < today (not <=) so "today" is excluded only via the notice
+        // window below, same as the booking form's calendar
+        // (js/reservations.js) — using <= here made today always read as
+        // "past" regardless of the configured minimum notice, which is why
+        // this calendar and the booking form's disagreed on the first
+        // selectable date by exactly one day.
+        const isPast = date < today;
         const isClosed = state.rescheduleModal.closedDates.has(dateKey);
-        const isOutsideWindow = !isPastOrToday && isOutsideBookingWindow(
+        const isOutsideWindow = !isPast && isOutsideBookingWindow(
             date, today, state.rescheduleModal.advanceNoticeRules, reservation.event_type
         );
         const dateAvailability = state.rescheduleModal.calendarAvailability.get(dateKey) || {
@@ -2349,7 +2355,7 @@ function renderRescheduleCalendar() {
         const reservationScope = getBookingScope(reservation);
         const isBooked = dateAvailability.isFullyBooked;
         const isCurrent = currentReservationDate === dateKey;
-        const isAvailable = !isPastOrToday && !isClosed && !isOutsideWindow && !isBooked && !isCurrent;
+        const isAvailable = !isPast && !isClosed && !isOutsideWindow && !isBooked && !isCurrent;
         const isSelected = state.rescheduleModal.selectedDate === dateKey;
         const classNames = ['reschedule-day'];
         let label = 'Unavailable';
@@ -2364,7 +2370,7 @@ function renderRescheduleCalendar() {
             classNames.push('booked');
             label = 'This date is fully booked.';
         } else if (isCurrent) {
-            // Checked before isOutsideWindow/isPastOrToday on purpose — the
+            // Checked before isOutsideWindow/isPast on purpose — the
             // reservation's own existing date can easily fall within the
             // advance-notice window relative to today, but it isn't a "too
             // soon to book" date for a *new* booking, so it keeps its own
@@ -2385,7 +2391,7 @@ function renderRescheduleCalendar() {
             label = diffDays < effectiveMinDays
                 ? `Too soon to book — needs at least ${effectiveMinDays} day(s) notice.`
                 : 'Too far in advance to book.';
-        } else if (isPastOrToday) {
+        } else if (isPast) {
             classNames.push('past');
             label = 'This date has already passed.';
         } else {

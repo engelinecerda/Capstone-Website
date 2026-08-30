@@ -147,6 +147,7 @@ async function loadPageData() {
             total_price,
             special_requests,
             status,
+            cancellation_reason,
             created_at,
             package:package_id ( package_name, package_type, duration_hours ),
             add_on:add_on_id ( package_name, package_type )
@@ -477,8 +478,50 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     `;
 }
 
-function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason = null) {
+// A cancellation request always supersedes an open reschedule (see
+// supabase/migrations/20260907_cancellation_supersedes_reschedule.sql,
+// which voids the reschedule server-side) — so once the reservation itself
+// is in a cancellation state, that's the only active request shown here,
+// regardless of any now-voided reschedule history.
+function buildCancellationRequestCard(reservation, cancellationFeePayment, paymentRules) {
+    const isPending = String(reservation.status || '').toLowerCase() === 'cancellation_requested';
+    const statusMeta = isPending
+        ? { label: 'Pending Admin Review', key: 'pending' }
+        : { label: 'Approved - Fee Due', key: 'info' };
+
+    return `
+        <section class="rd-panel rd-reschedule-card">
+            <div class="rd-reschedule-card-head">
+                <h2 class="rd-panel-title">Cancellation request</h2>
+                <span class="res-status ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
+            </div>
+            <dl class="rd-dl">
+                <div class="rd-dl-row rd-dl-row-wrap">
+                    <dt><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Reason</dt>
+                    <dd${reservation.cancellation_reason ? '' : ' class="muted"'}>${escapeHtml(reservation.cancellation_reason || 'No reason provided')}</dd>
+                </div>
+                ${!isPending ? `
+                    <div class="rd-dl-row">
+                        <dt><i class="fa-solid fa-coins" aria-hidden="true"></i> Cancellation fee</dt>
+                        <dd>${escapeHtml(formatCurrency(cancellationFeePayment?.amount ?? getCancellationFee(reservation, paymentRules)))}</dd>
+                    </div>
+                ` : ''}
+            </dl>
+            ${isPending ? `
+                <div class="rd-reschedule-row-actions">
+                    <button type="button" class="rd-cancel-link" data-action="withdraw-cancellation">Withdraw request</button>
+                </div>
+            ` : ''}
+        </section>
+    `;
+}
+
+function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason = null, cancellationFeePayment = null, paymentRules = null) {
     if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return '';
+
+    if (['cancellation_requested', 'cancellation_approved'].includes(String(reservation.status || '').toLowerCase())) {
+        return buildCancellationRequestCard(reservation, cancellationFeePayment, paymentRules);
+    }
 
     const latestRequest = rescheduleRequests[0] || null;
     const openRescheduleUrl = `/account.html?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
@@ -511,6 +554,7 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
     }
 
     const statusMeta = getRescheduleStatusMeta(latestRequest.status);
+    const isPendingReschedule = String(latestRequest.status || '').toLowerCase() === 'pending';
 
     return `
         <section class="rd-panel rd-reschedule-card">
@@ -530,8 +574,9 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
                     </div>
                 ` : ''}
             </dl>
-            ${(canReschedule || canCancel || cancelBlockReason) ? `
+            ${(canReschedule || canCancel || cancelBlockReason || isPendingReschedule) ? `
                 <div class="rd-reschedule-row-actions">
+                    ${isPendingReschedule ? `<button type="button" class="rd-cancel-link" data-action="withdraw-reschedule" data-request-id="${escapeHtml(latestRequest.reschedule_request_id)}">Withdraw request</button>` : ''}
                     ${canReschedule ? `<a class="rd-btn-outline" href="${escapeHtml(openRescheduleUrl)}">Request reschedule</a>` : ''}
                     ${cancelMarkup}
                 </div>
@@ -570,10 +615,10 @@ function buildReviewRow(effectiveStatus, review) {
 
 function render() {
     const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
-    const effectiveStatus = getEffectiveReservationStatus(reservation);
+    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
+    const effectiveStatus = getEffectiveReservationStatus(reservation, balance.remainingBalance);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
-    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const contractMeta = computeContractMeta(contract);
     const canReschedule = computeCanReschedule(reservation.status, rescheduleRequests);
     const canCancel = computeCanCancel(reservation.status, payments, reservation, paymentRules);
@@ -631,7 +676,7 @@ function render() {
             ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules)}
         </div>
 
-        ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason)}
+        ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules)}
         ${buildReviewRow(effectiveStatus, review)}
     `;
 }
@@ -739,6 +784,53 @@ async function submitCancellationRequest() {
     }
 }
 
+// Same lookup admin_reservation_details.js uses when a manager rejects a
+// cancellation — the reservation_status history row logged at the moment
+// cancellation was requested records what status to revert to.
+async function findCancellationRevertStatus(id) {
+    const { data, error } = await supabase
+        .from('reservation_status')
+        .select('previous_status')
+        .eq('reservation_id', id)
+        .eq('new_status', 'cancellation_requested')
+        .order('changed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (error) throw error;
+    return data?.previous_status || 'approved';
+}
+
+async function withdrawCancellationRequest() {
+    if (!window.confirm('Withdraw your cancellation request and keep this reservation active?')) return;
+    try {
+        const revertStatus = await findCancellationRevertStatus(reservationId);
+        const { error } = await supabase
+            .from('reservations')
+            .update({ status: revertStatus, cancellation_reason: null })
+            .eq('reservation_id', reservationId);
+        if (error) throw error;
+        await loadPageData();
+        render();
+    } catch (error) {
+        window.alert(`Failed to withdraw: ${error.message}`);
+    }
+}
+
+async function withdrawRescheduleRequest(requestId) {
+    if (!requestId || !window.confirm('Withdraw your reschedule request?')) return;
+    try {
+        const { error } = await supabase
+            .from('reschedule_requests')
+            .update({ status: 'withdrawn' })
+            .eq('reschedule_request_id', requestId);
+        if (error) throw error;
+        await loadPageData();
+        render();
+    } catch (error) {
+        window.alert(`Failed to withdraw: ${error.message}`);
+    }
+}
+
 async function init() {
     try {
         await loadPageData();
@@ -760,6 +852,18 @@ pageContainer?.addEventListener('click', async (event) => {
     const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
     if (cancelTriggerBtn) {
         openCancelModal();
+        return;
+    }
+
+    const withdrawCancelBtn = event.target.closest('[data-action="withdraw-cancellation"]');
+    if (withdrawCancelBtn) {
+        withdrawCancellationRequest();
+        return;
+    }
+
+    const withdrawRescheduleBtn = event.target.closest('[data-action="withdraw-reschedule"]');
+    if (withdrawRescheduleBtn) {
+        withdrawRescheduleRequest(withdrawRescheduleBtn.dataset.requestId);
     }
 });
 

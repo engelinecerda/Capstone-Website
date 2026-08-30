@@ -421,6 +421,11 @@
     line-height: 1.5;
 }
 
+.rd-dl-row dd.muted {
+    color: var(--acc-text-muted);
+    font-weight: 400;
+}
+
 .rd-footnote {
     margin: 4px 0 0;
     padding-top: 10px;

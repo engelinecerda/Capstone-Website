@@ -1347,7 +1347,9 @@ async function loadEventTypes() {
         .filter(et => !(et.status && et.status !== 'Active') && et.is_active !== false)
         .map(et => ({
             name: et.name ?? et.event_type_name ?? et.type_name ?? Object.values(et)[1],
-            minAdvanceDays: Number.isFinite(Number(et.min_advance_days)) ? Number(et.min_advance_days) : null
+            minAdvanceDays: (et.min_advance_days !== null && et.min_advance_days !== undefined && Number.isFinite(Number(et.min_advance_days)))
+                ? Number(et.min_advance_days)
+                : null
         }))
         .filter(et => Boolean(et.name));
 

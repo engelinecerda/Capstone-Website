@@ -41,7 +41,7 @@ async function fetchPaymentSummaries(reservationIds) {
     if (!reservationIds.length) return {};
     const { data, error } = await supabase
         .from('reservation_payment_summary')
-        .select('reservation_id, total_paid')
+        .select('reservation_id, total_paid, outstanding_balance')
         .in('reservation_id', reservationIds);
     if (error) throw error;
     return (data || []).reduce((map, row) => {
@@ -508,10 +508,7 @@ async function fetchReservations() {
         throw error;
     }
 
-    return syncCompletedReservations({
-        supabase,
-        reservations: data || []
-    });
+    return data || [];
 }
 
 async function validateAdminSession() {
@@ -550,10 +547,15 @@ async function loadReports({ silent = false } = {}) {
     }
 
     try {
-        state.reservations = await fetchReservations();
+        const rawReservations = await fetchReservations();
         state.paymentSummaryMap = await fetchPaymentSummaries(
-            state.reservations.map((r) => r.reservation_id).filter(Boolean)
+            rawReservations.map((r) => r.reservation_id).filter(Boolean)
         ).catch(() => ({}));
+        state.reservations = await syncCompletedReservations({
+            supabase,
+            reservations: rawReservations,
+            getOutstandingBalance: (reservation) => state.paymentSummaryMap[reservation?.reservation_id]?.outstanding_balance
+        });
         renderReports({ resetPage: !silent });
         await refreshAdminSidebarCounts({
             supabase,

@@ -699,7 +699,8 @@ table td {
 .status-pill.pending,
 .status-pill.pending_review,
 .status-pill.requested,
-.status-pill.cancellation_requested {
+.status-pill.cancellation_requested,
+.status-pill.reschedule_requested {
   background: var(--pending);
   color: var(--pending-txt);
 }
