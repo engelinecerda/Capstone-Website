@@ -50,6 +50,9 @@ const receiptModalBackdrop = document.getElementById('receipt-modal-backdrop');
 const receiptModalClose = document.getElementById('receipt-modal-close');
 const receiptModalDismiss = document.getElementById('receipt-modal-dismiss');
 const receiptView = document.getElementById('receipt-view');
+const paymentDraftModalBackdrop = document.getElementById('payment-draft-modal-backdrop');
+const paymentDraftContinueBtn = document.getElementById('payment-draft-continue-btn');
+const paymentDraftStartNewBtn = document.getElementById('payment-draft-start-new-btn');
 
 const state = {
     bundle: {
@@ -70,13 +73,18 @@ const state = {
     isSubmitting: false,
     flashMessage: '',
     flashType: '',
+    // Set true only when a saved draft is resumed (the receipt file itself
+    // is never in the draft — see applyPaymentDraft). Cleared the moment a
+    // file is chosen. Drives the reattach-receipt reminder banner below.
+    draftResumedMissingFile: false,
     form: {
         customAmount: '',
         referenceNumber: '',
         paymentDate: '',
         cashPaymentDate: '',
         notes: '',
-        proofFile: null
+        proofFile: null,
+        proofPreviewDataUrl: null
     }
 };
 
@@ -86,6 +94,78 @@ if (paymentBackLink) {
         event.preventDefault();
         window.location.href = buildCustomerAccountUrl('reservations');
     });
+}
+
+// ── Draft ──────────────────────────────────────────────────────────────
+// Scoped per reservation_id (a customer can have several reservations each
+// mid-payment at once) so drafts never bleed across them.
+//
+// The proof-of-payment File is intentionally NEVER persisted here — files
+// can't be serialized into localStorage without either losing them or
+// risking the ~5-10MB per-origin quota on a single receipt photo. A resumed
+// draft restores every typed field, but the customer has to reattach their
+// receipt image, and the resume prompt says so up front.
+const PAYMENT_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — reference numbers/dates go stale faster than a reservation draft
+
+function getPaymentDraftKey() {
+    return `eli_payment_draft_${state.reservationId}`;
+}
+
+function savePaymentDraft() {
+    if (!state.reservationId) return;
+    const hasContent = state.selectedMethod || state.selectedOptionKey
+        || state.form.customAmount || state.form.referenceNumber
+        || state.form.paymentDate || state.form.cashPaymentDate || state.form.notes;
+    if (!hasContent) {
+        clearPaymentDraft();
+        return;
+    }
+    try {
+        localStorage.setItem(getPaymentDraftKey(), JSON.stringify({
+            selectedMethod: state.selectedMethod,
+            selectedOptionKey: state.selectedOptionKey,
+            form: {
+                customAmount: state.form.customAmount,
+                referenceNumber: state.form.referenceNumber,
+                paymentDate: state.form.paymentDate,
+                cashPaymentDate: state.form.cashPaymentDate,
+                notes: state.form.notes
+            },
+            savedAt: Date.now()
+        }));
+    } catch { /* ignore (private browsing, quota, etc.) */ }
+}
+
+function clearPaymentDraft() {
+    if (!state.reservationId) return;
+    try { localStorage.removeItem(getPaymentDraftKey()); } catch { /* ignore */ }
+}
+
+// Reads the saved draft without applying it, so the resume-prompt modal can
+// decide whether to appear before anything is mutated. Returns null if
+// there's no draft, it's malformed, or it's past PAYMENT_DRAFT_MAX_AGE_MS.
+function peekPaymentDraft() {
+    if (!state.reservationId) return null;
+    try {
+        const raw = localStorage.getItem(getPaymentDraftKey());
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed?.form) return null;
+        if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > PAYMENT_DRAFT_MAX_AGE_MS) return null;
+        return parsed;
+    } catch { return null; }
+}
+
+function applyPaymentDraft(draft) {
+    if (!draft) return;
+    state.selectedMethod = draft.selectedMethod || state.selectedMethod;
+    state.selectedOptionKey = draft.selectedOptionKey || '';
+    state.form.customAmount = draft.form?.customAmount || '';
+    state.form.referenceNumber = draft.form?.referenceNumber || '';
+    state.form.paymentDate = draft.form?.paymentDate || '';
+    state.form.cashPaymentDate = draft.form?.cashPaymentDate || '';
+    state.form.notes = draft.form?.notes || '';
+    state.draftResumedMissingFile = true;
 }
 
 function escapeHtml(value) {
@@ -99,6 +179,13 @@ function escapeHtml(value) {
 
 function formatCurrency(value) {
     return `₱${Number(value || 0).toLocaleString()}`;
+}
+
+function formatFileSize(bytes) {
+    const size = Number(bytes || 0);
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatDate(value) {
@@ -532,7 +619,6 @@ function renderFormSection(reservation) {
     const isOnsite = selectedMethodObj?.type === 'onsite';
     const isCustomAmount = selectedOption.paymentType === 'partial_payment';
     const displayAmount = isCustomAmount ? Number(state.form.customAmount || 0) : selectedOption.amount;
-    const proofName = state.form.proofFile?.name || 'PNG, JPG up to 10MB';
     const refPattern = REFERENCE_NUMBER_PATTERNS[selectedMethodObj?.legacyModeKey];
 
     return `
@@ -566,12 +652,35 @@ function renderFormSection(reservation) {
                     </div>
                     <div class="payment-field-group full">
                         <label for="payment-proof-file">Proof of payment</label>
-                        <label class="payment-proof-dropzone" for="payment-proof-file">
+                        ${state.draftResumedMissingFile && !state.form.proofFile ? `
+                            <div class="payment-howto-reminder">${INFO_ICON} We restored your saved payment details, but your receipt image wasn't kept for security/storage reasons — <strong>please attach it again below.</strong></div>
+                        ` : ''}
+                        ${state.form.proofFile ? `
+                            <div class="payment-proof-uploaded">
+                                <div class="payment-proof-uploaded-thumb">
+                                    ${state.form.proofPreviewDataUrl
+                                        ? `<img src="${escapeHtml(state.form.proofPreviewDataUrl)}" alt="Proof of payment preview">`
+                                        : `<i class="fa-solid fa-file-image" aria-hidden="true"></i>`}
+                                </div>
+                                <div class="payment-proof-uploaded-info">
+                                    <div class="payment-proof-uploaded-status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Uploaded successfully</div>
+                                    <div class="payment-proof-uploaded-name">${escapeHtml(state.form.proofFile.name)}</div>
+                                    <div class="payment-proof-uploaded-size">${escapeHtml(formatFileSize(state.form.proofFile.size))}</div>
+                                </div>
+                                <div class="payment-proof-uploaded-actions">
+                                    <button type="button" class="payment-proof-action-btn" data-action="replace-proof-file">Replace</button>
+                                    <button type="button" class="payment-proof-action-btn danger" data-action="remove-proof-file">Remove</button>
+                                </div>
+                            </div>
                             <input id="payment-proof-file" class="payment-proof-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" data-field="proofFile">
-                            <div class="payment-proof-icon"><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i></div>
-                            <div class="payment-proof-cta">Drop file here or <span>browse</span></div>
-                            <div class="payment-proof-name">${escapeHtml(proofName)}</div>
-                        </label>
+                        ` : `
+                            <label class="payment-proof-dropzone" for="payment-proof-file">
+                                <input id="payment-proof-file" class="payment-proof-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" data-field="proofFile">
+                                <div class="payment-proof-icon"><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i></div>
+                                <div class="payment-proof-cta">Drop file here or <span>browse</span></div>
+                                <div class="payment-proof-name">PNG, JPG up to 10MB</div>
+                            </label>
+                        `}
                     </div>
                 ` : `
                     <div class="payment-form-row">
@@ -843,6 +952,25 @@ function renderTabs(reservation) {
     `;
 }
 
+// True only when renderActionableCard() (the form with the file upload) is
+// what actually renders for this reservation — i.e. not cancelled, not
+// already fully paid, and not sitting on an already-submitted pending
+// payment. Shared by renderReservationPaymentPage() and the init-time
+// draft-resume check below so the two can't drift out of sync.
+function isReservationActionable(reservation) {
+    if (!reservation) return false;
+    if (String(reservation.status || '').toLowerCase() === 'cancelled') return false;
+    const overviewArgs = [
+        reservation,
+        state.bundle.paymentsByReservationId,
+        state.bundle.reschedulesByReservationId,
+        { formatDate, reservationRules: state.reservationRules }
+    ];
+    if (isCompletedPaymentOverview(...overviewArgs)) return false;
+    if (isPendingPaymentOverview(...overviewArgs)) return false;
+    return true;
+}
+
 function renderReservationPaymentPage() {
     const reservation = getReservation();
     if (!reservation) {
@@ -1061,11 +1189,14 @@ async function handleSubmitPayment() {
             paymentDate: '',
             cashPaymentDate: '',
             notes: '',
-            proofFile: null
+            proofFile: null,
+            proofPreviewDataUrl: null
         };
         state.flashMessage = result.successMessage;
         state.flashType = 'success';
         state.activeTab = 'current';
+        state.draftResumedMissingFile = false;
+        clearPaymentDraft();
         await loadPaymentPage();
     } catch (error) {
         state.flashMessage = error?.message || 'Failed to submit payment.';
@@ -1130,6 +1261,20 @@ paymentApp?.addEventListener('click', async (event) => {
         return;
     }
 
+    const removeProofButton = event.target.closest('[data-action="remove-proof-file"]');
+    if (removeProofButton) {
+        state.form.proofFile = null;
+        state.form.proofPreviewDataUrl = null;
+        renderReservationPaymentPage();
+        return;
+    }
+
+    const replaceProofButton = event.target.closest('[data-action="replace-proof-file"]');
+    if (replaceProofButton) {
+        document.getElementById('payment-proof-file')?.click();
+        return;
+    }
+
     const submitButton = event.target.closest('[data-action="submit-payment"]');
     if (submitButton) {
         await handleSubmitPayment();
@@ -1162,8 +1307,23 @@ paymentApp?.addEventListener('input', (event) => {
 paymentApp?.addEventListener('change', (event) => {
     const field = event.target.dataset.field;
     if (field === 'proofFile') {
-        state.form.proofFile = event.target.files?.[0] || null;
+        const file = event.target.files?.[0] || null;
+        state.form.proofFile = file;
+        state.form.proofPreviewDataUrl = null;
+        if (file) state.draftResumedMissingFile = false;
         renderReservationPaymentPage();
+
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Guard against a stale read finishing after the customer
+                // already removed/replaced the file again.
+                if (state.form.proofFile !== file) return;
+                state.form.proofPreviewDataUrl = reader.result;
+                renderReservationPaymentPage();
+            };
+            reader.readAsDataURL(file);
+        }
         return;
     }
 
@@ -1188,16 +1348,47 @@ document.addEventListener('keydown', (event) => {
 
 await loadPaymentPage();
 
+function hidePaymentDraftModal() {
+    paymentDraftModalBackdrop?.classList.add('hidden');
+    paymentDraftModalBackdrop?.setAttribute('aria-hidden', 'true');
+}
+
+// Only offer to resume when the actionable form (the one with fields worth
+// saving) is actually what's showing — a draft left over from a payment
+// that got approved/rejected/superseded since should just be discarded.
+const draft = isReservationActionable(getReservation()) ? peekPaymentDraft() : null;
+if (draft) {
+    paymentDraftModalBackdrop?.classList.remove('hidden');
+    paymentDraftModalBackdrop?.setAttribute('aria-hidden', 'false');
+
+    paymentDraftContinueBtn?.addEventListener('click', () => {
+        applyPaymentDraft(draft);
+        hidePaymentDraftModal();
+        renderReservationPaymentPage();
+    }, { once: true });
+
+    paymentDraftStartNewBtn?.addEventListener('click', () => {
+        clearPaymentDraft();
+        hidePaymentDraftModal();
+    }, { once: true });
+}
+
+// Safety net: fields are saved to the draft right before the page actually
+// goes away, rather than on every keystroke, so an accidental refresh or
+// tab close doesn't lose whatever was last typed.
+window.addEventListener('pagehide', savePaymentDraft);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') savePaymentDraft();
+});
+
 initAutoRefresh(() => {
     // renderReservationPaymentPage() fully rebuilds paymentApp's markup, which
     // would wipe out an in-progress reference number or a chosen-but-not-yet-
     // submitted receipt file. Skip the refresh while the customer is actively
     // interacting with the form, or while a submission is in flight; the next
     // poll/focus event will pick it up.
-    const proofFileInput = document.getElementById('payment-proof-file');
     const isEditingForm = paymentApp?.contains(document.activeElement);
-    const hasUnsubmittedFile = !!(proofFileInput && proofFileInput.files && proofFileInput.files.length > 0);
-    if (isEditingForm || hasUnsubmittedFile || state.isSubmitting) return;
+    if (isEditingForm || state.form.proofFile || state.isSubmitting) return;
 
     loadPaymentPage();
 });

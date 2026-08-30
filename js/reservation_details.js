@@ -471,7 +471,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                 >
                     ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : 'Continue payment'}
                 </button>
-                ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your contract is verified</p>` : ''}
+                ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your reservation is verified</p>` : ''}
             ` : ''}
         </section>
     `;
