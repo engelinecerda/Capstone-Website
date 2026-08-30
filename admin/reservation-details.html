@@ -83,9 +83,17 @@
 
         <div class="reschedule-review-panel hidden" id="rescheduleReviewPanel">
           <div class="dl-rows" id="rescheduleReviewRows"></div>
-          <div class="details-action-row">
+          <div class="details-action-row" id="rescheduleReviewActions">
             <button type="button" class="action-btn approve" id="rescheduleApproveBtn">Approve reschedule</button>
             <button type="button" class="action-btn decline" id="rescheduleRejectBtn">Reject request</button>
+          </div>
+          <div class="reject-reason-inline hidden" id="rescheduleRejectReasonBlock">
+            <label class="record-payment-field-label" for="rescheduleRejectReasonInput">Reason for rejection <span class="record-payment-optional">(required)</span></label>
+            <textarea id="rescheduleRejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Requested date conflicts with another booking"></textarea>
+            <div class="details-action-row">
+              <button type="button" class="action-btn view" id="rescheduleRejectCancelBtn">Cancel</button>
+              <button type="button" class="action-btn decline" id="rescheduleRejectConfirmBtn">Confirm rejection</button>
+            </div>
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { initAdminNav } from './admin_nav.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
@@ -747,25 +748,7 @@ generateForecastBtn?.addEventListener('click', async () => {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-    const now = Date.now();
-    if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-    lastAutoRefreshAt = now;
-    loadDashboard({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
-window.addEventListener('pageshow', (event) => {
-    if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+initAutoRefresh(() => loadDashboard({ silent: true }));
 
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 monthlyYearSelect?.addEventListener('change', () => { renderMonthlyChart(fullReservations, monthlyYearSelect.value); });

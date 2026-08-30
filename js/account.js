@@ -52,6 +52,7 @@ import {
     computeCanCancel
 } from './reservation_shared.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const PAYMENT_METHODS = {
     card: {
@@ -2007,8 +2008,8 @@ async function fetchReviews(reservationIds) {
     }, {});
 }
 
-async function loadReservations() {
-    if (reservationsList) {
+async function loadReservations({ silent = false } = {}) {
+    if (!silent && reservationsList) {
         reservationsList.innerHTML = '<p style="color:#888;text-align:center;padding:40px 0;">Loading...</p>';
     }
 
@@ -2086,12 +2087,18 @@ async function loadReservations() {
         state.receiptsByPaymentId = await fetchSharedReceipts(supabase, paymentIds);
         renderReservations();
         renderPaymentsModule();
-        maybeAutoOpenReservationModal();
+        if (!silent) {
+            maybeAutoOpenReservationModal();
+        }
         if (!state.reviewPromptEvaluated) {
             state.reviewPromptEvaluated = true;
             openEligibleReviewPrompt();
         }
     } catch (error) {
+        if (silent) {
+            console.error('[account] silent auto-refresh of reservations failed:', error);
+            return;
+        }
         if (reservationsList) {
             const reviewFeatureMessage = getReviewFeatureErrorMessage(error);
             reservationsList.innerHTML = `<p style="color:#c0392b;text-align:center;padding:40px 0;">Failed to load reservations: ${escapeHtml(reviewFeatureMessage)}.</p>`;
@@ -2356,16 +2363,34 @@ function renderRescheduleCalendar() {
         } else if (isBooked) {
             classNames.push('booked');
             label = 'This date is fully booked.';
-        } else if (isOutsideWindow) {
+        } else if (isCurrent) {
+            // Checked before isOutsideWindow/isPastOrToday on purpose — the
+            // reservation's own existing date can easily fall within the
+            // advance-notice window relative to today, but it isn't a "too
+            // soon to book" date for a *new* booking, so it keeps its own
+            // distinct label/styling (.current, added below) instead of
+            // being swept into the "past" treatment.
             classNames.push('disabled');
+            label = 'Current booking date';
+        } else if (isOutsideWindow) {
+            // Same .past class (and swatch) as the "Too Soon to Book" /
+            // "past" entries on the booking form's calendar
+            // (reservations.html) — previously this used the same generic
+            // 'disabled' class as "fully booked", so a too-soon date was
+            // visually indistinguishable from a booked-out one, and the
+            // legend below had no matching entry for it at all.
+            classNames.push('past');
             const effectiveMinDays = getEffectiveMinAdvanceDaysForReservation(reservation);
             const diffDays = Math.round((date - today) / 86400000);
             label = diffDays < effectiveMinDays
                 ? `Too soon to book — needs at least ${effectiveMinDays} day(s) notice.`
                 : 'Too far in advance to book.';
+        } else if (isPastOrToday) {
+            classNames.push('past');
+            label = 'This date has already passed.';
         } else {
             classNames.push('disabled');
-            label = isCurrent ? 'Current booking date' : 'Unavailable';
+            label = 'Unavailable';
         }
 
         if (isCurrent) classNames.push('current');
@@ -3313,3 +3338,5 @@ await Promise.all([
     loadProfile(),
     loadReservations()
 ]);
+
+initAutoRefresh(() => loadReservations({ silent: true }));

@@ -12,6 +12,7 @@ import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
@@ -422,25 +423,7 @@ wireRosterTable();
 wireRosterModal();
 wireRosterConfirmModal();
 
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-  const now = Date.now();
-  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-  lastAutoRefreshAt = now;
-  loadRoster({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+initAutoRefresh(() => loadRoster({ silent: true }));
 
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {

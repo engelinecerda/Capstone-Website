@@ -12,6 +12,7 @@ import {
   resolveBlackoutDateColumn,
   resolveBlackoutReasonColumn,
 } from './reservation_availability.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const calendarMonthLabel = document.getElementById('calendarMonthLabel');
 const prevMonthBtn = document.getElementById('prevMonth');
@@ -588,25 +589,7 @@ wireBlackoutModal();
 wireDayPanelBookingLinks();
 wireClosedDatesList();
 
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-  const now = Date.now();
-  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-  lastAutoRefreshAt = now;
-  loadMonth({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+initAutoRefresh(() => loadMonth({ silent: true }));
 
 validateAdminSession({
   onSuccess: async ({ session, profile }) => {

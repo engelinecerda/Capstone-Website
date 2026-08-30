@@ -15,11 +15,16 @@ export function initPasswordToggles(root = document) {
 
         if (!input || !btn || !icon) return;
 
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-label', 'Show password');
+
         btn.addEventListener('click', () => {
             const willShow = input.type === 'password';
             input.type = willShow ? 'text' : 'password';
             icon.innerHTML = willShow ? EYE_CLOSED : EYE_OPEN;
             btn.title = willShow ? 'Hide password' : 'Show password';
+            btn.setAttribute('aria-label', willShow ? 'Hide password' : 'Show password');
+            btn.setAttribute('aria-pressed', String(willShow));
         });
     });
 }

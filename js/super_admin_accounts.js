@@ -6,6 +6,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 // supabase-js's functions.invoke() sets `data` to null on any non-2xx
 // response — the actual JSON body the function returned (our friendly
@@ -270,25 +271,7 @@ document.getElementById('statusFilterSeg').addEventListener('click', e => {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-  const now = Date.now();
-  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-  lastAutoRefreshAt = now;
-  loadAccounts({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+initAutoRefresh(() => loadAccounts({ silent: true }));
 
 // ── FOCUS TRAP (shared by Account + Confirm modals) ───────────────
 function trapFocus(container) {
@@ -335,7 +318,7 @@ document.getElementById('addAccountBtn').addEventListener('click', () => {
 
 function openAddModal() {
   document.getElementById('accountModalTitle').textContent = 'Invite User';
-  document.getElementById('accountModalSub').textContent   = 'Create a new Manager portal account';
+  document.getElementById('accountModalSub').textContent   = 'Create a new Manager account';
   document.getElementById('accountModalTabs').style.display = 'none';
   document.getElementById('addModeExtra').style.display     = 'block';
   document.getElementById('tab-info').classList.add('active');
@@ -530,10 +513,10 @@ async function handleUpdateAccount(a) {
 
 // ── ROLE CHANGE CONFIRMATION ────────────────────────────────────────
 function openRoleChangeConfirm(a, fields) {
-  document.getElementById('confirmTitle').textContent = 'Change Portal Role';
+  document.getElementById('confirmTitle').textContent = 'Change Role';
   document.getElementById('confirmSub').textContent   = displayName(a);
   document.getElementById('confirmBody').textContent  =
-    `This changes ${displayName(a)}'s portal role from ${formatRoleLabel(a.role)} to ${formatRoleLabel(fields.role)}.`;
+    `This changes ${displayName(a)}'s role from ${formatRoleLabel(a.role)} to ${formatRoleLabel(fields.role)}.`;
   document.getElementById('confirmOk').onclick = async () => {
     closeConfirmModal();
     await saveAccountUpdate(a, fields);
@@ -630,7 +613,7 @@ function openLockConfirm(a) {
   document.getElementById('confirmTitle').textContent = isLocked ? 'Reactivate Account' : 'Deactivate Account';
   document.getElementById('confirmSub').textContent   = displayName(a);
   document.getElementById('confirmBody').textContent  = isLocked
-    ? `This will restore portal access for ${displayName(a)}.`
+    ? `This will restore access for ${displayName(a)}.`
     : `This will prevent ${displayName(a)} from signing in until reactivated. Their history stays intact.`;
   document.getElementById('confirmOk').onclick = async () => {
     const newLocked = !isLocked;
@@ -690,6 +673,10 @@ function openBoardResetConfirm(a) {
       msg.textContent = await extractFnError(fnErr, data);
       return;
     }
+
+    // Never include the password itself here — audit trail records that the
+    // shared credential was rotated and by whom, not what it was rotated to.
+    await logAudit({ action: 'Reset Board Password', category: 'accounts', details: `Shared board account password was reset (${displayName(a)})`, entityId: a.user_id });
 
     msg.className = 'modal-message success';
     msg.textContent = `New password: ${data.password} — copy this now, it will not be shown again.`;
