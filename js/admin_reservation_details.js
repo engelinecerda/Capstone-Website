@@ -38,6 +38,11 @@ const cancellationReviewPanel = document.getElementById('cancellationReviewPanel
 const cancellationReviewRows = document.getElementById('cancellationReviewRows');
 const rescheduleApproveBtn = document.getElementById('rescheduleApproveBtn');
 const rescheduleRejectBtn = document.getElementById('rescheduleRejectBtn');
+const rescheduleReviewActions = document.getElementById('rescheduleReviewActions');
+const rescheduleRejectReasonBlock = document.getElementById('rescheduleRejectReasonBlock');
+const rescheduleRejectReasonInput = document.getElementById('rescheduleRejectReasonInput');
+const rescheduleRejectCancelBtn = document.getElementById('rescheduleRejectCancelBtn');
+const rescheduleRejectConfirmBtn = document.getElementById('rescheduleRejectConfirmBtn');
 
 const bookingDetailsGrid = document.getElementById('bookingDetailsGrid');
 const bookingDetailsRows = document.getElementById('bookingDetailsRows');
@@ -551,7 +556,7 @@ async function fetchReservationDetail(idParam) {
       .order('submitted_at', { ascending: false }),
     supabase
       .from('reschedule_requests')
-      .select('reschedule_request_id, reservation_id, original_date, original_time, requested_date, requested_time, status, requested_at, reviewed_at')
+      .select('reschedule_request_id, reservation_id, original_date, original_time, requested_date, requested_time, status, requested_at, reviewed_at, rejection_reason')
       .eq('reservation_id', data.reservation_id)
       .order('requested_at', { ascending: false })
   ]);
@@ -606,7 +611,7 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   await logReservationStatusChange(reservationId, previousStatus, status);
 }
 
-async function handleRescheduleReview(requestId, nextStatus) {
+async function handleRescheduleReview(requestId, nextStatus, rejectionReason = '') {
   const reservation = currentReservation;
   const request = getReservationRescheduleRequests(reservation).find((entry) => String(entry.reschedule_request_id) === String(requestId));
 
@@ -622,9 +627,14 @@ async function handleRescheduleReview(requestId, nextStatus) {
     }
   }
 
+  const updatePayload = { status: nextStatus, reviewed_at: new Date().toISOString() };
+  if (nextStatus === 'rejected') {
+    updatePayload.rejection_reason = rejectionReason;
+  }
+
   const { error } = await supabase
     .from('reschedule_requests')
-    .update({ status: nextStatus, reviewed_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('reschedule_request_id', requestId);
   if (error) throw error;
 }
@@ -729,11 +739,20 @@ function renderHeaderActions() {
 
 function renderRescheduleReviewPanel(request) {
   rescheduleReviewRows.innerHTML = [
+    dlRow('Original date', formatReservationDate(request.original_date)),
+    dlRow('Original time', request.original_time || 'No time selected'),
     dlRow('Requested date', formatReservationDate(request.requested_date)),
     dlRow('Requested time', request.requested_time || 'No time selected')
   ].join('');
   rescheduleApproveBtn.dataset.requestId = request.reschedule_request_id;
   rescheduleRejectBtn.dataset.requestId = request.reschedule_request_id;
+  rescheduleRejectConfirmBtn.dataset.requestId = request.reschedule_request_id;
+  // renderRescheduleReviewPanel only ever runs for the currently-open
+  // (pending) request — see its caller, renderHeaderActions — so any
+  // reason-input state left open from a previous render belongs to a
+  // request that's no longer active. Reset it here rather than carrying
+  // stale open/closed state across re-renders.
+  closeRescheduleRejectReason();
 }
 
 // Visible for both roles (unlike the reschedule panel) since this is
@@ -1405,6 +1424,12 @@ function wireHeaderActions() {
 
     if (action === 'toggle-reschedule') {
       rescheduleReviewPanel.classList.toggle('hidden');
+      // Reset any in-progress reject-reason state so reopening the panel
+      // later doesn't resurface a stale open textarea from an earlier
+      // visit that was never confirmed or cancelled.
+      if (rescheduleReviewPanel.classList.contains('hidden')) {
+        closeRescheduleRejectReason();
+      }
       return;
     }
 
@@ -1504,6 +1529,26 @@ function wireHeaderActions() {
   });
 }
 
+// Shows the mandatory reason textarea in place of the Approve/Reject
+// buttons — mirrors the same click-to-reveal pattern the Payments review
+// modal uses for "Reject payment" (js/admin_payments.js), reusing this
+// page's own .record-payment-field-label/.record-payment-textarea
+// styles rather than pulling in payment-specific classes.
+function openRescheduleRejectReason() {
+  if (!rescheduleRejectReasonBlock) return;
+  rescheduleReviewActions?.classList.add('hidden');
+  rescheduleRejectReasonBlock.classList.remove('hidden');
+  if (rescheduleRejectReasonInput) rescheduleRejectReasonInput.value = '';
+  rescheduleRejectReasonInput?.focus();
+}
+
+function closeRescheduleRejectReason() {
+  if (!rescheduleRejectReasonBlock) return;
+  rescheduleRejectReasonBlock.classList.add('hidden');
+  rescheduleReviewActions?.classList.remove('hidden');
+  if (rescheduleRejectReasonInput) rescheduleRejectReasonInput.value = '';
+}
+
 function wireRescheduleReviewPanel() {
   rescheduleApproveBtn.addEventListener('click', async () => {
     try {
@@ -1517,15 +1562,32 @@ function wireRescheduleReviewPanel() {
     }
   });
 
-  rescheduleRejectBtn.addEventListener('click', async () => {
+  // Reject is now a two-step confirmation: this click only reveals the
+  // required reason field, it doesn't reject anything by itself.
+  rescheduleRejectBtn.addEventListener('click', () => {
+    openRescheduleRejectReason();
+  });
+
+  rescheduleRejectCancelBtn?.addEventListener('click', () => {
+    closeRescheduleRejectReason();
+  });
+
+  rescheduleRejectConfirmBtn?.addEventListener('click', async () => {
+    const reason = rescheduleRejectReasonInput?.value.trim() || '';
+    if (!reason) {
+      setFlashMessage('Enter a reason for rejecting this reschedule request.', true);
+      rescheduleRejectReasonInput?.focus();
+      return;
+    }
+
     try {
-      rescheduleRejectBtn.setAttribute('disabled', 'true');
+      rescheduleRejectConfirmBtn.setAttribute('disabled', 'true');
       setFlashMessage('Updating reschedule request...');
-      await handleRescheduleReview(rescheduleRejectBtn.dataset.requestId, 'rejected');
+      await handleRescheduleReview(rescheduleRejectConfirmBtn.dataset.requestId, 'rejected', reason);
       await reloadAndRender('Reschedule request rejected.');
     } catch (error) {
       setFlashMessage(error.message, true);
-      rescheduleRejectBtn.removeAttribute('disabled');
+      rescheduleRejectConfirmBtn.removeAttribute('disabled');
     }
   });
 }

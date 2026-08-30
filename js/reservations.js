@@ -20,6 +20,9 @@ import {
     getBookingScope as getSharedBookingScope,
     getCalendarRange,
     getScopeLabel,
+    loadAdvanceNoticeRules,
+    getEffectiveMinAdvanceDays as getSharedEffectiveMinAdvanceDays,
+    isOutsideBookingWindow as sharedIsOutsideBookingWindow,
 } from '/js/reservation_availability.js';
 import { loadReservationFormConfig } from '/js/reservation_form_config.js';
 
@@ -274,27 +277,16 @@ const availabilityState = {
     selectedDateAvailability: null,
     timeStatusOverride: '',
     availableStartTimes: [],
-    // Booking window (min/max days from today) — from system_settings.reservation_rules,
-    // the same admin-editable value shown on the Reservation Rules tab. Previously loaded
-    // nowhere in this file; only a bare "not in the past" check applied.
-    minAdvanceDays: 14,
-    maxAdvanceDays: 365
 };
 
+// Booking window (min/max days from today, plus per-event-type overrides)
+// — loaded via the same reservation_availability.js module the reschedule
+// calendar (account.js) uses, so this page can never silently drift from
+// it. Populated by loadReservationRules() below.
+let advanceNoticeRules = null;
+
 async function loadReservationRules() {
-    try {
-        const { data, error } = await supabase
-            .from('system_settings')
-            .select('setting_value')
-            .eq('setting_key', 'reservation_rules')
-            .maybeSingle();
-        if (error || !data) return;
-        const parsed = JSON.parse(data.setting_value);
-        if (Number.isFinite(Number(parsed.min_advance_days))) availabilityState.minAdvanceDays = Number(parsed.min_advance_days);
-        if (Number.isFinite(Number(parsed.max_advance_days))) availabilityState.maxAdvanceDays = Number(parsed.max_advance_days);
-    } catch {
-        // Keep defaults — the calendar still works, just with the fallback window.
-    }
+    advanceNoticeRules = await loadAdvanceNoticeRules(supabase);
 }
 
 async function loadServiceChargeSettings() {
@@ -320,13 +312,11 @@ async function loadServiceChargeSettings() {
 // "use the site-wide default." "Other" and no-selection-yet both fall
 // back to the site-wide default.
 function getEffectiveMinAdvanceDays() {
-    const match = eventTypesCache.find(et => et.name === S.eventType);
-    return (match && Number.isFinite(match.minAdvanceDays)) ? match.minAdvanceDays : availabilityState.minAdvanceDays;
+    return getSharedEffectiveMinAdvanceDays(advanceNoticeRules, S.eventType);
 }
 
 function isOutsideBookingWindow(date, today) {
-    const diffDays = Math.round((date - today) / 86400000);
-    return diffDays < getEffectiveMinAdvanceDays() || diffDays > availabilityState.maxAdvanceDays;
+    return sharedIsOutsideBookingWindow(date, today, advanceNoticeRules, S.eventType);
 }
 
 // Landing a customer on a calendar page that's entirely grey (every date
