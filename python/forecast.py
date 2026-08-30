@@ -6,9 +6,16 @@ import sys
 import os
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
-SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM"
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Same reasoning as python/main.py: this needs to bypass RLS to read
+# `reservations` across all customers, so it must use the service role key,
+# loaded from the environment (set on Render), never hardcoded.
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not SUPABASE_SERVICE_ROLE_KEY:
+    print("ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is not set.", file=sys.stderr)
+    sys.exit(1)
+
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # 1. Fetch reservation data (ACTUAL)
 response = supabase.table("reservations").select("event_date").eq("status", "completed").execute()

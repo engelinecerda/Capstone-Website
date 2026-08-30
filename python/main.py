@@ -6,11 +6,28 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import subprocess
+import os
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
-SUPABASE_KEY = "sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM" 
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# This backend runs server-side and needs to read across all reservations
+# for analytics (package distribution, forecasting), regardless of which
+# staff member is logged in on the dashboard. That's a trusted, cross-cutting
+# read the anon/publishable key was never meant to satisfy — RLS correctly
+# blocks it from reading `reservations` (it holds customer PII), which is
+# what was causing the 500s on /forecast and /analytics/package-distribution.
+# The service role key bypasses RLS the same way the Supabase Edge Functions
+# in this project already do (see supabase/functions/*). It must be set as
+# an env var on Render — never hardcode it, it grants full DB access.
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not SUPABASE_SERVICE_ROLE_KEY:
+    raise RuntimeError(
+        "SUPABASE_SERVICE_ROLE_KEY environment variable is not set. "
+        "Add it in the Render dashboard (Environment tab) — get the value "
+        "from Supabase → Project Settings → API → service_role key."
+    )
+
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 app = FastAPI()
 
@@ -53,11 +70,14 @@ async def get_forecast():
         return supabase.table("reservations").select("event_date").eq("status", "completed").execute()  
 
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor() as pool:
-        forecast_res, res = await asyncio.gather(
-            loop.run_in_executor(pool, fetch_forecast),
-            loop.run_in_executor(pool, fetch_actuals)
-        )
+    try:
+        with ThreadPoolExecutor() as pool:
+            forecast_res, res = await asyncio.gather(
+                loop.run_in_executor(pool, fetch_forecast),
+                loop.run_in_executor(pool, fetch_actuals)
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load forecast data: {e}")
 
     if not forecast_res.data:
         return []
@@ -160,18 +180,21 @@ def monthly_reservations():
 @app.get("/analytics/package-distribution")
 def package_distribution():
 
-    res = (
-        supabase.table("reservations")
-        .select("""
-            reservation_id,
-            package:package_id (
-                package_category:package_category_id (
-                    category_name
+    try:
+        res = (
+            supabase.table("reservations")
+            .select("""
+                reservation_id,
+                package:package_id (
+                    package_category:package_category_id (
+                        category_name
+                    )
                 )
-            )
-        """)
-        .execute()
-    )
+            """)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load package distribution: {e}")
 
     counts = {}
 

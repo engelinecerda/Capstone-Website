@@ -630,6 +630,98 @@ body {
     font-size: 12.5px;
 }
 
+.payment-proof-uploaded {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid var(--pay-border);
+    border-radius: 10px;
+    background: var(--pay-cream-alt);
+    padding: 14px 16px;
+}
+
+.payment-proof-uploaded-thumb {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--pay-border);
+    display: grid;
+    place-items: center;
+    color: var(--pay-muted);
+    font-size: 18px;
+}
+
+.payment-proof-uploaded-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.payment-proof-uploaded-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.payment-proof-uploaded-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--pay-green-text);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.payment-proof-uploaded-name {
+    margin-top: 3px;
+    color: var(--pay-text);
+    font-size: 13.5px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.payment-proof-uploaded-size {
+    margin-top: 1px;
+    color: var(--pay-muted);
+    font-size: 12px;
+}
+
+.payment-proof-uploaded-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+}
+
+.payment-proof-action-btn {
+    border: 1px solid var(--pay-border);
+    background: #fff;
+    color: var(--pay-text);
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.payment-proof-action-btn:hover {
+    border-color: var(--pay-espresso);
+}
+
+.payment-proof-action-btn.danger {
+    color: var(--pay-red-text);
+}
+
+.payment-proof-action-btn.danger:hover {
+    border-color: var(--pay-red-text);
+    background: var(--pay-red-bg);
+}
+
 .payment-submit-preview {
     padding: 14px 16px;
     display: flex;
