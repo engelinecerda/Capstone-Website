@@ -563,6 +563,7 @@ const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,
   refund_window_days: 14,
+  proof_of_payment_window_days: 3,
   currency: 'PHP',
   cancellation_fee_onsite: 500,
   cancellation_fee_offsite: 2000,
@@ -579,6 +580,7 @@ function populatePaymentRulesFields(config) {
   const maxInst = document.getElementById('pr-max-installments');
   const autoHold = document.getElementById('pr-auto-hold');
   const refundWindow = document.getElementById('pr-refund-window');
+  const proofWindow = document.getElementById('pr-proof-window');
   const currency = document.getElementById('pr-currency');
   const cancelOnsite = document.getElementById('pr-cancellation-fee-onsite');
   const cancelOffsite = document.getElementById('pr-cancellation-fee-offsite');
@@ -587,6 +589,7 @@ function populatePaymentRulesFields(config) {
   if (maxInst) maxInst.value = config.max_installments ?? '';
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
   if (refundWindow) refundWindow.value = config.refund_window_days ?? '';
+  if (proofWindow) proofWindow.value = config.proof_of_payment_window_days ?? '';
   if (currency) currency.value = config.currency ?? 'PHP';
   if (cancelOnsite) cancelOnsite.value = config.cancellation_fee_onsite ?? '';
   if (cancelOffsite) cancelOffsite.value = config.cancellation_fee_offsite ?? '';
@@ -598,6 +601,7 @@ function readPaymentRulesFields() {
     max_installments: Number(document.getElementById('pr-max-installments')?.value),
     auto_hold_enabled: !!document.getElementById('pr-auto-hold')?.checked,
     refund_window_days: Number(document.getElementById('pr-refund-window')?.value),
+    proof_of_payment_window_days: Number(document.getElementById('pr-proof-window')?.value),
     currency: 'PHP',
     cancellation_fee_onsite: Number(document.getElementById('pr-cancellation-fee-onsite')?.value),
     cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value),
@@ -612,6 +616,7 @@ function readPaymentRulesFields() {
 function validatePaymentRules(config) {
   if (!Number.isFinite(config.max_installments) || config.max_installments < 1) return 'Maximum installments must be at least 1.';
   if (!Number.isFinite(config.refund_window_days) || config.refund_window_days < 0) return 'Refund window must be zero or more days.';
+  if (!Number.isFinite(config.proof_of_payment_window_days) || config.proof_of_payment_window_days < 0) return 'Proof of payment window must be zero or more days.';
   if (!Number.isFinite(config.cancellation_fee_onsite) || config.cancellation_fee_onsite < 0) return 'Onsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.cancellation_fee_offsite) || config.cancellation_fee_offsite < 0) return 'Offsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.reschedule_fee) || config.reschedule_fee < 0) return 'Reschedule fee must be zero or more.';
@@ -658,8 +663,8 @@ async function savePaymentRules() {
 
   showSettingsConfirm(
     'Change Payment Rules',
-    `${oldConfig.max_installments} installments, ${oldConfig.refund_window_days}d refund window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${oldConfig.cancellation_fee_onsite}/₱${oldConfig.cancellation_fee_offsite}, reschedule fee ₱${oldConfig.reschedule_fee}`,
-    `${config.max_installments} installments, ${config.refund_window_days}d refund window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${config.cancellation_fee_onsite}/₱${config.cancellation_fee_offsite}, reschedule fee ₱${config.reschedule_fee}`,
+    `${oldConfig.max_installments} installments, ${oldConfig.refund_window_days}d refund window, ${oldConfig.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${oldConfig.cancellation_fee_onsite}/₱${oldConfig.cancellation_fee_offsite}, reschedule fee ₱${oldConfig.reschedule_fee}`,
+    `${config.max_installments} installments, ${config.refund_window_days}d refund window, ${config.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${config.cancellation_fee_onsite}/₱${config.cancellation_fee_offsite}, reschedule fee ₱${config.reschedule_fee}`,
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase

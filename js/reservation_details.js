@@ -216,7 +216,13 @@ function isCancellationFeeOwed(reservation, payments) {
 // "Locked"; future steps carry no sublabel at all.
 function buildStepperSteps(reservation, contractMeta, balance, payments) {
     const verificationDone = isReservationPaymentEnabled(reservation);
-    const paymentDone = balance.remainingBalance <= 0;
+    // "Payment" and "Confirmed" complete as soon as ANY base payment type
+    // (reservation fee, down payment, custom amount, or full payment) has
+    // been approved — not only once the full balance is paid. A remaining
+    // balance is still communicated separately via the note strip/header
+    // balance badge (both driven by balance.remainingBalance, unchanged),
+    // so this doesn't hide that a balance is still due.
+    const paymentDone = balance.approvedBaseTotal > 0;
     const latestApprovedPaymentDate = getLatestApprovedPaymentDate(payments);
 
     return [
