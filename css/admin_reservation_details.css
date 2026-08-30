@@ -1064,6 +1064,21 @@
   border-color: #B98F6A;
 }
 
+/* Reason-for-rejection block inside .reschedule-review-panel — same
+   pattern as .reject-reason-inline on the Payments review modal
+   (css/admin_payments.css), reusing this page's own .record-payment-*
+   field styles rather than a cross-file import for one small block. */
+.reject-reason-inline {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.reject-reason-inline .record-payment-textarea {
+  min-height: 56px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
 .record-payment-inline-warning {
   margin: 6px 0 0;
   font-size: 10.5px;

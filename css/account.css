@@ -3519,6 +3519,16 @@ body {
     cursor: not-allowed;
 }
 
+/* Same treatment as .availability-day.past on the booking form's calendar
+   (css/reservations.css) — "too soon to book" and already-past dates,
+   visually distinct from "fully booked" now instead of sharing .disabled. */
+.reschedule-day.past {
+    background: #f8f5f1;
+    border-color: #eadbcf;
+    color: #c3b5a7;
+    cursor: not-allowed;
+}
+
 .reschedule-day.closed {
     background: #efe5dc;
     border-color: #d4bca6;
@@ -3567,6 +3577,10 @@ body {
 
 .reschedule-swatch.closed {
     background: #7f5539;
+}
+
+.reschedule-swatch.past {
+    background: #c3b5a7;
 }
 
 .reschedule-time-section {

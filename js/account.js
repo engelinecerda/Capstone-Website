@@ -2356,16 +2356,34 @@ function renderRescheduleCalendar() {
         } else if (isBooked) {
             classNames.push('booked');
             label = 'This date is fully booked.';
-        } else if (isOutsideWindow) {
+        } else if (isCurrent) {
+            // Checked before isOutsideWindow/isPastOrToday on purpose — the
+            // reservation's own existing date can easily fall within the
+            // advance-notice window relative to today, but it isn't a "too
+            // soon to book" date for a *new* booking, so it keeps its own
+            // distinct label/styling (.current, added below) instead of
+            // being swept into the "past" treatment.
             classNames.push('disabled');
+            label = 'Current booking date';
+        } else if (isOutsideWindow) {
+            // Same .past class (and swatch) as the "Too Soon to Book" /
+            // "past" entries on the booking form's calendar
+            // (reservations.html) — previously this used the same generic
+            // 'disabled' class as "fully booked", so a too-soon date was
+            // visually indistinguishable from a booked-out one, and the
+            // legend below had no matching entry for it at all.
+            classNames.push('past');
             const effectiveMinDays = getEffectiveMinAdvanceDaysForReservation(reservation);
             const diffDays = Math.round((date - today) / 86400000);
             label = diffDays < effectiveMinDays
                 ? `Too soon to book — needs at least ${effectiveMinDays} day(s) notice.`
                 : 'Too far in advance to book.';
+        } else if (isPastOrToday) {
+            classNames.push('past');
+            label = 'This date has already passed.';
         } else {
             classNames.push('disabled');
-            label = isCurrent ? 'Current booking date' : 'Unavailable';
+            label = 'Unavailable';
         }
 
         if (isCurrent) classNames.push('current');
