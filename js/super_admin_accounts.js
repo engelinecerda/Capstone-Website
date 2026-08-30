@@ -6,6 +6,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 // supabase-js's functions.invoke() sets `data` to null on any non-2xx
 // response — the actual JSON body the function returned (our friendly
@@ -270,25 +271,7 @@ document.getElementById('statusFilterSeg').addEventListener('click', e => {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-let lastAutoRefreshAt = 0;
-const AUTO_REFRESH_DEBOUNCE_MS = 3000;
-const AUTO_REFRESH_POLL_MS = 60000;
-
-function triggerAutoRefresh() {
-  const now = Date.now();
-  if (now - lastAutoRefreshAt < AUTO_REFRESH_DEBOUNCE_MS) return;
-  lastAutoRefreshAt = now;
-  loadAccounts({ silent: true });
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-window.addEventListener('focus', triggerAutoRefresh);
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) triggerAutoRefresh();
-});
-setInterval(triggerAutoRefresh, AUTO_REFRESH_POLL_MS);
+initAutoRefresh(() => loadAccounts({ silent: true }));
 
 // ── FOCUS TRAP (shared by Account + Confirm modals) ───────────────
 function trapFocus(container) {

@@ -1,4 +1,5 @@
 import { customerSupabase as supabase } from './supabase.js';
+import { initAutoRefresh } from './auto_refresh.js';
 import {
     REFERENCE_NUMBER_PATTERNS,
     buildCustomerAccountUrl,
@@ -1186,3 +1187,17 @@ document.addEventListener('keydown', (event) => {
 });
 
 await loadPaymentPage();
+
+initAutoRefresh(() => {
+    // renderReservationPaymentPage() fully rebuilds paymentApp's markup, which
+    // would wipe out an in-progress reference number or a chosen-but-not-yet-
+    // submitted receipt file. Skip the refresh while the customer is actively
+    // interacting with the form, or while a submission is in flight; the next
+    // poll/focus event will pick it up.
+    const proofFileInput = document.getElementById('payment-proof-file');
+    const isEditingForm = paymentApp?.contains(document.activeElement);
+    const hasUnsubmittedFile = !!(proofFileInput && proofFileInput.files && proofFileInput.files.length > 0);
+    if (isEditingForm || hasUnsubmittedFile || state.isSubmitting) return;
+
+    loadPaymentPage();
+});
