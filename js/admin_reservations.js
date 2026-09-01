@@ -8,7 +8,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
-import { getPaymentStatusPillMeta } from './reservation_shared.js';
+import { getPaymentStatusPillMeta, fetchUnseenReservationChanges, markReservationChangesSeen } from './reservation_shared.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 
@@ -43,6 +43,12 @@ let staffDirectory = [];
 let assignmentMapByReservationId = {};
 let assignmentFeatureReady = true;
 let assignmentFeatureMessage = '';
+let unseenChangeIds = new Set();
+// Separate from unseenChangeIds: snapshotted when "Review" is clicked, so
+// the table filter still shows the just-reviewed rows for this viewing
+// session even after unseenChangeIds itself is cleared (which is what
+// makes the banner disappear).
+let reviewFilterIds = new Set();
 let showPendingRescheduleOnly = false;
 
 function setMessage(el, msg, isError = false) {
@@ -228,7 +234,7 @@ function sortReservationsForView(list, status) {
 }
 
 function getEmptyFilterMessage(status) {
-  if (showPendingRescheduleOnly) return 'No pending reschedule requests match the current filter.';
+  if (showPendingRescheduleOnly) return 'No recently cancelled or rescheduled reservations match the current filter.';
   if (status === 'upcoming') return 'No upcoming reservations found.';
   return 'No reservations match the current filter.';
 }
@@ -310,41 +316,43 @@ function formatReadableKey(value) {
 
 function getLatestOpenRescheduleRequest(reservation) {
   return getReservationRescheduleRequests(reservation)
-    .find((request) => ['pending', 'approved_pending_payment'].includes(String(request.status || '').toLowerCase())) || null;
+    .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment') || null;
 }
 
+// update-v20 — no manager approval left to flag; this now tracks whether
+// a reservation has an unseen customer-initiated cancellation or
+// reschedule (finalized or still awaiting fee), per unseenChangeIds
+// (js/reservation_shared.js's fetchUnseenReservationChanges, refreshed in
+// loadData()). Function name kept for the smaller diff against the
+// pre-existing "only show reschedule-flagged rows" filter below.
 function hasPendingRescheduleRequest(reservation) {
-  return getReservationRescheduleRequests(reservation)
-    .some((request) => String(request.status || '').toLowerCase() === 'pending');
+  return reviewFilterIds.has(reservation.reservation_id);
 }
 
-function getPendingRescheduleRequestCount(list) {
-  return list.filter((reservation) => hasPendingRescheduleRequest(reservation)).length;
+function getPendingRescheduleRequestCount() {
+  return unseenChangeIds.size;
 }
 
-function renderPendingRescheduleAlert(list) {
+function renderPendingRescheduleAlert() {
   if (!rescheduleAlert || !rescheduleAlertCount || !rescheduleAlertText) return;
 
-  const pendingCount = getPendingRescheduleRequestCount(list);
-  if (!pendingCount) {
+  const count = unseenChangeIds.size;
+  if (!count) {
     showPendingRescheduleOnly = false;
     rescheduleAlert.hidden = true;
     rescheduleAlert.classList.add('hidden');
     rescheduleAlert.setAttribute('aria-hidden', 'true');
     rescheduleAlertCount.textContent = '0';
-    rescheduleAlertText.textContent = 'Customers have requested schedule changes that still need admin review.';
     return;
   }
 
   rescheduleAlert.hidden = false;
   rescheduleAlert.classList.remove('hidden');
   rescheduleAlert.setAttribute('aria-hidden', 'false');
-  rescheduleAlertCount.textContent = String(pendingCount);
-  rescheduleAlertText.textContent = pendingCount === 1
-    ? '1 customer has requested a schedule change that still needs admin review.'
-    : `${pendingCount} customers have requested schedule changes that still need admin review.`;
+  rescheduleAlertCount.textContent = String(count);
+  rescheduleAlertText.textContent = 'Customers can cancel or reschedule without approval — this is just for visibility.';
   if (rescheduleAlertAction) {
-    rescheduleAlertAction.textContent = 'Review Requests';
+    rescheduleAlertAction.textContent = 'Review';
   }
 }
 
@@ -426,7 +434,7 @@ function renderStats(list) {
     const val = status === 'all' ? counts.total : (counts[status] ?? 0);
     chip.textContent = `${chip.textContent.split('(')[0].trim()} (${val})`;
   });
-  renderPendingRescheduleAlert(list);
+  renderPendingRescheduleAlert();
 }
 
 function renderTable(list) {
@@ -492,7 +500,7 @@ function filterAndRender({ resetPage = true } = {}) {
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
   const status = dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
-  if (!getPendingRescheduleRequestCount(reservationsCache)) {
+  if (!getPendingRescheduleRequestCount()) {
     showPendingRescheduleOnly = false;
   }
   const filtered = sortReservationsForView(
@@ -539,12 +547,22 @@ function wireFilters() {
     statusDropdown.value = 'all';
     filterAndRender();
   });
-  rescheduleAlertAction?.addEventListener('click', () => {
+  rescheduleAlertAction?.addEventListener('click', async () => {
+    reviewFilterIds = new Set(unseenChangeIds);
     showPendingRescheduleOnly = true;
     statusDropdown.value = 'all';
     chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     chipsRow?.querySelector('[data-status="all"]')?.classList.add('active');
+
+    const idsToMark = Array.from(unseenChangeIds);
+    unseenChangeIds = new Set();
     filterAndRender();
+
+    try {
+      await markReservationChangesSeen(supabase, idsToMark);
+    } catch (error) {
+      // Non-fatal — worst case the banner re-shows these on the next load.
+    }
   });
 }
 
@@ -768,6 +786,8 @@ async function loadData({ silent = false } = {}) {
     const freshReservationIds = freshReservations.map((r) => r.reservation_id).filter(Boolean);
 
     const freshPaymentSummaryMap = await fetchPaymentSummaries(freshReservationIds).catch(() => ({}));
+    const unseenChanges = await fetchUnseenReservationChanges(supabase).catch(() => ({ reservationIds: [] }));
+    unseenChangeIds = new Set(unseenChanges.reservationIds);
 
     let freshStaffDirectory = [];
     let freshAssignmentMap = {};
@@ -895,5 +915,17 @@ validateAdminSession({
     initManagerNotificationBell(supabase, session.user.id);
     initAdminNav({ role: profile.role });
     await loadData();
+
+    // Arrived from the Dashboard's "Review" action (already marked seen
+    // there) — apply the same "recently changed" filter here too.
+    if (new URLSearchParams(window.location.search).get('filter') === 'changed') {
+      const isChanged = (reservation) => (
+        ['cancellation_approved', 'cancelled'].includes(String(reservation.status || '').toLowerCase())
+        || getReservationRescheduleRequests(reservation).some((req) => ['approved_pending_payment', 'completed'].includes(String(req.status || '').toLowerCase()))
+      );
+      reviewFilterIds = new Set(reservationsCache.filter(isChanged).map((r) => r.reservation_id));
+      showPendingRescheduleOnly = true;
+      filterAndRender();
+    }
   }
 });

@@ -4,13 +4,14 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
-import { fetchDateAvailability, fetchBlackoutDates, getBookingScope as getSharedBookingScope } from './reservation_availability.js';
+import { getBookingScope as getSharedBookingScope } from './reservation_availability.js';
 import { getPaymentStatusPillMeta, getCancellationFee } from './reservation_shared.js';
 import { isReservationEventPast } from './reservation_status.js';
 import { recordInCafePayment, uploadPaymentReceipt, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { logAudit } from './audit_logger.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -36,14 +37,6 @@ const detailsFlashMessage = document.getElementById('detailsFlashMessage');
 const rescheduleReviewPanel = document.getElementById('rescheduleReviewPanel');
 const rescheduleHelperLine = document.getElementById('rescheduleHelperLine');
 const cancellationReviewPanel = document.getElementById('cancellationReviewPanel');
-const rescheduleRejectReasonBlock = document.getElementById('rescheduleRejectReasonBlock');
-const rescheduleRejectReasonInput = document.getElementById('rescheduleRejectReasonInput');
-const rescheduleRejectCancelBtn = document.getElementById('rescheduleRejectCancelBtn');
-const rescheduleRejectConfirmBtn = document.getElementById('rescheduleRejectConfirmBtn');
-const cancellationRejectReasonBlock = document.getElementById('cancellationRejectReasonBlock');
-const cancellationRejectReasonInput = document.getElementById('cancellationRejectReasonInput');
-const cancellationRejectCancelBtn = document.getElementById('cancellationRejectCancelBtn');
-const cancellationRejectConfirmBtn = document.getElementById('cancellationRejectConfirmBtn');
 
 const bookingDetailsGrid = document.getElementById('bookingDetailsGrid');
 const bookingDetailsRows = document.getElementById('bookingDetailsRows');
@@ -352,22 +345,6 @@ function getReservationCancellationFeePayment(reservation) {
     .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
 }
 
-// Reads what the reservation's status was right before the customer's
-// cancellation request (logged by js/account.js at request time) so
-// rejecting a request restores the exact prior state instead of guessing.
-async function findReservationCancellationRevertStatus(reservationId) {
-  const { data, error } = await supabase
-    .from('reservation_status')
-    .select('previous_status, changed_at')
-    .eq('reservation_id', reservationId)
-    .eq('new_status', 'cancellation_requested')
-    .order('changed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.previous_status || 'approved';
-}
-
 // The customer's chosen pay-at-café arrival date lives on the payment row
 // itself (cash_payment_date on a pending online cash/card submission), not
 // on the reservation — and is never touched by recording an in-café
@@ -621,84 +598,6 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   await logReservationStatusChange(reservationId, previousStatus, status);
 }
 
-async function handleRescheduleReview(requestId, nextStatus, rejectionReason = '') {
-  if (currentRole === 'admin') {
-    throw new Error('This action requires the Manager role.');
-  }
-
-  const reservation = currentReservation;
-  const request = getReservationRescheduleRequests(reservation).find((entry) => String(entry.reschedule_request_id) === String(requestId));
-
-  if (nextStatus === 'approved_pending_payment' && reservation && request) {
-    const requestedDateKey = formatDateKey(request.requested_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (new Date(`${requestedDateKey}T00:00:00`) < today) {
-      throw new Error('The requested date is in the past.');
-    }
-
-    const blackoutData = await fetchBlackoutDates(supabase, {});
-    if (blackoutData.closedDates.has(requestedDateKey)) {
-      throw new Error('The requested date is closed.');
-    }
-
-    const availability = await fetchDateAvailability(supabase, {
-      eventDate: request.requested_date,
-      scope: getBookingScope(reservation),
-      durationHours: getReservationDurationHours(reservation),
-      excludeReservationId: reservation.reservation_id
-    });
-    if (availability.scopeTaken) {
-      throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
-    }
-  }
-
-  const updatePayload = { status: nextStatus, reviewed_at: new Date().toISOString() };
-  if (nextStatus === 'rejected') {
-    updatePayload.rejection_reason = rejectionReason;
-  }
-
-  const { error } = await supabase
-    .from('reschedule_requests')
-    .update(updatePayload)
-    .eq('reschedule_request_id', requestId);
-  if (error) throw error;
-}
-
-// reservations has no dedicated column for "why a cancellation request was
-// rejected" (only cancellation_reason, the customer's own reason for
-// requesting it) — this is a UI-only change, so rather than add one, the
-// manager's typed reason is folded straight into the customer notification
-// body, same as how the reason itself is surfaced today.
-async function handleCancellationReject(reason) {
-  if (currentRole === 'admin') {
-    throw new Error('This action requires the Manager role.');
-  }
-
-  const reservation = currentReservation;
-  const previousStatus = reservation.status;
-  const revertStatus = await findReservationCancellationRevertStatus(reservation.reservation_id);
-  await updateReservationStatus(reservation.reservation_id, revertStatus, previousStatus);
-
-  // Explicit insert rather than relying on the reservation-status DB
-  // trigger — NEW.status after a revert (e.g. 'approved') is
-  // indistinguishable at the trigger level from a normal transition into
-  // that same status, so the trigger's existing 'approved' branch would
-  // fire its own "Reservation confirmed" notification instead of a
-  // rejection-specific one. Mirrors the plain (non-templated) insert
-  // pattern already used for the reschedule "rejected" case in
-  // notify_customer_on_reschedule_review().
-  if (reservation.user_id) {
-    await supabase.from('notifications').insert({
-      user_id: reservation.user_id,
-      type: 'reservation_status',
-      title: 'Cancellation Request Declined',
-      body: `Your cancellation request was not approved: ${reason} Your reservation remains active — contact us if you have any questions.`,
-      link: '/account.html'
-    });
-  }
-}
-
 /* ---------------------------------------------------------------- */
 /* Rendering                                                          */
 /* ---------------------------------------------------------------- */
@@ -724,14 +623,14 @@ function renderStickyHeader() {
   const reservation = currentReservation;
   const name = reservation.contact_name || 'Unknown customer';
   const activeRescheduleRequest = getLatestOpenRescheduleRequest(reservation);
-  const hasOpenReschedule = Boolean(activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'pending');
-  // A pending reschedule doesn't change reservations.status at all (it's
-  // tracked entirely in reschedule_requests), so the header pill would
-  // otherwise still read whatever the reservation's own status is (e.g.
-  // "Confirmed") while a reschedule is actually the active request —
+  const hasOpenReschedule = Boolean(activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'approved_pending_payment');
+  // An awaiting-fee reschedule doesn't change reservations.status at all
+  // (it's tracked entirely in reschedule_requests), so the header pill
+  // would otherwise still read whatever the reservation's own status is
+  // (e.g. "Confirmed") while a reschedule is actually the active request —
   // override it here so the pill always matches the request panel below it.
   const status = hasOpenReschedule
-    ? { key: 'reschedule_requested', label: 'Reschedule Requested' }
+    ? { key: 'reschedule_requested', label: 'Reschedule - Fee Due' }
     : formatStatusPill(getEffectiveReservationStatus(reservation));
 
   detailsAvatar.textContent = getCustomerInitials(name, reservation.contact_email);
@@ -752,37 +651,38 @@ function renderStickyHeader() {
   renderHeaderActions();
 }
 
+// update-v20: no manager approval for reschedule or cancellation — the
+// manager can't legitimately refuse either (a cancellation is the customer
+// leaving; a reschedule date is already availability-checked before
+// submission), so both are self-service and go straight to awaiting-fee.
+// The manager's only remaining touchpoint for them is verifying/recording
+// the fee payment on the Payments page (unchanged), plus visibility via
+// the read-only panels below and the Dashboard/Reservations alert banner.
+// The new-booking approve/decline flow (status === 'pending', a completely
+// separate feature from reschedule/cancellation) is untouched.
 function renderHeaderActions() {
   const reservation = currentReservation;
   const status = getEffectiveReservationStatus(reservation);
   const approvalState = getReservationApprovalState(reservation);
   const activeRescheduleRequest = getLatestOpenRescheduleRequest(reservation);
-  const hasOpenReschedule = Boolean(activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'pending');
+  const hasOpenReschedule = Boolean(activeRescheduleRequest && String(activeRescheduleRequest.status || '').toLowerCase() === 'approved_pending_payment');
   const isManager = currentRole !== 'admin';
 
-  // Only one request type is ever shown as active at a time — a pending
-  // reschedule request takes precedence over the reservation's own
-  // lifecycle state, so cancellation info/controls and a reschedule
-  // request are never displayed together. Both panels are read-only
-  // context for Admin (comment on renderCancellationReviewPanel below);
-  // only their Approve/Reject controls (in the header, below) are
-  // Manager-only.
+  // Only one request type is ever shown as active at a time — an
+  // awaiting-fee reschedule takes precedence over the reservation's own
+  // lifecycle state, so cancellation info and a reschedule request are
+  // never displayed together. Both panels are read-only context for both
+  // roles — there's nothing left to approve or reject.
   if (hasOpenReschedule) {
     cancellationReviewPanel.classList.add('hidden');
     renderRescheduleReviewPanel(activeRescheduleRequest);
     rescheduleReviewPanel.classList.remove('hidden');
-    rescheduleHelperLine.classList.toggle('hidden', !isManager);
+    rescheduleHelperLine.classList.remove('hidden');
   } else {
     rescheduleReviewPanel.classList.add('hidden');
     rescheduleHelperLine.classList.add('hidden');
     renderCancellationReviewPanel(reservation, status);
   }
-
-  // Re-rendering always reflects the current (possibly just-reloaded)
-  // data, so any in-progress "type a reason" form belongs to a state that
-  // no longer applies — close both, matching whichever panel is now shown.
-  closeRescheduleRejectReason();
-  closeCancellationRejectReason();
 
   if (!isManager) {
     detailsHeaderActions.innerHTML = '';
@@ -791,35 +691,31 @@ function renderHeaderActions() {
 
   const buttons = [];
 
-  if (hasOpenReschedule) {
-    buttons.push(`
-      <button type="button" class="header-action-btn primary" data-action="approve-reschedule">Approve reschedule</button>
-      <button type="button" class="header-action-btn decline" data-action="reject-reschedule">Reject request</button>
-    `);
-  } else if (status === 'pending') {
+  if (status === 'pending') {
     buttons.push(`
       <button type="button" class="header-action-btn primary" data-action="approve" ${approvalState.canApprove ? '' : 'disabled'} title="${escapeHtml(approvalState.reason || 'Approve reservation')}">Approve</button>
       <button type="button" class="header-action-btn decline" data-action="decline">Decline</button>
     `);
-  } else if (status === 'cancellation_requested') {
-    buttons.push(`
-      <button type="button" class="header-action-btn primary" data-action="approve-cancellation">Approve request</button>
-      <button type="button" class="header-action-btn decline" data-action="reject-cancellation">Reject request</button>
-    `);
+  } else if (hasOpenReschedule) {
+    buttons.push(`<span class="header-action-note">Waiting for the customer to pay the reschedule fee</span>`);
   } else if (status === 'cancellation_approved') {
     const feePayment = getReservationCancellationFeePayment(reservation);
     const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
-    if (feeStatus === 'approved') {
-      buttons.push(`<button type="button" class="header-action-btn primary" data-action="finalize-cancellation">Finalize cancellation</button>`);
+    if (feePayment && feeStatus !== 'rejected') {
+      buttons.push(`<span class="header-action-note">Cancellation fee is pending review</span>`);
     } else if (feePayment) {
-      buttons.push(`<span class="header-action-note">Cancellation fee ${escapeHtml(feeStatus === 'rejected' ? 'was rejected — awaiting resubmission' : 'is pending review')}</span>`);
+      buttons.push(`<span class="header-action-note">Cancellation fee was rejected — awaiting resubmission</span>`);
     } else {
       buttons.push(`<span class="header-action-note">Waiting for the customer to pay the cancellation fee</span>`);
     }
   }
-  // status === 'approved' with no pending request, and any other
+  // status === 'approved' with no open request, and any other
   // non-actionable state: no manual lifecycle button — completion is
   // automatic (syncCompletedReservations, run from Homepage/Reports).
+  // cancellation_approved with an *approved* fee also shows no button —
+  // finalizing (status -> cancelled, date freed) now happens automatically
+  // the moment the fee payment is approved (js/admin_payments.js), not a
+  // separate manual click.
 
   detailsHeaderActions.innerHTML = buttons.join('');
 }
@@ -830,14 +726,11 @@ function renderRescheduleReviewPanel(request) {
   document.getElementById('rescheduleRequestedDate').textContent =
     `${formatReservationDate(request.requested_date)}${request.requested_time ? ` / ${request.requested_time}` : ''}`;
 
-  // reschedule_requests has no customer-submitted reason column (only
-  // rejection_reason, for the manager's own decision) — this always shows
-  // the muted fallback until that's added.
+  // reschedule_requests has no customer-submitted reason column — this
+  // always shows the muted fallback until that's added.
   const reasonEl = document.getElementById('rescheduleReasonValue');
   reasonEl.textContent = 'No reason provided';
   reasonEl.classList.add('muted');
-
-  rescheduleRejectConfirmBtn.dataset.requestId = request.reschedule_request_id;
 }
 
 // Visible for both roles, same as the reschedule panel — this is read-only
@@ -1514,28 +1407,11 @@ function wireHeaderActions() {
     const reservation = currentReservation;
     const previousStatus = reservation.status;
 
-    // These two only reveal the mandatory reason field — they don't
-    // mutate anything themselves, so they skip the disabled/flash-message
-    // handling below entirely.
-    if (action === 'reject-reschedule') {
-      openRescheduleRejectReason();
-      return;
-    }
-    if (action === 'reject-cancellation') {
-      openCancellationRejectReason();
-      return;
-    }
-
     try {
       button.setAttribute('disabled', 'true');
       setFlashMessage('Updating reservation...');
 
-      if (action === 'approve-reschedule') {
-        const activeRequest = getLatestOpenRescheduleRequest(reservation);
-        if (!activeRequest) throw new Error('This reschedule request is no longer open.');
-        await handleRescheduleReview(activeRequest.reschedule_request_id, 'approved_pending_payment');
-        await reloadAndRender('Reschedule request approved.');
-      } else if (action === 'approve') {
+      if (action === 'approve') {
         const limitMessage = await getApprovalLimitMessage(reservation);
         if (limitMessage) throw new Error(limitMessage);
         const approvalState = getReservationApprovalState(reservation);
@@ -1546,136 +1422,10 @@ function wireHeaderActions() {
       } else if (action === 'decline') {
         await updateReservationStatus(reservation.reservation_id, 'declined', previousStatus);
         await reloadAndRender('Reservation declined.');
-      } else if (action === 'approve-cancellation') {
-        await updateReservationStatus(reservation.reservation_id, 'cancellation_approved', previousStatus);
-
-        // Fee amount now respects whatever an admin configured in the
-        // Payment Rules panel (system_settings.payment_rules), loaded once
-        // at init() into module-level `currentPaymentRules`. The original
-        // hardcoded-default call is kept below, commented, so this is a
-        // one-line revert if the configured-amount behavior ever needs to
-        // be rolled back.
-        // const cancellationFeeAmount = getCancellationFee(reservation);
-        const cancellationFeeAmount = getCancellationFee(reservation, currentPaymentRules);
-
-        const { error: feeError } = await supabase.from('payment').insert({
-          reservation_id: reservation.reservation_id,
-          payment_type: 'cancellation_fee',
-          amount: cancellationFeeAmount,
-          payment_status: 'pending_review',
-          submitted_at: new Date().toISOString()
-        });
-        if (feeError) throw feeError;
-
-        await reloadAndRender('Cancellation request approved. The customer can now pay the cancellation fee.');
-
-      } else if (action === 'finalize-cancellation') {
-        const feePayment = getReservationCancellationFeePayment(reservation);
-        const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
-        if (!feePayment || feeStatus !== 'approved') {
-          throw new Error('The cancellation fee must be approved on the Payments page before finalizing.');
-        }
-
-        await updateReservationStatus(reservation.reservation_id, 'cancelled', previousStatus);
-
-        const { error: cancellationError } = await supabase.from('reservation_cancellations').insert({
-          reservation_id: reservation.reservation_id,
-          user_id: reservation.user_id,
-          previous_status: previousStatus,
-          reason: reservation.cancellation_reason || null,
-          cancelled_at: new Date().toISOString()
-        });
-        if (cancellationError) throw cancellationError;
-
-        await reloadAndRender('Reservation has been cancelled.');
       }
     } catch (error) {
       setFlashMessage(error.message, true);
       button.removeAttribute('disabled');
-    }
-  });
-}
-
-// Shows the mandatory reason textarea in the request card, in place of the
-// Approve/Reject buttons in the sticky header — mirrors the same
-// click-to-reveal pattern the Payments review modal uses for "Reject
-// payment" (js/admin_payments.js), reusing this page's own
-// .record-payment-field-label/.record-payment-textarea styles rather than
-// pulling in payment-specific classes.
-function openRescheduleRejectReason() {
-  if (!rescheduleRejectReasonBlock) return;
-  detailsHeaderActions.innerHTML = '';
-  rescheduleRejectReasonBlock.classList.remove('hidden');
-  if (rescheduleRejectReasonInput) rescheduleRejectReasonInput.value = '';
-  rescheduleRejectReasonInput?.focus();
-}
-
-function closeRescheduleRejectReason() {
-  if (!rescheduleRejectReasonBlock) return;
-  rescheduleRejectReasonBlock.classList.add('hidden');
-  if (rescheduleRejectReasonInput) rescheduleRejectReasonInput.value = '';
-}
-
-function openCancellationRejectReason() {
-  if (!cancellationRejectReasonBlock) return;
-  detailsHeaderActions.innerHTML = '';
-  cancellationRejectReasonBlock.classList.remove('hidden');
-  if (cancellationRejectReasonInput) cancellationRejectReasonInput.value = '';
-  cancellationRejectReasonInput?.focus();
-}
-
-function closeCancellationRejectReason() {
-  if (!cancellationRejectReasonBlock) return;
-  cancellationRejectReasonBlock.classList.add('hidden');
-  if (cancellationRejectReasonInput) cancellationRejectReasonInput.value = '';
-}
-
-function wireRescheduleReviewPanel() {
-  rescheduleRejectCancelBtn?.addEventListener('click', () => {
-    closeRescheduleRejectReason();
-    renderHeaderActions();
-  });
-
-  rescheduleRejectConfirmBtn?.addEventListener('click', async () => {
-    const reason = rescheduleRejectReasonInput?.value.trim() || '';
-    if (!reason) {
-      setFlashMessage('Enter a reason for rejecting this reschedule request.', true);
-      rescheduleRejectReasonInput?.focus();
-      return;
-    }
-
-    try {
-      rescheduleRejectConfirmBtn.setAttribute('disabled', 'true');
-      setFlashMessage('Updating reschedule request...');
-      await handleRescheduleReview(rescheduleRejectConfirmBtn.dataset.requestId, 'rejected', reason);
-      await reloadAndRender('Reschedule request rejected.');
-    } catch (error) {
-      setFlashMessage(error.message, true);
-      rescheduleRejectConfirmBtn.removeAttribute('disabled');
-    }
-  });
-
-  cancellationRejectCancelBtn?.addEventListener('click', () => {
-    closeCancellationRejectReason();
-    renderHeaderActions();
-  });
-
-  cancellationRejectConfirmBtn?.addEventListener('click', async () => {
-    const reason = cancellationRejectReasonInput?.value.trim() || '';
-    if (!reason) {
-      setFlashMessage('Enter a reason for rejecting this cancellation request.', true);
-      cancellationRejectReasonInput?.focus();
-      return;
-    }
-
-    try {
-      cancellationRejectConfirmBtn.setAttribute('disabled', 'true');
-      setFlashMessage('Updating cancellation request...');
-      await handleCancellationReject(reason);
-      await reloadAndRender('Cancellation request rejected. Reservation restored.');
-    } catch (error) {
-      setFlashMessage(error.message, true);
-      cancellationRejectConfirmBtn.removeAttribute('disabled');
     }
   });
 }
@@ -1963,7 +1713,6 @@ async function init() {
 }
 
 wireHeaderActions();
-wireRescheduleReviewPanel();
 wireAssignmentModal();
 wireApprovalPrompt();
 wireReceiptViewer();
@@ -1993,5 +1742,11 @@ validateAdminSession({
     window.__ADMIN_ACTIVE_NAV__ = 'reservations';
     initAdminNav({ role: profile.role });
     await init();
+
+    // A customer withdrawing a request (or any other change) doesn't push
+    // to this page on its own — poll it in on focus/visibility-return plus
+    // a 60s fallback, same pattern account.js already uses, so a manager
+    // sitting on this page doesn't need to hit refresh to see it clear.
+    initAutoRefresh(() => reloadAndRender(''));
   }
 });

@@ -101,21 +101,13 @@
             <span class="request-card-row-label">Reason</span>
             <span class="request-card-row-value" id="rescheduleReasonValue"></span>
           </div>
-          <div class="reject-reason-inline hidden" id="rescheduleRejectReasonBlock">
-            <label class="record-payment-field-label" for="rescheduleRejectReasonInput">Reason for rejection <span class="record-payment-optional">(required)</span></label>
-            <textarea id="rescheduleRejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Requested date conflicts with another booking"></textarea>
-            <div class="details-action-row">
-              <button type="button" class="header-action-btn" id="rescheduleRejectCancelBtn">Cancel</button>
-              <button type="button" class="header-action-btn decline" id="rescheduleRejectConfirmBtn">Confirm rejection</button>
-            </div>
-          </div>
         </div>
-        <p class="request-card-helper hidden" id="rescheduleHelperLine">Approving checks the new date&rsquo;s availability. The date changes only after the reschedule fee is paid.</p>
+        <p class="request-card-helper hidden" id="rescheduleHelperLine">No approval needed — the date was already confirmed available. The date changes once the reschedule fee is paid.</p>
 
         <div class="request-card hidden" id="cancellationReviewPanel">
           <div class="request-card-head">
             <i class="fa-solid fa-ban" aria-hidden="true"></i>
-            <span>Cancellation requested by customer</span>
+            <span>Cancellation confirmed by customer</span>
           </div>
           <div class="request-card-row">
             <span class="request-card-row-label">Reason</span>
@@ -124,14 +116,6 @@
           <div class="request-card-row">
             <span class="request-card-row-label">Cancellation fee</span>
             <span class="request-card-row-value" id="cancellationFeeValue"></span>
-          </div>
-          <div class="reject-reason-inline hidden" id="cancellationRejectReasonBlock">
-            <label class="record-payment-field-label" for="cancellationRejectReasonInput">Reason for rejection <span class="record-payment-optional">(required)</span></label>
-            <textarea id="cancellationRejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Reservation already fulfilled"></textarea>
-            <div class="details-action-row">
-              <button type="button" class="header-action-btn" id="cancellationRejectCancelBtn">Cancel</button>
-              <button type="button" class="header-action-btn decline" id="cancellationRejectConfirmBtn">Confirm rejection</button>
-            </div>
           </div>
         </div>
 

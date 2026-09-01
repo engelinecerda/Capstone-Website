@@ -47,6 +47,8 @@ import {
     getCancellationFee,
     getRescheduleFee,
     getCancellationBlockReason,
+    isCancellationFeeOwed,
+    isRescheduleFeeOwed,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel
@@ -1135,7 +1137,7 @@ function renderRescheduleSection(reservation) {
         <div class="res-section-head">
             <div>
                 <div class="res-section-title">Reschedule Request</div>
-                <div class="res-section-copy">Choose a new available date first, then wait for admin review before paying the reschedule fee.</div>
+                <div class="res-section-copy">Choose a new available date first, then pay the reschedule fee to finalize it.</div>
             </div>
             ${statusBadge}
         </div>
@@ -1384,9 +1386,9 @@ function renderPendingPaymentOverview(reservation) {
     `;
 }
 
-function getReservationCardTone(statusKey, isPaymentEnabled, remainingBalance) {
+function getReservationCardTone(statusKey, isPaymentEnabled, remainingBalance, feeOwed = false) {
     if (['cancelled', 'declined'].includes(statusKey)) return 'rejected';
-    if (isPaymentEnabled && remainingBalance > 0) return 'payment-required';
+    if (feeOwed || (isPaymentEnabled && remainingBalance > 0)) return 'payment-required';
     if (['approved', 'confirmed', 'rescheduled', 'completed'].includes(statusKey)) return 'approved';
     return 'pending';
 }
@@ -1396,9 +1398,18 @@ function buildReservationCard(reservation, view) {
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation, balance.remainingBalance));
     const packageName = getReservationPackageName(reservation);
     const location = getReservationLocationLabel(reservation);
-    const paymentIsActionable = isSharedReservationPaymentEnabled(reservation) && balance.remainingBalance > 0;
+    // Not just balance.remainingBalance > 0 — that only reflects the base
+    // reservation total, excluding reschedule_fee/cancellation_fee (by
+    // design, see getReservationBalanceDetails). A fully-paid reservation
+    // with an owed fee had remainingBalance <= 0 and so no "Continue
+    // Payment" entry point at all, even though a fee genuinely needed
+    // paying. getAvailablePaymentOptions() already enumerates all three
+    // (base balance, reschedule fee, cancellation fee) correctly.
+    const paymentIsActionable = getAvailablePaymentOptions(reservation).length > 0;
+    const cancellationFeeOwed = isCancellationFeeOwed(reservation, getReservationPayments(reservation.reservation_id));
+    const rescheduleFeeOwed = isRescheduleFeeOwed(getReservationRescheduleRequests(reservation.reservation_id), getReservationPayments(reservation.reservation_id));
     const reviewState = view === 'past' ? getReservationReviewState(reservation) : null;
-    const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance);
+    const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed);
     const statusIcon = getReservationStatusIcon(reservationStatus.key);
 
     const detailsUrl = `reservation-details.html?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
@@ -1439,8 +1450,13 @@ function buildReservationCard(reservation, view) {
             </div>
 
             ${paymentIsActionable ? `
-                <div class="reservation-balance-line ${escapeHtml(balance.toneKey)}">
-                    <strong>${escapeHtml(formatCurrency(balance.remainingBalance))}</strong> due by ${escapeHtml(balance.dueDateLabel)}
+                <div class="reservation-balance-line ${escapeHtml(cancellationFeeOwed || rescheduleFeeOwed ? 'pending' : balance.toneKey)}">
+                    ${cancellationFeeOwed
+                        ? `<strong>${escapeHtml(formatCurrency(getCancellationFee(reservation, state.paymentRules)))}</strong> cancellation fee due`
+                        : (rescheduleFeeOwed
+                            ? `<strong>${escapeHtml(formatCurrency(getRescheduleFee(state.paymentRules)))}</strong> reschedule fee due`
+                            : `<strong>${escapeHtml(formatCurrency(balance.remainingBalance))}</strong> due by ${escapeHtml(balance.dueDateLabel)}`)
+                    }
                 </div>
             ` : ''}
 
@@ -2485,43 +2501,49 @@ async function submitCancellationRequest() {
     setCancelModalMessage('Submitting your cancellation request...');
 
     try {
-        // No `payment` row is inserted here — same reasoning as before
-        // (customer hasn't chosen a payment_method yet, and this reservation
-        // isn't even payable until a manager approves the request). This is
-        // now a two-gate flow instead of one: request -> manager approves or
-        // rejects -> only on approval does js/admin_reservation_details.js
-        // create the cancellation_fee row and flip status to
-        // 'cancellation_approved', which is what makes
-        // js/customer_payments.js's option builder actually offer the fee on
-        // the payment page. Nothing is payable at request time.
+        // Confirm-and-settle — no manager approval step. The manager can't
+        // meaningfully refuse a cancellation (the customer is leaving), so
+        // confirming here goes straight to awaiting-fee: the reservation
+        // moves to cancellation_approved and the system-wide cancellation
+        // fee becomes payable immediately. Manager's remaining touchpoint
+        // is verifying/recording that fee payment, same as any other.
         const previousStatus = reservation.status;
+        const feeAmount = getCancellationFee(reservation, state.paymentRules);
 
         const { error: statusError } = await supabase
             .from('reservations')
-            .update({ status: 'cancellation_requested', cancellation_reason: reason })
+            .update({ status: 'cancellation_approved', cancellation_reason: reason })
             .eq('reservation_id', reservationId);
 
         if (statusError) throw statusError;
 
-        // Logged so a manager rejecting this request later knows exactly
-        // which status to revert the reservation to, rather than guessing.
         const { error: historyError } = await supabase
             .from('reservation_status')
             .insert({
                 reservation_id: reservationId,
                 previous_status: previousStatus,
-                new_status: 'cancellation_requested',
+                new_status: 'cancellation_approved',
                 changed_at: new Date().toISOString()
             });
 
         if (historyError) throw historyError;
 
+        const { error: feeError } = await supabase.from('payment').insert({
+            reservation_id: reservationId,
+            payment_type: 'cancellation_fee',
+            amount: feeAmount,
+            payment_status: 'pending_review',
+            submitted_at: new Date().toISOString()
+        });
+
+        if (feeError) throw feeError;
+
         closeCancelModal();
         await loadReservations();
         openSubmissionFeedbackModal({
-            eyebrow: 'Request Submitted',
-            title: 'Cancellation Request Sent',
-            copy: 'Our team will review your request. You\'ll be notified once a decision is made, and if approved, you\'ll be asked to pay the cancellation fee to finalize it.'
+            eyebrow: 'Cancellation Confirmed',
+            title: 'Cancellation Confirmed',
+            copy: `Your reservation is cancelled. Pay the ${formatCurrency(feeAmount)} cancellation fee to finalize it and free your date.`
         });
     } catch (error) {
         if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
@@ -2600,6 +2622,12 @@ async function submitRescheduleRequest() {
             throw new Error(selectedRow?.reason || 'That time is no longer available. Please choose another.');
         }
 
+        // No manager approval step — the calendar this modal uses is the
+        // same availability-aware source as the booking form (closed dates,
+        // fully-booked dates, and the advance-notice window are already
+        // enforced by what's selectable), so a submitted date is already
+        // guaranteed valid. Goes straight to awaiting-fee; the manager's
+        // only remaining touchpoint is verifying the fee payment.
         const payload = {
             reservation_id: reservation.reservation_id,
             user_id: user.id,
@@ -2607,7 +2635,7 @@ async function submitRescheduleRequest() {
             original_time: reservation.event_time,
             requested_date: state.rescheduleModal.selectedDate,
             requested_time: state.rescheduleModal.selectedTime,
-            status: 'pending'
+            status: 'approved_pending_payment'
         };
 
         const { error } = await supabase

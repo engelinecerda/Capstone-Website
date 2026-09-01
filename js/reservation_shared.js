@@ -16,9 +16,13 @@ export const PAYMENT_TYPE_META = {
     reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' }
 };
 
+// update-v20: no manager approval step — a submitted reschedule goes
+// straight to approved_pending_payment (skips 'pending' entirely). That
+// entry is kept only so any not-yet-migrated historical row still renders
+// a sensible label rather than falling through to the raw status string.
 export const RESCHEDULE_STATUS_META = {
-    pending: { label: 'Pending Admin Review', key: 'pending' },
-    approved_pending_payment: { label: 'Approved - Waiting for Fee', key: 'info' },
+    pending: { label: 'Awaiting Fee', key: 'info' },
+    approved_pending_payment: { label: 'Awaiting Fee', key: 'info' },
     rejected: { label: 'Rejected', key: 'rejected' },
     completed: { label: 'Completed', key: 'approved' },
     // A cancellation request always supersedes an open reschedule — see
@@ -206,6 +210,39 @@ export function getReservationLocationLabel(reservation) {
         : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
 }
 
+export function getCancellationFeePayment(payments) {
+    return (payments || []).find((payment) => payment.payment_type === 'cancellation_fee') || null;
+}
+
+// True only while the reservation is sitting in cancellation_approved with
+// no cancellation_fee payment yet submitted, or with one that was rejected
+// (needs resubmission). Once a cancellation_fee payment is pending_review
+// or approved, this goes false.
+export function isCancellationFeeOwed(reservation, payments) {
+    if (String(reservation?.status || '').toLowerCase() !== 'cancellation_approved') return false;
+    const feePayment = getCancellationFeePayment(payments);
+    const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
+    return !feePayment || feeStatus === 'rejected';
+}
+
+// A reservation's balance.remainingBalance only tracks the base package
+// price (see getReservationBalanceDetails in customer_payments.js) — it
+// can read 0 while a reschedule or cancellation fee is still separately
+// owed on top of that. Both this and isCancellationFeeOwed above exist so
+// every surface that shows "what does the customer owe right now" (the
+// account.js reservation card, reservation_details.js, payment.js) agrees,
+// instead of three separate re-derivations drifting apart.
+export function isRescheduleFeeOwed(rescheduleRequests, payments) {
+    const openRequest = (rescheduleRequests || [])
+        .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
+    if (!openRequest) return false;
+    const hasExistingFee = (payments || []).some((payment) => (
+        String(payment.reschedule_request_id || '') === String(openRequest.reschedule_request_id)
+        && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+    ));
+    return !hasExistingFee;
+}
+
 export function getCancellationFee(reservation, paymentRules) {
     const isOffsite = String(reservation?.location_type || '').toLowerCase() === 'offsite';
     const key = isOffsite ? 'cancellation_fee_offsite' : 'cancellation_fee_onsite';
@@ -350,4 +387,60 @@ export function getCancellationBlockReason(reservation, paymentRules) {
     }
 
     return null;
+}
+
+// update-v20 manager alert banner — with no approve/reject step left on
+// either flow, this is the manager's replacement visibility: reservations
+// with a customer-initiated cancellation or reschedule that's finalized
+// (paid, change took effect) or in progress (confirmed, fee not yet paid)
+// and not yet reviewed (reservations.change_seen_at is null, or older than
+// the reservation's own updated_at — i.e. something changed since it was
+// last marked seen). "Review" (wired per-page) sets change_seen_at to
+// clear it; a later change naturally re-trips it.
+export async function fetchUnseenReservationChanges(supabase) {
+    const [{ data: cancellations, error: cancellationError }, { data: rescheduleRows, error: rescheduleError }] = await Promise.all([
+        supabase
+            .from('reservations')
+            .select('reservation_id, change_seen_at, updated_at')
+            .in('status', ['cancellation_approved', 'cancelled']),
+        supabase
+            .from('reschedule_requests')
+            .select('reservation_id')
+            .in('status', ['approved_pending_payment', 'completed'])
+    ]);
+    if (cancellationError) throw cancellationError;
+    if (rescheduleError) throw rescheduleError;
+
+    const rescheduleReservationIds = Array.from(new Set((rescheduleRows || []).map((row) => row.reservation_id)));
+    const cancellationIds = new Set((cancellations || []).map((row) => row.reservation_id));
+    const seenById = new Map((cancellations || []).map((row) => [row.reservation_id, row]));
+
+    const missingIds = rescheduleReservationIds.filter((id) => !seenById.has(id));
+    if (missingIds.length) {
+        const { data: rescheduleReservations, error: fetchError } = await supabase
+            .from('reservations')
+            .select('reservation_id, change_seen_at, updated_at')
+            .in('reservation_id', missingIds);
+        if (fetchError) throw fetchError;
+        (rescheduleReservations || []).forEach((row) => seenById.set(row.reservation_id, row));
+    }
+
+    const allIds = new Set([...cancellationIds, ...rescheduleReservationIds]);
+    const unseenIds = Array.from(allIds).filter((id) => {
+        const row = seenById.get(id);
+        if (!row) return false;
+        if (!row.change_seen_at) return true;
+        return new Date(row.change_seen_at).getTime() < new Date(row.updated_at).getTime();
+    });
+
+    return { count: unseenIds.length, reservationIds: unseenIds };
+}
+
+export async function markReservationChangesSeen(supabase, reservationIds) {
+    if (!reservationIds?.length) return;
+    const { error } = await supabase
+        .from('reservations')
+        .update({ change_seen_at: new Date().toISOString() })
+        .in('reservation_id', reservationIds);
+    if (error) throw error;
 }

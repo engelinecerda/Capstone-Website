@@ -386,6 +386,17 @@
             color: #7b6a5d;
             margin: 0;
         }
+        .availability-head p.availability-event-type-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #8A5A22;
+        }
+        .availability-event-type-note i {
+            margin-top: 1px;
+        }
         .availability-nav {
             display: flex;
             align-items: center;
