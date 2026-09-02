@@ -78,8 +78,8 @@ body {
   margin-bottom: 20px;
   padding: 18px 20px;
   border-radius: 16px;
-  border: 1px solid #f0cda7;
-  background: linear-gradient(180deg, #fff8ef 0%, #fff2e2 100%);
+  border: 0.5px solid #EAD9BC;
+  background: #FBF3E6;
   display: flex;
   align-items: center;
   justify-content: space-between;

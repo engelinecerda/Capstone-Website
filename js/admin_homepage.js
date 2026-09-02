@@ -8,6 +8,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { initAdminNav } from './admin_nav.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { fetchUnseenReservationChanges, markReservationChangesSeen } from './reservation_shared.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
@@ -20,6 +21,9 @@ const demandYearSelect = document.getElementById('demandYear');
 const monthlyYearSelect = document.getElementById('monthlyYear');
 const generateForecastBtn = document.getElementById('generateForecastBtn');
 const pageDate = document.getElementById('pageDate');
+const rescheduleAlert = document.getElementById('rescheduleAlert');
+const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
+const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
 const qaPendingCount = document.getElementById('qaPendingCount');
 const API = "https://capstone-website-papg.onrender.com";
 
@@ -765,7 +769,40 @@ generateForecastBtn?.addEventListener('click', async () => {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-initAutoRefresh(() => loadDashboard({ silent: true }));
+let dashboardUnseenChangeIds = [];
+
+// update-v20 manager alert banner — same source as admin_reservations.js's
+// (js/reservation_shared.js's fetchUnseenReservationChanges); "Review"
+// here navigates to the Reservations module instead of filtering in
+// place, since this is the Dashboard.
+async function refreshChangesAlert() {
+    if (!rescheduleAlert || !rescheduleAlertCount) return;
+    try {
+        const { count, reservationIds } = await fetchUnseenReservationChanges(supabase);
+        dashboardUnseenChangeIds = reservationIds;
+        rescheduleAlert.hidden = count === 0;
+        rescheduleAlert.classList.toggle('hidden', count === 0);
+        rescheduleAlert.setAttribute('aria-hidden', String(count === 0));
+        rescheduleAlertCount.textContent = String(count);
+    } catch (error) {
+        console.warn('Failed to load the recent-changes alert:', error.message);
+    }
+}
+
+rescheduleAlertAction?.addEventListener('click', async () => {
+    try {
+        await markReservationChangesSeen(supabase, dashboardUnseenChangeIds);
+    } catch (error) {
+        // Non-fatal — worst case the banner re-shows these on next load.
+    }
+    window.location.href = '/admin/reservations.html?filter=changed';
+});
+
+refreshChangesAlert();
+initAutoRefresh(() => {
+    loadDashboard({ silent: true });
+    refreshChangesAlert();
+});
 
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
 monthlyYearSelect?.addEventListener('change', () => { renderMonthlyChart(fullReservations, monthlyYearSelect.value); });

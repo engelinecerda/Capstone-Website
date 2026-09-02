@@ -25,7 +25,11 @@ import {
     computeCanReschedule,
     computeCanCancel,
     getCancellationBlockReason,
-    getCancellationFee
+    getCancellationFee,
+    getRescheduleFee,
+    getCancellationFeePayment,
+    isCancellationFeeOwed,
+    isRescheduleFeeOwed
 } from './reservation_shared.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
@@ -193,22 +197,6 @@ function getLatestApprovedPaymentDate(payments) {
     return approved[0]?.verified_at || approved[0]?.submitted_at || null;
 }
 
-function getCancellationFeePayment(payments) {
-    return (payments || []).find((payment) => payment.payment_type === 'cancellation_fee') || null;
-}
-
-// True only while the reservation is sitting in cancellation_approved with
-// no cancellation_fee payment yet submitted, or with one that was rejected
-// (needs resubmission). Once a cancellation_fee payment is pending_review
-// or approved, this goes false — matches the same "hasPendingCancellationFee"
-// gating customer_payments.js's getAvailablePaymentOptions() already uses
-// to decide whether to offer the fee as a payment option.
-function isCancellationFeeOwed(reservation, payments) {
-    if (String(reservation?.status || '').toLowerCase() !== 'cancellation_approved') return false;
-    const feePayment = getCancellationFeePayment(payments);
-    const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
-    return !feePayment || feeStatus === 'rejected';
-}
 
 // Four-step stepper: Submitted -> Verification -> Payment -> Confirmed.
 // Completed steps show a timestamp sublabel; the active step sets an
@@ -415,15 +403,15 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null) {
+function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false) {
     // balance.remainingBalance only tracks the base package price — it goes
     // to 0 the moment the package itself is paid off, regardless of whether
-    // a *cancellation* fee is now separately owed on top of that. Without
-    // the cancellationFeeOwed check, a fully-paid reservation that later
-    // moves to cancellation_approved reads as paymentDone forever and the
-    // CTA below never renders, even though the customer still owes money.
+    // a *cancellation* or *reschedule* fee is now separately owed on top of
+    // that. Without these checks, a fully-paid reservation that later gets
+    // one of those fees reads as paymentDone forever and the CTA below
+    // never renders, even though the customer still owes money.
     const baseBalancePaid = balance.remainingBalance <= 0;
-    const paymentDone = baseBalancePaid && !cancellationFeeOwed;
+    const paymentDone = baseBalancePaid && !cancellationFeeOwed && !rescheduleFeeOwed;
     const verificationDone = isReservationPaymentEnabled(reservation);
     const hideActions = ['cancelled', 'declined', 'completed'].includes(effectiveStatus);
     const showPaymentCta = !hideActions && !paymentDone;
@@ -452,6 +440,12 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                         <span>${escapeHtml(formatCurrency(getCancellationFee(reservation, paymentRules)))}</span>
                     </div>
                 ` : ''}
+                ${rescheduleFeeOwed ? `
+                    <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
+                        <span>Reschedule fee due</span>
+                        <span>${escapeHtml(formatCurrency(getRescheduleFee(paymentRules)))}</span>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="rd-contract-inset">
@@ -476,7 +470,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : 'Continue payment'}
+                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : 'Continue payment')}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your reservation is verified</p>` : ''}
             ` : ''}
@@ -489,35 +483,29 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
 // which voids the reschedule server-side) — so once the reservation itself
 // is in a cancellation state, that's the only active request shown here,
 // regardless of any now-voided reschedule history.
+//
+// Confirm-and-settle, no manager approval step (update-v20) — a customer
+// confirming cancellation goes straight to cancellation_approved with the
+// fee already payable, so this card only ever shows the awaiting-fee
+// state. There's no approval limbo to withdraw from, so no withdraw
+// control here.
 function buildCancellationRequestCard(reservation, cancellationFeePayment, paymentRules) {
-    const isPending = String(reservation.status || '').toLowerCase() === 'cancellation_requested';
-    const statusMeta = isPending
-        ? { label: 'Pending Admin Review', key: 'pending' }
-        : { label: 'Approved - Fee Due', key: 'info' };
-
     return `
         <section class="rd-panel rd-reschedule-card">
             <div class="rd-reschedule-card-head">
-                <h2 class="rd-panel-title">Cancellation request</h2>
-                <span class="res-status ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
+                <h2 class="rd-panel-title">Cancellation confirmed</h2>
+                <span class="res-status info">Fee due</span>
             </div>
             <dl class="rd-dl">
                 <div class="rd-dl-row rd-dl-row-wrap">
                     <dt><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Reason</dt>
                     <dd${reservation.cancellation_reason ? '' : ' class="muted"'}>${escapeHtml(reservation.cancellation_reason || 'No reason provided')}</dd>
                 </div>
-                ${!isPending ? `
-                    <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-coins" aria-hidden="true"></i> Cancellation fee</dt>
-                        <dd>${escapeHtml(formatCurrency(cancellationFeePayment?.amount ?? getCancellationFee(reservation, paymentRules)))}</dd>
-                    </div>
-                ` : ''}
-            </dl>
-            ${isPending ? `
-                <div class="rd-reschedule-row-actions">
-                    <button type="button" class="rd-cancel-link" data-action="withdraw-cancellation">Withdraw request</button>
+                <div class="rd-dl-row">
+                    <dt><i class="fa-solid fa-coins" aria-hidden="true"></i> Cancellation fee</dt>
+                    <dd>${escapeHtml(formatCurrency(cancellationFeePayment?.amount ?? getCancellationFee(reservation, paymentRules)))}</dd>
                 </div>
-            ` : ''}
+            </dl>
         </section>
     `;
 }
@@ -560,7 +548,10 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
     }
 
     const statusMeta = getRescheduleStatusMeta(latestRequest.status);
-    const isPendingReschedule = String(latestRequest.status || '').toLowerCase() === 'pending';
+    // No manager approval step (update-v20) — a reschedule request goes
+    // straight to approved_pending_payment, the only "before the date
+    // actually moves" state left to withdraw from.
+    const isPendingReschedule = String(latestRequest.status || '').toLowerCase() === 'approved_pending_payment';
 
     return `
         <section class="rd-panel rd-reschedule-card">
@@ -632,9 +623,16 @@ function render() {
     const isTerminalCancelled = ['cancelled', 'declined'].includes(effectiveStatus);
     const paymentUrl = buildCustomerPaymentUrl(reservationId);
     const cancellationFeeOwed = isCancellationFeeOwed(reservation, payments);
+    const rescheduleFeeOwed = isRescheduleFeeOwed(rescheduleRequests, payments);
+    // The 4-step booking stepper (Submitted/Verification/Payment/Confirmed)
+    // describes progress toward a *new* booking — showing it while a
+    // cancellation fee is owed read as if the original reservation was
+    // still being set up. The cancellation request card further down the
+    // page (buildCancellationRequestCard) already covers this state.
+    const isCancellationInProgress = cancellationFeeOwed;
 
     const showBalanceSummary = !isTerminalCancelled;
-    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed;
+    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed && !rescheduleFeeOwed;
 
     pageContainer.innerHTML = `
         <section class="rd-header-card">
@@ -648,14 +646,16 @@ function render() {
                 </div>
                 ${showBalanceSummary ? `
                     <div class="rd-header-right">
-                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (paymentDone ? 'Paid in full' : 'Balance due')}</span>
+                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (rescheduleFeeOwed ? 'Reschedule fee due' : (paymentDone ? 'Paid in full' : 'Balance due'))}</span>
                         <div class="rd-balance-amount-row">
                             <strong class="rd-balance-amount">${escapeHtml(
                                 cancellationFeeOwed
                                     ? formatCurrency(getCancellationFee(reservation, paymentRules))
-                                    : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))
+                                    : (rescheduleFeeOwed
+                                        ? formatCurrency(getRescheduleFee(paymentRules))
+                                        : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance)))
                             )}</strong>
-                            ${(!paymentDone && !cancellationFeeOwed) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
+                            ${(!paymentDone && !cancellationFeeOwed && !rescheduleFeeOwed) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
                         </div>
                     </div>
                 ` : ''}
@@ -663,10 +663,10 @@ function render() {
 
             ${isTerminalCancelled
                 ? buildCancellationNotice(reservation, effectiveStatus, cancellationInfo, getCancellationFeePayment(payments))
-                : buildStepperMarkup(buildStepperSteps(reservation, contractMeta, balance, payments))
+                : (isCancellationInProgress ? '' : buildStepperMarkup(buildStepperSteps(reservation, contractMeta, balance, payments)))
             }
 
-            ${!isTerminalCancelled ? (() => {
+            ${(!isTerminalCancelled && !isCancellationInProgress) ? (() => {
                 const note = getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance);
                 return `
                     <div class="rd-note-strip tone-${escapeHtml(note.tone)}">
@@ -679,7 +679,7 @@ function render() {
 
         <div class="rd-grid">
             ${buildEventDetailsPanel(reservation)}
-            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules)}
+            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed)}
         </div>
 
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules)}
@@ -752,15 +752,15 @@ async function submitCancellationRequest() {
     setCancelModalMessage('Submitting your cancellation request...');
 
     try {
-        // Same two-gate flow as account.js's cancel modal: this only files
-        // the request. js/admin_reservation_details.js creates the
-        // cancellation_fee payment row and flips the status to
-        // 'cancellation_approved' once a manager approves it.
+        // Confirm-and-settle — no manager approval step (update-v20, same
+        // as account.js's cancel modal). Goes straight to
+        // cancellation_approved with the fee already payable.
         const previousStatus = reservation.status;
+        const feeAmount = getCancellationFee(reservation, pageData.paymentRules);
 
         const { error: statusError } = await supabase
             .from('reservations')
-            .update({ status: 'cancellation_requested', cancellation_reason: reason })
+            .update({ status: 'cancellation_approved', cancellation_reason: reason })
             .eq('reservation_id', reservationId);
 
         if (statusError) throw statusError;
@@ -770,55 +770,33 @@ async function submitCancellationRequest() {
             .insert({
                 reservation_id: reservationId,
                 previous_status: previousStatus,
-                new_status: 'cancellation_requested',
+                new_status: 'cancellation_approved',
                 changed_at: new Date().toISOString()
             });
 
         if (historyError) throw historyError;
 
+        const { error: feeError } = await supabase.from('payment').insert({
+            reservation_id: reservationId,
+            payment_type: 'cancellation_fee',
+            amount: feeAmount,
+            payment_status: 'pending_review',
+            submitted_at: new Date().toISOString()
+        });
+
+        if (feeError) throw feeError;
+
         closeCancelModal();
         await loadPageData();
         render();
         openSubmissionFeedbackModal({
-            eyebrow: 'Request Submitted',
-            title: 'Cancellation Request Sent',
-            copy: 'Our team will review your request. You\'ll be notified once a decision is made, and if approved, you\'ll be asked to pay the cancellation fee to finalize it.'
+            eyebrow: 'Cancellation Confirmed',
+            title: 'Cancellation Confirmed',
+            copy: `Your reservation is cancelled. Pay the ${formatCurrency(feeAmount)} cancellation fee to finalize it and free your date.`
         });
     } catch (error) {
         if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
         setCancelModalMessage(`Failed to submit cancellation: ${error.message}`, true);
-    }
-}
-
-// Same lookup admin_reservation_details.js uses when a manager rejects a
-// cancellation — the reservation_status history row logged at the moment
-// cancellation was requested records what status to revert to.
-async function findCancellationRevertStatus(id) {
-    const { data, error } = await supabase
-        .from('reservation_status')
-        .select('previous_status')
-        .eq('reservation_id', id)
-        .eq('new_status', 'cancellation_requested')
-        .order('changed_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-    if (error) throw error;
-    return data?.previous_status || 'approved';
-}
-
-async function withdrawCancellationRequest() {
-    if (!window.confirm('Withdraw your cancellation request and keep this reservation active?')) return;
-    try {
-        const revertStatus = await findCancellationRevertStatus(reservationId);
-        const { error } = await supabase
-            .from('reservations')
-            .update({ status: revertStatus, cancellation_reason: null })
-            .eq('reservation_id', reservationId);
-        if (error) throw error;
-        await loadPageData();
-        render();
-    } catch (error) {
-        window.alert(`Failed to withdraw: ${error.message}`);
     }
 }
 
@@ -858,12 +836,6 @@ pageContainer?.addEventListener('click', async (event) => {
     const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
     if (cancelTriggerBtn) {
         openCancelModal();
-        return;
-    }
-
-    const withdrawCancelBtn = event.target.closest('[data-action="withdraw-cancellation"]');
-    if (withdrawCancelBtn) {
-        withdrawCancellationRequest();
         return;
     }
 

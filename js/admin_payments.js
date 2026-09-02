@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource, getCancellationFee, getRescheduleFee } from './reservation_shared.js';
+import { fetchBlackoutDates, fetchDateAvailability, getBookingScope as getSharedBookingScope } from './reservation_availability.js';
 import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
@@ -328,6 +329,22 @@ function getRescheduleRequest(requestId) {
   return rescheduleRequestMap[requestId] || null;
 }
 
+function getReservationDurationHours(reservation) {
+  const storedDuration = Number(reservation?.duration_hours || 0);
+  if (storedDuration > 0) return storedDuration;
+  const packageDuration = Number(reservation?.package?.duration_hours || 0);
+  if (packageDuration > 0) return packageDuration;
+  return 3;
+}
+
+function getBookingScope(reservation) {
+  return getSharedBookingScope(
+    reservation?.location_type,
+    reservation?.package?.package_name || '',
+    reservation?.booking_scope || reservation?.package?.booking_scope || null
+  );
+}
+
 function countPendingReservations(list) {
   return list.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
 }
@@ -550,13 +567,18 @@ async function fetchReservationsForPayments(reservationIds) {
     .from('reservations')
     .select(`
       reservation_id,
+      user_id,
       contact_name,
       contact_email,
       event_date,
       event_time,
       status,
       total_price,
-      package:package_id ( package_name )
+      location_type,
+      booking_scope,
+      duration_hours,
+      cancellation_reason,
+      package:package_id ( package_name, duration_hours, booking_scope )
     `)
     .in('reservation_id', reservationIds);
 
@@ -735,6 +757,50 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
   const payment = getPaymentById(paymentId);
   if (!payment) throw new Error('Payment record could not be found.');
 
+  // Option B — the reschedule fee is only approvable when the requested
+  // date is still actually available. The date was checked once at
+  // submission (js/account.js's availability-aware calendar), but time has
+  // passed since then, so it's re-checked here, at the moment the date
+  // would actually move, against the same closed-dates/availability
+  // source the calendar reads. If it's no longer valid, the payment is
+  // rejected instead of approved — the reservation is never silently
+  // moved onto an invalid date, and the customer isn't charged for one.
+  // They keep their existing reschedule request (still awaiting fee) and
+  // can withdraw it to pick a new date.
+  if (nextStatus === 'approved' && payment.payment_type === 'reschedule_fee' && payment.reschedule_request_id) {
+    const request = getRescheduleRequest(payment.reschedule_request_id);
+    if (!request) {
+      throw new Error('Linked reschedule request could not be found.');
+    }
+    const reservation = getReservation(payment.reservation_id);
+
+    const requestedDateKey = formatDateKey(request.requested_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const invalidReason = new Date(`${requestedDateKey}T00:00:00`) < today
+      ? 'the requested date is now in the past'
+      : null;
+
+    const blackoutData = invalidReason ? null : await fetchBlackoutDates(supabase, {});
+    const isClosed = blackoutData?.closedDates?.has(requestedDateKey);
+
+    const availability = (invalidReason || isClosed) ? null : await fetchDateAvailability(supabase, {
+      eventDate: request.requested_date,
+      scope: getBookingScope(reservation),
+      durationHours: getReservationDurationHours(reservation),
+      excludeReservationId: payment.reservation_id
+    });
+
+    const reason = invalidReason
+      || (isClosed ? 'the requested date is now closed' : null)
+      || (availability?.scopeTaken ? 'the requested date is now fully booked' : null);
+
+    if (reason) {
+      nextStatus = 'rejected';
+      rejectionReason = `This date is no longer available (${reason}). Please withdraw this request and select a new date.`;
+    }
+  }
+
   const updatePayload = {
     payment_status: nextStatus,
     verified_at: new Date().toISOString()
@@ -780,6 +846,28 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
         .eq('reschedule_request_id', payment.reschedule_request_id);
 
       if (requestError) throw requestError;
+    }
+
+    // No manager "finalize cancellation" click anymore (update-v20) —
+    // approving the fee itself finalizes it, same as reschedule above.
+    if (payment.payment_type === 'cancellation_fee') {
+      const reservation = getReservation(payment.reservation_id);
+
+      const { error: reservationError } = await supabase
+        .from('reservations')
+        .update({ status: 'cancelled' })
+        .eq('reservation_id', payment.reservation_id);
+
+      if (reservationError) throw reservationError;
+
+      const { error: cancellationError } = await supabase.from('reservation_cancellations').insert({
+        reservation_id: payment.reservation_id,
+        user_id: reservation?.user_id || null,
+        previous_status: 'cancellation_approved',
+        reason: reservation?.cancellation_reason || null,
+        cancelled_at: new Date().toISOString()
+      });
+      if (cancellationError) throw cancellationError;
     }
   }
 }

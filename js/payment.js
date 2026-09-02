@@ -6,7 +6,7 @@ import {
     getAvailablePaymentOptions,
     getLatestApprovedReservationPayment,
     getLatestReservationPayment,
-    getMinPaymentDateKey,
+    getPendingBasePayment,
     getPaymentLabel,
     getPaymentStatusMeta,
     getPaymentSummary,
@@ -760,14 +760,23 @@ function renderActionableCard(reservation) {
 }
 
 function renderPendingCard(reservation) {
-    const pendingPayment = getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
+    // isPendingPaymentOverview() (the caller's routing check) only ever
+    // reaches this card because getPendingBasePayment() found a genuinely
+    // pending base payment — display that same payment, not just
+    // whatever's most recent overall. getLatestReservationPayment() could
+    // be a completely different, already-approved payment (e.g. a
+    // reschedule/cancellation fee approved after this base payment was
+    // submitted), which showed as a contradictory "Approved" pill inside
+    // this "waiting for review" card.
+    const pendingPayment = getPendingBasePayment(state.bundle.paymentsByReservationId, reservation.reservation_id)
+        || getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
     const paymentStatus = getPaymentStatusMeta(pendingPayment?.payment_status || 'pending_review');
     const methodLabel = LEGACY_METHOD_DISPLAY_LABELS[pendingPayment?.payment_method] || pendingPayment?.payment_method || 'Payment method';
 
     return `
         <section class="payment-focus-card">
             <div class="payment-readonly-card">
-                <span class="res-status pending"><i class="fa-solid fa-clock" aria-hidden="true"></i> ${escapeHtml(paymentStatus.label)}</span>
+                <span class="res-status ${escapeHtml(paymentStatus.key)}"><i class="fa-solid fa-clock" aria-hidden="true"></i> ${escapeHtml(paymentStatus.label)}</span>
                 <h2 class="payment-readonly-title">Payment submitted and waiting for admin review</h2>
                 <p class="payment-readonly-copy">Your latest payment is already in review. Once the admin confirms it, your balance and receipt records will update here automatically.</p>
                 <div class="payment-dl">
