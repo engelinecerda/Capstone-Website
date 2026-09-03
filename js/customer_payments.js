@@ -1,4 +1,4 @@
-import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee } from './reservation_shared.js';
+import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed } from './reservation_shared.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -332,6 +332,22 @@ export function getPendingBasePayment(paymentsByReservationId, reservationId) {
         .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
 }
 
+// Unlike getPendingBasePayment above (deliberately base-only — it gates
+// whether NEW base payment options should be offered, and a pending
+// reschedule/cancellation fee shouldn't block that), this covers EVERY
+// payment type. Used anywhere the UI needs to answer "what payment is the
+// customer currently waiting on?" — base-only used to mean a more recent
+// reschedule_fee/cancellation_fee submission (or its approval) was
+// invisible to those displays, which either showed an unrelated older
+// base payment's amount instead of the fee just paid, or kept a stale
+// "pending" status/label showing even after that fee was actually
+// approved.
+export function getLatestPendingPayment(paymentsByReservationId, reservationId) {
+    return getReservationPayments(paymentsByReservationId, reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
+        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+}
+
 // fullPaymentDays defaults to RESERVATION_RULES_DEFAULTS.full_payment_days
 // (7) so callers that haven't loaded reservation_rules yet keep the exact
 // prior behavior — pass options.reservationRules?.full_payment_days from
@@ -478,18 +494,32 @@ function getReservationFeeAmount(reservation, remainingBalance, paymentTypes) {
 }
 
 export function getAvailablePaymentOptions(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
-    if (!isReservationPaymentEnabled(reservation)) {
-        return [];
+    const reservationId = reservation.reservation_id;
+    const optionsList = [];
+
+    // Checked before the isReservationPaymentEnabled gate below, which
+    // excludes 'cancelled' on purpose (a cancelled reservation shouldn't
+    // offer to pay the rest of the event balance) — but the cancellation
+    // fee itself is exactly what's owed once cancelled, so it can't be
+    // gated behind the same check or it would never appear.
+    if (isCancellationFeeOwed(reservation, getReservationPayments(paymentsByReservationId, reservationId))) {
+        optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', getSharedCancellationFee(reservation, options.paymentRules), paymentsByReservationId, {
+            ...options,
+            displayLabel: 'Cancellation Fee',
+            displayDescription: 'Required fee to finalize the cancellation of your reservation.'
+        }));
     }
 
-    const reservationId = reservation.reservation_id;
+    if (!isReservationPaymentEnabled(reservation)) {
+        return optionsList.filter((option) => option.amount > 0 || option.paymentType === 'partial_payment');
+    }
+
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, options);
     const totalPrice = balance.totalPrice;
     const approvedBasePayments = balance.approvedBaseTotal;
     const remainingBalance = balance.remainingBalance;
     const pendingBasePayment = getPendingBasePayment(paymentsByReservationId, reservationId);
     const paymentTypes = options.paymentTypes || PAYMENT_TYPE_DEFAULTS;
-    const optionsList = [];
 
     // Every base-payment option is now computed fresh from the CURRENT
     // remaining balance (not gated behind "is this the first payment?"), so
@@ -584,27 +614,13 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             }
         });
 
-    if (String(reservation?.status || '').toLowerCase() === 'cancellation_approved') {
-        const hasPendingCancellationFee = getReservationPayments(paymentsByReservationId, reservationId).some((p) =>
-            p.payment_type === 'cancellation_fee' &&
-            ['pending_review', 'approved'].includes(String(p.payment_status || '').toLowerCase())
-        );
-        if (!hasPendingCancellationFee) {
-            const cancellationFeeAmount = getSharedCancellationFee(reservation, options.paymentRules);
-            optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', cancellationFeeAmount, paymentsByReservationId, {
-                ...options,
-                displayDescription: 'Required fee to finalize the cancellation of your reservation.'
-            }));
-        }
-    }
-
     return optionsList.filter((option) => option.amount > 0 || option.paymentType === 'partial_payment');
 }
 
 export function getPaymentSummary(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
     const reservationId = reservation.reservation_id;
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, options);
-    const pendingPayment = getPendingBasePayment(paymentsByReservationId, reservationId);
+    const pendingPayment = getLatestPendingPayment(paymentsByReservationId, reservationId);
 
     if (pendingPayment) {
         const pendingLabel = getPaymentActionLabel(
@@ -671,7 +687,7 @@ export function isPendingPaymentOverview(reservation, paymentsByReservationId, r
     const paymentSummary = getPaymentSummary(reservation, paymentsByReservationId, reschedulesByReservationId, options);
     const availableOptions = getAvailablePaymentOptions(reservation, paymentsByReservationId, reschedulesByReservationId, options);
     return paymentSummary.key === 'pending'
-        && Boolean(getPendingBasePayment(paymentsByReservationId, reservation.reservation_id))
+        && Boolean(getLatestPendingPayment(paymentsByReservationId, reservation.reservation_id))
         && !availableOptions.length;
 }
 
@@ -782,7 +798,8 @@ export async function fetchRescheduleRequests(supabase, reservationIds) {
             requested_time,
             status,
             requested_at,
-            reviewed_at
+            reviewed_at,
+            hold_expires_at
         `)
         .in('reservation_id', reservationIds)
         .order('requested_at', { ascending: false });

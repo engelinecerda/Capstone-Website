@@ -148,6 +148,17 @@
 
         <div class="pr-row">
           <div class="pr-row-copy">
+            <p class="pr-row-label">Cancellation fee payment deadline</p>
+            <p class="pr-row-desc">A cancellation request holds the reservation's date until the fee is paid and verified. If the deadline passes unpaid, the reservation is automatically finalized as cancelled and the date is released — the fee still stays owed.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-cancellation-hold-hours" min="1">
+            <span class="field-note" style="margin:0;">hours</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
             <p class="pr-row-label">Minimum notice before event</p>
             <p class="pr-row-desc">Customers must request cancellation at least this many days before their event date. Leave unchecked for no minimum.</p>
           </div>
@@ -176,10 +187,69 @@
           </div>
         </div>
 
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Overdue balance grace period</p>
+            <p class="pr-row-desc">How long an unpaid cancellation fee sits before it's flagged to managers as overdue. This only affects when you're notified — the fee blocks the customer's next booking immediately either way.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-cancellation-balance-grace-days" min="1">
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
         <p class="form-message" id="cancellation-notice-msg"></p>
 
         <div class="action-bar">
           <button type="button" class="btn-primary" id="saveCancellationNoticeBtn">Save Cancellation Notice Rules</button>
+        </div>
+      </div>
+
+      <!-- ── RESCHEDULE POLICY ── -->
+      <div class="card" id="reschedule-policy">
+        <p class="card-title">Reschedule Policy</p>
+        <p class="card-sub">Rescheduling has no manager approval step — a customer picks any date the calendar shows open. These rules control the hold on that date while the fee is unpaid. The fee itself lives in <a href="/admin/config/payment-options.html" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Hold duration</p>
+            <p class="pr-row-desc">How long the newly requested date stays reserved for this customer while they pay the reschedule fee, before it auto-releases back to the calendar.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-reschedule-hold-hours" min="1">
+            <span class="field-note" style="margin:0;">hours</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Minimum notice before original event</p>
+            <p class="pr-row-desc">Customers must request a reschedule at least this many days before their currently-booked event date. Leave unchecked for no minimum.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle" style="margin-right:8px;">
+              <input type="checkbox" id="pr-reschedule-min-notice-enabled">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <input type="number" class="pr-input-inline" id="pr-reschedule-min-notice-days" min="0" disabled>
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Maximum reschedules per reservation</p>
+            <p class="pr-row-desc">Caps how many times a single reservation can be rescheduled. A hold that expires unpaid doesn't count against this.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-max-reschedule-count" min="1">
+          </div>
+        </div>
+
+        <p class="form-message" id="reschedule-policy-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveReschedulePolicyBtn">Save Reschedule Policy</button>
         </div>
       </div>
 

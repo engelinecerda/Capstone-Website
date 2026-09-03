@@ -214,15 +214,29 @@ export function getCancellationFeePayment(payments) {
     return (payments || []).find((payment) => payment.payment_type === 'cancellation_fee') || null;
 }
 
-// True only while the reservation is sitting in cancellation_approved with
-// no cancellation_fee payment yet submitted, or with one that was rejected
-// (needs resubmission). Once a cancellation_fee payment is pending_review
-// or approved, this goes false.
+// True while the reservation has a cancellation fee outstanding and
+// needs the customer to act — either it's holding its date awaiting the
+// fee (cancellation_requested, payment-first model), or it's already
+// finalized cancelled (fee never got approved before the hold expired, or
+// a submitted fee was rejected and needs resubmission). Once a
+// cancellation_fee payment is pending_review or approved, this goes
+// false — nothing more for the customer to do right now.
+// 'cancellation_approved' is the pre-update-v20 manager-approval status —
+// kept here only for any reservation still sitting in that state from
+// before this cycle's rewrites.
 export function isCancellationFeeOwed(reservation, payments) {
-    if (String(reservation?.status || '').toLowerCase() !== 'cancellation_approved') return false;
+    if (!['cancellation_requested', 'cancellation_approved', 'cancelled'].includes(String(reservation?.status || '').toLowerCase())) return false;
     const feePayment = getCancellationFeePayment(payments);
     const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
     return !feePayment || feeStatus === 'rejected';
+}
+
+// True while a cancellation is holding the reservation's date and
+// awaiting the fee to be verified (or the hold to expire) — the
+// payment-first window itself, distinct from isCancellationFeeOwed which
+// also covers the already-finalized-but-unpaid case after the hold ends.
+export function isCancellationPending(reservation) {
+    return String(reservation?.status || '').toLowerCase() === 'cancellation_requested';
 }
 
 // A reservation's balance.remainingBalance only tracks the base package
@@ -343,6 +357,36 @@ export function computeCanReschedule(status, rescheduleRequests) {
     return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !latestOpenRequest;
 }
 
+// Client-side pre-flight for the two eligibility gates set_reschedule_hold_
+// expiry() (the DB trigger) actually enforces — this is the friendly
+// disabled-button reason (Rescheduling & Cancellation spec §4); the
+// trigger is still the real backstop if this ever goes stale relative to
+// admin policy changes or client state.
+export function getRescheduleBlockReason(reservation, paymentRules) {
+    if (!reservation) return null;
+
+    const minNotice = paymentRules?.reschedule_min_notice_days;
+    if (minNotice !== null && minNotice !== undefined && Number.isFinite(Number(minNotice))) {
+        const eventDate = getReservationEventDateTime(reservation);
+        if (eventDate) {
+            const daysUntilEvent = (eventDate.getTime() - Date.now()) / 86400000;
+            if (daysUntilEvent < Number(minNotice)) {
+                const n = Number(minNotice);
+                return `Reschedule requests must be made at least ${n} day${n === 1 ? '' : 's'} before your event.`;
+            }
+        }
+    }
+
+    const maxCount = paymentRules?.max_reschedule_count;
+    if (maxCount !== null && maxCount !== undefined && Number.isFinite(Number(maxCount))) {
+        if (Number(reservation.reschedule_count || 0) >= Number(maxCount)) {
+            return 'This reservation has reached its reschedule limit — contact us directly.';
+        }
+    }
+
+    return null;
+}
+
 export function computeCanCancel(status, payments, reservation = null, paymentRules = null) {
     const normalizedStatus = String(status || '').toLowerCase();
     if (!['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) return false;
@@ -402,7 +446,7 @@ export async function fetchUnseenReservationChanges(supabase) {
         supabase
             .from('reservations')
             .select('reservation_id, change_seen_at, updated_at')
-            .in('status', ['cancellation_approved', 'cancelled']),
+            .in('status', ['cancellation_requested', 'cancellation_approved', 'cancelled']),
         supabase
             .from('reschedule_requests')
             .select('reservation_id')

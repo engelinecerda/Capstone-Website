@@ -920,7 +920,7 @@ validateAdminSession({
     // there) — apply the same "recently changed" filter here too.
     if (new URLSearchParams(window.location.search).get('filter') === 'changed') {
       const isChanged = (reservation) => (
-        ['cancellation_approved', 'cancelled'].includes(String(reservation.status || '').toLowerCase())
+        ['cancellation_requested', 'cancellation_approved', 'cancelled'].includes(String(reservation.status || '').toLowerCase())
         || getReservationRescheduleRequests(reservation).some((req) => ['approved_pending_payment', 'completed'].includes(String(req.status || '').toLowerCase()))
       );
       reviewFilterIds = new Set(reservationsCache.filter(isChanged).map((r) => r.reservation_id));

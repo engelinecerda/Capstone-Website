@@ -5,6 +5,7 @@ import {
     buildCustomerAccountUrl,
     getAvailablePaymentOptions,
     getLatestApprovedReservationPayment,
+    getLatestPendingPayment,
     getLatestReservationPayment,
     getPendingBasePayment,
     getPaymentLabel,
@@ -758,14 +759,15 @@ function renderActionableCard(reservation) {
 
 function renderPendingCard(reservation) {
     // isPendingPaymentOverview() (the caller's routing check) only ever
-    // reaches this card because getPendingBasePayment() found a genuinely
-    // pending base payment — display that same payment, not just
-    // whatever's most recent overall. getLatestReservationPayment() could
-    // be a completely different, already-approved payment (e.g. a
-    // reschedule/cancellation fee approved after this base payment was
-    // submitted), which showed as a contradictory "Approved" pill inside
-    // this "waiting for review" card.
-    const pendingPayment = getPendingBasePayment(state.bundle.paymentsByReservationId, reservation.reservation_id)
+    // reaches this card because getLatestPendingPayment() found a genuinely
+    // pending payment — display that same one, not just whatever's most
+    // recent overall (getLatestReservationPayment() could be a completely
+    // different, already-approved payment, which would show as a
+    // contradictory "Approved" pill inside this "waiting for review"
+    // card) and not the base-only getPendingBasePayment() (which made a
+    // more recent reschedule/cancellation fee submission invisible here,
+    // showing an unrelated older base payment's amount instead).
+    const pendingPayment = getLatestPendingPayment(state.bundle.paymentsByReservationId, reservation.reservation_id)
         || getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
     const paymentStatus = getPaymentStatusMeta(pendingPayment?.payment_status || 'pending_review');
     const methodLabel = LEGACY_METHOD_DISPLAY_LABELS[pendingPayment?.payment_method] || pendingPayment?.payment_method || 'Payment method';
@@ -902,11 +904,20 @@ function renderReceiptsTab(reservation) {
 }
 
 function renderCurrentTab(reservation) {
-    const paymentSummary = getActivePaymentSummary(reservation);
     const balance = getActiveBalance(reservation);
-    const latestPayment = getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
+    // getLatestPendingPayment(), not paymentSummary.key or a plain
+    // "latest payment" lookup: this used to key off paymentSummary.key
+    // === 'pending' (itself derived from the base-only getPendingBasePayment,
+    // which made a more recent reschedule/cancellation fee submission — or
+    // its approval — invisible here) combined with a HARDCODED "Pending
+    // Review" pill that never actually read the shown payment's real
+    // payment_status. The net effect: a fee payment already approved by a
+    // manager could still render "Pending Review" on this tab, while
+    // Payment History (below, which reads payment_status per row) already
+    // correctly showed it as approved.
+    const latestPayment = getLatestPendingPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
 
-    if (paymentSummary.key === 'pending' && latestPayment) {
+    if (latestPayment) {
         const methodLabel = LEGACY_METHOD_DISPLAY_LABELS[latestPayment.payment_method] || latestPayment.payment_method;
         return `
             <div class="payment-current-card">

@@ -282,6 +282,10 @@ async function loadCancellationNoticeRules() {
   const minNoticeInput = document.getElementById('pr-cancellation-min-notice-days');
   const requestWindowEnabled = document.getElementById('pr-cancellation-request-window-enabled');
   const requestWindowInput = document.getElementById('pr-cancellation-request-window-days');
+  const graceDaysInput = document.getElementById('pr-cancellation-balance-grace-days');
+  const holdHoursInput = document.getElementById('pr-cancellation-hold-hours');
+
+  if (holdHoursInput) holdHoursInput.value = parsed.cancellation_hold_hours ?? 48;
 
   const hasMinNotice = parsed.cancellation_min_notice_days !== null && parsed.cancellation_min_notice_days !== undefined;
   if (minNoticeEnabled) minNoticeEnabled.checked = hasMinNotice;
@@ -296,6 +300,8 @@ async function loadCancellationNoticeRules() {
     requestWindowInput.value = hasRequestWindow ? parsed.cancellation_request_window_days : '';
     requestWindowInput.disabled = !hasRequestWindow;
   }
+
+  if (graceDaysInput) graceDaysInput.value = parsed.cancellation_balance_grace_days ?? 7;
 }
 
 async function saveCancellationNoticeRules() {
@@ -303,12 +309,20 @@ async function saveCancellationNoticeRules() {
   const requestWindowEnabled = !!document.getElementById('pr-cancellation-request-window-enabled')?.checked;
   const minNoticeDays = minNoticeEnabled ? Number(document.getElementById('pr-cancellation-min-notice-days')?.value) : null;
   const requestWindowDays = requestWindowEnabled ? Number(document.getElementById('pr-cancellation-request-window-days')?.value) : null;
+  const graceDays = Number(document.getElementById('pr-cancellation-balance-grace-days')?.value);
+  const holdHours = Number(document.getElementById('pr-cancellation-hold-hours')?.value);
 
+  if (!Number.isFinite(holdHours) || holdHours < 1) {
+    setCancellationNoticeMsg('Cancellation fee payment deadline must be at least 1 hour.', true); return;
+  }
   if (minNoticeDays !== null && (!Number.isFinite(minNoticeDays) || minNoticeDays < 0)) {
     setCancellationNoticeMsg('Minimum cancellation notice must be zero or more days.', true); return;
   }
   if (requestWindowDays !== null && (!Number.isFinite(requestWindowDays) || requestWindowDays < 1)) {
     setCancellationNoticeMsg('Cancellation request window must be at least 1 day.', true); return;
+  }
+  if (!Number.isFinite(graceDays) || graceDays < 1) {
+    setCancellationNoticeMsg('Overdue balance grace period must be at least 1 day.', true); return;
   }
 
   const { data: current } = await supabase
@@ -317,12 +331,18 @@ async function saveCancellationNoticeRules() {
     .eq('setting_key', 'payment_rules')
     .maybeSingle();
   const existing = current ? JSON.parse(current.setting_value) : {};
-  const merged = { ...existing, cancellation_min_notice_days: minNoticeDays, cancellation_request_window_days: requestWindowDays };
+  const merged = {
+    ...existing,
+    cancellation_hold_hours: holdHours,
+    cancellation_min_notice_days: minNoticeDays,
+    cancellation_request_window_days: requestWindowDays,
+    cancellation_balance_grace_days: graceDays
+  };
 
   showSettingsConfirm(
     'Change Cancellation Notice Rules',
-    `Min notice: ${existing.cancellation_min_notice_days ?? 'none'}, request window: ${existing.cancellation_request_window_days ?? 'none'}`,
-    `Min notice: ${minNoticeDays ?? 'none'}, request window: ${requestWindowDays ?? 'none'}`,
+    `Payment deadline: ${existing.cancellation_hold_hours ?? 'default'}h, min notice: ${existing.cancellation_min_notice_days ?? 'none'}, request window: ${existing.cancellation_request_window_days ?? 'none'}, grace period: ${existing.cancellation_balance_grace_days ?? 'none'}`,
+    `Payment deadline: ${holdHours}h, min notice: ${minNoticeDays ?? 'none'}, request window: ${requestWindowDays ?? 'none'}, grace period: ${graceDays}`,
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
@@ -333,8 +353,92 @@ async function saveCancellationNoticeRules() {
         );
 
       if (error) { setCancellationNoticeMsg('Failed to save: ' + error.message, true); return; }
-      await logAudit({ action: 'Updated Cancellation Notice Rules', category: 'scheduling_config', details: `min_notice=${minNoticeDays}, request_window=${requestWindowDays}` });
+      await logAudit({ action: 'Updated Cancellation Notice Rules', category: 'scheduling_config', details: `min_notice=${minNoticeDays}, request_window=${requestWindowDays}, grace_period=${graceDays}` });
       setCancellationNoticeMsg('Cancellation notice rules saved successfully.');
+    }
+  );
+}
+
+// ── Reschedule Policy ────────────────────────────────────────────────────────
+// Same system_settings.payment_rules blob, same load/save pattern as
+// Cancellation Notice Rules above.
+function setReschedulePolicyMsg(msg, isError = false) {
+  const el = document.getElementById('reschedule-policy-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+async function loadReschedulePolicy() {
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+
+  const parsed = data ? JSON.parse(data.setting_value) : {};
+  const holdHoursInput = document.getElementById('pr-reschedule-hold-hours');
+  const minNoticeEnabled = document.getElementById('pr-reschedule-min-notice-enabled');
+  const minNoticeInput = document.getElementById('pr-reschedule-min-notice-days');
+  const maxCountInput = document.getElementById('pr-max-reschedule-count');
+
+  if (holdHoursInput) holdHoursInput.value = parsed.reschedule_hold_hours ?? 48;
+
+  const hasMinNotice = parsed.reschedule_min_notice_days !== null && parsed.reschedule_min_notice_days !== undefined;
+  if (minNoticeEnabled) minNoticeEnabled.checked = hasMinNotice;
+  if (minNoticeInput) {
+    minNoticeInput.value = hasMinNotice ? parsed.reschedule_min_notice_days : '';
+    minNoticeInput.disabled = !hasMinNotice;
+  }
+
+  if (maxCountInput) maxCountInput.value = parsed.max_reschedule_count ?? 2;
+}
+
+async function saveReschedulePolicy() {
+  const holdHours = Number(document.getElementById('pr-reschedule-hold-hours')?.value);
+  const minNoticeEnabled = !!document.getElementById('pr-reschedule-min-notice-enabled')?.checked;
+  const minNoticeDays = minNoticeEnabled ? Number(document.getElementById('pr-reschedule-min-notice-days')?.value) : null;
+  const maxCount = Number(document.getElementById('pr-max-reschedule-count')?.value);
+
+  if (!Number.isFinite(holdHours) || holdHours < 1) {
+    setReschedulePolicyMsg('Hold duration must be at least 1 hour.', true); return;
+  }
+  if (minNoticeDays !== null && (!Number.isFinite(minNoticeDays) || minNoticeDays < 0)) {
+    setReschedulePolicyMsg('Minimum reschedule notice must be zero or more days.', true); return;
+  }
+  if (!Number.isFinite(maxCount) || maxCount < 1) {
+    setReschedulePolicyMsg('Maximum reschedules must be at least 1.', true); return;
+  }
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+  const existing = current ? JSON.parse(current.setting_value) : {};
+  const merged = {
+    ...existing,
+    reschedule_hold_hours: holdHours,
+    reschedule_min_notice_days: minNoticeDays,
+    max_reschedule_count: maxCount
+  };
+
+  showSettingsConfirm(
+    'Change Reschedule Policy',
+    `Hold: ${existing.reschedule_hold_hours ?? 'default'}h, min notice: ${existing.reschedule_min_notice_days ?? 'none'}, max reschedules: ${existing.max_reschedule_count ?? 'default'}`,
+    `Hold: ${holdHours}h, min notice: ${minNoticeDays ?? 'none'}, max reschedules: ${maxCount}`,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'payment_rules', setting_value: JSON.stringify(merged), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+
+      if (error) { setReschedulePolicyMsg('Failed to save: ' + error.message, true); return; }
+      await logAudit({ action: 'Updated Reschedule Policy', category: 'scheduling_config', details: `hold_hours=${holdHours}, min_notice=${minNoticeDays}, max_count=${maxCount}` });
+      setReschedulePolicyMsg('Reschedule policy saved successfully.');
     }
   );
 }
@@ -581,6 +685,7 @@ async function init() {
   await loadMinAdvanceDays();
   await loadEventTypeAdvanceOverrides();
   await loadCancellationNoticeRules();
+  await loadReschedulePolicy();
   await loadSchedulingSettings();
   await loadScopeCapacity();
 
@@ -594,6 +699,11 @@ async function init() {
   });
   document.getElementById('pr-cancellation-request-window-enabled')?.addEventListener('change', (e) => {
     const input = document.getElementById('pr-cancellation-request-window-days');
+    if (input) input.disabled = !e.target.checked;
+  });
+  document.getElementById('saveReschedulePolicyBtn')?.addEventListener('click', saveReschedulePolicy);
+  document.getElementById('pr-reschedule-min-notice-enabled')?.addEventListener('change', (e) => {
+    const input = document.getElementById('pr-reschedule-min-notice-days');
     if (input) input.disabled = !e.target.checked;
   });
   document.getElementById('saveCapacityBtn')?.addEventListener('click', saveSchedulingSettings);

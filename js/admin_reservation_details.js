@@ -504,6 +504,7 @@ async function fetchReservationDetail(idParam) {
     reservation_number,
     user_id,
     cancellation_reason,
+    cancellation_hold_expires_at,
     contact_name,
     contact_email,
     contact_phone,
@@ -698,24 +699,29 @@ function renderHeaderActions() {
     `);
   } else if (hasOpenReschedule) {
     buttons.push(`<span class="header-action-note">Waiting for the customer to pay the reschedule fee</span>`);
-  } else if (status === 'cancellation_approved') {
+  } else if (['cancellation_requested', 'cancellation_approved', 'cancelled'].includes(status)) {
     const feePayment = getReservationCancellationFeePayment(reservation);
     const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
+    const holdNote = (status === 'cancellation_requested' && reservation.cancellation_hold_expires_at)
+      ? ` — hold expires ${formatDateTime(reservation.cancellation_hold_expires_at)}`
+      : '';
     if (feePayment && feeStatus !== 'rejected') {
-      buttons.push(`<span class="header-action-note">Cancellation fee is pending review</span>`);
+      buttons.push(`<span class="header-action-note">Cancellation fee is pending review${escapeHtml(holdNote)}</span>`);
     } else if (feePayment) {
-      buttons.push(`<span class="header-action-note">Cancellation fee was rejected — awaiting resubmission</span>`);
+      buttons.push(`<span class="header-action-note">Cancellation fee was rejected — awaiting resubmission${escapeHtml(holdNote)}</span>`);
     } else {
-      buttons.push(`<span class="header-action-note">Waiting for the customer to pay the cancellation fee</span>`);
+      buttons.push(`<span class="header-action-note">Waiting for the customer to pay the cancellation fee${escapeHtml(holdNote)}</span>`);
     }
   }
   // status === 'approved' with no open request, and any other
   // non-actionable state: no manual lifecycle button — completion is
   // automatic (syncCompletedReservations, run from Homepage/Reports).
-  // cancellation_approved with an *approved* fee also shows no button —
-  // finalizing (status -> cancelled, date freed) now happens automatically
-  // the moment the fee payment is approved (js/admin_payments.js), not a
-  // separate manual click.
+  // cancellation_requested with an *approved* fee also shows no button —
+  // finalizing (status -> cancelled, date freed) happens automatically the
+  // moment the fee payment is approved (finalize_cancellation_on_fee_
+  // approval DB trigger, 20260909_reschedule_hold_and_cancellation_debt.sql
+  // §8) — or automatically at the hold deadline either way, so there's
+  // never a manual click for this transition.
 
   detailsHeaderActions.innerHTML = buttons.join('');
 }
@@ -739,9 +745,15 @@ function renderRescheduleReviewPanel(request) {
 // customer wants to cancel shouldn't require Manager access. Stays
 // visible through cancellation_approved too, since the reason is still
 // relevant context while the fee is outstanding.
+// Cancel-then-bill (Rescheduling & Cancellation spec §7) — a cancellation
+// is already terminal ('cancelled') the instant the customer confirms, so
+// this shows for that status too, not just the old in-progress states
+// (kept for any not-yet-migrated historical rows). The fee is a
+// completely separate ledger entry from here on, so its status is read
+// straight off the payment row rather than assumed to still be "due".
 function renderCancellationReviewPanel(reservation, status) {
-  const isCancellationInProgress = ['cancellation_requested', 'cancellation_approved'].includes(status);
-  if (!isCancellationInProgress) {
+  const isCancellationRelated = ['cancellation_requested', 'cancellation_approved', 'cancelled'].includes(status);
+  if (!isCancellationRelated || !reservation.cancellation_reason) {
     cancellationReviewPanel.classList.add('hidden');
     return;
   }
@@ -750,8 +762,12 @@ function renderCancellationReviewPanel(reservation, status) {
   reasonEl.textContent = reservation.cancellation_reason || 'No reason provided';
   reasonEl.classList.toggle('muted', !reservation.cancellation_reason);
 
+  const feePayment = getReservationCancellationFeePayment(reservation);
+  const feeStatusLabel = feePayment
+    ? ({ pending_review: 'pending review', approved: 'settled', rejected: 'rejected — awaiting resubmission' }[String(feePayment.payment_status || '').toLowerCase()] || feePayment.payment_status)
+    : 'not yet submitted';
   document.getElementById('cancellationFeeValue').textContent =
-    formatCurrency(getCancellationFee(reservation, currentPaymentRules));
+    `${formatCurrency(feePayment?.amount ?? getCancellationFee(reservation, currentPaymentRules))} (${feeStatusLabel})`;
 
   cancellationReviewPanel.classList.remove('hidden');
 }

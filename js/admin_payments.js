@@ -435,6 +435,7 @@ function matchesSearch(payment, term) {
   if (!term) return true;
   const reservation = getReservation(payment.reservation_id);
   const haystacks = [
+    reservation?.reservation_number,
     reservation?.contact_name,
     reservation?.contact_email,
     reservation?.package?.package_name,
@@ -567,6 +568,7 @@ async function fetchReservationsForPayments(reservationIds) {
     .from('reservations')
     .select(`
       reservation_id,
+      reservation_number,
       user_id,
       contact_name,
       contact_email,
@@ -848,27 +850,16 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
       if (requestError) throw requestError;
     }
 
-    // No manager "finalize cancellation" click anymore (update-v20) —
-    // approving the fee itself finalizes it, same as reschedule above.
-    if (payment.payment_type === 'cancellation_fee') {
-      const reservation = getReservation(payment.reservation_id);
-
-      const { error: reservationError } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled' })
-        .eq('reservation_id', payment.reservation_id);
-
-      if (reservationError) throw reservationError;
-
-      const { error: cancellationError } = await supabase.from('reservation_cancellations').insert({
-        reservation_id: payment.reservation_id,
-        user_id: reservation?.user_id || null,
-        previous_status: 'cancellation_approved',
-        reason: reservation?.cancellation_reason || null,
-        cancelled_at: new Date().toISOString()
-      });
-      if (cancellationError) throw cancellationError;
-    }
+    // cancellation_fee needs no finalize step here either, but for the
+    // opposite reason reschedule_fee does above: payment-first cancellation
+    // (Rescheduling & Cancellation spec §7, revised) holds the reservation
+    // in 'cancellation_requested' until this exact approval, and a DB
+    // trigger (finalize_cancellation_on_fee_approval, 20260909_reschedule_
+    // hold_and_cancellation_debt.sql §8) does the reservations.status ->
+    // 'cancelled' flip and writes reservation_cancellations the moment
+    // this UPDATE lands — so it can't be bypassed or duplicated by a
+    // different UI path (this modal, a future bulk-review screen, etc.)
+    // the way JS-side finalize logic could be.
   }
 }
 

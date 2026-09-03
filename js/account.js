@@ -418,6 +418,19 @@ function getPendingBasePayment(reservationId) {
         .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
 }
 
+// Unlike getPendingBasePayment above (deliberately base-only — see
+// getAvailablePaymentOptions, where it gates NEW base payment options and
+// shouldn't be blocked by an unrelated pending fee), this covers EVERY
+// payment type. Use this anywhere the UI needs "what payment is the
+// customer currently waiting on?" — base-only used to make a more recent
+// reschedule/cancellation fee submission (or its approval) invisible to
+// those displays.
+function getLatestPendingPayment(reservationId) {
+    return getReservationPayments(reservationId)
+        .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'pending_review')
+        .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+}
+
 function getReservationBalanceDueDate(reservation) {
     const eventDateKey = formatDateKey(reservation?.event_date);
     if (!eventDateKey) return null;
@@ -531,17 +544,30 @@ function getReservationFeeAmount(reservation, remainingBalance) {
 }
 
 function getAvailablePaymentOptions(reservation) {
-    if (!isReservationPaymentEnabled(reservation)) {
-        return [];
+    const reservationId = reservation.reservation_id;
+    const options = [];
+
+    // Checked before the isReservationPaymentEnabled gate below, which
+    // excludes 'cancelled' on purpose (a cancelled reservation shouldn't
+    // offer to pay the rest of the event balance) — but the cancellation
+    // fee itself is exactly what's owed once cancelled, so it can't be
+    // gated behind the same check or it would never appear.
+    if (isCancellationFeeOwed(reservation, getReservationPayments(reservationId))) {
+        options.push(buildPaymentOption(reservation, 'cancellation_fee', getCancellationFee(reservation, state.paymentRules), {
+            displayLabel: 'Cancellation Fee',
+            displayDescription: 'Required fee to finalize the cancellation of your reservation.'
+        }));
     }
 
-    const reservationId = reservation.reservation_id;
+    if (!isReservationPaymentEnabled(reservation)) {
+        return options.filter((option) => option.amount > 0);
+    }
+
     const balance = getReservationBalanceDetails(reservation);
     const totalPrice = balance.totalPrice;
     const approvedBasePayments = balance.approvedBaseTotal;
     const remainingBalance = balance.remainingBalance;
     const pendingBasePayment = getPendingBasePayment(reservationId);
-    const options = [];
 
     if (!pendingBasePayment && remainingBalance > 0) {
         if (approvedBasePayments > 0) {
@@ -604,32 +630,13 @@ function getAvailablePaymentOptions(reservation) {
             }
         });
 
-    // Mirrors the same branch in customer_payments.js's shared
-    // getAvailablePaymentOptions() — without this, a reservation that's
-    // fully paid before being cancelled has remainingBalance === 0, so
-    // nothing above ever fires and the customer has no way to pay the
-    // cancellation fee from this list.
-    if (String(reservation?.status || '').toLowerCase() === 'cancellation_approved') {
-        const hasPendingCancellationFee = getReservationPayments(reservationId).some((payment) => (
-            payment.payment_type === 'cancellation_fee'
-            && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
-        ));
-        if (!hasPendingCancellationFee) {
-            const cancellationFeeAmount = getCancellationFee(reservation, state.paymentRules);
-            options.push(buildPaymentOption(reservation, 'cancellation_fee', cancellationFeeAmount, {
-                displayLabel: 'Cancellation Fee',
-                displayDescription: 'Required fee to finalize the cancellation of your reservation.'
-            }));
-        }
-    }
-
     return options.filter((option) => option.amount > 0);
 }
 
 function getPaymentSummary(reservation) {
     const reservationId = reservation.reservation_id;
     const balance = getReservationBalanceDetails(reservation);
-    const pendingPayment = getPendingBasePayment(reservationId);
+    const pendingPayment = getLatestPendingPayment(reservationId);
 
     if (pendingPayment) {
         const pendingLabel = getPaymentActionLabel(
@@ -694,7 +701,7 @@ function isPendingPaymentOverview(reservation) {
     const paymentSummary = getPaymentSummary(reservation);
     const availableOptions = getAvailablePaymentOptions(reservation);
     return paymentSummary.key === 'pending'
-        && Boolean(getPendingBasePayment(reservation.reservation_id))
+        && Boolean(getLatestPendingPayment(reservation.reservation_id))
         && !availableOptions.length;
 }
 
@@ -705,7 +712,7 @@ function getTimelineTimestamp(value, fallback = Number.MAX_SAFE_INTEGER) {
 
 function getPaymentTimelineEntries(reservation) {
     const reservationId = reservation.reservation_id;
-    const pendingBasePayment = getPendingBasePayment(reservationId);
+    const pendingTimelinePayment = getLatestPendingPayment(reservationId);
     const approvedPayments = getReservationPayments(reservationId)
         .filter((payment) => String(payment.payment_status || '').toLowerCase() === 'approved')
         .slice()
@@ -734,14 +741,14 @@ function getPaymentTimelineEntries(reservation) {
         });
     }
 
-    if (pendingBasePayment) {
-        const pendingTimestamp = getTimelineTimestamp(pendingBasePayment.submitted_at);
+    if (pendingTimelinePayment) {
+        const pendingTimestamp = getTimelineTimestamp(pendingTimelinePayment.submitted_at);
         entries.push({
             key: 'pending',
-            title: `${getPaymentLabel(pendingBasePayment.payment_type)} Submitted`,
-            meta: formatShortDate(pendingBasePayment.submitted_at),
-            note: `${formatCurrency(pendingBasePayment.amount)} / ${PAYMENT_METHODS[pendingBasePayment.payment_method]?.label || pendingBasePayment.payment_method} / awaiting admin review`,
-            proofUrl: pendingBasePayment.proof_url || '',
+            title: `${getPaymentLabel(pendingTimelinePayment.payment_type)} Submitted`,
+            meta: formatShortDate(pendingTimelinePayment.submitted_at),
+            note: `${formatCurrency(pendingTimelinePayment.amount)} / ${PAYMENT_METHODS[pendingTimelinePayment.payment_method]?.label || pendingTimelinePayment.payment_method} / awaiting admin review`,
+            proofUrl: pendingTimelinePayment.proof_url || '',
             sortTimestamp: pendingTimestamp,
             sortOrder: 30
         });
@@ -893,16 +900,16 @@ function renderPaymentComposer(reservation) {
         if (!isReservationPaymentEnabled(reservation)) {
             return '<div class="payment-empty">Payment submission becomes available after admin approves this reservation.</div>';
         }
-        const waitingMessage = getPendingBasePayment(reservation.reservation_id)
+        const waitingMessage = getLatestPendingPayment(reservation.reservation_id)
             ? 'Your latest reservation payment is still pending admin review.'
             : 'No new payment actions are available right now.';
         return `<div class="payment-empty">${escapeHtml(waitingMessage)}</div>`;
     }
 
     const balance = getReservationBalanceDetails(reservation);
-    const isCancellationApproved = String(reservation?.status || '').toLowerCase() === 'cancellation_approved';
+    const isCancellationApproved = isCancellationFeeOwed(reservation, getReservationPayments(reservation.reservation_id));
     const actionIntro = isCancellationApproved
-        ? 'Your cancellation request was approved. Pay the cancellation fee to finalize it.'
+        ? 'Your reservation is cancelled. Pay the cancellation fee to settle your balance.'
         : (balance.hasPartialPayment
             ? `This reservation is already confirmed. Settle the remaining balance by ${balance.dueDateLabel}.`
             : 'Choose the payment that works for you to confirm this reservation.');
@@ -1275,7 +1282,11 @@ function renderCompletedPaymentOverview(reservation) {
 
 function renderPendingPaymentOverview(reservation) {
     const balance = getReservationBalanceDetails(reservation);
-    const pendingPayment = getPendingBasePayment(reservation.reservation_id) || getLatestReservationPayment(reservation.reservation_id);
+    // getLatestPendingPayment(), not the base-only getPendingBasePayment()
+    // — that made a more recent reschedule/cancellation fee submission
+    // invisible here, showing an unrelated older base payment's amount
+    // and status instead of the fee actually just paid.
+    const pendingPayment = getLatestPendingPayment(reservation.reservation_id) || getLatestReservationPayment(reservation.reservation_id);
     const pendingStatus = getPaymentStatusMeta(pendingPayment?.payment_status || 'pending_review');
     const paymentLabel = pendingPayment ? getPaymentLabel(pendingPayment.payment_type) : 'Payment';
     const paymentMethod = pendingPayment
@@ -2501,49 +2512,48 @@ async function submitCancellationRequest() {
     setCancelModalMessage('Submitting your cancellation request...');
 
     try {
-        // Confirm-and-settle — no manager approval step. The manager can't
-        // meaningfully refuse a cancellation (the customer is leaving), so
-        // confirming here goes straight to awaiting-fee: the reservation
-        // moves to cancellation_approved and the system-wide cancellation
-        // fee becomes payable immediately. Manager's remaining touchpoint
-        // is verifying/recording that fee payment, same as any other.
+        // Payment-first cancellation (Rescheduling & Cancellation spec §7,
+        // revised) — mirrors the reschedule hold exactly, just holding the
+        // CURRENT date instead of a new one. The reservation moves to
+        // 'cancellation_requested', which still occupies its date/time
+        // (is_capacity_blocking_reservation_status), until either a
+        // manager approves the cancellation_fee payment (finalize_
+        // cancellation_on_fee_approval trigger) or the hold deadline
+        // passes unpaid (expire_cancellation_holds cron). Both are DB-side
+        // — the client only sets the request itself; the fee payment row
+        // is created separately when the customer actually submits proof
+        // through js/payment.js's real flow, same as every other payment
+        // type. See 20260909_reschedule_hold_and_cancellation_debt.sql §8.
         const previousStatus = reservation.status;
         const feeAmount = getCancellationFee(reservation, state.paymentRules);
+        const holdHours = Number(state.paymentRules?.cancellation_hold_hours) || 48;
 
         const { error: statusError } = await supabase
             .from('reservations')
-            .update({ status: 'cancellation_approved', cancellation_reason: reason })
+            .update({ status: 'cancellation_requested', cancellation_reason: reason })
             .eq('reservation_id', reservationId);
 
         if (statusError) throw statusError;
 
-        const { error: historyError } = await supabase
+        // Best-effort audit trail — the hold/pending state itself already
+        // lives on the reservation row regardless of whether this insert
+        // succeeds, so a failure here doesn't leave anything customer-
+        // facing broken.
+        await supabase
             .from('reservation_status')
             .insert({
                 reservation_id: reservationId,
                 previous_status: previousStatus,
-                new_status: 'cancellation_approved',
+                new_status: 'cancellation_requested',
                 changed_at: new Date().toISOString()
             });
-
-        if (historyError) throw historyError;
-
-        const { error: feeError } = await supabase.from('payment').insert({
-            reservation_id: reservationId,
-            payment_type: 'cancellation_fee',
-            amount: feeAmount,
-            payment_status: 'pending_review',
-            submitted_at: new Date().toISOString()
-        });
-
-        if (feeError) throw feeError;
 
         closeCancelModal();
         await loadReservations();
         openSubmissionFeedbackModal({
-            eyebrow: 'Cancellation Confirmed',
-            title: 'Cancellation Confirmed',
-            copy: `Your reservation is cancelled. Pay the ${formatCurrency(feeAmount)} cancellation fee to finalize it and free your date.`
+            eyebrow: 'Cancellation Requested',
+            title: 'Pay the Cancellation Fee to Finalize',
+            copy: `Your date is on hold. Pay the ${formatCurrency(feeAmount)} cancellation fee within ${holdHours} hours to finalize your cancellation — if it isn't verified in time, your reservation will be automatically cancelled and the fee will still be owed.`
         });
     } catch (error) {
         if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
