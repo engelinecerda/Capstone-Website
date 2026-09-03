@@ -7,6 +7,7 @@ import {
     getLatestApprovedReservationPayment,
     getLatestPendingPayment,
     getLatestReservationPayment,
+    getMinPaymentDateKey,
     getPendingBasePayment,
     getPaymentLabel,
     getPaymentStatusMeta,
@@ -21,6 +22,7 @@ import {
     loadPaymentRules,
     loadPaymentTypes,
     loadReservationRules,
+    PAYMENT_DATE_MAX_AGE_DAYS,
     submitCustomerPayment,
     validateReferenceNumber
 } from './customer_payments.js';
@@ -622,6 +624,7 @@ function renderFormSection(reservation) {
     const isCustomAmount = selectedOption.paymentType === 'partial_payment';
     const displayAmount = isCustomAmount ? Number(state.form.customAmount || 0) : selectedOption.amount;
     const refPattern = REFERENCE_NUMBER_PATTERNS[selectedMethodObj?.legacyModeKey];
+    const proofWindowDays = state.paymentRules?.proof_of_payment_window_days ?? PAYMENT_DATE_MAX_AGE_DAYS;
 
     return `
         <section class="payment-step-section">
@@ -650,7 +653,8 @@ function renderFormSection(reservation) {
                     </div>
                     <div class="payment-field-group full">
                         <label for="payment-date-paid">Date paid</label>
-                        <input id="payment-date-paid" type="date" data-field="paymentDate" value="${escapeHtml(state.form.paymentDate)}" max="${escapeHtml(getTodayDateKey())}">
+                        <input id="payment-date-paid" type="date" data-field="paymentDate" value="${escapeHtml(state.form.paymentDate)}" min="${escapeHtml(getMinPaymentDateKey(proofWindowDays))}" max="${escapeHtml(getTodayDateKey())}">
+                        <div class="payment-howto-reminder">${INFO_ICON} Proof of payment must be submitted within ${proofWindowDays} days of the payment date.</div>
                     </div>
                     <div class="payment-field-group full">
                         <label for="payment-proof-file">Proof of payment</label>
@@ -1201,7 +1205,8 @@ async function handleSubmitPayment() {
             proofFile: state.form.proofFile,
             formatDate,
             reservationRules: state.reservationRules,
-            paymentTypes: state.paymentTypes
+            paymentTypes: state.paymentTypes,
+            paymentRules: state.paymentRules
         });
 
         state.form = {

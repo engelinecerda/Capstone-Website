@@ -280,6 +280,18 @@ export function getTodayDateKey() {
     return buildLocalDateKey(new Date());
 }
 
+// Proof of payment must be submitted within this many days of the actual
+// payment date. This is the fallback used only when the admin-configured
+// value (system_settings.payment_rules.proof_of_payment_window_days,
+// managed on the Payment Settings page) hasn't loaded yet.
+export const PAYMENT_DATE_MAX_AGE_DAYS = 3;
+
+export function getMinPaymentDateKey(windowDays = PAYMENT_DATE_MAX_AGE_DAYS) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - Number(windowDays ?? PAYMENT_DATE_MAX_AGE_DAYS));
+    return buildLocalDateKey(cutoff);
+}
+
 export function roundCurrency(value) {
     return Math.round(Number(value || 0) * 100) / 100;
 }
@@ -888,7 +900,8 @@ export async function submitCustomerPayment({
     proofFile = null,
     formatDate,
     reservationRules = null,
-    paymentTypes = null
+    paymentTypes = null,
+    paymentRules = null
 }) {
     const reservation = (reservations || []).find((entry) => String(entry.reservation_id) === String(reservationId));
     if (!reservation) {
@@ -961,6 +974,10 @@ export async function submitCustomerPayment({
         }
         if (paymentDate > getTodayDateKey()) {
             throw new Error('The payment date cannot be in the future.');
+        }
+        const proofWindowDays = paymentRules?.proof_of_payment_window_days ?? PAYMENT_DATE_MAX_AGE_DAYS;
+        if (paymentDate < getMinPaymentDateKey(proofWindowDays)) {
+            throw new Error(`The payment date must be within the last ${proofWindowDays} days. Please contact us if your payment is older than that.`);
         }
         if (!proofFile) {
             throw new Error('Please upload a proof of payment.');
