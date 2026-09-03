@@ -427,9 +427,13 @@ function showBoard() {
 }
 
 async function checkSession() {
-  const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
+  const { session, profile } = await verifyPortalSession(supabase);
   if (!session) {
     showSignedOutState();
+    return false;
+  }
+  if (profile?.role !== 'staff') {
+    window.location.replace('/admin/dashboard.html');
     return false;
   }
   showBoard();
@@ -439,7 +443,7 @@ async function checkSession() {
 async function handleLogout() {
   boardLogoutBtn.disabled = true;
   await supabase.auth.signOut();
-  window.location.replace('/admin/index.html');
+  window.location.replace('/board/login');
 }
 
 function showLogoutConfirmDialog() {
@@ -495,9 +499,13 @@ function resetIdleTimer() {
 }
 
 async function init() {
-  const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
+  const { session, profile } = await verifyPortalSession(supabase);
   if (!session) {
-    window.location.replace('/admin/index.html');
+    window.location.replace('/board/login');
+    return;
+  }
+  if (profile?.role !== 'staff') {
+    window.location.replace('/admin/dashboard.html');
     return;
   }
 

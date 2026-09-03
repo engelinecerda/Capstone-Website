@@ -74,9 +74,28 @@ Deno.serve(async (req) => {
 
   const newPassword = generatePassword();
 
+  // Open a short allowance window so the guard_staff_password_change trigger
+  // (supabase/migrations/20260913_staff_login_separation.sql) lets this
+  // specific update through — it otherwise blocks any password change on a
+  // staff-role account, self-service included.
+  const allowedUntil = new Date(Date.now() + 30_000).toISOString();
+  const { error: allowanceError } = await supabaseAdmin
+    .from('profiles')
+    .update({ staff_password_reset_allowed_until: allowedUntil })
+    .eq('user_id', boardUserId);
+
+  if (allowanceError) {
+    return jsonResponse({ detail: allowanceError.message || 'Failed to authorize password reset' }, 400);
+  }
+
   const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(boardUserId, {
     password: newPassword,
   });
+
+  await supabaseAdmin
+    .from('profiles')
+    .update({ staff_password_reset_allowed_until: null })
+    .eq('user_id', boardUserId);
 
   if (updateError) {
     return jsonResponse({ detail: updateError.message || 'Failed to reset password' }, 400);

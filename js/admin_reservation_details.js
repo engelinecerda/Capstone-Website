@@ -137,6 +137,7 @@ let assignmentSelection = new Set();
 let assignmentSearchTerm = '';
 let recordPaymentMethods = [];
 let recordPaymentFile = null;
+let recordPaymentTargetPayment = null;
 let receiptViewerZoom = 100;
 let currentPaymentRules = null;
 
@@ -350,15 +351,24 @@ function getReservationCancellationFeePayment(reservation) {
 // on the reservation — and is never touched by recording an in-café
 // payment, since that always inserts a new row rather than updating this
 // one.
-function getPlannedArrivalDate(reservation) {
-  const pending = getReservationPayments(reservation)
+// The customer's own "I'll pay cash/card on arrival" submission (js/
+// customer_payments.js's isOnsite branch) — identified by cash_payment_date
+// being set on a still-pending row, regardless of which cafe_issued method.
+// Used both for the planned-arrival note below and by openRecordPaymentModal
+// to detect that a queue row already exists for this reservation, so
+// Record Payment can confirm it in place instead of inserting a duplicate.
+function getPendingCafePayment(reservation) {
+  return getReservationPayments(reservation)
     .filter((payment) => (
       ['cash', 'card'].includes(payment.payment_method)
       && String(payment.payment_status || '').toLowerCase() === 'pending_review'
       && payment.cash_payment_date
     ))
-    .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0];
-  return pending ? pending.cash_payment_date : null;
+    .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+}
+
+function getPlannedArrivalDate(reservation) {
+  return getPendingCafePayment(reservation)?.cash_payment_date || null;
 }
 
 function getContractReviewMeta(reservation) {
@@ -1046,13 +1056,22 @@ function checkRecordPaymentAmountWarning() {
   }
 }
 
-// This page's modal always INSERTs a brand-new payment (an "unplanned"
-// payment the customer never pre-submitted) — there's no queue-row context
-// here, unlike the Payments module's modal, which only ever confirms an
-// existing pending row.
+// This page's modal used to always INSERT a brand-new payment, assuming
+// there was never a queue-row context here the way the Payments module's
+// modal has. That assumption broke as soon as a customer had already
+// submitted an "I'll pay cash/card on arrival" payment before a manager
+// opened this reservation and clicked Record Payment: with no awareness
+// of that pending row, this always created a SECOND, duplicate payment
+// (hardcoded payment_type 'partial_payment', shown to the customer as
+// "Custom Amount") while the original submission sat pending forever,
+// never actually confirmed. Now it looks for that row first via
+// getPendingCafePayment() and, if found, confirms it in place — same
+// existingPaymentId update path the Payments module's modal already used
+// — preserving its original payment_type instead of masking it.
 async function openRecordPaymentModal() {
   if (currentRole === 'admin') return;
   const reservation = currentReservation;
+  recordPaymentTargetPayment = getPendingCafePayment(reservation);
 
   if (recordPaymentAmountInput) recordPaymentAmountInput.value = '';
   if (recordPaymentDateInput) {
@@ -1078,9 +1097,9 @@ async function openRecordPaymentModal() {
   }
   if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? outstanding : '';
 
-  const plannedArrival = getPlannedArrivalDate(reservation);
-  if (plannedArrival && recordPaymentPlannedNote) {
-    recordPaymentPlannedNote.textContent = `Customer planned to arrive ${formatReservationDate(plannedArrival)} — the planned date is kept on the reservation.`;
+  if (recordPaymentTargetPayment && recordPaymentPlannedNote) {
+    const plannedArrival = recordPaymentTargetPayment.cash_payment_date;
+    recordPaymentPlannedNote.textContent = `Confirming the customer's pending ${getPaymentTypeLabel(recordPaymentTargetPayment.payment_type)} submission (${formatCurrency(recordPaymentTargetPayment.amount)})${plannedArrival ? `, planned arrival ${formatReservationDate(plannedArrival)}` : ''} — this updates that submission instead of creating a new one.`;
     recordPaymentPlannedNote.classList.remove('hidden');
   } else {
     recordPaymentPlannedNote?.classList.add('hidden');
@@ -1103,6 +1122,7 @@ function closeRecordPaymentModal() {
   recordPaymentModal?.classList.add('hidden');
   recordPaymentModal?.setAttribute('aria-hidden', 'true');
   recordPaymentSaveBtn?.removeAttribute('disabled');
+  recordPaymentTargetPayment = null;
 }
 
 async function saveRecordPayment() {
@@ -1127,6 +1147,7 @@ async function saveRecordPayment() {
 
     await recordInCafePayment(supabase, {
       reservationId: reservation.reservation_id,
+      existingPaymentId: recordPaymentTargetPayment?.payment_id || null,
       amount: recordPaymentAmountInput?.value,
       paymentMethodId: selectedMethod.payment_method_id,
       paymentMethodLabel: selectedMethod.label,

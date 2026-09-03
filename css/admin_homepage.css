@@ -13,7 +13,7 @@
   --border:      #E8DFD3;
   --text:        #1A1A1A;
   --muted:       #7A6A5C;
-  --muted-2:     #8A7A6C;
+  --muted-2:     #7C6E61; /* darkened from #8A7A6C — see manager-theme.css for the WCAG AA rationale */
 
   /* Sidebar */
   --sidebar-bg:    #2A1208;
@@ -25,8 +25,8 @@
   --active-text:   #F5EBDD;
   --badge-bg:      #F5EBDD;
   --badge-text:    #2A1208;
-  --section-label: #8A6A55;
-  --user-role:     #8A6A55;
+  --section-label: #9A7D69; /* was #8A6A55 — see manager-theme.css for the WCAG AA rationale */
+  --user-role:     #9A7D69;
   --sidebar-line:  #4A2C17;
 
   /* Status colors */
@@ -399,7 +399,7 @@ body {
 }
 
 .trend-word {
-  color: #9B8B7C;
+  color: var(--muted-2);
   margin-left: 3px;
 }
 
@@ -788,7 +788,7 @@ body {
 .no-contract {
   display: block;
   font-size: 11px;
-  color: #9B8B7C;
+  color: var(--muted-2);
 }
 
 .status-pill {
@@ -1007,7 +1007,7 @@ body {
 
 .notif-item-time {
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   margin-top: 3px;
 }
 
@@ -1041,7 +1041,7 @@ body {
   padding: 32px 16px;
   text-align: center;
   font-size: 13px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 @media (max-width: 480px) {

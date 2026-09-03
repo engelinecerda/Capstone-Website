@@ -15,7 +15,14 @@
   --border:      #E8DFD3;
   --text:        #1A1A1A;
   --muted:       #7A6A5C;
-  --muted-2:     #8A7A6C;
+  /* #7C6E61, not the old #8A7A6C — that failed WCAG AA (3.84:1 on the
+     #FAF6F0 page background, 4.13:1 on white cards; both need 4.5:1).
+     This value clears 4.5:1 against every background it's actually used
+     on (measured: 4.58:1 on #FAF6F0, 4.93:1 on white) with the smallest
+     darkening that does it, so it still reads as visibly lighter/more
+     secondary than --muted (#7A6A5C) rather than collapsing the two
+     tiers into one color. */
+  --muted-2:     #7C6E61;
 
   /* Sidebar */
   --sidebar-bg:    #2A1208;
@@ -27,8 +34,12 @@
   --active-text:   #F5EBDD;
   --badge-bg:      #F5EBDD;
   --badge-text:    #2A1208;
-  --section-label: #8A6A55;
-  --user-role:     #8A6A55;
+  /* #9A7D69, not #8A6A55 — the old value only hit 3.60:1 against the dark
+     sidebar (#2A1208) it renders on, failing WCAG AA for text this small
+     (the "Manager"/"Admin" role label and sidebar section headings). This
+     clears 4.64:1. */
+  --section-label: #9A7D69;
+  --user-role:     #9A7D69;
   --sidebar-line:  #4A2C17;
   --avatar-bg:     #6B3F23;
 
@@ -917,7 +928,7 @@ table td {
 
 .notif-item-time {
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   margin-top: 3px;
 }
 
@@ -951,7 +962,7 @@ table td {
   padding: 32px 16px;
   text-align: center;
   font-size: 13px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 @media (max-width: 480px) {
@@ -995,7 +1006,7 @@ table td {
 .pagination-summary {
   margin: 0;
   font-size: 12px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .pagination-controls {
@@ -1044,7 +1055,7 @@ table td {
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 @media (max-width: 480px) {

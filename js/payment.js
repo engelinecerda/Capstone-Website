@@ -318,11 +318,17 @@ function syncSelections(reservation) {
 function getTopSummary(reservation) {
     const paymentSummary = getActivePaymentSummary(reservation);
     const balance = getActiveBalance(reservation);
-    const availableOptions = getActivePaymentOptions(reservation);
     const latestPayment = getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
+    // The hero card is "what do you owe right now" — that's the TOTAL
+    // remaining balance (same figure the "Full Payment" option and the
+    // rest of the page already show), not availableOptions[0]?.amount.
+    // The first available option isn't necessarily Full Payment — it
+    // could be a partial Reservation Fee or a Down Payment top-up amount
+    // (both legitimately smaller than what's actually owed), which showed
+    // a second, conflicting "amount due" here.
     const highlightedAmount = paymentSummary.key === 'pending'
         ? Number(latestPayment?.amount || 0)
-        : availableOptions[0]?.amount || 0;
+        : balance.remainingBalance;
 
     return {
         paymentSummary,
@@ -947,6 +953,32 @@ function renderCurrentTab(reservation) {
             <div class="payment-current-card">
                 <h2 class="payment-current-title">Payment complete</h2>
                 <p class="payment-current-copy">${escapeHtml(latestApproved ? `Your latest approved payment was ${getPaymentLabel(latestApproved.payment_type)} for ${formatCurrency(latestApproved.amount)}.` : 'All required payments are already recorded for this reservation.')}</p>
+            </div>
+        `;
+    }
+
+    // A rejected payment doesn't block resubmission (the form below is
+    // already showing, same as the "nothing submitted yet" case — see
+    // hasPendingOrApprovedPayment in customer_payments.js, which only
+    // treats pending_review/approved as blocking), but silently falling
+    // through to "No payment submitted yet" was misleading — the customer
+    // DID submit something, and needs to see why it didn't go through
+    // before trying again.
+    const latestOverall = getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
+    if (latestOverall && String(latestOverall.payment_status || '').toLowerCase() === 'rejected') {
+        const methodLabel = LEGACY_METHOD_DISPLAY_LABELS[latestOverall.payment_method] || latestOverall.payment_method;
+        return `
+            <div class="payment-current-card">
+                <div class="payment-current-list">
+                    <div class="payment-current-item">
+                        <div>
+                            <div class="payment-item-title">${escapeHtml(getPaymentLabel(latestOverall.payment_type))}</div>
+                            <div class="payment-item-meta">${escapeHtml(`${formatCurrency(latestOverall.amount)} · ${methodLabel} · Submitted ${formatDateTime(latestOverall.submitted_at)}`)}</div>
+                        </div>
+                        <span class="res-status rejected"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> Rejected</span>
+                    </div>
+                </div>
+                <p class="payment-current-copy">${escapeHtml(latestOverall.rejection_reason ? `Reason: ${latestOverall.rejection_reason}` : 'This submission was rejected.')} Please review and resubmit using the form above.</p>
             </div>
         `;
     }

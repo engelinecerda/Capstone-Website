@@ -261,7 +261,7 @@
 .dl-value-sub {
   font-size: 11px;
   font-weight: 400;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .details-grid {
@@ -413,7 +413,7 @@
 }
 
 .stat-value-muted {
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-weight: 400;
   font-size: 15px !important;
 }
@@ -635,7 +635,7 @@
 
 .ocr-panel-icon {
   display: inline-flex;
-  color: #8a7060;
+  color: var(--muted-2);
   flex-shrink: 0;
 }
 
@@ -647,7 +647,7 @@
 
 .ocr-panel-note {
   font-size: 12px;
-  color: #8a7060;
+  color: var(--muted-2);
   margin-bottom: 12px;
   line-height: 1.5;
 }
@@ -658,7 +658,7 @@
 .ocr-panel-warning {
   margin-top: 10px;
   font-size: 11px;
-  color: #9b8878;
+  color: var(--muted-2);
   line-height: 1.5;
 }
 
@@ -683,7 +683,7 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #9b8878;
+  color: var(--muted-2);
 }
 
 .ocr-field-value {
@@ -764,7 +764,7 @@
 
 .record-payment-optional {
   font-weight: 400;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-input,
@@ -819,7 +819,7 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-context-main {
@@ -832,7 +832,7 @@
 .record-payment-context-date {
   margin: 2px 0 0;
   font-size: 10px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-context-balance-row {
@@ -877,13 +877,13 @@
 .record-payment-helper {
   margin: 6px 0 0;
   font-size: 10.5px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-planned-note {
   margin: 6px 0 0;
   font-size: 10.5px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-planned-note.hidden {
@@ -948,7 +948,7 @@
   height: 20px;
   border: none;
   background: transparent;
-  color: #8A7A6C;
+  color: var(--muted-2);
   cursor: pointer;
   font-size: 14px;
   line-height: 1;

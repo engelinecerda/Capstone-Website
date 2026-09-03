@@ -7,10 +7,33 @@ const form = document.getElementById('portal-reset-password-form');
 const message = document.getElementById('portal-reset-password-msg');
 
 let recoveryReady = false;
+let staffResetBlocked = false;
 
 function setMessage(type, text) {
   message.className = `form-msg ${type}`.trim();
   message.innerText = text;
+}
+
+function setSubmitDisabled(disabled) {
+  const submitBtn = form?.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = disabled;
+}
+
+async function blockIfStaffAccount() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (profile?.role === 'staff') {
+    staffResetBlocked = true;
+    setSubmitDisabled(true);
+    setMessage('error', 'The shared staff password is managed by the admin — contact your administrator to have it reset.');
+  }
 }
 
 const {
@@ -19,6 +42,7 @@ const {
   if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
     recoveryReady = true;
     setMessage('', '');
+    blockIfStaffAccount();
   }
 });
 
@@ -28,6 +52,7 @@ const {
 
 if (session) {
   recoveryReady = true;
+  await blockIfStaffAccount();
 }
 
 if (!recoveryReady) {
@@ -45,6 +70,11 @@ form?.addEventListener('submit', async (event) => {
 
   if (!recoveryReady) {
     setMessage('error', 'This reset link is invalid or has expired.');
+    return;
+  }
+
+  if (staffResetBlocked) {
+    setMessage('error', 'The shared staff password is managed by the admin — contact your administrator to have it reset.');
     return;
   }
 

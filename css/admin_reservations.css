@@ -13,7 +13,7 @@
   --line: #E8DFD3;
   --text: #1A1A1A;
   --muted: #7A6A5C;
-  --muted-2: #8A7A6C;
+  --muted-2: #7C6E61; /* darkened from #8A7A6C — see manager-theme.css for the WCAG AA rationale */
   --font: 'Inter', sans-serif;
   --shadow: 0 1px 2px rgba(42, 18, 8, 0.04);
   --pending: #FAEEDA;
@@ -518,7 +518,7 @@ body {
 
 .signature-check-sub {
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 /* Panel stays neutral (#FAF6F0) in every state — only the icon is
@@ -533,7 +533,7 @@ body {
 }
 
 .signature-check-panel.state-not-scanned .signature-check-icon {
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 /* Manual override — shown only when the automatic scan hasn't confirmed a
@@ -833,7 +833,7 @@ body {
   text-align: center;
   font-size: 10px;
   font-weight: 500;
-  color: #9B8B7C;
+  color: var(--muted-2);
   padding: 6px 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -880,7 +880,7 @@ body {
 
 .calendar-cell.outside-month {
   opacity: 0.45;
-  color: #9B8B7C;
+  color: var(--muted-2);
   cursor: default;
 }
 
@@ -889,7 +889,7 @@ body {
 }
 
 .calendar-cell.closed .calendar-day-number {
-  color: #9B8B7C;
+  color: var(--muted-2);
   text-decoration: line-through;
 }
 
@@ -1057,7 +1057,7 @@ body {
 
 .day-panel-helper {
   font-size: 10.5px;
-  color: #9B8B7C;
+  color: var(--muted-2);
   text-align: center;
   margin-top: 8px;
 }

@@ -30,11 +30,11 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .breadcrumb a {
-  color: #8A7A6C;
+  color: var(--muted-2);
   text-decoration: none;
 }
 
@@ -152,7 +152,7 @@
 .reservation-header-meta {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .reservation-header-right {
@@ -221,7 +221,7 @@
   height: 36px;
   padding: 0 4px;
   font-size: 12.5px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-style: italic;
 }
 
@@ -284,7 +284,7 @@
 
 .request-date-label {
   font-size: 10px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .request-date-value {
@@ -321,7 +321,7 @@
 }
 
 .request-card-row-label {
-  color: #8A7A6C;
+  color: var(--muted-2);
   flex: 0 0 auto;
 }
 
@@ -332,13 +332,13 @@
 }
 
 .request-card-row-value.muted {
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-weight: 400;
 }
 
 .request-card-helper {
   font-size: 10px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   margin: 0 0 16px;
 }
 
@@ -476,7 +476,7 @@
 }
 
 .dl-value.muted {
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-weight: 400;
 }
 
@@ -495,7 +495,7 @@
 .staff-assign-helper {
   margin: 8px 0 0;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   text-align: center;
 }
 
@@ -537,7 +537,7 @@
 .assignment-modal-subtitle {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .assignment-modal-close {
@@ -587,7 +587,7 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .assignment-context-main {
@@ -600,7 +600,7 @@
 .assignment-context-sub {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .assignment-search-field {
@@ -614,7 +614,7 @@
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: #8A7A6C;
+  color: var(--muted-2);
   pointer-events: none;
 }
 
@@ -647,7 +647,7 @@
 
 .assignment-selection-label {
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   flex-shrink: 0;
 }
 
@@ -692,7 +692,7 @@
 .assignment-staff-empty {
   padding: 20px 12px;
   text-align: center;
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-size: 11px;
 }
 
@@ -765,7 +765,7 @@
   display: block;
   margin-top: 1px;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 /* ============================================================
@@ -812,7 +812,7 @@
 .approval-prompt-meta {
   margin: 4px 0 0;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .approval-prompt-note {
@@ -852,7 +852,7 @@
 
 .approval-prompt-note-sub {
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   line-height: 1.4;
 }
 
@@ -886,7 +886,7 @@
 .payment-overpaid-note {
   margin: 8px 0 0;
   font-size: 11px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .payment-history-wrap {
@@ -952,13 +952,13 @@
 }
 
 .payment-history-no-receipt {
-  color: #9B8B7C;
+  color: var(--muted-2);
 }
 
 .payment-history-empty-row td {
   padding: 16px 0;
   text-align: center;
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-size: 12px;
   border-bottom: none;
 }
@@ -1051,7 +1051,7 @@
 
 .record-payment-optional {
   font-weight: 400;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .payment-context-balance {
@@ -1065,7 +1065,7 @@
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-context-balance-row {
@@ -1110,13 +1110,13 @@
 .record-payment-helper {
   margin: 6px 0 0;
   font-size: 10.5px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-planned-note {
   margin: 6px 0 0;
   font-size: 10.5px;
-  color: #8A7A6C;
+  color: var(--muted-2);
 }
 
 .record-payment-planned-note.hidden {
@@ -1267,7 +1267,7 @@
   height: 20px;
   border: none;
   background: transparent;
-  color: #8A7A6C;
+  color: var(--muted-2);
   cursor: pointer;
   font-size: 14px;
   line-height: 1;

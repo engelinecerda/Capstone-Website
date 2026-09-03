@@ -77,7 +77,21 @@ export async function validateAdminSession({
     .eq('user_id', session.user.id)
     .maybeSingle();
 
-  if (error || !fetchedProfile || !ALLOWED_ROLES.includes(fetchedProfile.role)) {
+  if (error || !fetchedProfile) {
+    await supabase.auth.signOut();
+    localStorage.removeItem('profile');
+    window.location.replace(redirectTo);
+    return null;
+  }
+
+  if (fetchedProfile.role === 'staff') {
+    // Legitimate session, just the wrong portal — send it to its own area
+    // instead of signing it out.
+    window.location.replace('/board');
+    return null;
+  }
+
+  if (!ALLOWED_ROLES.includes(fetchedProfile.role)) {
     await supabase.auth.signOut();
     localStorage.removeItem('profile');
     window.location.replace(redirectTo);

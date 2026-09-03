@@ -64,7 +64,7 @@
 .contract-review-header-meta {
   margin: 2px 0 0;
   font-size: 10px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   letter-spacing: 0.01em;
 }
 
@@ -159,7 +159,7 @@
 }
 
 .dl-value.muted {
-  color: #8A7A6C;
+  color: var(--muted-2);
   font-weight: 400;
 }
 
@@ -281,7 +281,7 @@
 
 .contract-review-helper-note {
   font-size: 10px;
-  color: #8A7A6C;
+  color: var(--muted-2);
   margin: 0;
 }
 

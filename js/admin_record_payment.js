@@ -117,14 +117,20 @@ export async function fetchCafeIssuedPaymentMethods(supabase) {
 // influence, since the RLS policy also checks recorded_by = auth.uid()
 // but a clear client-side guard avoids a confusing RLS-rejection round trip.
 //
-// existingPaymentId absent -> INSERT a brand-new row (the reservation-
-// details "unplanned payment" entry point, where nothing was pre-submitted).
 // existingPaymentId present -> UPDATE that pending row in place (a queue
 // row the customer already submitted as "I'll pay cash/card on arrival" —
 // recording confirms what actually happened rather than creating a second,
-// duplicate transaction). payment_source flips to 'in_cafe' on that update:
-// the manager is now the one vouching for the transaction, regardless of
-// which flow originally created the row.
+// duplicate transaction, and preserves whatever payment_type the customer
+// actually submitted instead of masking it). payment_source flips to
+// 'in_cafe' on that update: the manager is now the one vouching for the
+// transaction, regardless of which flow originally created the row.
+// existingPaymentId absent -> INSERT a brand-new row, hardcoded
+// payment_type 'partial_payment' ("Custom Amount") — reserved for a
+// genuinely unplanned payment with no prior customer submission to
+// confirm. Both callers (admin_reservation_details.js's Record Payment
+// button, admin_payments.js's per-row one) now check for an existing
+// pending cafe-issued row first and only fall through to this branch when
+// none exists — see getPendingCafePayment() in admin_reservation_details.js.
 export async function recordInCafePayment(supabase, {
   reservationId,
   existingPaymentId = null,
