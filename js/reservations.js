@@ -25,12 +25,49 @@ import {
     isOutsideBookingWindow as sharedIsOutsideBookingWindow,
 } from '/js/reservation_availability.js';
 import { loadReservationFormConfig } from '/js/reservation_form_config.js';
+import { buildCustomerPaymentUrl } from '/js/customer_payments.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
 
 if (!isLoggedIn) {
     document.getElementById('resGuestNotice').classList.remove('hidden');
+}
+
+// Booking block — a customer with an overdue balance or unpaid
+// cancellation fee on another reservation can't start a new one. This is
+// UX only: block_booking_with_overdue_balance() and block_booking_with_
+// unresolved_cancellation_debt() (supabase/migrations/20260914_.../20260909_...)
+// enforce the same two conditions server-side regardless of this check, so
+// a blocked customer finds out here instead of only at the final submit,
+// but nothing relies on this call succeeding for actual enforcement.
+function showBookingBlockNotice(blockInfo) {
+    const notice = document.getElementById('resBookingBlockNotice');
+    const messageEl = document.getElementById('resBookingBlockMessage');
+    const linkEl = document.getElementById('resBookingBlockLink');
+    if (!notice || !messageEl || !linkEl) return;
+
+    const amount = fmtPeso(blockInfo.balance_due);
+    const label = blockInfo.reservation_number || 'a previous reservation';
+    messageEl.textContent = blockInfo.reason === 'unpaid_cancellation_fee'
+        ? `You have an unpaid cancellation fee of ${amount} on reservation ${label}. Settle it before booking another event.`
+        : `You have an overdue balance of ${amount} on reservation ${label}${blockInfo.due_date ? ` (due ${formatDisplayDate(blockInfo.due_date)})` : ''}. Settle it before booking another event.`;
+    linkEl.href = buildCustomerPaymentUrl(blockInfo.reservation_id);
+
+    notice.classList.remove('hidden');
+
+    // Hard stop — hide the entire booking flow, not just show a banner
+    // above it, so a blocked customer can't fill out the form at all.
+    document.querySelector('.progress-container')?.classList.add('hidden');
+    document.querySelectorAll('.res-step').forEach((el) => el.classList.add('hidden'));
+    document.querySelector('.reservation-buttons')?.classList.add('hidden');
+}
+
+if (isLoggedIn) {
+    try {
+        const { data: blockInfo } = await supabase.rpc('get_booking_block_reason');
+        if (blockInfo?.blocked) showBookingBlockNotice(blockInfo);
+    } catch { /* fail open — the DB triggers still enforce this at submit */ }
 }
 
 // Fetched and awaited here, before anything else runs, so it's always

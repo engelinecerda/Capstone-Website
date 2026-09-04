@@ -150,6 +150,7 @@ function buildRowMenu(a) {
   items.push({ action: 'reset-password', label: 'Resend password setup email' });
   if (a.is_board_account) items.push({ action: 'reset-board-password', label: 'Reset board password' });
   items.push({ action: 'lock', label: a._status === 'deactivated' ? 'Reactivate' : 'Deactivate' });
+  items.push({ action: 'clear-login-lock', label: 'Clear login lockout' });
   items.push({ divider: true });
   items.push({ action: 'delete', label: 'Remove', destructive: true });
 
@@ -247,6 +248,7 @@ document.getElementById('accountsBody').addEventListener('click', e => {
   lastFocusedTrigger = btn;
   if (btn.dataset.action === 'edit')                 openEditModal(a);
   if (btn.dataset.action === 'lock')                  openLockConfirm(a);
+  if (btn.dataset.action === 'clear-login-lock')      clearLoginLock(a);
   if (btn.dataset.action === 'reset-password')        sendPasswordReset(a);
   if (btn.dataset.action === 'reset-board-password')  openBoardResetConfirm(a);
   if (btn.dataset.action === 'delete')                openRemoveConfirm(a);
@@ -647,6 +649,25 @@ function openLockConfirm(a) {
     closeConfirmModal();
   };
   openModalWithTrap(document.getElementById('confirmModal'));
+}
+
+// ── CLEAR LOGIN LOCKOUT ──────────────────────────────────────────
+// The failed-attempt lockout (supabase/migrations/20260904_login_lockout_
+// enforcement.sql) is separate from the manual Deactivate/Reactivate
+// switch above — this clears the failure counter/cooldown, not is_locked.
+// Always offered (not conditional on the account actually being locked
+// right now) since checking that would need an extra round trip; clearing
+// an account that isn't locked is a harmless no-op. This is the shared
+// staff/board tablet account's real recovery path — the whole café floor
+// is locked out with it, so an Admin must be able to clear it immediately
+// rather than wait out the cooldown.
+async function clearLoginLock(a) {
+  const { error } = await supabase.rpc('admin_clear_login_lock', { p_user_id: a.user_id });
+  if (error) {
+    alert('Failed to clear login lockout: ' + error.message);
+    return;
+  }
+  alert(`Login lockout cleared for ${displayName(a)}. They can sign in again immediately.`);
 }
 
 // ── RESET BOARD PASSWORD ─────────────────────────────────────────

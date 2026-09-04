@@ -1,4 +1,4 @@
-import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed } from './reservation_shared.js';
+import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed, isRescheduleFeeOwed } from './reservation_shared.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -629,11 +629,64 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
     return optionsList.filter((option) => option.amount > 0 || option.paymentType === 'partial_payment');
 }
 
-export function getPaymentSummary(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
+// ── Payment page state — single source of truth ────────────────────────
+// Answers "can this reservation be paid right now, for how much, and why"
+// for every caller that needs it (account.js's Payment Status badge,
+// payment.js's hero figure and its choice of which focus card to render).
+// This used to be re-derived independently in each of those places and
+// drifted apart twice in one review cycle: getPaymentSummary existed as
+// two separate copies (account.js + this one) that disagreed about
+// cancelled reservations, and payment.js's card-routing didn't check
+// cancellation-fee-owed at all — making an owed fee genuinely unpayable
+// through the UI despite getAvailablePaymentOptions() correctly listing it.
+// Consolidated here once; getPaymentSummary below is now a thin projection
+// of this for callers that only need the badge shape.
+//
+// Fixes one more real bug as a side effect of correct-once ordering: the
+// old inline version returned "Paid in full" the moment
+// balance.remainingBalance <= 0, before ever checking for an approved
+// reschedule request awaiting its fee — so a reservation with its base
+// balance settled but a reschedule fee still owed showed as fully paid.
+//
+// mode is the discriminator every caller should branch on:
+//   'awaiting_approval'    - reservation not yet approved; nothing payable
+//   'pending_review'       - a payment (any type) is awaiting admin review
+//   'cancellation_fee_due' - cancelled, fee unpaid — the only thing payable
+//   'cancelled_settled'    - cancelled, nothing left to pay
+//   'reschedule_fee_due'   - an approved reschedule is awaiting its fee
+//   'paid_in_full'         - base balance fully paid, nothing else owed
+//   'balance_due'          - base balance (still) owed, reservation active
+export function getPaymentPageState(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
     const reservationId = reservation.reservation_id;
+    const payments = getReservationPayments(paymentsByReservationId, reservationId);
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, options);
-    const pendingPayment = getLatestPendingPayment(paymentsByReservationId, reservationId);
 
+    if (isCancellationFeeOwed(reservation, payments)) {
+        const amountDue = getSharedCancellationFee(reservation, options.paymentRules);
+        return {
+            mode: 'cancellation_fee_due',
+            submittable: true,
+            amountDue,
+            balance,
+            label: 'Cancellation fee due',
+            key: 'rejected',
+            sublabel: `${safeFormatCurrency(amountDue)} required to finalize your cancellation`
+        };
+    }
+
+    if (String(reservation?.status || '').toLowerCase() === 'cancelled') {
+        return {
+            mode: 'cancelled_settled',
+            submittable: false,
+            amountDue: 0,
+            balance,
+            label: 'Cancelled',
+            key: 'cancelled',
+            sublabel: 'This reservation has been cancelled'
+        };
+    }
+
+    const pendingPayment = getLatestPendingPayment(paymentsByReservationId, reservationId);
     if (pendingPayment) {
         const pendingLabel = getPaymentActionLabel(
             pendingPayment.payment_type,
@@ -644,36 +697,77 @@ export function getPaymentSummary(reservation, paymentsByReservationId, reschedu
             options
         );
         return {
+            mode: 'pending_review',
+            submittable: false,
+            amountDue: Number(pendingPayment.amount || 0),
+            balance,
             label: `${pendingLabel} pending review`,
             key: 'pending',
             sublabel: 'Waiting for admin confirmation'
         };
     }
 
-    if (balance.remainingBalance <= 0) {
-        return { label: 'Paid in full', key: 'approved', sublabel: 'All required payments recorded' };
-    }
-
-    if (balance.hasPartialPayment) {
+    // Mirrors getAvailablePaymentOptions()'s own gate exactly — a
+    // reservation still awaiting its initial admin approval has nothing
+    // submittable yet, regardless of what its (already-computed, real)
+    // total_price/balance figures would otherwise suggest.
+    if (!isReservationPaymentEnabled(reservation)) {
         return {
-            label: balance.isPastDue ? 'Overdue' : 'Remaining balance due',
-            key: balance.toneKey,
-            sublabel: `${safeFormatCurrency(balance.remainingBalance)} remaining / Pay by ${balance.dueDateLabel}`
+            mode: 'awaiting_approval',
+            submittable: false,
+            amountDue: 0,
+            balance,
+            label: 'Awaiting approval',
+            key: 'pending',
+            sublabel: 'Payment becomes available once your reservation is approved.'
         };
     }
 
-    const approvedRescheduleRequest = (reschedulesByReservationId?.[reservationId] || [])
-        .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
+    const rescheduleRequests = reschedulesByReservationId?.[reservationId] || [];
+    if (isRescheduleFeeOwed(rescheduleRequests, payments)) {
+        const amountDue = getSharedRescheduleFee(options.paymentRules);
+        return {
+            mode: 'reschedule_fee_due',
+            submittable: true,
+            amountDue,
+            balance,
+            label: 'Reschedule fee pending',
+            key: 'info',
+            sublabel: 'Complete the reschedule fee to finalize the change'
+        };
+    }
 
-    if (approvedRescheduleRequest) {
-        return { label: 'Reschedule fee pending', key: 'info', sublabel: 'Complete the reschedule fee to finalize the change' };
+    if (balance.remainingBalance <= 0) {
+        return {
+            mode: 'paid_in_full',
+            submittable: false,
+            amountDue: 0,
+            balance,
+            label: 'Paid in full',
+            key: 'approved',
+            sublabel: 'All required payments recorded'
+        };
     }
 
     return {
-        label: balance.isPastDue ? 'Overdue' : 'Initial payment needed',
+        mode: 'balance_due',
+        submittable: true,
+        amountDue: balance.remainingBalance,
+        balance,
+        label: balance.isPastDue ? 'Overdue' : (balance.hasPartialPayment ? 'Remaining balance due' : 'Initial payment needed'),
         key: balance.toneKey,
-        sublabel: balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'Choose your first payment'
+        sublabel: balance.hasPartialPayment
+            ? `${safeFormatCurrency(balance.remainingBalance)} remaining / Pay by ${balance.dueDateLabel}`
+            : (balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'Choose your first payment')
     };
+}
+
+// Thin projection of getPaymentPageState for callers that only need the
+// badge shape (label/key/sublabel) — kept so every existing call site
+// (account.js, payment.js) needs zero changes to its return-value handling.
+export function getPaymentSummary(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
+    const { label, key, sublabel } = getPaymentPageState(reservation, paymentsByReservationId, reschedulesByReservationId, options);
+    return { label, key, sublabel };
 }
 
 export function getLatestReservationPayment(paymentsByReservationId, reservationId) {

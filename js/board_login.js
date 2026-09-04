@@ -1,6 +1,9 @@
-//admin_login.js
-import { portalSupabase as supabase } from './supabase.js';
+//board_login.js
+import { boardSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
+
+const BOARD_ROUTE = '/board';
+const WRONG_PORTAL_MESSAGE = 'This is the staff login. Managers and admins should sign in at the management portal.';
 
 const adminLoginForm = document.getElementById('adminLoginForm');
 const loginCard = document.getElementById('loginCard');
@@ -17,28 +20,8 @@ const mfaSubmitBtn = document.getElementById('mfaSubmitBtn');
 
 const mfaState = {
     factorId: '',
-    challengeId: '',
-    redirectTo: ''
+    challengeId: ''
 };
-
-// Staff sign in at /board/login (js/board_login.js), a separate storage
-// bucket (boardSupabase) from this portal's portalSupabase session — a
-// staff credential entered here is rejected rather than redirected, since
-// redirecting would land on a page that can't see this session anyway.
-const PORTAL_ROUTES = {
-    manager: '/admin/dashboard.html',
-    admin: '/admin/dashboard.html'
-};
-
-const WRONG_PORTAL_MESSAGE = 'Staff should sign in at the staff login page.';
-
-function normalizeRole(value) {
-    return String(value || '').trim().toLowerCase();
-}
-
-function getPortalRoute(role) {
-    return PORTAL_ROUTES[normalizeRole(role)] || '';
-}
 
 function setMessage(message, type = '') {
     if (!formMsg) return;
@@ -73,17 +56,13 @@ function hideMfaCard() {
     setMfaMessage('');
 }
 
-async function redirectIfPortalSessionExists() {
+async function redirectIfStaffSessionExists() {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) return;
 
-    const { session, profile } = await verifyPortalSession(supabase);
-
+    const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
     if (session) {
-        const route = getPortalRoute(profile?.role);
-        if (route) {
-            window.location.replace(route);
-        }
+        window.location.replace(BOARD_ROUTE);
     }
 }
 
@@ -102,6 +81,8 @@ adminLoginForm?.addEventListener('submit', async (event) => {
     // real enforcement is the Password Verification Attempt hook
     // (server-side, cannot be bypassed by skipping this call), which still
     // rejects the sign-in below even if this check is skipped or stale.
+    // The shared staff tablet account has a higher failure threshold (10
+    // vs 5) before it locks, since many different people type into it.
     let lockCheck = null;
     try {
         const { data } = await supabase.rpc('check_login_lock', { p_email: email });
@@ -123,10 +104,6 @@ adminLoginForm?.addEventListener('submit', async (event) => {
 
     if (error) {
         Promise.resolve(supabase.rpc('record_failed_login', { p_email: email })).catch(() => {});
-        // A hook-rejected (locked) attempt carries our own "Too many failed
-        // attempts..." message — surface it verbatim. Any other failure
-        // stays generic, same as before, so a wrong password never reveals
-        // whether the email exists.
         const isLockMessage = /too many failed attempts/i.test(error.message || '');
         setMessage(isLockMessage ? error.message : 'Invalid email or password.', 'error');
         return;
@@ -138,7 +115,6 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         // best-effort only, never block login on this
     }
 
-    // CHECK STATUS
     const { data: profileCheck, error: lockError } = await supabase
         .from('profiles')
         .select('is_locked')
@@ -157,17 +133,10 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         return;
     }
 
-    const { session, profile, message } = await verifyPortalSession(supabase);
+    const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
     if (!session) {
         await supabase.auth.signOut();
-        setMessage(message || 'This account is not allowed to sign in here.', 'error');
-        return;
-    }
-
-    const targetRoute = getPortalRoute(profile?.role);
-    if (!targetRoute) {
-        await supabase.auth.signOut();
-        setMessage(profile?.role === 'staff' ? WRONG_PORTAL_MESSAGE : 'This account is not allowed to sign in here.', 'error');
+        setMessage(WRONG_PORTAL_MESSAGE, 'error');
         return;
     }
 
@@ -184,7 +153,6 @@ adminLoginForm?.addEventListener('submit', async (event) => {
             }
             mfaState.factorId = totpFactor.id;
             mfaState.challengeId = challengeData.id;
-            mfaState.redirectTo = targetRoute;
             showMfaCard();
             return;
         }
@@ -192,7 +160,7 @@ adminLoginForm?.addEventListener('submit', async (event) => {
 
     localStorage.removeItem('profile');
     setMessage('Login successful. Redirecting...');
-    window.location.replace(targetRoute);
+    window.location.replace(BOARD_ROUTE);
 });
 
 mfaForm?.addEventListener('submit', async (event) => {
@@ -225,7 +193,7 @@ mfaForm?.addEventListener('submit', async (event) => {
     }
 
     localStorage.removeItem('profile');
-    window.location.replace(mfaState.redirectTo);
+    window.location.replace(BOARD_ROUTE);
 });
 
 mfaBackBtn?.addEventListener('click', async () => {
@@ -234,4 +202,4 @@ mfaBackBtn?.addEventListener('click', async () => {
     setMessage('');
 });
 
-redirectIfPortalSessionExists();
+redirectIfStaffSessionExists();

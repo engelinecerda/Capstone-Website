@@ -11,7 +11,7 @@ import {
     getPendingBasePayment,
     getPaymentLabel,
     getPaymentStatusMeta,
-    getPaymentSummary,
+    getPaymentPageState,
     getReservationBalanceDetails,
     getReservationPayments,
     getReservationReceipts,
@@ -248,12 +248,22 @@ function getReservationPackageName(reservation) {
     return reservation?.package?.package_name || reservation?.package_id || 'No package selected';
 }
 
-function getActivePaymentSummary(reservation) {
-    return getPaymentSummary(
+// The single source of truth for "what can this reservation's payment page
+// do right now" (js/customer_payments.js's getPaymentPageState) — used for
+// the hero figure, the header status pill, and which focus card to render,
+// instead of each re-deriving/disagreeing about cancellation and fee state
+// independently. Previously this call was missing reservationRules/
+// paymentRules from its options (unlike getActiveBalance/
+// getActivePaymentOptions below, which always passed them) — the
+// cancellation/reschedule fee amounts it computes silently fell back to
+// hardcoded defaults instead of the admin-configured ones whenever they'd
+// been customized away from the default.
+function getActivePaymentPageState(reservation) {
+    return getPaymentPageState(
         reservation,
         state.bundle.paymentsByReservationId,
         state.bundle.reschedulesByReservationId,
-        { formatDate }
+        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules }
     );
 }
 
@@ -316,40 +326,46 @@ function syncSelections(reservation) {
 }
 
 function getTopSummary(reservation) {
-    const paymentSummary = getActivePaymentSummary(reservation);
-    const balance = getActiveBalance(reservation);
-    const latestPayment = getLatestReservationPayment(state.bundle.paymentsByReservationId, reservation.reservation_id);
-    // The hero card is "what do you owe right now" — that's the TOTAL
-    // remaining balance (same figure the "Full Payment" option and the
-    // rest of the page already show), not availableOptions[0]?.amount.
-    // The first available option isn't necessarily Full Payment — it
-    // could be a partial Reservation Fee or a Down Payment top-up amount
-    // (both legitimately smaller than what's actually owed), which showed
-    // a second, conflicting "amount due" here.
-    const highlightedAmount = paymentSummary.key === 'pending'
-        ? Number(latestPayment?.amount || 0)
-        : balance.remainingBalance;
+    const pageState = getActivePaymentPageState(reservation);
 
+    // The hero card is "what do you owe right now" — pageState.amountDue
+    // already resolves this correctly per mode (the cancellation fee once
+    // cancelled, the pending payment's own amount while one's in review,
+    // the base remaining balance otherwise), so no separate branching is
+    // needed here. It also fixes what used to be a second, conflicting
+    // "amount due" from availableOptions[0]?.amount: the first available
+    // option isn't necessarily Full Payment — it could be a partial
+    // Reservation Fee or Down Payment top-up amount, both legitimately
+    // smaller than what's actually owed.
     return {
-        paymentSummary,
-        balance,
-        highlightedAmount
+        paymentSummary: pageState,
+        balance: pageState.balance,
+        highlightedAmount: pageState.amountDue
     };
 }
 
 // One pill component reused everywhere on this page (also used on the
 // account and reservation-details pages) — icon + label, soft tint per
-// state. Payment-summary "key" values (pending/approved/info/rejected) get
-// mapped onto that same 4-tone system here.
-function getHeaderStatusMeta(reservation, paymentSummary, balance) {
-    if (String(reservation.status || '').toLowerCase() === 'cancelled') {
+// state. Branches on pageState.mode (the single source of truth — see
+// getPaymentPageState in js/customer_payments.js) instead of re-deriving
+// cancelled/pending/overdue independently, so this pill can never disagree
+// with the hero figure or which focus card gets rendered below it.
+function getHeaderStatusMeta(pageState) {
+    const { mode, balance } = pageState;
+    if (mode === 'cancellation_fee_due' || mode === 'cancelled_settled') {
         return { cssKey: 'cancelled', icon: 'ban', label: 'Cancelled' };
     }
-    if (balance.remainingBalance <= 0) {
+    if (mode === 'paid_in_full') {
         return { cssKey: 'approved', icon: 'check', label: 'Paid in Full' };
     }
-    if (paymentSummary.key === 'pending') {
+    if (mode === 'pending_review') {
         return { cssKey: 'pending', icon: 'clock', label: 'Pending Review' };
+    }
+    if (mode === 'awaiting_approval') {
+        return { cssKey: 'pending', icon: 'clock', label: 'Awaiting Approval' };
+    }
+    if (mode === 'reschedule_fee_due') {
+        return { cssKey: 'pending', icon: 'clock', label: 'Reschedule Fee Due' };
     }
     if (balance.isPastDue) {
         return { cssKey: 'overdue', icon: 'triangle-exclamation', label: 'Overdue' };
@@ -361,8 +377,26 @@ function getHeaderStatusMeta(reservation, paymentSummary, balance) {
 }
 
 function renderSummaryStrip(reservation) {
-    const { paymentSummary, balance, highlightedAmount } = getTopSummary(reservation);
-    const statusMeta = getHeaderStatusMeta(reservation, paymentSummary, balance);
+    const { paymentSummary: pageState, highlightedAmount } = getTopSummary(reservation);
+    const statusMeta = getHeaderStatusMeta(pageState);
+
+    // "highlightedAmount || balance.remainingBalance" used to sit here as a
+    // fallback, but that treated a legitimate 0 (fee already settled) as
+    // falsy and silently fell back to the stale base-package balance anyway.
+    // pageState.mode is now the single source of truth for both the figure
+    // and its caption — no per-field re-derivation to drift out of sync.
+    const SETTLED_VALUE_TEXT = { cancelled_settled: 'Settled', paid_in_full: 'Paid', awaiting_approval: 'Pending' };
+    const payValueText = SETTLED_VALUE_TEXT[pageState.mode] || formatCurrency(highlightedAmount);
+
+    const META_TEXT = {
+        cancellation_fee_due: 'Cancellation fee due',
+        cancelled_settled: 'Cancellation fee settled',
+        paid_in_full: 'Completed',
+        reschedule_fee_due: 'Reschedule fee due',
+        pending_review: 'Awaiting admin confirmation',
+        awaiting_approval: 'Awaiting approval'
+    };
+    const payMetaText = META_TEXT[pageState.mode] || `Due ${pageState.balance.dueDateLabel}`;
 
     return `
         <section class="payment-hero-card">
@@ -375,10 +409,10 @@ function renderSummaryStrip(reservation) {
             <div class="payment-hero-right">
                 <span class="res-status ${escapeHtml(statusMeta.cssKey)}"><i class="fa-solid fa-${escapeHtml(statusMeta.icon)}" aria-hidden="true"></i> ${escapeHtml(statusMeta.label)}</span>
                 <div>
-                    <div class="payment-hero-pay-value">${escapeHtml(balance.remainingBalance <= 0 ? 'Paid' : formatCurrency(highlightedAmount || balance.remainingBalance))}</div>
+                    <div class="payment-hero-pay-value">${escapeHtml(payValueText)}</div>
                 </div>
                 <div class="payment-hero-pay-meta">
-                    ${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : `Due ${balance.dueDateLabel}`)}
+                    ${escapeHtml(payMetaText)}
                 </div>
             </div>
         </section>
@@ -420,11 +454,22 @@ function getCancellationReasonText(reservation) {
 // Replaces the whole payment form once a reservation is cancelled — there is
 // nothing left to pay toward, so the actionable/pending/complete cards never
 // render in this state.
-function renderCancellationCard(reservation) {
-    const feePayment = getReservationPayments(state.bundle.paymentsByReservationId, reservation.reservation_id)
-        .find((payment) => payment.payment_type === 'cancellation_fee') || null;
+function renderCancellationCard(reservation, pageState) {
+    const payments = getReservationPayments(state.bundle.paymentsByReservationId, reservation.reservation_id);
+    const feePayment = payments.find((payment) => payment.payment_type === 'cancellation_fee') || null;
+    const feeOwed = pageState.mode === 'cancellation_fee_due';
     const contractUrl = `/reservation-details.html?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
+    // Previously this card was the entire cancelled-state UI, full stop —
+    // no payment method/amount/submit form ever rendered here, regardless
+    // of whether a cancellation fee was actually still owed. That made a
+    // "cancelled, fee due" reservation's fee genuinely unsubmittable from
+    // this page: getAvailablePaymentOptions() already listed it as payable,
+    // but nothing routed to a form that could act on it.
+    // isReservationPaymentEnabled() intentionally excludes 'cancelled' from
+    // the general balance/reschedule flow (that part stays gone), but the
+    // cancellation fee itself needs the opposite treatment — it's the one
+    // thing that's still genuinely payable once cancelled.
     return `
         <section class="payment-focus-card">
             <div class="payment-cancellation-card">
@@ -447,6 +492,22 @@ function renderCancellationCard(reservation) {
                     <i class="fa-solid fa-file-lines" aria-hidden="true"></i> View service agreement
                 </a>
             </div>
+            ${feeOwed ? `
+                <section class="payment-step-section">
+                    <div>
+                        <p class="payment-step-label">Settle your cancellation fee</p>
+                        <h2 class="payment-step-heading">Choose payment method</h2>
+                    </div>
+                    <div class="payment-chip-grid">${renderPaymentMethodButtons(reservation)}</div>
+                </section>
+                <section class="payment-step-section">
+                    <div>
+                        <h2 class="payment-step-heading">How to pay</h2>
+                    </div>
+                    ${renderInstructionCard(reservation)}
+                </section>
+                ${renderFormSection(reservation)}
+            ` : ''}
         </section>
     `;
 }
@@ -1046,21 +1107,28 @@ function renderReservationPaymentPage() {
 
     syncSelections(reservation);
 
-    const isCancelled = String(reservation.status || '').toLowerCase() === 'cancelled';
+    // isCompletedPaymentOverview/isPendingPaymentOverview now internally
+    // route through getPaymentPageState too (via getPaymentSummary), so
+    // this dispatch can't disagree with the hero card above it or the
+    // status pill inside it. Their options were previously missing
+    // paymentRules — same silent-default-fallback bug getActivePaymentPageState
+    // had before this consolidation.
+    const pageState = getActivePaymentPageState(reservation);
+    const isCancelled = pageState.mode === 'cancellation_fee_due' || pageState.mode === 'cancelled_settled';
     const focusCard = isCancelled
-        ? renderCancellationCard(reservation)
+        ? renderCancellationCard(reservation, pageState)
         : isCompletedPaymentOverview(
             reservation,
             state.bundle.paymentsByReservationId,
             state.bundle.reschedulesByReservationId,
-            { formatDate, reservationRules: state.reservationRules }
+            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules }
         )
             ? renderCompleteCard(reservation)
             : isPendingPaymentOverview(
                 reservation,
                 state.bundle.paymentsByReservationId,
                 state.bundle.reschedulesByReservationId,
-                { formatDate, reservationRules: state.reservationRules }
+                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules }
             )
                 ? renderPendingCard(reservation)
                 : renderActionableCard(reservation);

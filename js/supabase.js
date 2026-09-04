@@ -73,6 +73,11 @@ function lazyClient(storageKey) {
 
 export const customerSupabase = lazyClient('eli-customer-auth')
 export const portalSupabase = lazyClient('eli-portal-auth')
+// Kept fully separate from portalSupabase: the shared staff/board kiosk
+// credential must never share a browser session bucket with manager/admin,
+// otherwise signing in on one login page silently overwrites the other's
+// session in every open tab (see the staff-login-separation follow-up).
+export const boardSupabase = lazyClient('eli-board-auth')
 
 // Keep the public site on the customer session by default.
 export const supabase = customerSupabase

@@ -1,4 +1,4 @@
-import { portalSupabase as supabase } from './supabase.js';
+import { boardSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
 
 const boardClock = document.getElementById('boardClock');
@@ -427,13 +427,9 @@ function showBoard() {
 }
 
 async function checkSession() {
-  const { session, profile } = await verifyPortalSession(supabase);
+  const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
   if (!session) {
     showSignedOutState();
-    return false;
-  }
-  if (profile?.role !== 'staff') {
-    window.location.replace('/admin/dashboard.html');
     return false;
   }
   showBoard();
@@ -499,13 +495,9 @@ function resetIdleTimer() {
 }
 
 async function init() {
-  const { session, profile } = await verifyPortalSession(supabase);
+  const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
   if (!session) {
     window.location.replace('/board/login');
-    return;
-  }
-  if (profile?.role !== 'staff') {
-    window.location.replace('/admin/dashboard.html');
     return;
   }
 

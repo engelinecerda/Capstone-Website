@@ -5,6 +5,7 @@ import {
     fetchReceipts as fetchSharedReceipts,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     getReservationBalanceDetails as getSharedReservationBalanceDetails,
+    getPaymentSummary as getSharedPaymentSummary,
     isReservationPaymentEnabled as isSharedReservationPaymentEnabled,
     loadPaymentRules,
     loadReservationRules,
@@ -528,10 +529,6 @@ function hasPendingOrApprovedPayment(reservationId, paymentType) {
     ));
 }
 
-function isReservationPaymentEnabled(reservation) {
-    return ['approved', 'confirmed', 'rescheduled', 'completed', 'cancellation_approved'].includes(String(reservation?.status || '').toLowerCase());
-}
-
 function getReservationFeeAmount(reservation, remainingBalance) {
     const locationType = String(reservation?.location_type || '').toLowerCase();
 
@@ -559,7 +556,7 @@ function getAvailablePaymentOptions(reservation) {
         }));
     }
 
-    if (!isReservationPaymentEnabled(reservation)) {
+    if (!isSharedReservationPaymentEnabled(reservation)) {
         return options.filter((option) => option.amount > 0);
     }
 
@@ -633,49 +630,18 @@ function getAvailablePaymentOptions(reservation) {
     return options.filter((option) => option.amount > 0);
 }
 
+// Thin wrapper over the shared, single-source-of-truth implementation
+// (js/customer_payments.js's getPaymentPageState/getPaymentSummary) — this
+// used to be a full separate re-derivation that drifted out of sync with
+// that one (twice, in two different ways) before being consolidated. Kept
+// as a same-signature local wrapper so every existing call site in this
+// file (getPaymentSummary(reservation)) needs no changes.
 function getPaymentSummary(reservation) {
-    const reservationId = reservation.reservation_id;
-    const balance = getReservationBalanceDetails(reservation);
-    const pendingPayment = getLatestPendingPayment(reservationId);
-
-    if (pendingPayment) {
-        const pendingLabel = getPaymentActionLabel(
-            pendingPayment.payment_type,
-            reservation,
-            Number(pendingPayment.amount || 0),
-            pendingPayment.reschedule_request_id || ''
-        );
-        return {
-            label: `${pendingLabel} pending review`,
-            key: 'pending',
-            sublabel: 'Waiting for admin confirmation'
-        };
-    }
-
-    if (balance.remainingBalance <= 0) {
-        return { label: 'Paid in full', key: 'approved', sublabel: 'All required payments recorded' };
-    }
-
-    if (balance.hasPartialPayment) {
-        return {
-            label: balance.isPastDue ? 'Overdue' : 'Remaining balance due',
-            key: balance.toneKey,
-            sublabel: `${formatCurrency(balance.remainingBalance)} remaining / Pay by ${balance.dueDateLabel}`
-        };
-    }
-
-    const approvedRescheduleRequest = getReservationRescheduleRequests(reservationId)
-        .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
-
-    if (approvedRescheduleRequest) {
-        return { label: 'Reschedule fee pending', key: 'info', sublabel: 'Complete the reschedule fee to finalize the change' };
-    }
-
-    return {
-        label: balance.isPastDue ? 'Overdue' : 'Initial payment needed',
-        key: balance.toneKey,
-        sublabel: balance.dueDateKey ? `Pay by ${balance.dueDateLabel}` : 'Choose your first payment'
-    };
+    return getSharedPaymentSummary(reservation, state.paymentsByReservationId, state.reschedulesByReservationId, {
+        formatDate,
+        reservationRules: state.reservationRules,
+        paymentRules: state.paymentRules
+    });
 }
 
 function getLatestReservationPayment(reservationId) {
@@ -897,7 +863,7 @@ function canCancelReservation(reservation) {
 function renderPaymentComposer(reservation) {
     const options = getAvailablePaymentOptions(reservation);
     if (!options.length) {
-        if (!isReservationPaymentEnabled(reservation)) {
+        if (!isSharedReservationPaymentEnabled(reservation)) {
             return '<div class="payment-empty">Payment submission becomes available after admin approves this reservation.</div>';
         }
         const waitingMessage = getLatestPendingPayment(reservation.reservation_id)
@@ -925,7 +891,7 @@ function renderPaymentComposer(reservation) {
 function renderPaymentStatusContext(reservation) {
     const paymentSummary = getPaymentSummary(reservation);
     const paymentEntries = getReservationPayments(reservation.reservation_id);
-    const paymentModuleEnabled = isReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
+    const paymentModuleEnabled = isSharedReservationPaymentEnabled(reservation) || paymentEntries.length > 0;
     const nextStepCopy = getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnabled, paymentEntries.length > 0);
     const availableOptions = getAvailablePaymentOptions(reservation);
     const balance = getReservationBalanceDetails(reservation);
@@ -1842,7 +1808,7 @@ function renderPaymentsModule() {
     if (!paymentsList) return;
 
     const paymentReservations = state.reservations.filter((reservation) => (
-        isReservationPaymentEnabled(reservation)
+        isSharedReservationPaymentEnabled(reservation)
         || getReservationPayments(reservation.reservation_id).length > 0
         || getReservationReceipts(reservation.reservation_id).length > 0
     ));

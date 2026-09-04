@@ -46,11 +46,33 @@ signupTab.addEventListener('click', showSignupTab);
 // ========================
 // Login Form Submit
 // ========================
+function formatLockMessage(lockedUntil) {
+    const minutesLeft = Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60000));
+    return `Too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.`;
+}
+
 loginForm.addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
+
+    // Pre-check only — a UX nicety that skips a wasted Auth call when we
+    // already know the account is locked. The real enforcement is the
+    // Password Verification Attempt hook (server-side, cannot be bypassed
+    // by skipping this call), which still rejects the sign-in below even
+    // if this check is skipped or its result is stale.
+    let lockCheck = null;
+    try {
+        const { data } = await supabase.rpc('check_login_lock', { p_email: email });
+        lockCheck = data;
+    } catch (_) {
+        // best-effort only — the hook still enforces the lock either way
+    }
+    if (lockCheck?.locked) {
+        alert(formatLockMessage(lockCheck.locked_until));
+        return;
+    }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -60,8 +82,15 @@ loginForm.addEventListener('submit', async function (e) {
             return;
         }
 
+        Promise.resolve(supabase.rpc('record_failed_login', { p_email: email })).catch(() => {});
         alert('Login failed: ' + error.message);
         return;
+    }
+
+    try {
+        await supabase.rpc('clear_my_login_failures');
+    } catch (_) {
+        // best-effort only, never block login on this
     }
 
     window.location.href = '/';

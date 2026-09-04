@@ -1755,6 +1755,38 @@
     animation: res-notice-pulse .8s ease-out;
 }
 
+/* Booking-block variant — a hard stop (unpaid balance/fee), not just an
+   informational nudge, so it gets a stronger terracotta/red tone than the
+   base guest notice. */
+.res-guest-notice--block {
+    background: #FBEFEC;
+    border-color: #A34F2E;
+}
+
+.res-guest-notice--block i {
+    color: #A34F2E;
+}
+
+.res-guest-notice-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    margin-top: 12px;
+    padding: 10px 20px;
+    background: #A34F2E;
+    color: #fff;
+    font-weight: 600;
+    font-size: 13.5px;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background 0.18s ease;
+}
+
+.res-guest-notice-btn:hover {
+    background: #8A4223;
+}
+
 /* ── Event-type chips ───────────────────────────────────────────────────────── */
 .event-type-chips {
     display: flex;

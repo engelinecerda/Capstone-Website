@@ -67,6 +67,17 @@
                 <p>You're browsing as a guest. <a href="/login.html">Sign in</a> or <a href="/login.html">create an account</a> to complete your booking.</p>
             </div>
 
+            <!-- BOOKING BLOCK NOTICE — shown by JS when the customer has an
+                 overdue balance or unpaid cancellation fee on another
+                 reservation; hides the booking flow entirely while shown -->
+            <div class="res-guest-notice res-guest-notice--block hidden" id="resBookingBlockNotice" role="alert" aria-live="assertive">
+                <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                <div>
+                    <p id="resBookingBlockMessage"></p>
+                    <a href="#" id="resBookingBlockLink" class="res-guest-notice-btn">Go to payment</a>
+                </div>
+            </div>
+
             <!-- Progress -->
             <div class="progress-container">
                 <div class="progress-bar"><div id="progress"></div></div>
