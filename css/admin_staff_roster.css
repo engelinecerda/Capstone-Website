@@ -61,6 +61,34 @@
    so its border-bottom collapses correctly with the rest of the row.
    The flex layout for the buttons lives on the wrapper div inside it. */
 .roster-actions-inner { display: flex; gap: 8px; align-items: center; }
+.roster-count-suffix { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+.roster-delete-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #A32D2D;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.roster-delete-btn:hover {
+  background: rgba(163, 45, 45, 0.08);
+  border-color: rgba(163, 45, 45, 0.35);
+}
+
+.modal-btn-danger {
+  background: transparent;
+  border: 1px solid rgba(163, 45, 45, 0.35);
+  color: #A32D2D;
+}
+.modal-btn-danger:hover {
+  background: rgba(163, 45, 45, 0.08);
+}
 
 /* ── Toggle switch (Active column) ───────────────────────────────────────── */
 .pm2-toggle {
@@ -82,11 +110,9 @@
 .pm2-toggle-track {
   position: absolute;
   inset: 0;
-  box-sizing: border-box;
   background: #D8D3CD;
-  border: 1px solid var(--btn-secondary-border);
   border-radius: 999px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease;
 }
 .pm2-toggle-track::before {
   content: '';
@@ -100,7 +126,7 @@
   transition: transform 0.15s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
-.pm2-toggle input:checked + .pm2-toggle-track { background: var(--active-bg); border-color: var(--active-bg); }
+.pm2-toggle input:checked + .pm2-toggle-track { background: var(--active-bg); }
 .pm2-toggle input:checked + .pm2-toggle-track::before { transform: translateX(16px); }
 .pm2-toggle input:focus-visible + .pm2-toggle-track { outline: 2px solid var(--active-bg); outline-offset: 2px; }
 
@@ -159,7 +185,7 @@
   display: block;
   width: 100%;
   font-size: 11px;
-  color: var(--muted-2);
+  color: #9B8B7C;
   line-height: 1.5;
   margin-top: 4px;
 }
