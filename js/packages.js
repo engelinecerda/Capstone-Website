@@ -3,6 +3,7 @@
 
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPageHeader } from './page_content.js';
+import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 const CATEGORY_TABLE      = 'package_category';
 const PACKAGE_TABLE       = 'package';
@@ -467,7 +468,7 @@ function buildPackageCard(pkg, categoryName) {
        <p class="pkg-card-price-note">Custom pricing</p>`;
 
   const coverPhotoHtml = pkg._coverPhoto
-    ? `<img class="pkg-card-photo" src="${esc(pkg._coverPhoto.image_url)}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
+    ? `<img class="pkg-card-photo" src="${esc(optimizedImageUrl(pkg._coverPhoto.image_url))}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
     : '';
 
   return `
@@ -568,7 +569,7 @@ function buildPhotoGallery(pkg) {
   return `
     <div class="pkg-gallery">
       ${photos.map(ph => `
-        <img class="pkg-gallery-img" src="${esc(ph.image_url)}" alt="${esc(ph.alt_text || pkg.package_name || '')}" loading="lazy">
+        <img class="pkg-gallery-img" src="${esc(optimizedImageUrl(ph.image_url))}" alt="${esc(ph.alt_text || pkg.package_name || '')}" loading="lazy">
       `).join('')}
     </div>`;
 }

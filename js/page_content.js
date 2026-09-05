@@ -3,6 +3,14 @@
 // fails silently — a Page Content outage must never break a customer-facing
 // page; the page's existing hardcoded markup stays on screen if a fetch
 // fails or a row is missing.
+//
+// Every image_url returned/applied below is passed through
+// optimizedImageUrl() (see cloudinary_delivery.js) — Cloudinary's
+// q_auto,f_auto delivery transformation — once here, so every caller
+// (home/about/packages/faqs/menu headers, the home gallery, menu sections
+// and banner) gets optimized images automatically without needing its own
+// import. Board item #47.
+import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 // ── Config-loading skeleton helper ──────────────────────────────────────
 // Paired with the .cfg-loading CSS class (css/styles.css — see that rule's
@@ -47,7 +55,7 @@ export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subE
     if (error || !data) return;
 
     if (imgEl && data.image_url) {
-      imgEl.src = data.image_url;
+      imgEl.src = optimizedImageUrl(data.image_url);
       if (data.alt_text) imgEl.alt = data.alt_text;
     }
     if (headingEl && data.heading) headingEl.textContent = data.heading;
@@ -65,7 +73,7 @@ export async function loadGalleryImages(supabase) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     if (error) return [];
-    return data || [];
+    return (data || []).map((row) => ({ ...row, image_url: optimizedImageUrl(row.image_url) }));
   } catch (err) {
     return [];
   }
@@ -106,7 +114,7 @@ export async function loadMenuSections(supabase) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     if (error) return [];
-    return data || [];
+    return (data || []).map((row) => ({ ...row, image_url: optimizedImageUrl(row.image_url) }));
   } catch (err) {
     return [];
   }
@@ -134,7 +142,7 @@ export async function loadMenuBanner(supabase) {
       .eq('id', true)
       .maybeSingle();
     if (error || !data) return null;
-    return data;
+    return { ...data, image_url: optimizedImageUrl(data.image_url) };
   } catch (err) {
     return null;
   }
