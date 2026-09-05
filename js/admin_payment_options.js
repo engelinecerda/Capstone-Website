@@ -569,6 +569,10 @@ const DEFAULT_PAYMENT_RULES = {
   cancellation_fee_offsite: 2000,
   reschedule_fee: 3000,
   service_charge_percent: 10,
+  // Safe default: unchanged current behaviour (offsite charged 0%) until
+  // an admin deliberately turns this on — the café has not confirmed
+  // offsite should be charged, so this must never default to true.
+  service_charge_applies_offsite: false,
   cancellation_min_notice_days: null,
   cancellation_request_window_days: null
 };
@@ -655,11 +659,18 @@ async function savePaymentRules() {
     .eq('setting_key', 'payment_rules')
     .maybeSingle();
   const oldConfig = current ? { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) } : DEFAULT_PAYMENT_RULES;
-  // Re-sync the two fields this page no longer edits with whatever is
-  // freshest in the DB right before saving, in case the Availability and
-  // Scheduling page changed them since this page was loaded.
+  // Re-sync the fields this form doesn't render with whatever is freshest
+  // in the DB right before saving — this upsert replaces the whole JSON
+  // blob, so any field readPaymentRulesFields() doesn't return would
+  // otherwise silently revert to DEFAULT_PAYMENT_RULES the next time this
+  // (unrelated) form is saved. cancellation_min_notice_days/_window_days
+  // belong to the Availability and Scheduling page; service_charge_percent
+  // and service_charge_applies_offsite belong to the Service Charge
+  // section's own mini-save further down this same page.
   config.cancellation_min_notice_days = oldConfig.cancellation_min_notice_days ?? null;
   config.cancellation_request_window_days = oldConfig.cancellation_request_window_days ?? null;
+  config.service_charge_percent = oldConfig.service_charge_percent;
+  config.service_charge_applies_offsite = !!oldConfig.service_charge_applies_offsite;
 
   showSettingsConfirm(
     'Change Payment Rules',
@@ -682,16 +693,21 @@ async function savePaymentRules() {
 }
 
 // ── Service charge ───────────────────────────────────────────────────────────
-// Global default lives in the same system_settings.payment_rules blob as
-// reschedule_fee/cancellation_fee (see DEFAULT_PAYMENT_RULES above) — this
-// section has its own mini load/save so editing it doesn't require touching
-// the rest of the Payment Rules form. Per-category override is a real
-// column on package_category (service_charge_percent, null = inherit).
+// Global default and the offsite toggle live in the same system_settings.
+// payment_rules blob as reschedule_fee/cancellation_fee (see
+// DEFAULT_PAYMENT_RULES above) — this section has its own mini load/save so
+// editing it doesn't require touching the rest of the Payment Rules form.
+// Per-category override is a real column on package_category
+// (service_charge_percent, null = inherit).
 //
-// Resolution used everywhere this actually applies (reservations.html):
-// offsite bookings are 0% (pending confirmation — see the note in the UI),
-// regardless of category, since a category can hold both onsite and offsite
-// packages; otherwise coalesce(category override, this global default).
+// Resolution used everywhere this actually applies (js/reservations.js,
+// resolveServiceCharge()): offsite bookings are 0% UNLESS
+// service_charge_applies_offsite is on, regardless of category (a category
+// can hold both onsite and offsite packages, so category alone can't carry
+// "offsite-only" intent); once on, offsite resolves exactly like onsite —
+// coalesce(category override, this global default). Applies to the
+// package + add-on total only; there's no separate travel-fee amount
+// anywhere in this codebase to include or exclude.
 let scCategories = [];
 
 function setScMsg(elId, msg, isError = false) {
@@ -709,15 +725,20 @@ async function loadServiceChargeSection() {
     .maybeSingle();
 
   let globalPct = DEFAULT_PAYMENT_RULES.service_charge_percent;
+  let appliesOffsite = DEFAULT_PAYMENT_RULES.service_charge_applies_offsite;
   if (data?.setting_value) {
     try {
       const parsed = JSON.parse(data.setting_value);
       if (Number.isFinite(Number(parsed.service_charge_percent))) globalPct = Number(parsed.service_charge_percent);
-    } catch { /* keep default */ }
+      appliesOffsite = !!parsed.service_charge_applies_offsite;
+    } catch { /* keep defaults */ }
   }
 
   const globalInput = document.getElementById('sc-global-percent');
   if (globalInput) globalInput.value = globalPct;
+
+  const offsiteToggle = document.getElementById('sc-offsite-toggle');
+  if (offsiteToggle) offsiteToggle.checked = appliesOffsite;
 
   const { data: categories, error } = await supabase
     .from('package_category')
@@ -732,7 +753,7 @@ async function loadServiceChargeSection() {
     renderCategoryOverrideTable(globalPct);
   }
 
-  updateWorkedExample(globalPct);
+  updateWorkedExample(globalPct, appliesOffsite);
 }
 
 function renderCategoryOverrideTable(globalPct) {
@@ -765,20 +786,40 @@ function escapeHtmlSc(str) {
   return String(str ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
-function updateWorkedExample(globalPctOverride) {
-  const globalInput = document.getElementById('sc-global-percent');
-  const pct = Number.isFinite(globalPctOverride) ? globalPctOverride : Number(globalInput?.value);
-  const exampleEl = document.getElementById('sc-example-text');
-  if (!exampleEl || !Number.isFinite(pct)) return;
-
-  const base = 28000;
+function computeWorkedExample(base, pct) {
   const charge = Math.round(base * pct) / 100;
   const total = base + charge;
   const deposit = Math.round(total * 0.5);
+  return { charge, total, deposit };
+}
 
-  exampleEl.textContent =
-    `On a ₱${base.toLocaleString()} package, a ${pct}% service charge adds ₱${charge.toLocaleString()} ` +
-    `for a ₱${total.toLocaleString()} total; a 50% deposit is ₱${deposit.toLocaleString()}.`;
+function updateWorkedExample(globalPctOverride, appliesOffsiteOverride) {
+  const globalInput = document.getElementById('sc-global-percent');
+  const pct = Number.isFinite(globalPctOverride) ? globalPctOverride : Number(globalInput?.value);
+  const offsiteToggle = document.getElementById('sc-offsite-toggle');
+  const appliesOffsite = typeof appliesOffsiteOverride === 'boolean' ? appliesOffsiteOverride : !!offsiteToggle?.checked;
+
+  const exampleEl = document.getElementById('sc-example-text');
+  const offsiteExampleEl = document.getElementById('sc-example-text-offsite');
+  if (!Number.isFinite(pct)) return;
+
+  const base = 28000;
+
+  if (exampleEl) {
+    const { charge, total, deposit } = computeWorkedExample(base, pct);
+    exampleEl.textContent =
+      `Onsite — on a ₱${base.toLocaleString()} package, a ${pct}% service charge adds ₱${charge.toLocaleString()} ` +
+      `for a ₱${total.toLocaleString()} total; a 50% deposit is ₱${deposit.toLocaleString()}.`;
+  }
+
+  if (offsiteExampleEl) {
+    const offsitePct = appliesOffsite ? pct : 0;
+    const { charge, total, deposit } = computeWorkedExample(base, offsitePct);
+    offsiteExampleEl.textContent = appliesOffsite
+      ? `Offsite (toggle on) — the same ₱${base.toLocaleString()} package is charged the same ${offsitePct}%, adding ₱${charge.toLocaleString()} ` +
+        `for a ₱${total.toLocaleString()} total; a 50% deposit is ₱${deposit.toLocaleString()}.`
+      : `Offsite (toggle off) — the same ₱${base.toLocaleString()} package is charged 0% service charge, so the total stays ₱${total.toLocaleString()}; a 50% deposit is ₱${deposit.toLocaleString()}.`;
+  }
 }
 
 async function saveGlobalServiceCharge() {
@@ -815,6 +856,46 @@ async function saveGlobalServiceCharge() {
   setScMsg('sc-global-msg', 'Saved.');
   renderCategoryOverrideTable(pct);
   updateWorkedExample(pct);
+}
+
+async function saveOffsiteToggle() {
+  const toggle = document.getElementById('sc-offsite-toggle');
+  if (!toggle) return;
+  const appliesOffsite = toggle.checked;
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+
+  let config = { ...DEFAULT_PAYMENT_RULES };
+  if (current?.setting_value) {
+    try { config = { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) }; } catch { /* use default */ }
+  }
+  config.service_charge_applies_offsite = appliesOffsite;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      { setting_key: 'payment_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
+    );
+
+  if (error) {
+    setScMsg('sc-offsite-msg', 'Failed to save: ' + error.message, true);
+    toggle.checked = !appliesOffsite; // revert the visible toggle to match what's actually saved
+    return;
+  }
+
+  await logAudit({
+    action: 'Updated Offsite Service Charge Setting',
+    category: 'payment_config',
+    details: `Offsite packages now ${appliesOffsite ? 'DO' : 'do NOT'} receive the service charge`
+  });
+  setScMsg('sc-offsite-msg', 'Saved.');
+  updateWorkedExample(Number(document.getElementById('sc-global-percent')?.value), appliesOffsite);
 }
 
 async function saveCategoryOverride(row) {
@@ -908,6 +989,11 @@ async function init() {
 
   document.getElementById('sc-save-global-btn')?.addEventListener('click', saveGlobalServiceCharge);
   document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());
+  document.getElementById('sc-save-offsite-btn')?.addEventListener('click', saveOffsiteToggle);
+  // Live-preview the effect immediately on toggle, before the admin saves —
+  // same "see it before committing" behaviour the global-percent input
+  // already has above.
+  document.getElementById('sc-offsite-toggle')?.addEventListener('change', () => updateWorkedExample());
   document.getElementById('sc-category-body')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.sc-save-category-btn');
     if (!btn) return;

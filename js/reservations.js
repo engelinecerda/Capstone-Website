@@ -121,16 +121,21 @@ let ONSITE_CATEGORIES  = []; // [{ id, name, count }]
 let OFFSITE_CATEGORIES = []; // [{ id, name, count }]
 
 // ── Service charge (populated by loadServiceChargeSettings + loadPackages) ──
-// Resolution: offsite bookings are 0% (pending manager confirmation —
-// see admin Payment Settings note), else coalesce(category override,
-// global default). Categories don't map to location (onsite/offsite/
-// both packages share categories), so location is checked first, not
-// derived from category structure. See resolveServiceCharge() below.
+// Resolution: offsite bookings are 0% UNLESS the admin has turned on
+// SERVICE_CHARGE_APPLIES_OFFSITE (Payment Settings), in which case offsite
+// resolves exactly like onsite — coalesce(category override, global
+// default). Categories don't map to location (onsite/offsite/both packages
+// share categories), so location is checked first, not derived from
+// category structure. Applies to basePrice only (package + add-ons) — there
+// is no separate travel-fee amount computed anywhere in this app to include
+// or exclude, so nothing is carved out on that basis. See
+// resolveServiceCharge() below.
 let GLOBAL_SERVICE_CHARGE_PCT = 10;
+let SERVICE_CHARGE_APPLIES_OFFSITE = false; // safe default: unchanged current behaviour until the admin opts in
 let CATEGORY_SERVICE_CHARGE_PCT = {}; // categoryId -> percent or null (null = inherit)
 
 function resolveServiceCharge(basePrice, locationType, categoryId) {
-    const pct = locationType === 'offsite'
+    const pct = (locationType === 'offsite' && !SERVICE_CHARGE_APPLIES_OFFSITE)
         ? 0
         : (CATEGORY_SERVICE_CHARGE_PCT[categoryId] ?? GLOBAL_SERVICE_CHARGE_PCT);
     const amount = Math.round(basePrice * pct) / 100;
@@ -338,8 +343,9 @@ async function loadServiceChargeSettings() {
         if (Number.isFinite(Number(parsed.service_charge_percent))) {
             GLOBAL_SERVICE_CHARGE_PCT = Number(parsed.service_charge_percent);
         }
+        SERVICE_CHARGE_APPLIES_OFFSITE = !!parsed.service_charge_applies_offsite;
     } catch {
-        // Keep the 10% fallback.
+        // Keep the 10% / offsite-off fallback.
     }
 }
 
