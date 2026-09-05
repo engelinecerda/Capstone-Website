@@ -26,6 +26,7 @@ import {
 } from '/js/reservation_availability.js';
 import { loadReservationFormConfig } from '/js/reservation_form_config.js';
 import { buildCustomerPaymentUrl } from '/js/customer_payments.js';
+import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
@@ -121,16 +122,21 @@ let ONSITE_CATEGORIES  = []; // [{ id, name, count }]
 let OFFSITE_CATEGORIES = []; // [{ id, name, count }]
 
 // ── Service charge (populated by loadServiceChargeSettings + loadPackages) ──
-// Resolution: offsite bookings are 0% (pending manager confirmation —
-// see admin Payment Settings note), else coalesce(category override,
-// global default). Categories don't map to location (onsite/offsite/
-// both packages share categories), so location is checked first, not
-// derived from category structure. See resolveServiceCharge() below.
+// Resolution: offsite bookings are 0% UNLESS the admin has turned on
+// SERVICE_CHARGE_APPLIES_OFFSITE (Payment Settings), in which case offsite
+// resolves exactly like onsite — coalesce(category override, global
+// default). Categories don't map to location (onsite/offsite/both packages
+// share categories), so location is checked first, not derived from
+// category structure. Applies to basePrice only (package + add-ons) — there
+// is no separate travel-fee amount computed anywhere in this app to include
+// or exclude, so nothing is carved out on that basis. See
+// resolveServiceCharge() below.
 let GLOBAL_SERVICE_CHARGE_PCT = 10;
+let SERVICE_CHARGE_APPLIES_OFFSITE = false; // safe default: unchanged current behaviour until the admin opts in
 let CATEGORY_SERVICE_CHARGE_PCT = {}; // categoryId -> percent or null (null = inherit)
 
 function resolveServiceCharge(basePrice, locationType, categoryId) {
-    const pct = locationType === 'offsite'
+    const pct = (locationType === 'offsite' && !SERVICE_CHARGE_APPLIES_OFFSITE)
         ? 0
         : (CATEGORY_SERVICE_CHARGE_PCT[categoryId] ?? GLOBAL_SERVICE_CHARGE_PCT);
     const amount = Math.round(basePrice * pct) / 100;
@@ -176,7 +182,18 @@ function sid(n)  { return STEP_IDS[n - 1]; }
 const DRAFT_KEY = 'eli_reservation_draft';
 const DRAFT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days — after this, treat as stale and don't offer to resume
 
+// Set the instant submission succeeds (see the reservation-submit handler).
+// window.addEventListener('pagehide', saveDraft) below fires unconditionally
+// on tab close/navigation — including the moment right after a successful
+// submit, since this page shows its "Reservation Submitted!" message in
+// place rather than navigating away. Without this flag, that pagehide would
+// silently re-write S (still fully populated in memory) back into
+// localStorage a few ms after clearDraft() ran, undoing it — a customer who
+// just submitted successfully would still get the resume prompt next visit.
+let submissionLocked = false;
+
 function saveDraft() {
+    if (submissionLocked) return;
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ state: S, step: cur, savedAt: Date.now() })); } catch { /* ignore */ }
 }
 
@@ -267,6 +284,8 @@ const signatureTypeInput      = document.getElementById('signature-type-input');
 const signatureTypePreview    = document.getElementById('signature-type-preview');
 const sigModeDrawBtn          = document.getElementById('sig-mode-draw');
 const sigModeTypeBtn          = document.getElementById('sig-mode-type');
+const signatureCapturedBadge  = document.getElementById('signature-captured-badge');
+const signatureGuidePlaceholder = document.getElementById('signature-guide-placeholder');
 const policyModalBackdrop     = document.getElementById('policy-modal-backdrop');
 const draftResumeModalBackdrop = document.getElementById('draft-resume-modal-backdrop');
 const draftResumeContinueBtn   = document.getElementById('draft-resume-continue-btn');
@@ -286,10 +305,6 @@ const agreementReadingColumn  = document.getElementById('agreement-reading-colum
 const agreementModalCloseBtn        = document.getElementById('agreement-modal-close-btn');
 const agreementModalFooterCloseBtn  = document.getElementById('agreement-modal-footer-close-btn');
 const agreementModalFinishBtn       = document.getElementById('agreement-modal-finish-btn');
-const warningModalBackdrop    = document.getElementById('warning-modal-backdrop');
-const warningModalTitle       = document.getElementById('warning-modal-title');
-const warningModalMessage     = document.getElementById('warning-modal-message');
-const warningModalOkBtn       = document.getElementById('warning-modal-ok-btn');
 
 // ── Signature state ────────────────────────────────────────────────────
 const signatureState = {
@@ -338,8 +353,9 @@ async function loadServiceChargeSettings() {
         if (Number.isFinite(Number(parsed.service_charge_percent))) {
             GLOBAL_SERVICE_CHARGE_PCT = Number(parsed.service_charge_percent);
         }
+        SERVICE_CHARGE_APPLIES_OFFSITE = !!parsed.service_charge_applies_offsite;
     } catch {
-        // Keep the 10% fallback.
+        // Keep the 10% / offsite-off fallback.
     }
 }
 
@@ -699,18 +715,8 @@ function closePolicyModal() {
 }
 
 // ── Warning modal ──────────────────────────────────────────────────────
-function showWarningModal(message, title) {
-    if (!warningModalBackdrop) { alert(message); return; }
-    warningModalTitle.textContent = title || 'Almost there';
-    warningModalMessage.textContent = message;
-    warningModalBackdrop.classList.remove('hidden');
-    warningModalBackdrop.setAttribute('aria-hidden', 'false');
-    warningModalOkBtn?.focus();
-}
-
-function closeWarningModal() {
-    warningModalBackdrop.classList.add('hidden');
-    warningModalBackdrop.setAttribute('aria-hidden', 'true');
+function showWarningModal(message, title, type = 'warning') {
+    showFeedbackModal({ type, title: title || 'Almost there', message });
 }
 
 function agreeToPolicies() {
@@ -741,14 +747,46 @@ function resizeSignatureCanvas() {
     }
 }
 
+// Transparent background (not white) so the CSS-drawn baseline/X guide
+// underneath (.signature-guide, a DOM sibling — see the markup) shows
+// through wherever the customer hasn't drawn ink. The guide is never
+// touched by SignaturePad's own clear()/resize repaints since it isn't
+// part of the canvas bitmap at all.
 function initSignaturePad() {
     if (!signatureCanvas || signatureState.pad || typeof SignaturePad === 'undefined') return;
     signatureState.pad = new SignaturePad(signatureCanvas, {
-        backgroundColor: 'rgb(255,255,255)',
-        penColor: 'rgb(42,20,8)'
+        backgroundColor: 'rgba(0,0,0,0)',
+        penColor: 'rgb(42,20,8)',
+        onBegin: () => setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false),
+        onEnd: () => updateSignatureCapturedBadge()
     });
     resizeSignatureCanvas();
     window.addEventListener('resize', resizeSignatureCanvas);
+}
+
+function setSignatureGuidePlaceholderVisible(el, visible) {
+    el?.classList.toggle('is-hidden', !visible);
+}
+
+function updateSignatureCapturedBadge() {
+    signatureCapturedBadge?.classList.toggle('is-hidden', !isSignaturePresent());
+}
+
+// Shrinks the live cursive preview in steps until it fits the available
+// width, rather than letting a long typed name run past the box (the
+// preview's own overflow:hidden + ellipsis is the hard backstop if even
+// the smallest step still doesn't fit).
+const SIGNATURE_TYPE_FONT_MAX = 32;
+const SIGNATURE_TYPE_FONT_MIN = 18;
+function fitSignatureTypePreview() {
+    if (!signatureTypePreview) return;
+    let size = SIGNATURE_TYPE_FONT_MAX;
+    signatureTypePreview.style.fontSize = `${size}px`;
+    const maxWidth = signatureTypePreview.clientWidth;
+    while (signatureTypePreview.scrollWidth > maxWidth && size > SIGNATURE_TYPE_FONT_MIN) {
+        size -= 2;
+        signatureTypePreview.style.fontSize = `${size}px`;
+    }
 }
 
 function setSignatureMode(mode) {
@@ -759,6 +797,7 @@ function setSignatureMode(mode) {
     signatureTypePanel?.classList.toggle('hidden', mode !== 'type');
     if (mode === 'draw') { initSignaturePad(); resizeSignatureCanvas(); }
     setSignatureStatus('');
+    updateSignatureCapturedBadge();
 }
 
 function isSignaturePresent() {
@@ -785,10 +824,37 @@ function renderTypedSignatureToDataUrl(text) {
     return canvas.toDataURL('image/png');
 }
 
+// The live canvas is transparent (so the CSS baseline/X guide shows
+// through while drawing — see initSignaturePad), but the submitted/signed
+// contract's signature image must not be: composite it onto an opaque
+// white background at export time, independent of how the canvas is
+// styled for the drawing UX. Never touches the live pad/canvas.
+function flattenSignatureOntoWhite(transparentDataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = transparentDataUrl;
+    });
+}
+
 async function getSignatureDataUrl() {
     if (signatureState.mode === 'draw') {
         if (!signatureState.pad || signatureState.pad.isEmpty()) return null;
-        return signatureState.pad.toDataURL('image/png');
+        try {
+            return await flattenSignatureOntoWhite(signatureState.pad.toDataURL('image/png'));
+        } catch {
+            return signatureState.pad.toDataURL('image/png');
+        }
     }
     const text = (signatureTypeInput?.value || '').trim();
     if (!text) return null;
@@ -853,9 +919,30 @@ function renderContractBody(templateBody) {
         guest_count: S.guestCount || ''
     };
     const merged = mergeTemplateTokens(templateBody, data);
+    // Templates have no explicit structural markup — real contract_templates
+    // rows are plain text with the title (and often a brand line before it)
+    // as consecutive ALL-CAPS lines at the very top, then ALL-CAPS section
+    // headers (EVENT DETAILS, PAYMENT TERMS, etc.) scattered through
+    // otherwise-regular paragraphs. Confirmed against live template rows,
+    // not assumed. inTitleBlock tracks "still in that opening run of
+    // consecutive caps lines" — the first blank line ends it, so any caps
+    // line after that point is a section header, not more title.
+    let inTitleBlock = true;
     contractViewer.innerHTML = merged.split('\n').map(line => {
         const trimmed = line.trim();
-        return trimmed ? `<p>${escapeHtml(trimmed)}</p>` : '<div class="contract-viewer-gap"></div>';
+        if (!trimmed) {
+            inTitleBlock = false;
+            return '<div class="contract-viewer-gap"></div>';
+        }
+        const isAllCaps = /[A-Z]/.test(trimmed) && !/[a-z]/.test(trimmed);
+        if (isAllCaps && inTitleBlock) {
+            return `<p class="contract-viewer-title">${escapeHtml(trimmed)}</p>`;
+        }
+        inTitleBlock = false;
+        if (isAllCaps) {
+            return `<p class="contract-viewer-heading">${escapeHtml(trimmed)}</p>`;
+        }
+        return `<p>${escapeHtml(trimmed)}</p>`;
     }).join('');
     return merged;
 }
@@ -2610,11 +2697,50 @@ availabilityNextMonthBtn?.addEventListener('click', async () => {
 
 contractAgreementTerms?.addEventListener('change', () => { if (contractAgreementTerms.checked) setContractPolicyMessage(''); });
 contractAgreementEsign?.addEventListener('change', () => { if (contractAgreementEsign.checked) setContractPolicyMessage(''); });
-sigModeDrawBtn?.addEventListener('click', () => setSignatureMode('draw'));
-sigModeTypeBtn?.addEventListener('click', () => setSignatureMode('type'));
-signatureClearBtn?.addEventListener('click', () => { signatureState.pad?.clear(); setSignatureStatus(''); });
+// Only one signature format is ever submitted — switching modes discards
+// whichever one the customer is leaving. Confirm first if there's actually
+// something to lose; an empty mode switches silently.
+async function switchSignatureMode(nextMode) {
+    if (nextMode === signatureState.mode) return;
+    const leavingMode = signatureState.mode;
+    const hasContentToLose = leavingMode === 'draw'
+        ? !!signatureState.pad && !signatureState.pad.isEmpty()
+        : !!(signatureTypeInput?.value || '').trim();
+
+    if (hasContentToLose) {
+        const confirmed = await showConfirmModal({
+            title: 'Switch signature mode?',
+            message: 'Switching will clear your current signature.',
+            confirmText: 'Yes, switch',
+            cancelText: 'Cancel'
+        });
+        if (!confirmed) return;
+    }
+
+    if (leavingMode === 'draw') {
+        signatureState.pad?.clear();
+        setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, true);
+    } else {
+        if (signatureTypeInput) signatureTypeInput.value = '';
+        if (signatureTypePreview) signatureTypePreview.textContent = '';
+    }
+
+    setSignatureMode(nextMode);
+}
+
+sigModeDrawBtn?.addEventListener('click', () => switchSignatureMode('draw'));
+sigModeTypeBtn?.addEventListener('click', () => switchSignatureMode('type'));
+signatureClearBtn?.addEventListener('click', () => {
+    signatureState.pad?.clear();
+    setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, true);
+    updateSignatureCapturedBadge();
+    setSignatureStatus('');
+});
 signatureTypeInput?.addEventListener('input', () => {
-    if (signatureTypePreview) signatureTypePreview.textContent = signatureTypeInput.value.trim();
+    const text = signatureTypeInput.value.trim();
+    if (signatureTypePreview) signatureTypePreview.textContent = text;
+    fitSignatureTypePreview();
+    updateSignatureCapturedBadge();
     setSignatureStatus('');
 });
 policyButtons.forEach(btn => btn.addEventListener('click', () => openPolicyModal(btn.dataset.policy)));
@@ -2623,9 +2749,6 @@ policyModalDismiss?.addEventListener('click', closePolicyModal);
 policyModalAgree?.addEventListener('click', agreeToPolicies);
 policyModalBackdrop?.addEventListener('click', e => { if (e.target === policyModalBackdrop) closePolicyModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !policyModalBackdrop?.classList.contains('hidden')) closePolicyModal(); });
-warningModalOkBtn?.addEventListener('click', closeWarningModal);
-warningModalBackdrop?.addEventListener('click', e => { if (e.target === warningModalBackdrop) closeWarningModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !warningModalBackdrop?.classList.contains('hidden')) closeWarningModal(); });
 
 contractViewer?.addEventListener('scroll', () => {
     if (signatureState.agreementViewMethod) return;
@@ -2749,6 +2872,10 @@ async function submitDone() {
             throw new Error(contractResult?.error || 'We could not finalize your signed contract. Please try again.');
         }
 
+        // Order matters: lock BEFORE clearing, so a pagehide/visibilitychange
+        // firing in the gap between these two lines still hits the guard in
+        // saveDraft() rather than racing clearDraft() itself.
+        submissionLocked = true;
         clearDraft();
 
         document.querySelectorAll('.res-step').forEach(s => s.classList.remove('active'));
@@ -2769,7 +2896,7 @@ async function submitDone() {
         document.querySelector('.reservation-container').appendChild(msg);
 
     } catch (err) {
-        showWarningModal(err.message, 'Something went wrong');
+        showWarningModal(err.message, 'Something went wrong', 'error');
         nextBtn.disabled = false; nextBtn.textContent = 'Submit';
     }
 }
@@ -2817,6 +2944,31 @@ function finishInit() {
     loadAvailabilityCalendar();
 }
 
+// Cross-checks a saved draft against the server before ever offering to
+// "resume" it — client-side storage alone isn't trustworthy here: a
+// customer who already submitted successfully (this device or a different
+// one) after this draft was last saved would otherwise still see a stale
+// resume prompt if localStorage wasn't cleared for some reason (browser
+// crash, closed tab before the clear call ran, etc.). Finding a
+// reservation created at/after the draft's own savedAt timestamp means the
+// draft was already carried to completion. Submitting a reservation always
+// requires a logged-in customer, so there's no anonymous-draft case here.
+async function wasDraftAlreadySubmitted(draft) {
+    if (!session?.user?.id) return false;
+    try {
+        const { data, error } = await supabase
+            .from('reservations')
+            .select('reservation_id')
+            .eq('user_id', session.user.id)
+            .gte('created_at', new Date(draft.savedAt).toISOString())
+            .limit(1);
+        if (error) return false;
+        return Boolean(data && data.length);
+    } catch {
+        return false;
+    }
+}
+
 function hideDraftResumeModal() {
     draftResumeModalBackdrop?.classList.add('hidden');
     draftResumeModalBackdrop?.setAttribute('aria-hidden', 'true');
@@ -2835,7 +2987,15 @@ if (hasUrlPackage) {
     finishInit();
 } else {
     const draft = peekDraft();
-    if (draft) {
+    if (draft && await wasDraftAlreadySubmitted(draft)) {
+        // The draft's own reservation already exists server-side — it was
+        // carried to completion, not abandoned. Discard it silently rather
+        // than offering to "resume" a reservation that's already been made.
+        clearDraft();
+        cur = 1;
+        showStep(cur);
+        finishInit();
+    } else if (draft) {
         // Don't touch S/cur yet — wait for the customer to choose.
         draftResumeModalBackdrop?.classList.remove('hidden');
         draftResumeModalBackdrop?.setAttribute('aria-hidden', 'false');

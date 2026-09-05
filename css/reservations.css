@@ -599,38 +599,81 @@
             color: #5e4636;
         }
 
-        /* Location Cards */
-        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+        /* Location rows — compact, matches the espresso/cream chip language
+           used by .pkg-cat-card (--acc-* tokens defined further down this
+           file, in the "Unified package card + category chips" block).
+           role="button"/aria-pressed/data-val/.active are read by
+           js/reservations.js — do not rename those. */
+        .location-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
         .location-card {
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            padding: 30px 24px;
-            min-height: 150px;
-            cursor: pointer;
-            text-align: center;
             display: flex;
-            flex-direction: column;
-            justify-content: center;
             align-items: center;
-            transition: all 0.2s;
+            gap: 10px;
+            min-height: 56px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: 0.5px solid var(--acc-border-tan, #E5DBCC);
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            transition: background .15s ease, border-color .15s ease;
         }
         .loc-icon {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 14px;
-            border-radius: 14px;
-            background: #fff8f0;
-            border: 1px solid #ead8ca;
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            border-radius: 8px;
+            background: #F7F2EA;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #6B3A1F;
-            font-size: 20px;
+            color: #8A5A3B;
+            font-size: 14px;
+            transition: background .15s ease, color .15s ease;
         }
-        .location-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .location-card.active { border-color: #6B3A1F; background: #FFEDE0; }
-        .location-card h4 { font-size: 16px; font-weight: 700; color: #2A1408; margin-bottom: 8px; }
-        .location-card p  { font-size: 13px; color: #777; margin: 0; line-height: 1.6; max-width: 250px; text-align: center; }
+        .loc-copy { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+        .loc-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--acc-text, #3E2418);
+            line-height: 1.3;
+            transition: color .15s ease;
+        }
+        .loc-sub {
+            font-size: 11px;
+            color: var(--acc-text-muted, #8A7965);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color .15s ease;
+        }
+        .loc-check {
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #F5EDE2;
+            opacity: 0;
+            transform: scale(0.6);
+            transition: opacity .15s ease, transform .15s ease;
+        }
+        .location-card:hover {
+            border-color: #A34F2E;
+            background: #FFFDFA;
+        }
+        .location-card.active {
+            border-color: var(--acc-espresso, #4A2C17);
+            background: var(--acc-espresso, #4A2C17);
+        }
+        .location-card.active:hover { background: #3A2110; }
+        .location-card.active .loc-icon { background: rgba(245, 237, 226, 0.15); color: #F5EDE2; }
+        .location-card.active .loc-name { color: #F5EDE2; }
+        .location-card.active .loc-sub  { color: #C9A98E; }
+        .location-card.active .loc-check { opacity: 1; transform: scale(1); }
 
         /* Package Cards — base grid; the unified card's own visual design
            (image, chips, price, details link) lives in the dedicated
@@ -1094,7 +1137,14 @@
         .dl-btn:hover { background: var(--brown-dark, #1E0C03); }
 
         /* Capped to roughly 5-6 lines — this is a preview now; the full text
-           lives in the full-screen reader opened via "View full agreement". */
+           lives in the full-screen reader opened via "View full agreement".
+           Wrapped so the bottom fade (.contract-viewer-fade) can pin itself
+           to the box's visible bottom edge via a non-scrolling sibling,
+           without touching #contract-viewer itself — that element's own
+           scrollHeight/clientHeight already drive the "read to the end"
+           agreement-gating check elsewhere, so its structure/scroll
+           behavior must stay exactly as it is. */
+        .contract-viewer-wrap { position: relative; margin-bottom: 12px; }
         .contract-viewer {
             max-height: 190px;
             overflow-y: auto;
@@ -1102,13 +1152,28 @@
             border-radius: 12px;
             padding: 20px 22px;
             background: #fff;
-            margin-bottom: 12px;
+            margin-bottom: 0;
+            scrollbar-width: thin;
+            scrollbar-color: #C9A98E #F7F2EA;
         }
+        .contract-viewer::-webkit-scrollbar { width: 8px; }
+        .contract-viewer::-webkit-scrollbar-track { background: #F7F2EA; }
+        .contract-viewer::-webkit-scrollbar-thumb { background: #C9A98E; border-radius: 4px; }
         .contract-viewer:focus-visible {
             outline: 2px solid #6B3A1F;
             outline-offset: 2px;
         }
-        .contract-viewer p { font-size: 13.5px; line-height: 1.7; color: #3a2a1c; margin-bottom: 12px; }
+        .contract-viewer-fade {
+            position: absolute;
+            left: 1px; right: 1px; bottom: 1px;
+            height: 34px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #FFFFFF);
+            border-radius: 0 0 11px 11px;
+            pointer-events: none;
+        }
+        .contract-viewer p { font-size: 13.5px; line-height: 1.7; color: #6B5A47; margin-bottom: 12px; }
+        .contract-viewer-title { font-size: 15px; font-weight: 500; color: #A34F2E; }
+        .contract-viewer-heading { font-size: 13.5px; font-weight: 500; color: #3E2418; }
         .contract-viewer-gap { height: 6px; }
         .contract-viewer-loading { font-size: 13px; color: #9c8f84; text-align: center; padding: 24px 0; }
         .contract-viewer-error { color: #b42318; }
@@ -1163,7 +1228,21 @@
         }
 
         .signature-section { margin-bottom: 20px; }
-        .signature-heading { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 10px; }
+        .signature-heading-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .signature-heading { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 0; }
+        .signature-captured-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: #E1F5EE;
+            color: #085041;
+            font-size: 12px;
+            font-weight: 600;
+            transition: opacity .15s ease;
+        }
+        .signature-captured-badge.is-hidden { display: none; }
         .signature-mode-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
         .signature-mode-btn {
             border: 1px solid #e0d0c0;
@@ -1180,16 +1259,72 @@
         .signature-mode-btn:not(.active):hover { background: #FFF8F0; }
 
         .signature-draw-panel.hidden, .signature-type-panel.hidden { display: none; }
-        .signature-canvas {
+
+        /* Shared canvas-styled frame for both Draw and Type-instead — a
+           baseline guide (line + "X") lives here as plain CSS/DOM (not
+           drawn onto the canvas bitmap), so it can never be wiped by
+           SignaturePad's own clear()/resize repaints, and the same frame
+           is reused for the Type-instead input so both modes look
+           identical apart from what's inside. */
+        .signature-canvas-wrap {
+            position: relative;
             width: 100%;
             height: 180px;
-            border: 2px dashed #e0d0c0;
+            border: 2px dashed #D8C9AE;
             border-radius: 12px;
             background: #fff;
+            overflow: hidden;
+        }
+        .signature-guide {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .signature-guide-line {
+            position: absolute;
+            left: 24px;
+            right: 24px;
+            bottom: 22px;
+            height: 1px;
+            background: #D8C9AE;
+        }
+        .signature-guide-x {
+            position: absolute;
+            left: 22px;
+            bottom: 25px;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: #B8A88F;
+        }
+        .signature-guide-placeholder {
+            position: absolute;
+            left: 0; right: 0;
+            top: 0; bottom: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            color: #C9BBA8;
+            transition: opacity .15s ease;
+        }
+        .signature-guide-placeholder.is-hidden { opacity: 0; }
+
+        .signature-canvas {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: transparent;
             touch-action: none;
             cursor: crosshair;
         }
         .signature-clear-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             margin-top: 8px;
             border: 1px solid #e0d0c0;
             background: #fff;
@@ -1202,25 +1337,46 @@
         }
         .signature-clear-btn:hover { background: #FFF8F0; }
 
+        /* Type-instead: the real <input> sits on top (transparent text, a
+           visible caret so typing position stays legible) with the live
+           cursive rendering just beneath it in the same spot — matching
+           how an input's own text would look, just styled as a signature
+           instead of typed characters. */
+        /* Type-instead reverted to a plain, visibly-a-text-field input plus
+           a separate live cursive preview below it — the shared
+           canvas-styled overlay (invisible input + absolutely-positioned
+           preview on the baseline) looked broken in practice: long names
+           overflowed past the box edge instead of wrapping/clipping
+           cleanly, and it read as a malfunctioning signature pad rather
+           than a text field. Kept: the live update on every keystroke and
+           the Dancing Script font, matching how the actually-submitted
+           signature image is rendered (renderTypedSignatureToDataUrl). */
         .signature-type-input {
             width: 100%;
             box-sizing: border-box;
-            border: 2px dashed #e0d0c0;
+            border: 2px dashed #D8C9AE;
             border-radius: 12px;
             padding: 14px 16px;
             font-size: 15px;
             font-family: inherit;
+            color: #3E2418;
             background: #fff;
         }
         .signature-type-preview {
             margin-top: 10px;
             min-height: 56px;
+            padding: 10px 16px;
+            box-sizing: border-box;
+            border: 1px dashed #D8C9AE;
+            border-radius: 12px;
+            background: #fff;
             font-family: 'Dancing Script', cursive;
-            font-size: 40px;
-            font-weight: 700;
-            color: #2A1408;
-            padding: 6px 4px;
-            border-bottom: 1px solid #e0d0c0;
+            font-size: 32px;
+            line-height: 1.2;
+            color: #3E2418;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
         .signature-status {
             min-height: 18px;
@@ -1230,41 +1386,67 @@
         }
         .signature-status.error { color: #b42318; }
 
+        @media (max-width: 480px) {
+            .signature-canvas-wrap { height: 140px; }
+            .signature-guide-placeholder { bottom: 30px; }
+            .signature-type-preview { font-size: 26px; }
+        }
+
         .contract-agreement-box {
             margin-top: 18px;
             padding: 16px 18px;
-            border: 1px solid #ead9ca;
+            border: 1px solid #F0DFBB;
             border-radius: 12px;
-            background: #fffaf5;
+            background: #FDF8EE;
         }
+        /* Each row is its own self-contained flex line: checkbox +
+           exactly one sibling item holding all of that row's text (a
+           .contract-agreement-copy div/label). align-items: flex-start
+           (not center) pins the checkbox to the TOP of the first text
+           line regardless of how many lines the text wraps to, and no
+           flex-wrap on the row itself means the checkbox and its copy can
+           never separate onto different lines the way flex-wrap: wrap
+           previously let a single wide label do — text wraps normally
+           inside .contract-agreement-copy instead. */
         .contract-agreement-row {
             display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
+            align-items: flex-start;
+            gap: 10px;
         }
         .contract-agreement-checkbox {
-            width: 18px;
-            height: 18px;
-            accent-color: #6B3A1F;
+            width: 17px;
+            height: 17px;
+            margin-top: 2px;
+            accent-color: #4A2C17;
             flex-shrink: 0;
         }
         .contract-agreement-checkbox:disabled {
             cursor: not-allowed;
             opacity: 0.55;
         }
+        .contract-agreement-divider {
+            height: 0;
+            margin: 16px 0;
+            border-top: 0.5px solid #F0DFBB;
+        }
+        /* Indented to the start of the row's text (checkbox width 17px +
+           row gap 10px = 27px) so it reads as attached to the first
+           checkbox row specifically, not floating between both rows. */
         .contract-agreement-helper {
-            margin: 6px 0 0;
+            margin: 6px 0 0 27px;
             font-size: 12px;
             line-height: 1.5;
-            color: #9c8f84;
+            color: #A89880;
             font-style: italic;
         }
         .contract-agreement-copy {
+            flex: 1;
+            min-width: 0;
             font-size: 14px;
-            color: #2A1408;
-            line-height: 1.6;
+            color: #3E2418;
+            line-height: 1.5;
         }
+        .contract-agreement-copy label { cursor: pointer; }
         .contract-policy-link {
             border: none;
             background: none;
@@ -1272,12 +1454,12 @@
             font: inherit;
             font-size: 14px;
             font-weight: 700;
-            color: #6B3A1F;
+            color: #A34F2E;
             text-decoration: underline;
             cursor: pointer;
         }
         .contract-policy-link:hover {
-            color: #2A1408;
+            color: #3E2418;
         }
         .contract-inline-message {
             min-height: 20px;
@@ -1392,72 +1574,6 @@
             border: none;
             background: #6B3A1F;
             color: #fff;
-        }
-
-        /* Warning / validation modal */
-        .warning-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            background: rgba(42, 20, 8, 0.56);
-            z-index: 1400;
-        }
-        .warning-modal-backdrop.hidden {
-            display: none !important;
-        }
-        .warning-modal-card {
-            width: min(400px, 100%);
-            text-align: center;
-            border-radius: 10px;
-            padding: 32px 26px 24px;
-            background: #fff;
-            box-shadow: 0 24px 60px rgba(30,12,3,0.24);
-        }
-        .warning-modal-icon {
-            width: 52px;
-            height: 52px;
-            margin: 0 auto 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 999px;
-            background: #FCE9D8;
-            color: #B4622A;
-            font-size: 22px;
-        }
-        .warning-modal-title {
-            margin: 0 0 8px;
-            font-size: 20px;
-            font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
-            font-weight: 600;
-            color: var(--brown-dark, #1E0C03);
-        }
-        .warning-modal-message {
-            margin: 0;
-            font-size: 14.5px;
-            line-height: 1.6;
-            color: #5a4a3d;
-        }
-        .warning-modal-actions {
-            margin-top: 22px;
-        }
-        .warning-modal-btn {
-            width: 100%;
-            border: none;
-            border-radius: 10px;
-            padding: 12px 18px;
-            font: inherit;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            background: #6B3A1F;
-            color: #fff;
-        }
-        .warning-modal-btn:hover {
-            background: #59300f;
         }
 
         /* Full-screen agreement reader */
@@ -1967,6 +2083,7 @@
     padding-top: 0;
     border-top: none;
 }
+
 
 .res-section h2 {
     /* Inherit existing h2 styling from the step; just ensure consistent spacing */

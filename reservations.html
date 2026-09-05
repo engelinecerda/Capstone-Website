@@ -97,14 +97,20 @@
                     <p>Choose whether to host at ELI Coffee Events Caf&eacute; or have our team come to you.</p>
                     <div class="location-options">
                         <div class="location-card" data-val="onsite" role="button" tabindex="0" aria-pressed="false">
-                            <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-store"></i></div>
-                            <h4>Onsite</h4>
-                            <p>Hold your event at ELI Coffee Events Caf&eacute; Binangonan</p>
+                            <span class="loc-icon" aria-hidden="true"><i class="fa-solid fa-store"></i></span>
+                            <span class="loc-copy">
+                                <span class="loc-name">Onsite</span>
+                                <span class="loc-sub">At ELI Coffee Binangonan</span>
+                            </span>
+                            <span class="loc-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
                         </div>
                         <div class="location-card" data-val="offsite" role="button" tabindex="0" aria-pressed="false">
-                            <div class="loc-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></div>
-                            <h4>Offsite</h4>
-                            <p>We bring the service to your venue</p>
+                            <span class="loc-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></span>
+                            <span class="loc-copy">
+                                <span class="loc-name">Offsite</span>
+                                <span class="loc-sub">We come to your venue</span>
+                            </span>
+                            <span class="loc-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
                         </div>
                     </div>
                 </div>
@@ -322,15 +328,18 @@
                             <p id="contract-description">This is a short preview. Open the full agreement to read every section.</p>
                         </div>
                     </div>
-                    <div
-                        class="contract-viewer"
-                        id="contract-viewer"
-                        aria-live="polite"
-                        role="region"
-                        aria-label="Service agreement preview"
-                        tabindex="0"
-                    >
-                        <p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>
+                    <div class="contract-viewer-wrap">
+                        <div
+                            class="contract-viewer"
+                            id="contract-viewer"
+                            aria-live="polite"
+                            role="region"
+                            aria-label="Service agreement preview"
+                            tabindex="0"
+                        >
+                            <p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>
+                        </div>
+                        <div class="contract-viewer-fade" aria-hidden="true"></div>
                     </div>
                     <div class="contract-viewer-actions">
                         <button type="button" class="contract-view-full-btn" id="contract-view-full-btn">
@@ -339,20 +348,34 @@
                     </div>
 
                     <div class="signature-section">
-                        <h4 class="signature-heading">Sign below</h4>
+                        <div class="signature-heading-row">
+                            <h4 class="signature-heading">Sign below</h4>
+                            <span class="signature-captured-badge is-hidden" id="signature-captured-badge" aria-hidden="true">
+                                <i class="fa-solid fa-check" aria-hidden="true"></i> Signature captured
+                            </span>
+                        </div>
                         <div class="signature-mode-tabs">
                             <button type="button" class="signature-mode-btn active" data-mode="draw" id="sig-mode-draw">Draw</button>
                             <button type="button" class="signature-mode-btn" data-mode="type" id="sig-mode-type">Type instead</button>
                         </div>
 
                         <div class="signature-draw-panel" id="signature-draw-panel">
-                            <canvas id="signature-canvas" class="signature-canvas" aria-label="Draw your signature here"></canvas>
-                            <button type="button" class="signature-clear-btn" id="signature-clear-btn">Clear</button>
+                            <div class="signature-canvas-wrap">
+                                <div class="signature-guide" aria-hidden="true">
+                                    <span class="signature-guide-placeholder" id="signature-guide-placeholder">Sign here</span>
+                                    <span class="signature-guide-line"></span>
+                                    <span class="signature-guide-x">X</span>
+                                </div>
+                                <canvas id="signature-canvas" class="signature-canvas" aria-label="Draw your signature here"></canvas>
+                            </div>
+                            <button type="button" class="signature-clear-btn" id="signature-clear-btn">
+                                <i class="fa-solid fa-eraser" aria-hidden="true"></i> Clear
+                            </button>
                         </div>
 
                         <div class="signature-type-panel hidden" id="signature-type-panel">
-                            <input type="text" id="signature-type-input" class="signature-type-input" placeholder="Type your full name">
-                            <p class="signature-type-preview" id="signature-type-preview"></p>
+                            <input type="text" id="signature-type-input" class="signature-type-input" placeholder="Type your full name" aria-label="Type your full name as your signature" autocomplete="off">
+                            <p class="signature-type-preview" id="signature-type-preview" aria-live="polite"></p>
                         </div>
 
                         <p class="signature-status" id="signature-status" aria-live="polite"></p>
@@ -361,12 +384,16 @@
                     <div class="contract-agreement-box">
                         <div class="contract-agreement-row">
                             <input type="checkbox" id="contract-agreement-terms" class="contract-agreement-checkbox">
-                            <label for="contract-agreement-terms" class="contract-agreement-copy">I have read and agree to the</label>
-                            <button type="button" class="contract-policy-link" data-policy="terms">Terms &amp; Conditions</button>
-                            <span class="contract-agreement-copy">and</span>
-                            <button type="button" class="contract-policy-link" data-policy="privacy">Data Privacy Policy</button>
-                            <span class="contract-agreement-copy">.</span>
+                            <div class="contract-agreement-copy">
+                                <label for="contract-agreement-terms">I have read and agree to the</label>
+                                <button type="button" class="contract-policy-link" data-policy="terms">Terms &amp; Conditions</button>
+                                <span>and</span>
+                                <button type="button" class="contract-policy-link" data-policy="privacy">Data Privacy Policy</button><span>.</span>
+                            </div>
                         </div>
+
+                        <div class="contract-agreement-divider"></div>
+
                         <div class="contract-agreement-row">
                             <input type="checkbox" id="contract-agreement-esign" class="contract-agreement-checkbox" disabled>
                             <label for="contract-agreement-esign" class="contract-agreement-copy">I confirm my reservation details above are accurate, and I am signing this contract electronically.</label>
@@ -433,20 +460,6 @@
                 <button type="button" class="agreement-modal-btn-outline" id="agreement-modal-footer-close-btn">Close</button>
                 <button type="button" class="agreement-modal-btn-solid" id="agreement-modal-finish-btn">I've finished reading</button>
             </footer>
-        </div>
-    </div>
-
-    <!-- Warning / Validation Modal -->
-    <div class="warning-modal-backdrop hidden" id="warning-modal-backdrop" aria-hidden="true">
-        <div class="warning-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="warning-modal-title">
-            <div class="warning-modal-icon" aria-hidden="true">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            <h3 class="warning-modal-title" id="warning-modal-title">Almost there</h3>
-            <p class="warning-modal-message" id="warning-modal-message"></p>
-            <div class="warning-modal-actions">
-                <button type="button" class="warning-modal-btn" id="warning-modal-ok-btn">OK</button>
-            </div>
         </div>
     </div>
 

@@ -32,7 +32,7 @@
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
-            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Admin</p>
           </div>
         </a>
         <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
@@ -262,16 +262,27 @@
       <!-- Service Charge -->
       <div class="card" id="service-charge">
         <p class="card-title">Service Charge</p>
-        <p class="card-sub">A percentage added to the package total to cover utilities and staff. Shown to customers as its own line — never folded into the package price.</p>
+        <p class="card-sub">A percentage added to the package total to cover utilities and staff. Shown to customers as its own line — never folded into the package price. Applies to the package and add-on total only; there is no separate travel-fee line item to include, so nothing is excluded on that basis.</p>
 
-        <div class="settings-note">
-          <p>Offsite bookings are currently charged <strong>0% service charge</strong>, pending confirmation from the café — this applies regardless of category, since packages of different locations can share the same category. Onsite bookings use the rate below (or a category override).</p>
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Apply service charge to offsite packages</p>
+            <p class="pr-row-desc">When off, offsite events are not charged the service charge. When on, they follow the same rate as onsite, including category overrides.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle">
+              <input type="checkbox" id="sc-offsite-toggle">
+              <span class="pm2-toggle-track"></span>
+            </label>
+            <button type="button" class="action-btn view" id="sc-save-offsite-btn">Save</button>
+          </div>
         </div>
+        <p class="form-message" id="sc-offsite-msg"></p>
 
         <div class="pr-row">
           <div class="pr-row-copy">
             <p class="pr-row-label">Global default</p>
-            <p class="pr-row-desc">Applied to onsite package totals to cover utilities and staff, unless a category below overrides it.</p>
+            <p class="pr-row-desc">Applied to onsite package totals — and to offsite totals too, once the toggle above is on — unless a category below overrides it.</p>
           </div>
           <div class="pr-row-control">
             <input type="number" class="pr-input-inline" id="sc-global-percent" min="0" max="100" step="0.5" value="10">
@@ -283,7 +294,7 @@
         <p class="form-message" id="sc-global-msg"></p>
 
         <p class="pr-row-label" style="margin-top:22px;">Per-category overrides</p>
-        <p class="pr-row-desc" style="margin-bottom:12px;">Leave a category on "Inherits default" unless it needs a different onsite rate. Setting 0% is allowed and exempts that category.</p>
+        <p class="pr-row-desc" style="margin-bottom:12px;">Leave a category on "Inherits default" unless it needs a different rate. Setting 0% is allowed and exempts that category — for onsite always, and for offsite too once the toggle above is on.</p>
         <div class="table-wrap">
           <table class="pm2-table" id="sc-category-table">
             <thead>
@@ -299,6 +310,7 @@
         <div class="sc-example-box">
           <p class="sc-example-title">Worked example</p>
           <p class="sc-example-text" id="sc-example-text"></p>
+          <p class="sc-example-text" id="sc-example-text-offsite"></p>
         </div>
       </div>
 

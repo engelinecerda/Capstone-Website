@@ -1,0 +1,118 @@
+/* Shared feedback modal — used everywhere a customer-facing page needs to
+   show a success/error/warning/info message or a confirm-style dialog
+   instead of console-only logging or native alert()/confirm(). Fully
+   self-contained (own tokens) so it renders identically no matter which
+   page-specific stylesheet is loaded alongside it. See js/feedback_modal.js. */
+
+.fm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(42, 18, 8, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease;
+}
+
+.fm-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.fm-card {
+    width: 100%;
+    max-width: 420px;
+    background: #FFFDFA;
+    border: 0.5px solid #E5DBCC;
+    border-radius: 12px;
+    padding: 28px 24px 24px;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(30, 12, 3, 0.24);
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.15s ease;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+.fm-backdrop.is-open .fm-card {
+    transform: translateY(0) scale(1);
+}
+
+.fm-icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 16px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.fm-icon.fm-success { background: #E1F5EE; color: #085041; }
+.fm-icon.fm-error   { background: #FCEBEB; color: #791F1F; }
+.fm-icon.fm-warning { background: #FAEEDA; color: #854F0B; }
+.fm-icon.fm-info    { background: #F2EADD; color: #4A2C17; }
+
+.fm-title {
+    margin: 0 0 8px;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 21px;
+    font-weight: 600;
+    color: #3E2418;
+    line-height: 1.3;
+}
+
+.fm-message {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: #6B5A47;
+}
+
+.fm-actions {
+    margin-top: 22px;
+    display: flex;
+    gap: 10px;
+}
+
+.fm-btn {
+    flex: 1;
+    min-height: 44px;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fm-btn-primary {
+    background: #4A2C17;
+    color: #fff;
+}
+.fm-btn-primary:hover { background: #3A2110; }
+.fm-btn-primary.fm-danger { background: #791F1F; }
+.fm-btn-primary.fm-danger:hover { background: #601818; }
+
+.fm-btn-secondary {
+    background: #fff;
+    color: #3E2418;
+    border-color: #E5DBCC;
+}
+.fm-btn-secondary:hover { background: #F5EFE6; }
+
+.fm-btn:focus-visible {
+    outline: 2px solid #4A2C17;
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    .fm-card { padding: 24px 18px 20px; }
+    .fm-title { font-size: 19px; }
+}

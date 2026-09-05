@@ -1,4 +1,5 @@
 import { customerSupabase as supabase } from './supabase.js';
+import { showFeedbackModal, showConfirmModal } from './feedback_modal.js';
 import {
     buildCustomerPaymentUrl,
     fetchPayments as fetchSharedPayments,
@@ -841,7 +842,14 @@ async function submitCancellationRequest() {
 
 async function withdrawCancellationRequest() {
     const reservation = pageData?.reservation;
-    if (!reservation || !window.confirm('Withdraw your cancellation request and keep this reservation?')) return;
+    if (!reservation) return;
+    const confirmed = await showConfirmModal({
+        title: 'Withdraw cancellation request?',
+        message: 'This will withdraw your cancellation request and keep this reservation active.',
+        confirmText: 'Yes, keep reservation',
+        cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
     try {
         const { error } = await supabase
             .from('reservations')
@@ -866,12 +874,23 @@ async function withdrawCancellationRequest() {
         await loadPageData();
         render();
     } catch (error) {
-        window.alert(`Failed to withdraw: ${error.message}`);
+        showFeedbackModal({
+            type: 'error',
+            title: 'Couldn\'t withdraw request',
+            message: `Failed to withdraw: ${error.message}`
+        });
     }
 }
 
 async function withdrawRescheduleRequest(requestId) {
-    if (!requestId || !window.confirm('Withdraw your reschedule request?')) return;
+    if (!requestId) return;
+    const confirmed = await showConfirmModal({
+        title: 'Withdraw reschedule request?',
+        message: 'This will withdraw your pending reschedule request.',
+        confirmText: 'Yes, withdraw',
+        cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
     try {
         const { error } = await supabase
             .from('reschedule_requests')
@@ -881,7 +900,11 @@ async function withdrawRescheduleRequest(requestId) {
         await loadPageData();
         render();
     } catch (error) {
-        window.alert(`Failed to withdraw: ${error.message}`);
+        showFeedbackModal({
+            type: 'error',
+            title: 'Couldn\'t withdraw request',
+            message: `Failed to withdraw: ${error.message}`
+        });
     }
 }
 

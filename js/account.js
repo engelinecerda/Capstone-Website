@@ -1,4 +1,5 @@
 import { customerSupabase as supabase } from './supabase.js';
+import { showFeedbackModal } from './feedback_modal.js';
 import {
     buildCustomerPaymentUrl,
     fetchPayments as fetchSharedPayments,
@@ -3325,7 +3326,12 @@ function wireChangePasswordCard() {
 function wireDeleteAccount() {
     document.getElementById('delete-account-btn')?.addEventListener('click', () => {
         // Deletion requires admin-level API access; direct users to contact support.
-        alert('To permanently delete your account, please contact us directly at the café or reach out via email. This action cannot be undone.');
+        showFeedbackModal({
+            type: 'info',
+            title: 'Contact us to delete your account',
+            message: 'To permanently delete your account, please contact us directly at the café or reach out via email. This action cannot be undone.',
+            confirmText: 'Got it'
+        });
     });
 }
 

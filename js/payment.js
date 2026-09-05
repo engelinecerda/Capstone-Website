@@ -115,8 +115,19 @@ function getPaymentDraftKey() {
     return `eli_payment_draft_${state.reservationId}`;
 }
 
+// Set the instant a submission succeeds. window.addEventListener('pagehide',
+// savePaymentDraft) below fires unconditionally on tab close/navigation —
+// including right after a successful submit, since this page re-renders in
+// place rather than navigating away. Without this flag, that pagehide could
+// still re-write a draft: state.form is reset on success, but
+// state.selectedMethod/selectedOptionKey are not, and savePaymentDraft()'s
+// hasContent check treats either of those alone as "worth saving" — a
+// customer who just submitted successfully could still see the resume
+// prompt next visit.
+let paymentSubmissionLocked = false;
+
 function savePaymentDraft() {
-    if (!state.reservationId) return;
+    if (!state.reservationId || paymentSubmissionLocked) return;
     const hasContent = state.selectedMethod || state.selectedOptionKey
         || state.form.customAmount || state.form.referenceNumber
         || state.form.paymentDate || state.form.cashPaymentDate || state.form.notes;
@@ -1322,6 +1333,12 @@ async function handleSubmitPayment() {
         state.flashType = 'success';
         state.activeTab = 'current';
         state.draftResumedMissingFile = false;
+        state.selectedMethod = '';
+        state.selectedOptionKey = '';
+        // Order matters: lock BEFORE clearing, so a pagehide/visibilitychange
+        // firing in the gap between these two lines still hits the guard in
+        // savePaymentDraft() rather than racing clearPaymentDraft() itself.
+        paymentSubmissionLocked = true;
         clearPaymentDraft();
         await loadPaymentPage();
     } catch (error) {
@@ -1474,6 +1491,22 @@ document.addEventListener('keydown', (event) => {
 
 await loadPaymentPage();
 
+// Cross-checks a saved draft against already-submitted payments before ever
+// offering to "resume" it. Client-side storage alone isn't trustworthy: if
+// a payment was actually submitted for this reservation after this draft
+// was last saved (this device or another), the draft describes an attempt
+// that was already carried to completion, not one that was abandoned — so
+// it should never come back as something to "resume", even if the pagehide
+// race above is what let it survive. Finding a payment with submitted_at
+// at/after the draft's own savedAt is enough to prove that.
+function wasPaymentDraftAlreadySubmitted(draft, reservationId) {
+    const payments = getReservationPayments(state.bundle.paymentsByReservationId, reservationId);
+    return payments.some((payment) => {
+        const submittedAt = payment.submitted_at ? new Date(payment.submitted_at).getTime() : null;
+        return submittedAt !== null && submittedAt >= draft.savedAt;
+    });
+}
+
 function hidePaymentDraftModal() {
     paymentDraftModalBackdrop?.classList.add('hidden');
     paymentDraftModalBackdrop?.setAttribute('aria-hidden', 'true');
@@ -1482,7 +1515,14 @@ function hidePaymentDraftModal() {
 // Only offer to resume when the actionable form (the one with fields worth
 // saving) is actually what's showing — a draft left over from a payment
 // that got approved/rejected/superseded since should just be discarded.
-const draft = isReservationActionable(getReservation()) ? peekPaymentDraft() : null;
+let draft = isReservationActionable(getReservation()) ? peekPaymentDraft() : null;
+if (draft && wasPaymentDraftAlreadySubmitted(draft, state.reservationId)) {
+    // The draft's own payment already exists server-side — it was carried
+    // to completion, not abandoned. Discard it silently rather than
+    // offering to "resume" a payment that's already been submitted.
+    clearPaymentDraft();
+    draft = null;
+}
 if (draft) {
     paymentDraftModalBackdrop?.classList.remove('hidden');
     paymentDraftModalBackdrop?.setAttribute('aria-hidden', 'false');

@@ -359,7 +359,7 @@ document.addEventListener('keydown', e => {
 
 // ── SESSION ──────────────────────────────────────────────────────
 async function init() {
-  const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
+  const result = await validateAdminSession({ fallbackLabel: 'Admin' });
   if (!result) return;
 
   if (result.profile.role !== 'admin') {
@@ -370,7 +370,7 @@ async function init() {
   const avatarEl = document.getElementById('sidebarAvatar');
   if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
   const roleBottomEl = document.getElementById('sidebarRoleBottom');
-  if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+  if (roleBottomEl) roleBottomEl.textContent = 'Admin';
 
   watchAuthState();
   wireLogoutButton();

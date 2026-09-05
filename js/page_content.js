@@ -45,7 +45,15 @@ export function withConfigTimeout(fetchPromise, timeoutValue, ms = 6000) {
   ]);
 }
 
-export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}) {
+// Pure data fetch — no DOM mutation. Callers racing this against
+// withConfigTimeout() (home_content.js/about_content.js's hero sections)
+// MUST use this instead of loadPageHeader() below: if the timeout wins the
+// race and the fallback is revealed, a slow/late-resolving fetch must never
+// be able to reach back and mutate the DOM after the fact (that's exactly
+// the "hardcoded content flashes, then gets replaced" bug this avoids —
+// see loadPageHeader()'s own comment for why it's the one loader that
+// couldn't safely be raced directly).
+export async function fetchPageHeader(supabase, pageKey) {
   try {
     const { data, error } = await supabase
       .from('page_header')
@@ -60,9 +68,32 @@ export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subE
     }
     if (headingEl && data.heading) headingEl.textContent = data.heading;
     if (subEl && data.subheading) subEl.textContent = data.subheading;
+    if (error) return null;
+    return data || null;
   } catch (err) {
-    // Falls back to the static heading already in the HTML.
+    return null;
   }
+}
+
+// Fetches AND applies the result directly to the given elements — used by
+// pages (packages.js, faqs_content.js) that call this plainly, with no
+// cfg-loading skeleton/timeout race, so there's nothing for a late-arriving
+// result to clobber. Do NOT wrap this specific function in
+// withConfigTimeout() — its DOM writes happen inside its own await chain,
+// so a "timeout wins the race" path would leave this promise running
+// unobserved in the background, and it would still overwrite the revealed
+// fallback whenever it eventually resolves. Use fetchPageHeader() above for
+// any caller that needs to race against a timeout.
+export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}) {
+  const data = await fetchPageHeader(supabase, pageKey);
+  if (!data) return;
+
+  if (imgEl && data.image_url) {
+    imgEl.src = data.image_url;
+    if (data.alt_text) imgEl.alt = data.alt_text;
+  }
+  if (headingEl && data.heading) headingEl.textContent = data.heading;
+  if (subEl && data.subheading) subEl.textContent = data.subheading;
 }
 
 export async function loadGalleryImages(supabase) {

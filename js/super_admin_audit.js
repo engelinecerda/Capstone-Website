@@ -498,7 +498,7 @@ function init() {
       const avatarEl = document.getElementById('sidebarAvatar');
       if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
       const roleBottomEl = document.getElementById('sidebarRoleBottom');
-      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+      if (roleBottomEl) roleBottomEl.textContent = 'Admin';
 
       const adminBadge = document.getElementById('adminBadge');
       if (adminBadge) adminBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
