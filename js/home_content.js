@@ -16,7 +16,7 @@
 // and .hero-section's fixed-height/overflow:hidden layout is a higher-risk
 // touchpoint for the one prize above-the-fold element on the page.
 import { customerSupabase as supabase } from './supabase.js';
-import { loadPageHeader, loadGalleryImages, loadAboutSections, revealConfigContent, withConfigTimeout } from './page_content.js';
+import { fetchPageHeader, loadGalleryImages, loadAboutSections, revealConfigContent, withConfigTimeout } from './page_content.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 
 function escapeHtml(str) {
@@ -27,15 +27,22 @@ function escapeHtml(str) {
 async function initHero() {
   const headingEl = document.querySelector('.hero-title');
   const subEl = document.querySelector('.hero-sub');
+  const imgEl = document.querySelector('.hero-bg');
   try {
-    await withConfigTimeout(
-      loadPageHeader(supabase, 'home', {
-        imgEl: document.querySelector('.hero-bg'),
-        headingEl,
-        subEl
-      }),
-      undefined
-    );
+    // fetchPageHeader() only returns data — it never touches the DOM — so
+    // if the timeout wins this race, a slow fetch that resolves later has
+    // nothing left to apply and simply gets discarded. That's what stops
+    // the fallback (revealed below) from being silently overwritten a
+    // moment after the customer already sees it.
+    const data = await withConfigTimeout(fetchPageHeader(supabase, 'home'), null);
+    if (!data) return; // keep the existing hardcoded fallback
+
+    if (imgEl && data.image_url) {
+      imgEl.src = data.image_url;
+      if (data.alt_text) imgEl.alt = data.alt_text;
+    }
+    if (headingEl && data.heading) headingEl.textContent = data.heading;
+    if (subEl && data.subheading) subEl.textContent = data.subheading;
   } finally {
     revealConfigContent(headingEl, subEl);
   }

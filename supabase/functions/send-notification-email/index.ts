@@ -222,6 +222,7 @@ const PRESENTATION_BY_TITLE: Record<string, Presentation> = {
   'Cancellation Finalized':      { eyebrow: 'Cancellation', ctaLabel: 'View reservation' },
   'Contract Rejected':           { eyebrow: 'Contract',     ctaLabel: 'View contract' },
   'Reschedule Request Declined': { eyebrow: 'Reschedule',   ctaLabel: 'View reservation' },
+  'Your password was changed':   { eyebrow: 'Security',     ctaLabel: 'View Details' },
 }
 
 const DEFAULT_PRESENTATION: Presentation = { eyebrow: 'Reservation', ctaLabel: 'View Details' }

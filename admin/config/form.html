@@ -32,7 +32,7 @@
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
-            <p class="sidebar-user-role" id="sidebarRoleBottom">Super Admin</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Admin</p>
           </div>
         </a>
         <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
@@ -276,7 +276,7 @@
     import { initContractTemplateTab } from '/js/admin_contract_template.js';
 
     async function init() {
-      const result = await validateAdminSession({ fallbackLabel: 'Super Admin' });
+      const result = await validateAdminSession({ fallbackLabel: 'Admin' });
       if (!result) return;
 
       if (result.profile.role !== 'admin') {
@@ -287,7 +287,7 @@
       const avatarEl = document.getElementById('sidebarAvatar');
       if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
       const roleBottomEl = document.getElementById('sidebarRoleBottom');
-      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+      if (roleBottomEl) roleBottomEl.textContent = 'Admin';
       const adminBadge = document.getElementById('adminBadge');
       if (adminBadge) adminBadge.textContent = 'Admin';
 

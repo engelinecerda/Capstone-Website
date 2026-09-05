@@ -200,6 +200,19 @@ body.sidebar-open .sidebar-overlay { display: block; }
     margin-left: 0;
   }
 
+  /* Rail mode: the profile avatar and logout button stack, both centered —
+     same treatment as .sidebar-brand above. Left as a row, the avatar and
+     logout button (26px each + gap + padding) don't fit in the 64px rail
+     and squeeze/overlap each other. */
+  .sidebar.collapsed .sidebar-user {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 0 4px;
+  }
+  .sidebar.collapsed .sidebar-user-link {
+    flex: 0 0 auto;
+  }
+
   .sidebar.collapsed .nav-item { justify-content: center; }
 
   body.sidebar-collapsed .main {

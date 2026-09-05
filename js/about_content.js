@@ -22,7 +22,7 @@
 // this script never runs at all). The hero background photo is left out
 // of this treatment deliberately, same as index.html's hero.
 import { customerSupabase as supabase } from './supabase.js';
-import { loadPageHeader, loadAboutSections, loadAboutValues, revealConfigContent, withConfigTimeout } from './page_content.js';
+import { fetchPageHeader, loadAboutSections, loadAboutValues, revealConfigContent, withConfigTimeout } from './page_content.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 
 function escapeHtml(value) {
@@ -34,15 +34,22 @@ function escapeHtml(value) {
 async function initHero() {
   const headingEl = document.querySelector('.page-hero-title');
   const subEl = document.querySelector('.page-hero-sub');
+  const imgEl = document.querySelector('.page-hero-img');
   try {
-    await withConfigTimeout(
-      loadPageHeader(supabase, 'about', {
-        imgEl: document.querySelector('.page-hero-img'),
-        headingEl,
-        subEl
-      }),
-      undefined
-    );
+    // fetchPageHeader() only returns data — it never touches the DOM — so
+    // if the timeout wins this race, a slow fetch that resolves later has
+    // nothing left to apply and simply gets discarded. That's what stops
+    // the fallback (revealed below) from being silently overwritten a
+    // moment after the customer already sees it.
+    const data = await withConfigTimeout(fetchPageHeader(supabase, 'about'), null);
+    if (!data) return; // keep the existing hardcoded fallback
+
+    if (imgEl && data.image_url) {
+      imgEl.src = data.image_url;
+      if (data.alt_text) imgEl.alt = data.alt_text;
+    }
+    if (headingEl && data.heading) headingEl.textContent = data.heading;
+    if (subEl && data.subheading) subEl.textContent = data.subheading;
   } finally {
     revealConfigContent(headingEl, subEl);
   }

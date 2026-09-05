@@ -10,7 +10,11 @@
 
 const CLOUDINARY_CONFIG = {
   cloudName: 'dtt707f1w',
-  uploadPreset: 'eli_contracts',
+  // See the matching comment in js/customer_payments.js — eli_contracts'
+  // fixed Asset Folder ("contracts") silently overrides any folder param
+  // sent by the client. eli_payments is a dedicated preset (Asset folder
+  // "payments") so manager-recorded receipts stop landing there too.
+  uploadPreset: 'eli_payments',
   folder: 'payments',
   maxFileSize: 5 * 1024 * 1024
 };

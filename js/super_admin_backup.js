@@ -876,7 +876,7 @@ function init() {
       const avatarEl = document.getElementById('sidebarAvatar');
       if (avatarEl) avatarEl.textContent = getPortalInitials(profile);
       const roleBottomEl = document.getElementById('sidebarRoleBottom');
-      if (roleBottomEl) roleBottomEl.textContent = 'Super Admin';
+      if (roleBottomEl) roleBottomEl.textContent = 'Admin';
 
       createBackupBtn.disabled  = true;
       restoreSystemBtn.disabled = true;

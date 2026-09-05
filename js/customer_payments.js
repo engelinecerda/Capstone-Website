@@ -2,7 +2,13 @@ import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as get
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
-    uploadPreset: 'eli_contracts',
+    // eli_contracts' preset has a fixed Asset Folder of "contracts" (Dynamic
+    // Folder Mode), so every upload through it lands in the Console's
+    // "contracts" folder regardless of the folder param sent in the
+    // request — confirmed directly against the live account. eli_payments
+    // is a separate preset with Asset folder "payments" so receipts stop
+    // sharing a folder setting with contracts.
+    uploadPreset: 'eli_payments',
     paymentFolder: 'payments',
     maxFileSize: 10 * 1024 * 1024
 };
