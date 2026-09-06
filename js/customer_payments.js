@@ -1,4 +1,4 @@
-import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed, isRescheduleFeeOwed } from './reservation_shared.js';
+import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed, isRescheduleFeeOwed, isExtensionFeeOwed } from './reservation_shared.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -110,7 +110,8 @@ export const PAYMENT_TYPE_META = {
     partial_payment: { label: 'Custom Amount', description: 'Customer-specified partial payment' },
     full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
     reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' },
-    cancellation_fee: { label: 'Cancellation Fee', description: 'Required fee to process the reservation cancellation' }
+    cancellation_fee: { label: 'Cancellation Fee', description: 'Required fee to process the reservation cancellation' },
+    extension_fee: { label: 'Extension Fee', description: 'Fee for your requested extension hours' }
 };
 
 export const PAYMENT_STATUS_META = {
@@ -325,7 +326,7 @@ export function getReservationReceipts(paymentsByReservationId, receiptsByPaymen
 }
 
 export function getNormalPayments(paymentsByReservationId, reservationId) {
-    return getReservationPayments(paymentsByReservationId, reservationId).filter((payment) => !payment.reschedule_request_id);
+    return getReservationPayments(paymentsByReservationId, reservationId).filter((payment) => !payment.reschedule_request_id && !payment.extension_id);
 }
 
 // Excludes cancellation_fee/reschedule_fee the same way public.
@@ -335,7 +336,7 @@ export function getNormalPayments(paymentsByReservationId, reservationId) {
 // but cancellation_fee rows carry no reschedule_request_id, so without this
 // filter an approved cancellation fee would inflate "amount paid" and
 // understate the remaining balance shown to the customer.
-const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee']);
+const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee', 'extension_fee']);
 
 export function getApprovedBasePaymentsTotal(paymentsByReservationId, reservationId) {
     return getNormalPayments(paymentsByReservationId, reservationId)
@@ -484,6 +485,7 @@ function buildPaymentOption(reservation, paymentType, amount, paymentsByReservat
         description: baseDescription,
         displayDescription: options.displayDescription || baseDescription,
         rescheduleRequestId: options.rescheduleRequestId || '',
+        extensionId: options.extensionId || '',
         minAmount: options.minAmount,
         maxAmount: options.maxAmount
     };
@@ -632,6 +634,29 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             }
         });
 
+    // Package Extension Hours — mirrors the reschedule_fee block above
+    // exactly: one payment option per still-unpaid extension request
+    // (status 'pending_payment'), amount pre-filled from the request's own
+    // snapshotted total_price (never recomputed here — see reservation_
+    // extensions.price_per_hour's own "never re-read live pricing" rule).
+    const extensionRequests = options.extensionsByReservationId?.[reservationId] || [];
+    extensionRequests
+        .filter((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
+        .forEach((extension) => {
+            const hasExistingExtensionFee = getReservationPayments(paymentsByReservationId, reservationId).some((payment) => (
+                String(payment.extension_id || '') === String(extension.extension_id)
+                && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+            ));
+
+            if (!hasExistingExtensionFee) {
+                optionsList.push(buildPaymentOption(reservation, 'extension_fee', Number(extension.total_price || 0), paymentsByReservationId, {
+                    ...options,
+                    displayDescription: `${PAYMENT_TYPE_META.extension_fee.description} (${extension.requested_hours} hour${Number(extension.requested_hours) === 1 ? '' : 's'})`,
+                    extensionId: extension.extension_id
+                }));
+            }
+        });
+
     return optionsList.filter((option) => option.amount > 0 || option.paymentType === 'partial_payment');
 }
 
@@ -740,6 +765,21 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             label: 'Reschedule fee pending',
             key: 'info',
             sublabel: 'Complete the reschedule fee to finalize the change'
+        };
+    }
+
+    const extensionRequests = options.extensionsByReservationId?.[reservationId] || [];
+    if (isExtensionFeeOwed(extensionRequests, payments)) {
+        const openExtension = extensionRequests.find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment');
+        const amountDue = Number(openExtension?.total_price || 0);
+        return {
+            mode: 'extension_fee_due',
+            submittable: true,
+            amountDue,
+            balance,
+            label: 'Extension fee pending',
+            key: 'info',
+            sublabel: 'Complete the extension fee to confirm your added hours'
         };
     }
 
@@ -853,6 +893,7 @@ export async function fetchPayments(supabase, reservationIds) {
             payment_id,
             reservation_id,
             reschedule_request_id,
+            extension_id,
             payment_type,
             payment_method,
             amount,
@@ -927,6 +968,37 @@ export async function fetchRescheduleRequests(supabase, reservationIds) {
     }, {});
 }
 
+export async function fetchExtensions(supabase, reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reservation_extensions')
+        .select(`
+            extension_id,
+            reservation_id,
+            requested_hours,
+            price_per_hour,
+            total_price,
+            status,
+            hold_expires_at,
+            requested_at,
+            decided_at,
+            rejection_reason
+        `)
+        .in('reservation_id', reservationIds)
+        .order('requested_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).reduce((map, extension) => {
+        if (!map[extension.reservation_id]) {
+            map[extension.reservation_id] = [];
+        }
+        map[extension.reservation_id].push(extension);
+        return map;
+    }, {});
+}
+
 export async function fetchCustomerReservations(supabase, userId, options = {}) {
     const includeReviewPrompt = Boolean(options.includeReviewPrompt);
     const selectClause = includeReviewPrompt
@@ -965,9 +1037,10 @@ export async function fetchCustomerReservations(supabase, userId, options = {}) 
 export async function loadCustomerPaymentBundle(supabase, userId, options = {}) {
     const reservations = await fetchCustomerReservations(supabase, userId, options);
     const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
-    const [paymentsByReservationId, reschedulesByReservationId] = await Promise.all([
+    const [paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId] = await Promise.all([
         fetchPayments(supabase, reservationIds),
-        fetchRescheduleRequests(supabase, reservationIds)
+        fetchRescheduleRequests(supabase, reservationIds),
+        fetchExtensions(supabase, reservationIds)
     ]);
     const paymentIds = Object.values(paymentsByReservationId)
         .flat()
@@ -979,7 +1052,8 @@ export async function loadCustomerPaymentBundle(supabase, userId, options = {}) 
         reservations,
         paymentsByReservationId,
         receiptsByPaymentId,
-        reschedulesByReservationId
+        reschedulesByReservationId,
+        extensionsByReservationId
     };
 }
 
@@ -988,10 +1062,12 @@ export async function submitCustomerPayment({
     reservations,
     paymentsByReservationId,
     reschedulesByReservationId,
+    extensionsByReservationId = {},
     reservationId,
     selectedMethod,
     paymentType,
     rescheduleRequestId = null,
+    extensionId = null,
     customAmount = null,
     referenceNumber = '',
     paymentDate = null,
@@ -1013,11 +1089,12 @@ export async function submitCustomerPayment({
         reservation,
         paymentsByReservationId,
         reschedulesByReservationId,
-        { formatDate, reservationRules, paymentTypes }
+        { formatDate, reservationRules, paymentTypes, extensionsByReservationId }
     );
     const selectedOption = availableOptions.find((option) => (
         option.paymentType === paymentType
         && String(option.rescheduleRequestId || '') === String(rescheduleRequestId || '')
+        && String(option.extensionId || '') === String(extensionId || '')
     ));
 
     if (!selectedOption) {
@@ -1088,6 +1165,7 @@ export async function submitCustomerPayment({
     const payload = {
         reservation_id: reservation.reservation_id,
         reschedule_request_id: selectedOption.rescheduleRequestId || null,
+        extension_id: selectedOption.extensionId || null,
         payment_type: selectedOption.paymentType,
         payment_method: legacyModeKey,
         payment_method_id: selectedMethod.id,

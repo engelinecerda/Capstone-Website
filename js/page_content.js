@@ -60,16 +60,8 @@ export async function fetchPageHeader(supabase, pageKey) {
       .select('heading, subheading, image_url, alt_text')
       .eq('page_key', pageKey)
       .maybeSingle();
-    if (error || !data) return;
-
-    if (imgEl && data.image_url) {
-      imgEl.src = optimizedImageUrl(data.image_url);
-      if (data.alt_text) imgEl.alt = data.alt_text;
-    }
-    if (headingEl && data.heading) headingEl.textContent = data.heading;
-    if (subEl && data.subheading) subEl.textContent = data.subheading;
-    if (error) return null;
-    return data || null;
+    if (error || !data) return null;
+    return data.image_url ? { ...data, image_url: optimizedImageUrl(data.image_url) } : data;
   } catch (err) {
     return null;
   }
@@ -89,7 +81,7 @@ export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subE
   if (!data) return;
 
   if (imgEl && data.image_url) {
-    imgEl.src = data.image_url;
+    imgEl.src = data.image_url; // already optimized by fetchPageHeader()
     if (data.alt_text) imgEl.alt = data.alt_text;
   }
   if (headingEl && data.heading) headingEl.textContent = data.heading;

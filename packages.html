@@ -57,141 +57,84 @@
   </section>
 
   <!-- ══════════════════════════════════════════════════
-       SECTION 1 · CATEGORY TABS
+       SECTION 1 · FILTERABLE PACKAGE BROWSER
+       Agoda-style: left filter sidebar + vertical result list. All facet
+       data (categories/counts, price bounds, capacity counts, location
+       availability) and all package data are fetched from Supabase — no
+       hardcoded catalogue data lives in this markup.
        ══════════════════════════════════════════════════ -->
-  <section class="pkg-cat-section" id="section-categories">
-    <div class="pkg-wrap">
-      <!-- States -->
-      <div class="pkg-state" id="pkgCatLoading">
-        <div class="pkg-spinner"></div>
-        <p>Loading packages…</p>
-      </div>
-      <div class="pkg-state hidden" id="pkgCatError">
-        <i class="ti ti-alert-circle pkg-state-icon--error"></i>
-        <p id="pkgCatErrorMsg">Failed to load packages.</p>
-        <button class="pkg-retry-btn" id="pkgRetryBtn">Try Again</button>
-      </div>
-      <div class="pkg-state hidden" id="pkgCatEmpty">
-        <i class="ti ti-package-off pkg-state-icon"></i>
-        <p>No packages available at the moment.</p>
-      </div>
-      <!-- Category tab grid -->
-      <div class="pkg-cat-grid hidden" id="pkgCatGrid"></div>
-    </div>
-  </section>
+  <section class="pkg-browse-section" id="section-browse">
+    <div class="pkg-wrap pkg-browse-wrap">
 
-  <!-- ══════════════════════════════════════════════════
-       SECTION 2 · PACKAGE PRICING CARDS
-       (category overview card removed — redundant with the package
-       cards below and each package's own detail page)
-       ══════════════════════════════════════════════════ -->
-  <section class="pkg-options-section hidden" id="section-options">
-    <div class="pkg-wrap">
-      <p class="pkg-options-label" id="optTitle"></p>
+      <button type="button" class="pkg-filters-toggle" id="pkgFiltersToggle">
+        <i class="ti ti-adjustments-horizontal"></i>
+        <span>Filters</span>
+        <span class="pkg-filters-count-badge hidden" id="pkgFiltersCountBadge">0</span>
+      </button>
 
-      <div class="pkg-state hidden" id="pkgOptLoading">
-        <div class="pkg-spinner"></div>
-        <p>Loading packages…</p>
-      </div>
-      <div class="pkg-state hidden" id="pkgOptEmpty">
-        <i class="ti ti-package-off pkg-state-icon"></i>
-        <p>No packages available in this category yet.</p>
-      </div>
+      <div class="pkg-sidebar-backdrop hidden" id="pkgSidebarBackdrop"></div>
 
-      <!-- Main packages -->
-      <div class="pkg-cards-grid" id="pkgMainGrid"></div>
+      <aside class="pkg-sidebar" id="pkgSidebar" aria-label="Filter packages">
+        <div class="pkg-sidebar-head">
+          <p class="pkg-sidebar-title">Filters</p>
+          <button type="button" class="pkg-clear-filters hidden" id="pkgClearFilters">Clear all</button>
+          <button type="button" class="pkg-sidebar-close" id="pkgSidebarClose" aria-label="Close filters">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
 
-      <!-- Add-on packages -->
-      <div class="pkg-addon-section hidden" id="pkgAddonSection">
-        <p class="pkg-options-label pkg-options-label--addon">Add-on packages</p>
-        <div class="pkg-cards-grid" id="pkgAddonGrid"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════
-       SECTION 4 · PACKAGE DETAIL PANEL
-       ══════════════════════════════════════════════════ -->
-  <section class="pkg-detail-section hidden" id="section-detail">
-    <div class="pkg-wrap">
-      <div class="pkg-detail-panel">
-
-        <!-- Two-column header -->
-        <div class="pkg-detail-head">
-          <div class="pkg-detail-head-left">
-            <span class="pkg-detail-eyebrow" id="pkgDetailCatTag"></span>
-            <h3 class="pkg-detail-name" id="pkgDetailName"></h3>
-            <div class="pkg-detail-pills" id="pkgDetailPills"></div>
-          </div>
-          <div class="pkg-detail-head-right">
-            <div id="pkgDetailPricing"></div>
-            <a href="/reservations.html" class="pkg-detail-book-btn" id="pkgDetailBookBtn">
-              <i class="ti ti-calendar-plus"></i> Book This Package
-            </a>
+        <div class="pkg-sidebar-body" id="pkgSidebarBody">
+          <div class="pkg-sidebar-skeleton" id="pkgSidebarSkeleton">
+            <div class="pkg-skel-line pkg-skel-line--title"></div>
+            <div class="pkg-skel-line"></div>
+            <div class="pkg-skel-line"></div>
+            <div class="pkg-skel-line"></div>
+            <div class="pkg-skel-line pkg-skel-line--title"></div>
+            <div class="pkg-skel-line"></div>
+            <div class="pkg-skel-line"></div>
           </div>
         </div>
 
-        <!-- "Hide details" text link -->
-        <button class="pkg-hide-link" id="pkgDetailClose">Hide details</button>
+        <div class="pkg-sidebar-footer">
+          <button type="button" class="pkg-apply-filters" id="pkgApplyFilters">Apply filters</button>
+        </div>
+      </aside>
 
-        <!-- Tab row -->
-        <div class="pkg-tabs" id="pkgTabs" role="tablist" aria-label="Package information">
-          <button role="tab" class="pkg-tab active" data-tab="overview" aria-selected="true">Overview</button>
-          <button role="tab" class="pkg-tab" data-tab="inclusions" aria-selected="false">Inclusions</button>
-          <button role="tab" class="pkg-tab hidden" id="tabAreaCoverage" data-tab="area" aria-selected="false">Area Coverage</button>
-          <button role="tab" class="pkg-tab" data-tab="policies" aria-selected="false">Policies</button>
+      <div class="pkg-results">
+        <div class="pkg-state" id="pkgListLoading">
+          <div class="pkg-spinner"></div>
+          <p>Loading packages…</p>
         </div>
 
-        <!-- Tab panels -->
-        <div class="pkg-tab-panels">
-          <div class="pkg-tab-panel active" id="panelOverview" role="tabpanel"></div>
-          <div class="pkg-tab-panel hidden" id="panelInclusions" role="tabpanel"></div>
-          <div class="pkg-tab-panel hidden" id="panelArea" role="tabpanel"></div>
-          <div class="pkg-tab-panel hidden" id="panelPolicies" role="tabpanel">
-            <div class="pkg-policies">
-              <div class="pkg-policy-item">
-                <i class="ti ti-file-invoice"></i>
-                <div>
-                  <strong>Contract &amp; Downpayment</strong>
-                  <p>A signed contract and initial downpayment are required to confirm your reservation. Dates are only secured upon receipt of both.</p>
-                </div>
-              </div>
-              <div class="pkg-policy-item">
-                <i class="ti ti-calendar-x"></i>
-                <div>
-                  <strong>Cancellation Policy</strong>
-                  <p>Cancellations must be submitted at least 7 days before your event date. Cancellations within 7 days may forfeit the downpayment.</p>
-                </div>
-              </div>
-              <div class="pkg-policy-item">
-                <i class="ti ti-users"></i>
-                <div>
-                  <strong>Guest Count Changes</strong>
-                  <p>Changes to the final guest count must be communicated at least 48 hours before the event. Last-minute additions may not be accommodated.</p>
-                </div>
-              </div>
-              <div class="pkg-policy-item">
-                <i class="ti ti-clock"></i>
-                <div>
-                  <strong>Duration &amp; Extensions</strong>
-                  <p>All packages include setup and breakdown time within the stated hours. Extension fees apply if the event exceeds the booked duration.</p>
-                </div>
-              </div>
-              <div class="pkg-policy-item">
-                <i class="ti ti-edit"></i>
-                <div>
-                  <strong>Customization Requests</strong>
-                  <p>Special requests, theme adjustments, or menu modifications should be communicated at least 3 days prior to the event.</p>
-                </div>
-              </div>
-              <a href="/terms-and-conditions.html" class="pkg-policy-terms-link">
-                <i class="ti ti-file-text"></i> View full Terms &amp; Conditions
-              </a>
+        <div class="pkg-state hidden" id="pkgListError">
+          <i class="ti ti-alert-circle pkg-state-icon--error"></i>
+          <p id="pkgListErrorMsg">Failed to load packages.</p>
+          <button class="pkg-retry-btn" id="pkgRetryBtn">Try Again</button>
+        </div>
+
+        <div class="pkg-results-body hidden" id="pkgResultsBody">
+          <div class="pkg-results-head">
+            <p class="pkg-results-count" id="pkgResultsCount"></p>
+            <div class="pkg-sort-wrap">
+              <label for="pkgSortSelect" class="pkg-sort-label">Sort by</label>
+              <select id="pkgSortSelect" class="pkg-sort-select">
+                <option value="popularity_desc">Most Booked</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+              </select>
             </div>
           </div>
-        </div>
 
+          <div class="pkg-empty-state hidden" id="pkgEmptyState">
+            <i class="ti ti-package-off pkg-state-icon"></i>
+            <p>No packages match your filters.</p>
+            <button type="button" class="pkg-retry-btn" id="pkgEmptyClearBtn">Clear all filters</button>
+          </div>
+
+          <div class="pkg-list" id="pkgList"></div>
+        </div>
       </div>
+
     </div>
   </section>
 

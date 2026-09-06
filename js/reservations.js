@@ -1829,7 +1829,7 @@ function buildPkgCardInner(p) {
             priceHtml +
             (p.desc ? '<p class="rpkg-desc">' + escapeHtml(p.desc) + '</p>' : '') +
             (chips ? '<div class="rpkg-chips">' + chips + '</div>' : '') +
-            '<a class="rpkg-details-link" href="/packages.html?package=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener noreferrer">' +
+            '<a class="rpkg-details-link" href="/package-details.html?id=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener noreferrer">' +
                 'View full details <i class="ti ti-arrow-up-right" aria-hidden="true"></i>' +
             '</a>' +
         '</div>'

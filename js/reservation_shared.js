@@ -13,7 +13,19 @@ export const PAYMENT_TYPE_META = {
     down_payment: { label: 'Down Payment', description: '50% of your total amount' },
     partial_payment: { label: 'Custom Amount', description: 'Enter any amount you want to pay' },
     full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
-    reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' }
+    reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' },
+    extension_fee: { label: 'Extension Fee', description: 'Fee for your requested extension hours' }
+};
+
+// Package Extension Hours — mirrors RESCHEDULE_STATUS_META's shape exactly,
+// but this feature has no update-v20-style "skip pending" history: every
+// extension request genuinely passes through pending_payment first.
+export const EXTENSION_STATUS_META = {
+    pending_payment: { label: 'Awaiting Payment', key: 'info' },
+    pending_verification: { label: 'Pending Verification', key: 'pending' },
+    approved: { label: 'Approved', key: 'approved' },
+    rejected: { label: 'Rejected', key: 'rejected' },
+    expired: { label: 'Expired', key: 'cancelled' }
 };
 
 // update-v20: no manager approval step — a submitted reschedule goes
@@ -196,6 +208,10 @@ export function getRescheduleStatusMeta(status) {
     return RESCHEDULE_STATUS_META[String(status || 'pending').toLowerCase()] || RESCHEDULE_STATUS_META.pending;
 }
 
+export function getExtensionStatusMeta(status) {
+    return EXTENSION_STATUS_META[String(status || 'pending_payment').toLowerCase()] || EXTENSION_STATUS_META.pending_payment;
+}
+
 export function getReservationPackageName(reservation) {
     return reservation.package?.package_name || reservation.package_id || 'No package selected';
 }
@@ -255,6 +271,39 @@ export function isRescheduleFeeOwed(rescheduleRequests, payments) {
         && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
     ));
     return !hasExistingFee;
+}
+
+// Mirrors isRescheduleFeeOwed exactly, for the same reason: a reservation's
+// balance.remainingBalance never reflects an extension fee, so every
+// surface that shows "what does the customer owe right now" needs this
+// checked alongside the base balance, not folded into it.
+export function isExtensionFeeOwed(extensions, payments) {
+    const openExtension = (extensions || [])
+        .find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment');
+    if (!openExtension) return false;
+    const hasExistingFee = (payments || []).some((payment) => (
+        String(payment.extension_id || '') === String(openExtension.extension_id)
+        && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+    ));
+    return !hasExistingFee;
+}
+
+// True while an extension request exists that the customer still needs to
+// see progress on (awaiting their payment, or awaiting Manager review) —
+// used to render the "not yet confirmed" status indicator on the
+// reservation details page (spec item 4).
+export function getOpenExtension(extensions) {
+    return (extensions || []).find((extension) => (
+        ['pending_payment', 'pending_verification'].includes(String(extension.status || '').toLowerCase())
+    )) || null;
+}
+
+// Pure eligibility check, mirrors computeCanReschedule exactly: only once
+// the base reservation is Confirmed (approved/confirmed/rescheduled), and
+// only when no other extension request is already open for it.
+export function computeCanRequestExtension(status, extensions) {
+    const normalizedStatus = String(status || '').toLowerCase();
+    return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !getOpenExtension(extensions);
 }
 
 export function getCancellationFee(reservation, paymentRules) {

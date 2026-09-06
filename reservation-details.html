@@ -89,6 +89,23 @@
     </div>
   </div>
 
+  <div class="account-modal-backdrop hidden" id="extension-request-backdrop" aria-hidden="true">
+    <div class="account-modal-card" role="dialog" aria-modal="true" aria-labelledby="extension-modal-title">
+      <button type="button" class="account-modal-close" id="extension-modal-close" aria-label="Close extension request dialog">&times;</button>
+      <p class="account-modal-eyebrow">Add More Time</p>
+      <h2 class="account-modal-title" id="extension-modal-title">Request Extension</h2>
+
+      <div id="extension-modal-body"></div>
+
+      <p class="account-modal-message" id="extension-modal-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="extension-modal-dismiss">Go Back</button>
+        <button type="button" class="account-modal-btn primary" id="extension-modal-confirm">Request Extension</button>
+      </div>
+    </div>
+  </div>
+
   <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
     <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
       <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
