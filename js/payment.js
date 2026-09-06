@@ -63,7 +63,8 @@ const state = {
         reservations: [],
         paymentsByReservationId: {},
         receiptsByPaymentId: {},
-        reschedulesByReservationId: {}
+        reschedulesByReservationId: {},
+        extensionsByReservationId: {}
     },
     reservationId: new URLSearchParams(window.location.search).get('reservation_id') || '',
     reservationRules: null,
@@ -274,7 +275,12 @@ function getActivePaymentPageState(reservation) {
         reservation,
         state.bundle.paymentsByReservationId,
         state.bundle.reschedulesByReservationId,
-        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules }
+        {
+            formatDate,
+            reservationRules: state.reservationRules,
+            paymentRules: state.paymentRules,
+            extensionsByReservationId: state.bundle.extensionsByReservationId
+        }
     );
 }
 
@@ -290,7 +296,13 @@ function getActivePaymentOptions(reservation) {
         reservation,
         state.bundle.paymentsByReservationId,
         state.bundle.reschedulesByReservationId,
-        { formatDate, reservationRules: state.reservationRules, paymentTypes: state.paymentTypes, paymentRules: state.paymentRules }
+        {
+            formatDate,
+            reservationRules: state.reservationRules,
+            paymentTypes: state.paymentTypes,
+            paymentRules: state.paymentRules,
+            extensionsByReservationId: state.bundle.extensionsByReservationId
+        }
     );
 }
 
@@ -299,7 +311,7 @@ function getSelectedMethodObject() {
 }
 
 function getPaymentOptionKey(option) {
-    return `${option.paymentType}:${option.rescheduleRequestId || ''}`;
+    return `${option.paymentType}:${option.rescheduleRequestId || ''}:${option.extensionId || ''}`;
 }
 
 function getVisibleOptions(reservation) {
@@ -1304,10 +1316,12 @@ async function handleSubmitPayment() {
             reservations: state.bundle.reservations,
             paymentsByReservationId: state.bundle.paymentsByReservationId,
             reschedulesByReservationId: state.bundle.reschedulesByReservationId,
+            extensionsByReservationId: state.bundle.extensionsByReservationId,
             reservationId: reservation.reservation_id,
             selectedMethod: selectedMethodObj,
             paymentType: selectedOption.paymentType,
             rescheduleRequestId: selectedOption.rescheduleRequestId || null,
+            extensionId: selectedOption.extensionId || null,
             customAmount: selectedOption.paymentType === 'partial_payment' ? Number(state.form.customAmount) : null,
             referenceNumber: state.form.referenceNumber.trim(),
             paymentDate: state.form.paymentDate || null,

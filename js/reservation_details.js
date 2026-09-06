@@ -4,6 +4,7 @@ import {
     buildCustomerPaymentUrl,
     fetchPayments as fetchSharedPayments,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
+    fetchExtensions as fetchSharedExtensions,
     getReservationBalanceDetails,
     isReservationPaymentEnabled,
     loadPaymentRules,
@@ -22,17 +23,22 @@ import {
     getReservationAddOnName,
     getReservationLocationLabel,
     getRescheduleStatusMeta,
+    getExtensionStatusMeta,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel,
+    computeCanRequestExtension,
+    getOpenExtension,
     getCancellationBlockReason,
     getRescheduleBlockReason,
     getCancellationFee,
     getRescheduleFee,
     getCancellationFeePayment,
     isCancellationFeeOwed,
-    isRescheduleFeeOwed
+    isRescheduleFeeOwed,
+    isExtensionFeeOwed
 } from './reservation_shared.js';
+import { fetchMaxExtensionHours, requestExtension } from './reservation_extensions.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
 
@@ -61,6 +67,13 @@ const cancelModalMessage        = document.getElementById('cancel-modal-message'
 const cancelFeeAmount           = document.getElementById('cancel-fee-amount');
 const cancelReasonInput         = document.getElementById('cancel-reason-input');
 
+const extensionRequestBackdrop = document.getElementById('extension-request-backdrop');
+const extensionModalClose      = document.getElementById('extension-modal-close');
+const extensionModalDismiss    = document.getElementById('extension-modal-dismiss');
+const extensionModalConfirm    = document.getElementById('extension-modal-confirm');
+const extensionModalBody       = document.getElementById('extension-modal-body');
+const extensionModalMessage    = document.getElementById('extension-modal-message');
+
 const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
 const submissionFeedbackClose    = document.getElementById('submission-feedback-close');
 const submissionFeedbackDismiss  = document.getElementById('submission-feedback-dismiss');
@@ -69,6 +82,19 @@ const submissionFeedbackTitle    = document.getElementById('submission-feedback-
 const submissionFeedbackCopy     = document.getElementById('submission-feedback-copy');
 
 let pageData = null;
+
+// reservation.event_end_time comes back from Postgres as a raw "HH:MM:SS"
+// time value (unlike event_time, which is already stored pre-formatted as
+// "3:00 PM") — this is the one place that needs converting for display.
+function formatTimeOfDay(value) {
+    const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return '';
+    let hours = Number(match[1]);
+    const minutes = match[2];
+    const meridiem = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes} ${meridiem}`;
+}
 
 function isReservationContractsColumnMissing(error, columnName) {
     const message = error?.message || '';
@@ -145,6 +171,7 @@ async function loadPageData() {
             event_type,
             event_date,
             event_time,
+            event_end_time,
             guest_count,
             location_type,
             venue_location,
@@ -170,10 +197,11 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
+        fetchSharedExtensions(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
         loadReservationRules(supabase),
@@ -186,6 +214,7 @@ async function loadPageData() {
         contract,
         payments: paymentsByReservationId[reservationId] || [],
         rescheduleRequests: reschedulesByReservationId[reservationId] || [],
+        extensions: extensionsByReservationId[reservationId] || [],
         paymentsByReservationId,
         cancellationInfo,
         review,
@@ -376,6 +405,12 @@ function buildEventDetailsPanel(reservation) {
                     <dt><i class="fa-solid fa-clock" aria-hidden="true"></i> Start time</dt>
                     <dd>${escapeHtml(reservation.event_time || 'No time selected')}</dd>
                 </div>
+                ${reservation.event_end_time ? `
+                <div class="rd-dl-row">
+                    <dt><i class="fa-solid fa-hourglass-end" aria-hidden="true"></i> End time</dt>
+                    <dd>${escapeHtml(formatTimeOfDay(reservation.event_end_time))}</dd>
+                </div>
+                ` : ''}
                 <div class="rd-dl-row">
                     <dt><i class="fa-solid fa-users" aria-hidden="true"></i> Guests</dt>
                     <dd>${escapeHtml(String(reservation.guest_count || 0))} guests</dd>
@@ -408,15 +443,19 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false) {
+function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false, extensionFeeOwed = null) {
     // balance.remainingBalance only tracks the base package price — it goes
     // to 0 the moment the package itself is paid off, regardless of whether
-    // a *cancellation* or *reschedule* fee is now separately owed on top of
-    // that. Without these checks, a fully-paid reservation that later gets
-    // one of those fees reads as paymentDone forever and the CTA below
-    // never renders, even though the customer still owes money.
+    // a *cancellation*, *reschedule*, or *extension* fee is now separately
+    // owed on top of that. Without these checks, a fully-paid reservation
+    // that later gets one of those fees reads as paymentDone forever and
+    // the CTA below never renders, even though the customer still owes
+    // money. extensionFeeOwed is the open reservation_extensions row itself
+    // (or null) rather than a boolean, since its amount comes from that
+    // row's own snapshotted total_price, not a shared config value the way
+    // the cancellation/reschedule fee amounts do.
     const baseBalancePaid = balance.remainingBalance <= 0;
-    const paymentDone = baseBalancePaid && !cancellationFeeOwed && !rescheduleFeeOwed;
+    const paymentDone = baseBalancePaid && !cancellationFeeOwed && !rescheduleFeeOwed && !extensionFeeOwed;
     const verificationDone = isReservationPaymentEnabled(reservation);
     const hideActions = ['cancelled', 'declined', 'completed'].includes(effectiveStatus);
     const showPaymentCta = !hideActions && !paymentDone;
@@ -451,6 +490,12 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                         <span>${escapeHtml(formatCurrency(getRescheduleFee(paymentRules)))}</span>
                     </div>
                 ` : ''}
+                ${extensionFeeOwed ? `
+                    <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
+                        <span>Extension fee due (${escapeHtml(String(extensionFeeOwed.requested_hours))} hour${Number(extensionFeeOwed.requested_hours) === 1 ? '' : 's'})</span>
+                        <span>${escapeHtml(formatCurrency(extensionFeeOwed.total_price))}</span>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="rd-contract-inset">
@@ -475,7 +520,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : 'Continue payment')}
+                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : 'Continue payment'))}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your reservation is verified</p>` : ''}
             ` : ''}
@@ -619,6 +664,80 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
     `;
 }
 
+// Adds whole hours to a raw Postgres "HH:MM:SS" time-of-day string, for
+// showing the *pending* effective end time before an extension is approved
+// (reservation.event_end_time itself only updates once it actually is).
+function addHoursToTimeString(value, hours) {
+    const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return '';
+    const totalMinutes = (Number(match[1]) * 60 + Number(match[2]) + Number(hours) * 60) % (24 * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = String(totalMinutes % 60).padStart(2, '0');
+    return formatTimeOfDay(`${h}:${m}`);
+}
+
+// Package Extension Hours (spec item 4) — mirrors buildRescheduleRow's
+// shape/markup exactly (same "Need to change...?" prompt row when nothing
+// is open yet, same status-badge card once something is), reusing the same
+// .rd-reschedule-row / .rd-reschedule-card / .res-status classes so this
+// reads as one consistent pattern rather than a bolted-on second design.
+function buildExtensionSection(reservation, extensions, effectiveStatus) {
+    if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return '';
+    if (['cancellation_requested', 'cancellation_approved'].includes(String(reservation.status || '').toLowerCase())) return '';
+
+    const canRequest = computeCanRequestExtension(reservation.status, extensions);
+    const latestExtension = (extensions || [])[0] || null;
+    const isOpen = latestExtension && ['pending_payment', 'pending_verification'].includes(String(latestExtension.status || '').toLowerCase());
+
+    if (!isOpen) {
+        if (!canRequest) return '';
+        return `
+            <div class="rd-reschedule-row">
+                <div class="rd-reschedule-row-left">
+                    <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>
+                    <span>Need more time for your event?</span>
+                </div>
+                <div class="rd-reschedule-row-actions">
+                    <button type="button" class="rd-btn-outline" data-action="open-extension">Request extension</button>
+                </div>
+            </div>
+        `;
+    }
+
+    const statusMeta = getExtensionStatusMeta(latestExtension.status);
+    const isAwaitingPayment = String(latestExtension.status).toLowerCase() === 'pending_payment';
+    const pendingEndTime = reservation.event_end_time
+        ? addHoursToTimeString(reservation.event_end_time, latestExtension.requested_hours)
+        : '';
+
+    return `
+        <section class="rd-panel rd-reschedule-card">
+            <div class="rd-reschedule-card-head">
+                <h2 class="rd-panel-title">Extension request</h2>
+                <span class="res-status ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
+            </div>
+            <dl class="rd-dl">
+                <div class="rd-dl-row">
+                    <dt><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Requested hours</dt>
+                    <dd>${escapeHtml(String(latestExtension.requested_hours))} hour${Number(latestExtension.requested_hours) === 1 ? '' : 's'} &middot; ${escapeHtml(formatCurrency(latestExtension.total_price))}</dd>
+                </div>
+                ${pendingEndTime ? `
+                    <div class="rd-dl-row">
+                        <dt><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pending end time</dt>
+                        <dd>${escapeHtml(pendingEndTime)} &mdash; not yet confirmed</dd>
+                    </div>
+                ` : ''}
+                ${isAwaitingPayment && latestExtension.hold_expires_at ? `
+                    <div class="rd-dl-row">
+                        <dt><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Hold expires</dt>
+                        <dd>${escapeHtml(formatDateTime(latestExtension.hold_expires_at))} &mdash; pay by then to keep this time</dd>
+                    </div>
+                ` : ''}
+            </dl>
+        </section>
+    `;
+}
+
 function buildReviewRow(effectiveStatus, review) {
     if (effectiveStatus !== 'completed') return '';
 
@@ -648,7 +767,7 @@ function buildReviewRow(effectiveStatus, review) {
 }
 
 function render() {
-    const { reservation, contract, payments, rescheduleRequests, paymentsByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
+    const { reservation, contract, payments, rescheduleRequests, extensions, paymentsByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
     const effectiveStatus = getEffectiveReservationStatus(reservation, balance.remainingBalance);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
@@ -662,6 +781,12 @@ function render() {
     const paymentUrl = buildCustomerPaymentUrl(reservationId);
     const cancellationFeeOwed = isCancellationFeeOwed(reservation, payments);
     const rescheduleFeeOwed = isRescheduleFeeOwed(rescheduleRequests, payments);
+    // Unlike cancellation/reschedule (a shared config amount), an extension
+    // fee's amount comes from the specific open request's own snapshotted
+    // total_price — so this is the row itself (or null), not a boolean.
+    const openExtension = isExtensionFeeOwed(extensions, payments)
+        ? (extensions || []).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
+        : null;
     // The 4-step booking stepper (Submitted/Verification/Payment/Confirmed)
     // describes progress toward a *new* booking — showing it while a
     // cancellation fee is owed read as if the original reservation was
@@ -670,7 +795,7 @@ function render() {
     const isCancellationInProgress = cancellationFeeOwed;
 
     const showBalanceSummary = !isTerminalCancelled;
-    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed && !rescheduleFeeOwed;
+    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed && !rescheduleFeeOwed && !openExtension;
 
     pageContainer.innerHTML = `
         <section class="rd-header-card">
@@ -684,16 +809,18 @@ function render() {
                 </div>
                 ${showBalanceSummary ? `
                     <div class="rd-header-right">
-                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (rescheduleFeeOwed ? 'Reschedule fee due' : (paymentDone ? 'Paid in full' : 'Balance due'))}</span>
+                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (rescheduleFeeOwed ? 'Reschedule fee due' : (openExtension ? 'Extension fee due' : (paymentDone ? 'Paid in full' : 'Balance due')))}</span>
                         <div class="rd-balance-amount-row">
                             <strong class="rd-balance-amount">${escapeHtml(
                                 cancellationFeeOwed
                                     ? formatCurrency(getCancellationFee(reservation, paymentRules))
                                     : (rescheduleFeeOwed
                                         ? formatCurrency(getRescheduleFee(paymentRules))
-                                        : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance)))
+                                        : (openExtension
+                                            ? formatCurrency(openExtension.total_price)
+                                            : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))))
                             )}</strong>
-                            ${(!paymentDone && !cancellationFeeOwed && !rescheduleFeeOwed) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
+                            ${(!paymentDone && !cancellationFeeOwed && !rescheduleFeeOwed && !openExtension) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
                         </div>
                     </div>
                 ` : ''}
@@ -717,10 +844,11 @@ function render() {
 
         <div class="rd-grid">
             ${buildEventDetailsPanel(reservation)}
-            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed)}
+            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed, openExtension)}
         </div>
 
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules, rescheduleBlockReason)}
+        ${buildExtensionSection(reservation, extensions, effectiveStatus)}
         ${buildReviewRow(effectiveStatus, review)}
     `;
 }
@@ -918,6 +1046,122 @@ async function init() {
     }
 }
 
+// ── Extension request modal ────────────────────────────────────────────────
+// availability is re-fetched from get_max_extension_hours() every time the
+// modal opens (never cached across opens) — the real gap can shrink between
+// visits as other customers book, and the server re-validates it again
+// anyway at INSERT time, but showing a stale number here would just mean a
+// confusing rejection right after the customer submits.
+let extensionAvailability = null;
+let extensionQuantity = 1;
+
+function setExtensionModalMessage(message, isError = false) {
+    if (!extensionModalMessage) return;
+    extensionModalMessage.textContent = message || '';
+    extensionModalMessage.className = 'account-modal-message' + (isError ? ' error' : '');
+}
+
+function renderExtensionModalBody() {
+    if (!extensionModalBody) return;
+
+    if (!extensionAvailability) {
+        extensionModalBody.innerHTML = '<p class="rd-inline-note">Checking availability…</p>';
+        extensionModalConfirm?.setAttribute('disabled', 'true');
+        return;
+    }
+
+    if (!extensionAvailability.extendable) {
+        const reason = extensionAvailability.nextBookingLabel
+            ? `No extension time is available — the next slot is booked at ${extensionAvailability.nextBookingLabel}.`
+            : 'No extension time is available for this reservation right now.';
+        extensionModalBody.innerHTML = `<p class="rd-inline-note">${escapeHtml(reason)}</p>`;
+        extensionModalConfirm?.setAttribute('disabled', 'true');
+        return;
+    }
+
+    const maxHours = extensionAvailability.maxHours;
+    const pricePerHour = extensionAvailability.pricePerHour || 0;
+    const total = extensionQuantity * pricePerHour;
+    const capNote = extensionAvailability.nextBookingLabel
+        ? ` — the next slot is booked at ${extensionAvailability.nextBookingLabel}`
+        : '';
+
+    extensionModalBody.innerHTML = `
+        <p class="rd-inline-note">${escapeHtml(`You can extend by up to ${maxHours} hour${maxHours === 1 ? '' : 's'}${capNote}.`)}</p>
+        <div class="extension-qty-row">
+            <label class="cancel-reason-label" for="extension-qty-input">Hours to add</label>
+            <div class="extension-qty-stepper">
+                <button type="button" class="extension-qty-btn" id="extension-qty-minus" aria-label="Decrease hours" ${extensionQuantity <= 1 ? 'disabled' : ''}>&minus;</button>
+                <input type="number" id="extension-qty-input" class="extension-qty-input" inputmode="numeric" min="1" max="${maxHours}" step="1" value="${extensionQuantity}" aria-label="Hours to add">
+                <button type="button" class="extension-qty-btn" id="extension-qty-plus" aria-label="Increase hours" ${extensionQuantity >= maxHours ? 'disabled' : ''}>&plus;</button>
+            </div>
+        </div>
+        <div class="cancel-fee-block">
+            <span class="cancel-fee-label">Total</span>
+            <strong class="cancel-fee-amount">${escapeHtml(formatCurrency(total))}</strong>
+            <p class="cancel-fee-note">${escapeHtml(formatCurrency(pricePerHour))} per hour &middot; ${extensionQuantity} hour${extensionQuantity === 1 ? '' : 's'}</p>
+        </div>
+    `;
+    extensionModalConfirm?.removeAttribute('disabled');
+
+    const qtyInput = document.getElementById('extension-qty-input');
+    const minusBtn = document.getElementById('extension-qty-minus');
+    const plusBtn = document.getElementById('extension-qty-plus');
+
+    const setQuantity = (value) => {
+        extensionQuantity = Math.max(1, Math.min(maxHours, Math.round(value) || 1));
+        renderExtensionModalBody();
+    };
+
+    qtyInput?.addEventListener('change', () => setQuantity(Number(qtyInput.value)));
+    minusBtn?.addEventListener('click', () => setQuantity(extensionQuantity - 1));
+    plusBtn?.addEventListener('click', () => setQuantity(extensionQuantity + 1));
+}
+
+async function openExtensionModal() {
+    if (!pageData?.reservation) return;
+    extensionQuantity = 1;
+    extensionAvailability = null;
+    setExtensionModalMessage('');
+    renderExtensionModalBody();
+    extensionRequestBackdrop?.classList.remove('hidden');
+    extensionRequestBackdrop?.setAttribute('aria-hidden', 'false');
+
+    try {
+        extensionAvailability = await fetchMaxExtensionHours(supabase, reservationId);
+    } catch (error) {
+        extensionAvailability = { maxHours: 0, pricePerHour: null, extendable: false, nextBookingLabel: null };
+        setExtensionModalMessage(`Couldn't check extension availability: ${error.message}`, true);
+    }
+    renderExtensionModalBody();
+}
+
+function closeExtensionModal() {
+    extensionRequestBackdrop?.classList.add('hidden');
+    extensionRequestBackdrop?.setAttribute('aria-hidden', 'true');
+    extensionModalConfirm?.removeAttribute('disabled');
+    setExtensionModalMessage('');
+}
+
+async function submitExtensionRequest() {
+    if (!extensionAvailability?.extendable) return;
+    extensionModalConfirm?.setAttribute('disabled', 'true');
+    setExtensionModalMessage('Submitting your extension request…');
+
+    try {
+        await requestExtension(supabase, reservationId, extensionQuantity);
+        closeExtensionModal();
+        // Routes straight into the existing payment flow (spec item 4) —
+        // the extension_fee option now exists for this reservation
+        // (getAvailablePaymentOptions picks it up automatically), so no
+        // separate payment UI is needed here.
+        window.location.href = buildCustomerPaymentUrl(reservationId);
+    } catch (error) {
+        extensionModalConfirm?.removeAttribute('disabled');
+        setExtensionModalMessage(`Failed to submit extension request: ${error.message}`, true);
+    }
+}
+
 pageContainer?.addEventListener('click', async (event) => {
     const payBtn = event.target.closest('.rd-pay-cta');
     if (payBtn && !payBtn.disabled) {
@@ -929,6 +1173,12 @@ pageContainer?.addEventListener('click', async (event) => {
     const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
     if (cancelTriggerBtn) {
         openCancelModal();
+        return;
+    }
+
+    const extensionTriggerBtn = event.target.closest('[data-action="open-extension"]');
+    if (extensionTriggerBtn) {
+        openExtensionModal();
         return;
     }
 
@@ -952,6 +1202,14 @@ cancelReservationBackdrop?.addEventListener('click', (event) => {
 });
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !cancelReservationBackdrop?.classList.contains('hidden')) closeCancelModal();
+    if (event.key === 'Escape' && !extensionRequestBackdrop?.classList.contains('hidden')) closeExtensionModal();
+});
+
+extensionModalClose?.addEventListener('click', closeExtensionModal);
+extensionModalDismiss?.addEventListener('click', closeExtensionModal);
+extensionModalConfirm?.addEventListener('click', submitExtensionRequest);
+extensionRequestBackdrop?.addEventListener('click', (event) => {
+    if (event.target === extensionRequestBackdrop) closeExtensionModal();
 });
 
 submissionFeedbackClose?.addEventListener('click', closeSubmissionFeedbackModal);

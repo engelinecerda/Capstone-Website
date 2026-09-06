@@ -72,6 +72,21 @@ function escapeHtml(str) {
   }[m]));
 }
 
+// reservation.event_end_time is a raw Postgres "HH:MM:SS" time value
+// (unlike event_time, already stored pre-formatted as "3:00 PM") — this
+// reflects any approved Package Extension Hours automatically, since
+// enforce_reservation_capacity() keeps this column as the reservation's
+// real effective end time.
+function formatTimeOfDay(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${meridiem}`;
+}
+
 function formatBlackoutDate(dateIso) {
   return new Date(`${dateIso}T00:00:00`).toLocaleDateString('en-PH', {
     weekday: 'long', month: 'long', day: 'numeric'
@@ -148,7 +163,7 @@ function getBlackoutSchemaHint(error) {
 async function fetchReservationsForRange(fromDate, toDate) {
   const { data, error } = await supabase
     .from('reservations')
-    .select('reservation_id, contact_name, status, event_type, event_date, event_time, guest_count')
+    .select('reservation_id, contact_name, status, event_type, event_date, event_time, event_end_time, guest_count')
     .gte('event_date', fromDate)
     .lte('event_date', toDate)
     .order('event_date', { ascending: true });
@@ -294,7 +309,7 @@ function renderDayPanel() {
             <span class="day-booking-name">${escapeHtml(reservation.contact_name || 'Unknown customer')}</span>
             <span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
           </div>
-          <p class="day-booking-meta">${escapeHtml(reservation.event_type || 'Event')} &middot; ${escapeHtml(reservation.event_time || 'No time selected')} &middot; ${escapeHtml(String(reservation.guest_count || 0))} guests</p>
+          <p class="day-booking-meta">${escapeHtml(reservation.event_type || 'Event')} &middot; ${escapeHtml(reservation.event_time || 'No time selected')}${reservation.event_end_time ? escapeHtml(` – ${formatTimeOfDay(reservation.event_end_time)}`) : ''} &middot; ${escapeHtml(String(reservation.guest_count || 0))} guests</p>
           <a href="#" class="day-booking-link" data-reservation-id="${escapeHtml(reservation.reservation_id)}">View reservation &rarr;</a>
         </div>
       `;

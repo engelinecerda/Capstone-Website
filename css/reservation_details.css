@@ -811,3 +811,65 @@
         font-size: 20px;
     }
 }
+
+/* ========================
+   Extension request modal (Package Extension Hours)
+   Quantity stepper meets the same 40px minimum touch-target and keyboard-
+   operability the rest of this page's controls already follow — the
+   number input is natively keyboard-steppable, and the +/- buttons are
+   real <button> elements in the normal tab order.
+======================== */
+.extension-qty-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.extension-qty-stepper {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.extension-qty-btn {
+    min-width: 40px;
+    min-height: 40px;
+    border: 1px solid var(--acc-border-tan);
+    background: var(--acc-cream);
+    color: var(--acc-espresso);
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.extension-qty-btn:hover:not(:disabled),
+.extension-qty-btn:focus-visible {
+    background: var(--acc-border-tan);
+    outline: none;
+}
+
+.extension-qty-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.extension-qty-input {
+    flex: 1;
+    min-height: 40px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--acc-text);
+    border: 1px solid var(--acc-border-tan);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.extension-qty-input:focus-visible {
+    outline: 2px solid var(--acc-terracotta);
+    outline-offset: 1px;
+}
