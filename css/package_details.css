@@ -1,0 +1,60 @@
+/* package_details.css — standalone Package Details page.
+   All shared .pkg-* component styles (gallery, tabs, sidebar, lightbox,
+   chips, etc.) live in packages.css and are reused as-is here — this file
+   only covers what's specific to this page being its own route rather than
+   an in-page panel: top spacing (no hero banner precedes it here), the
+   back link, and the loading/not-found states. */
+
+body { background: var(--cream, #FAF6F0); }
+
+/* .navbar is position:sticky (css/styles.css), not fixed — it occupies its
+   own space in normal flow, so this only needs the same small breathing-room
+   padding reservation-details.html already uses for the identical
+   navbar-then-back-link-then-content pattern (css/reservation_details.css
+   .rd-page), not a "clear the fixed navbar" height compensation. */
+.pkgd-page {
+  padding-top: 28px;
+  padding-bottom: 48px;
+}
+
+.pkgd-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #6B5A47;
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+.pkgd-back-link:hover { color: #A34F2E; }
+.pkgd-back-link i { font-size: 14px; }
+
+/* ── Loading skeleton ─────────────────────────────────────────────────── */
+#pkgdLoading { padding-top: 4px; }
+.pkgd-skel-gallery {
+  height: 360px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  background: linear-gradient(90deg, #F2EBE0 25%, #FAF8F4 37%, #F2EBE0 63%);
+  background-size: 400% 100%;
+  animation: pkgdSkelShimmer 1.4s ease infinite;
+}
+.pkgd-skel-line {
+  border-radius: 4px;
+  margin-bottom: 12px;
+  background: linear-gradient(90deg, #F2EBE0 25%, #FAF8F4 37%, #F2EBE0 63%);
+  background-size: 400% 100%;
+  animation: pkgdSkelShimmer 1.4s ease infinite;
+}
+.pkgd-skel-line--eyebrow { width: 120px; height: 12px; }
+.pkgd-skel-line--title   { width: 45%; height: 30px; }
+.pkgd-skel-line--pills   { width: 60%; height: 20px; }
+@keyframes pkgdSkelShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+@media (max-width: 640px) {
+  .pkgd-skel-gallery { height: 220px; }
+}

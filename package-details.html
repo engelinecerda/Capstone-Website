@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Package Details — ELI Coffee Events Cafe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/packages.css" />
+  <link rel="stylesheet" href="/css/package_details.css" />
+  <link rel="stylesheet" href="/css/home.css" />
+  <link rel="stylesheet" href="/css/announcement_banner.css" />
+  <style>.hidden { display: none !important; }</style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="navbar__container">
+      <a href="/index.html" id="navbar__logo">
+        <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo" />
+      </a>
+      <div class="navbar__toggle" id="mobile-menu">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+      </div>
+      <div class="navbar__topbar-right" id="navTopbarRight"></div>
+      <ul class="navbar__menu">
+        <li class="nav-drawer-header">
+          <img src="/images/ELI COFFEE LOGO ONLY.png" alt="ELI Coffee" class="nav-drawer-logo" />
+          <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu"><i class="ti ti-x"></i></button>
+        </li>
+        <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
+        <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/reviews.html" class="navbar__links">Reviews</a></li>
+        <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
+        <li class="navbar__btn"></li>
+      </ul>
+    </div>
+  </nav>
+  <div class="nav-overlay" id="nav-drawer-overlay"></div>
+
+  <main class="pkgd-page">
+    <div class="pkg-wrap">
+      <a href="/packages.html" class="pkgd-back-link">
+        <i class="ti ti-arrow-left" aria-hidden="true"></i> Back to packages
+      </a>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div class="pkg-wrap" id="pkgdLoading">
+      <div class="pkgd-skel-gallery"></div>
+      <div class="pkgd-skel-line pkgd-skel-line--eyebrow"></div>
+      <div class="pkgd-skel-line pkgd-skel-line--title"></div>
+      <div class="pkgd-skel-line pkgd-skel-line--pills"></div>
+    </div>
+
+    <!-- Not found / error state -->
+    <div class="pkg-state hidden" id="pkgdNotFound">
+      <i class="ti ti-package-off pkg-state-icon"></i>
+      <p>We couldn't find this package. It may have been removed or is no longer available.</p>
+      <a class="pkg-retry-btn" href="/packages.html">Back to Packages</a>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         PACKAGE DETAIL PANEL — identical markup/ids to the panel that used
+         to live inline in packages.html, now rendered as its own page by
+         js/package_details.js
+         ══════════════════════════════════════════════════ -->
+    <div class="pkg-wrap hidden" id="pkgdContent">
+      <div class="pkg-detail-panel">
+
+        <!-- Category + title sit directly above the gallery -->
+        <div class="pkg-title-block">
+          <span class="pkg-detail-eyebrow" id="pkgDetailCatTag"></span>
+          <h1 class="pkg-detail-name" id="pkgDetailName"></h1>
+        </div>
+
+        <!-- Photo gallery — populated from package_photo, ordered by sort_order.
+             The "Gallery (N)" badge is injected as part of this same element
+             (see renderGalleryHero) so it can float over the grid. -->
+        <div class="pkg-gallery-hero" id="pkgGalleryHero"></div>
+
+        <!-- At a Glance (left) + compact price card (right) — top-aligned,
+             price card does NOT stretch or stick. -->
+        <div class="pkg-summary-row">
+          <div class="pkg-glance-card">
+            <h2 class="pkg-glance-heading">At a Glance</h2>
+            <div class="pkg-glance-divider"></div>
+            <div class="pkg-glance-facts" id="pkgGlanceFacts"></div>
+            <div class="pkg-glance-divider"></div>
+            <p class="pkg-glance-desc" id="pkgGlanceDesc"></p>
+            <button type="button" class="pkg-glance-readmore hidden" id="pkgGlanceReadMore" aria-expanded="false">Read more</button>
+          </div>
+
+          <div class="pkg-price-card" id="pkgPriceCard">
+            <span class="pkg-most-booked-chip hidden" id="pkgDetailMostBooked"><i class="ti ti-flame" aria-hidden="true"></i>Most Booked</span>
+            <div class="pkg-admin-badges" id="pkgAdminBadges"></div>
+            <p class="pkg-sidebar-price-label">Starting price</p>
+            <div id="pkgDetailPricing"></div>
+            <a href="/reservations.html" class="pkg-detail-book-btn" id="pkgDetailBookBtn">
+              <i class="ti ti-calendar-plus"></i> Book This Package
+            </a>
+          </div>
+        </div>
+
+        <!-- What's Included — flat checklist, admin-configured highlights -->
+        <div class="pkg-section-card">
+          <h2 class="pkg-section-heading">What's Included</h2>
+          <div class="pkg-section-divider"></div>
+          <div id="pkgInclusionsGrid"></div>
+        </div>
+
+        <!-- Area Coverage — offsite packages only -->
+        <div class="pkg-section-card hidden" id="pkgAreaCard">
+          <h2 class="pkg-section-heading">Area Coverage</h2>
+          <div class="pkg-section-divider"></div>
+          <div id="pkgAreaContent"></div>
+        </div>
+
+        <!-- Policies — structured, real-data rows -->
+        <div class="pkg-section-card">
+          <h2 class="pkg-section-heading">Policies</h2>
+          <div class="pkg-section-divider"></div>
+          <div class="pkg-policy-rows" id="pkgPolicyRows"></div>
+          <div class="pkg-policy-footer">
+            <p class="pkg-policy-footer-caption">These terms apply alongside our general Terms &amp; Conditions.</p>
+            <a href="/terms-and-conditions.html" class="pkg-policy-terms-btn">View full terms</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Gallery lightbox -->
+  <div class="pkg-lightbox-backdrop hidden" id="pkgLightboxBackdrop" role="dialog" aria-modal="true" aria-label="Package photos">
+    <button type="button" class="pkg-lightbox-close" id="pkgLightboxClose" aria-label="Close gallery"><i class="ti ti-x"></i></button>
+    <button type="button" class="pkg-lightbox-nav pkg-lightbox-prev" id="pkgLightboxPrev" aria-label="Previous photo"><i class="ti ti-chevron-left"></i></button>
+    <img class="pkg-lightbox-img" id="pkgLightboxImg" src="" alt="" />
+    <button type="button" class="pkg-lightbox-nav pkg-lightbox-next" id="pkgLightboxNext" aria-label="Next photo"><i class="ti ti-chevron-right"></i></button>
+    <p class="pkg-lightbox-counter" id="pkgLightboxCounter"></p>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer-new">
+    <div class="footer-new-grid">
+      <div>
+        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
+        <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
+        <div class="footer-new-social">
+          <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>
+          <a href="https://www.instagram.com/elicoffeeph/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>
+        </div>
+      </div>
+      <div>
+        <p class="footer-new-heading">Explore</p>
+        <ul class="footer-new-links">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/packages.html">Packages</a></li>
+          <li><a href="/reservations.html">Reservations</a></li>
+          <li><a href="/reviews.html">Reviews</a></li>
+          <li><a href="/faqs.html">FAQs</a></li>
+          <li><a href="/about.html">About</a></li>
+          <li><a href="/terms-and-conditions.html">Terms &amp; Conditions</a></li>
+          <li><a href="/privacy-policy.html">Data Privacy Policy</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-new-heading">Services</p>
+        <ul class="footer-new-links">
+          <li><a href="/packages.html">Cafe &amp; Lounge</a></li>
+          <li><a href="/packages.html">Private Events</a></li>
+          <li><a href="/packages.html">Catering</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-new-heading">Contact</p>
+        <div class="footer-new-contact-row"><i class="ti ti-phone"></i><span>0917 562 0306 | 0917 562 0308</span></div>
+        <div class="footer-new-contact-row"><i class="ti ti-mail"></i><span>elicoffeetea@gmail.com</span></div>
+        <div class="footer-new-contact-row"><i class="ti ti-map-pin"></i><span>Binangonan, Rizal &amp; Antipolo City</span></div>
+      </div>
+    </div>
+    <div class="footer-new-bottom">
+      <span>© 2026 ELI Coffee Events Cafe. All rights reserved.</span>
+      <span>Designed with care for every cup.</span>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script type="module" src="/js/package_details.js"></script>
+  <script type="module" src="/js/navbar.js"></script>
+  <script type="module" src="/js/footer_content.js"></script>
+  <script type="module" src="/js/announcement_banner.js"></script>
+</body>
+</html>

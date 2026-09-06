@@ -98,422 +98,464 @@ body { background: var(--cream); }
 .pkg-retry-btn:hover { background: var(--brown-dark); }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SECTION 1 · CATEGORY TABS
+   FILTERABLE PACKAGE BROWSER — brand tokens local to this file only, so the
+   (unchanged) detail panel below keeps using home.css's --brown- and
+   --text- prefixed tokens exactly as it always has.
    ══════════════════════════════════════════════════════════════════════════ */
-.pkg-cat-section {
-  background: var(--white);
-  border-bottom: 1px solid var(--border);
-  padding: 40px 0 36px;
-}
-
-/* Auto-fit grid — handles 3, 5, 8+ categories without breakpoints */
-.pkg-cat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-/* ── Category card (icon-based, no image) ────────────────────────────── */
-.pkg-cat-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  padding: 22px 16px 18px;
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform .18s ease, box-shadow .18s ease, border-color .15s, background .15s, color .15s;
-  outline: none;
-}
-.pkg-cat-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--brown-light);
-  box-shadow: 0 6px 20px rgba(44,20,6,.08);
-}
-
-/* Active state */
-.pkg-cat-card.active {
-  background: var(--brown-primary);
-  border-color: var(--brown-primary);
-  box-shadow: 0 6px 24px rgba(61,26,10,.22);
-  transform: none;
-}
-
-/* Checkmark badge in top-right (only shown when active) */
-.pkg-cat-check {
-  position: absolute;
-  top: -9px;
-  right: 10px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity .15s, transform .15s;
-  box-shadow: 0 1px 4px rgba(0,0,0,.12);
-}
-.pkg-cat-check i {
-  font-size: 11px;
-  color: var(--brown-primary);
-  font-weight: 700;
-}
-.pkg-cat-card.active .pkg-cat-check {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.pkg-cat-icon {
-  font-size: 22px;
-  color: var(--brown-primary);
-  transition: color .15s;
-}
-.pkg-cat-card.active .pkg-cat-icon {
-  color: rgba(255,255,255,.9);
-}
-
-.pkg-cat-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-dark);
-  line-height: 1.3;
-  transition: color .15s;
-}
-.pkg-cat-card.active .pkg-cat-name { color: var(--white); }
-
-.pkg-cat-count {
-  font-size: 11.5px;
-  color: var(--text-light);
-  transition: color .15s;
-}
-.pkg-cat-card.active .pkg-cat-count { color: rgba(255,255,255,.7); }
-
-/* Hover only on inactive cards */
-.pkg-cat-card:not(.active):hover .pkg-cat-icon { color: var(--brown-primary); }
-
-/* ── Detail panel Inclusions tab — full tile grid ────────────────── */
-.pkg-incl-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 10px;
-}
-.pkg-incl-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  text-align: center;
-  gap: 7px;
-  background: var(--cream-dark);
-  border-radius: 8px;
-  padding: 12px 8px;
-  transition: background .15s;
-}
-.pkg-incl-tile i {
-  font-size: 18px;
-  color: var(--brown-primary);
-}
-.pkg-incl-tile span {
-  font-size: 11.5px;
-  color: var(--text-mid);
-  line-height: 1.35;
-  font-weight: 500;
-}
-
-/* Flat fallback list (for <4 items) */
-.pkg-incl-flat {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.pkg-incl-flat li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--text-mid);
-  line-height: 1.6;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.pkg-incl-flat li:last-child { border-bottom: none; }
-.pkg-incl-flat li::before {
-  content: '✔';
-  color: var(--brown-primary);
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-top: 2px;
+.pkg-browse-section {
+  --pkg-bg:            #FAF6F0;
+  --pkg-card-bg:       #FFFFFF;
+  --pkg-card-border:   #E5DBCC;
+  --pkg-chip-bg:       #F7F2EA;
+  --pkg-chip-border:   #EEE5D8;
+  --pkg-text:          #3E2418;
+  --pkg-text-muted:    #8A7965;
+  --pkg-text-muted-2:  #6B5A47;
+  --pkg-terracotta:    #A34F2E;
+  --pkg-espresso:      #4A2C17;
+  --pkg-green-bg:      #E1F5EE;
+  --pkg-green-text:    #085041;
+  background: var(--pkg-bg);
+  /* Top padding reuses the same 48px value .pkg-detail-section already
+     uses for its own hero-to-content gap, so both pages share one
+     spacing value instead of two arbitrary ones. */
+  padding: 48px 0 64px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SECTION 3 · PACKAGE PRICING CARDS
+   BROWSE LAYOUT — sidebar + result list
    ══════════════════════════════════════════════════════════════════════════ */
-.pkg-options-section {
-  background: var(--cream);
-  padding: 60px 0;
-}
-
-/* Section label above both main and add-on grids */
-.pkg-options-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--brown-light);
-  margin-bottom: 18px;
-}
-.pkg-options-label--addon {
-  margin-top: 48px;
-  padding-top: 36px;
-  border-top: 1px solid var(--border);
-}
-
-/* Hard 3-column grid: gives 2 full rows of 3 for the standard 5-package
-   category. The 6th slot is intentionally empty — reserved for a future
-   package rather than having one card float alone on a half-empty row.   */
-.pkg-cards-grid {
+.pkg-browse-wrap {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  align-items: stretch;
+  grid-template-columns: 280px 1fr;
+  gap: 32px;
+  align-items: start;
 }
 
-/* ── Package card ───────────────────────────────────────────────────── */
-.pkg-card {
-  display: flex;
-  flex-direction: column;
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-top: 4px solid var(--brown-light);
+.pkg-filters-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--pkg-card-bg);
+  border: 0.5px solid var(--pkg-card-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pkg-text);
+  cursor: pointer;
+}
+.pkg-filters-toggle i { font-size: 16px; color: var(--pkg-espresso); }
+.pkg-filters-count-badge {
+  margin-left: auto;
+  background: var(--pkg-espresso);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.pkg-sidebar-backdrop { display: none; }
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+.pkg-sidebar {
+  position: sticky;
+  top: 16px;
+  background: var(--pkg-card-bg);
+  border: 0.5px solid var(--pkg-card-border);
   border-radius: 10px;
   overflow: hidden;
-  cursor: pointer;
-  position: relative;
-  transition: transform .2s ease, box-shadow .2s ease, border-color .15s;
-}
-.pkg-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(44,20,6,.10);
-}
-.pkg-card.selected {
-  border-color: var(--brown-primary);
-  border-top-color: var(--brown-primary);
-  box-shadow: 0 0 0 3px rgba(61,26,10,.10);
-}
-
-/* ── Badge highlight (Best Value / Best Seller / promo — any assigned or
-   derived badge, admin-controlled via js/super_admin_packages.js) ───── */
-/* Replaces the 1.5px neutral border with a 2px golden border on all
-   sides; the 4px top accent is preserved to stay consistent with the
-   card family, but the colour shifts to the golden highlight tone.   */
-.pkg-card--badged {
-  border: 2px solid #C98A4B;
-  border-top: 4px solid #C98A4B;
-}
-/* Small downward-pointing tabs that sit in the card's top padding area
-   so they overlap no content — the 20px body padding-top is taller than
-   a badge's ~18px height. Stacked top to bottom, capped at 2. */
-.pkg-card-badges {
-  position: absolute;
-  top: 0;
-  right: 16px;
+  max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  pointer-events: none;
 }
-.pkg-card-badge {
-  display: inline-block;
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 10px;
+
+.pkg-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 0.5px solid var(--pkg-card-border);
+}
+.pkg-sidebar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pkg-text);
+  margin: 0;
+}
+.pkg-clear-filters {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pkg-terracotta);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 4px;
+}
+.pkg-sidebar-close {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--pkg-text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pkg-sidebar-body {
+  padding: 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.pkg-sidebar-footer { display: none; padding: 14px 18px; border-top: 0.5px solid var(--pkg-card-border); }
+.pkg-apply-filters {
+  width: 100%;
+  background: var(--pkg-espresso);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+/* Loading skeleton — shown until the first facet fetch resolves */
+.pkg-sidebar-skeleton { display: flex; flex-direction: column; gap: 10px; }
+.pkg-skel-line {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--pkg-chip-bg) 25%, #FCFAF6 37%, var(--pkg-chip-bg) 63%);
+  background-size: 400% 100%;
+  animation: pkgSkelShimmer 1.4s ease infinite;
+}
+.pkg-skel-line--title { width: 40%; height: 11px; margin-top: 12px; }
+.pkg-skel-line--title:first-child { margin-top: 0; }
+@keyframes pkgSkelShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+.pkg-filter-group { margin-bottom: 26px; }
+.pkg-filter-group:last-child { margin-bottom: 0; }
+.pkg-filter-group-title {
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  line-height: 1;
-  padding: 5px 10px 4px;
-  border-radius: 0 0 7px 7px;
-  user-select: none;
+  color: var(--pkg-text-muted-2);
+  margin: 0 0 12px;
 }
-.pkg-card-badge--pending  { background: #FAEEDA; color: #854F0B; }
-.pkg-card-badge--approved { background: #EAF3DE; color: #3B6D11; }
-.pkg-card-badge--info     { background: #E3EEFB; color: #2C5A99; }
-.pkg-card-badge--neutral  { background: #F1EFE8; color: #5F5E5A; }
+.pkg-filter-empty-note { font-size: 12.5px; color: var(--pkg-text-muted); margin: 0; }
 
-/* Edge-to-edge cover photo — only rendered when the package has one, so
-   packages without a photo yet keep today's card layout unchanged. */
-.pkg-card-photo {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  display: block;
-  background: var(--bg-light, #f2ede6);
-}
-
-.pkg-card-body {
-  padding: 20px 20px 22px;
-  flex: 1;
+.pkg-filter-options { display: flex; flex-direction: column; gap: 2px; }
+.pkg-filter-row {
   display: flex;
-  flex-direction: column;
-  min-height: 210px; /* guarantees a dignified card height even for minimal-data packages */
+  align-items: center;
+  gap: 9px;
+  padding: 7px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--pkg-text);
 }
-
-/* Badge + corner icon row */
-.pkg-card-top-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  min-height: 22px;
-}
-.pkg-card-loc-badge {
-  display: inline-block;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  padding: 3px 9px;
-  border-radius: 100px;
-  color: var(--white);
-}
-.pkg-card-loc-badge--onsite  { background: rgba(61,26,10,.72); }
-.pkg-card-loc-badge--offsite { background: rgba(20,80,30,.72); }
-
-.pkg-card-cat-icon {
-  font-size: 18px;
-  color: var(--brown-pale);
+.pkg-filter-row:hover { background: var(--pkg-chip-bg); }
+.pkg-filter-checkbox,
+.pkg-filter-radio {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--pkg-espresso);
   flex-shrink: 0;
+  cursor: pointer;
+}
+.pkg-filter-row-label { flex: 1; }
+.pkg-filter-row-count { font-size: 12px; color: var(--pkg-text-muted); }
+.pkg-filter-checkbox:focus-visible,
+.pkg-filter-radio:focus-visible { outline: 2px solid var(--pkg-espresso); outline-offset: 2px; }
+
+/* Price dual-handle slider — two overlapping native range inputs give full
+   native keyboard support + aria-valuemin/max/now for free. */
+.pkg-price-slider { position: relative; height: 20px; margin: 6px 4px 10px; }
+.pkg-price-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--pkg-chip-border);
+  border-radius: 999px;
+}
+.pkg-price-track-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--pkg-espresso);
+  border-radius: 999px;
+}
+.pkg-range-input {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  transform: translateY(-50%);
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  pointer-events: none;
+}
+.pkg-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pkg-espresso);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(74,44,23,.4);
+  cursor: pointer;
+}
+.pkg-range-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pkg-espresso);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(74,44,23,.4);
+  cursor: pointer;
+}
+.pkg-range-input::-webkit-slider-runnable-track { background: none; }
+.pkg-range-input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--pkg-espresso); outline-offset: 2px; }
+.pkg-price-values {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pkg-text);
 }
 
-/* Package name — always occupies exactly 2 lines so the price block starts
-   at the same vertical position across all cards in the same grid row.
-   line-clamp clips longer names cleanly rather than pushing everything below. */
-.pkg-card-name {
+.pkg-location-toggle { display: flex; gap: 8px; }
+.pkg-location-btn {
+  flex: 1;
+  background: var(--pkg-chip-bg);
+  border: 0.5px solid var(--pkg-chip-border);
+  border-radius: 8px;
+  padding: 9px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pkg-text-muted-2);
+  cursor: pointer;
+  min-height: 40px;
+}
+.pkg-location-btn:hover { border-color: var(--pkg-terracotta); }
+.pkg-location-btn.active {
+  background: var(--pkg-espresso);
+  border-color: var(--pkg-espresso);
+  color: #fff;
+}
+.pkg-location-btn:focus-visible { outline: 2px solid var(--pkg-espresso); outline-offset: 2px; }
+
+/* ── Results ──────────────────────────────────────────────────────────── */
+.pkg-results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.pkg-results-count {
   font-size: 14.5px;
   font-weight: 600;
-  color: var(--text-dark);
-  line-height: 1.3;
-  margin-bottom: 10px;
-  min-height: calc(14.5px * 1.3 * 2); /* reserve 2 line-heights = ~37.7px */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--pkg-text);
+  margin: 0;
 }
-
-/* Price block — Inter font to prevent ₱ glyph fallback artifacts.
-   Price is the primary comparison axis; it needs clear visual weight. */
-.pkg-card-price {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--brown-primary);
-  letter-spacing: -.02em;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-.pkg-card-price--contact {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-light);
-  font-style: italic;
-  margin-bottom: 4px;
-}
-/* Border-bottom creates a visual zone break between [price] and [pills + actions],
-   so scanning eyes can lock onto the price row across all five cards at once.   */
-.pkg-card-price-note {
-  font-size: 10.5px;
-  color: var(--text-light);
-  margin-bottom: 0;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-/* Pills row — min-height reserves one pill-row of space even when the container
-   is empty (packages with no capacity/duration data), preventing the actions
-   row from floating at inconsistent distances from the price separator.
-   margin-bottom: 20px gives clear breathing room between pills and the divider
-   above the buttons — previously 14px felt tight on shorter cards.            */
-.pkg-card-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 12px;
-  margin-bottom: 20px;
-  min-height: 26px;
-  align-items: flex-start;
-}
-.pkg-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-mid);
-  background: var(--cream-dark);
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  padding: 3px 9px;
-}
-.pkg-pill i { font-size: 12px; color: var(--brown-light); }
-.pkg-pill--offsite { background: rgba(20,80,30,.07); border-color: rgba(20,80,30,.2); color: #145020; }
-
-/* Button row — "Details" ghost, "Book" solid primary */
-.pkg-card-actions {
-  display: flex;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  margin-top: auto;
-}
-.pkg-card-btn-details {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 9px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-mid);
-  cursor: pointer;
-  transition: border-color .15s, color .15s;
-  white-space: nowrap;
-}
-.pkg-card-btn-details:hover {
-  border-color: var(--brown-light);
-  color: var(--brown-primary);
-}
-.pkg-card-btn-book {
-  flex: 1.4;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--brown-primary);
-  color: var(--white);
-  border: none;
-  border-radius: 6px;
+.pkg-sort-wrap { display: flex; align-items: center; gap: 8px; }
+.pkg-sort-label { font-size: 12.5px; color: var(--pkg-text-muted); }
+.pkg-sort-select {
+  background: var(--pkg-card-bg);
+  border: 0.5px solid var(--pkg-card-border);
+  border-radius: 8px;
   padding: 9px 12px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pkg-text);
+  cursor: pointer;
+  min-height: 40px;
+}
+.pkg-sort-select:focus-visible { outline: 2px solid var(--pkg-espresso); outline-offset: 2px; }
+
+.pkg-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 64px 20px;
+  text-align: center;
+  color: var(--pkg-text-muted);
+  font-size: 14px;
+  background: var(--pkg-card-bg);
+  border: 0.5px solid var(--pkg-card-border);
+  border-radius: 10px;
+}
+
+.pkg-list { display: flex; flex-direction: column; gap: 14px; }
+
+/* ── Horizontal result card ───────────────────────────────────────────── */
+.pkg-result-card {
+  display: flex;
+  gap: 18px;
+  background: var(--pkg-card-bg);
+  border: 0.5px solid var(--pkg-card-border);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.pkg-result-card:hover {
+  border-color: var(--pkg-terracotta);
+  box-shadow: 0 8px 24px rgba(44,20,6,.08);
+}
+
+.pkg-result-img-wrap { position: relative; flex-shrink: 0; width: 200px; }
+.pkg-result-img {
+  width: 200px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+.pkg-result-img--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pkg-chip-bg);
+  border: 0.5px dashed var(--pkg-chip-border);
+  color: var(--pkg-text-muted);
+  font-size: 30px;
+}
+/* Wraps Most Booked + any admin-assigned badges (e.g. "Best Value") so a
+   package carrying both stacks them instead of overlapping. */
+.pkg-result-badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.pkg-most-booked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--pkg-espresso);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  padding: 5px 9px;
+  border-radius: 999px;
+}
+.pkg-most-booked-badge i { font-size: 11px; }
+
+.pkg-admin-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: 5px 9px;
+  border-radius: 999px;
+}
+.pkg-admin-badge--approved { background: #E1F5EE; color: #085041; }
+.pkg-admin-badge--pending  { background: #FAEEDA; color: #854F0B; }
+.pkg-admin-badge--info     { background: #E3EEFB; color: #2C5A99; }
+.pkg-admin-badge--neutral  { background: #F1EFE8; color: #5F5E5A; }
+
+.pkg-result-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pkg-result-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--pkg-terracotta);
+  margin: 0 0 4px;
+}
+.pkg-result-name {
+  font-size: 17px;
   font-weight: 600;
+  color: var(--pkg-text);
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+.pkg-result-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.pkg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pkg-text-muted-2);
+  background: var(--pkg-chip-bg);
+  border: 0.5px solid var(--pkg-chip-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.pkg-chip i { font-size: 12px; color: var(--pkg-terracotta); }
+.pkg-chip--location { background: var(--pkg-green-bg); color: var(--pkg-green-text); border-color: transparent; }
+
+.pkg-result-action {
+  flex-shrink: 0;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  text-align: right;
+}
+.pkg-result-price-note { font-size: 11px; color: var(--pkg-text-muted); margin: 0; }
+.pkg-result-price {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--pkg-espresso);
+  margin: 0 0 4px;
+}
+.pkg-result-price--contact { font-size: 15px; font-style: italic; color: var(--pkg-text-muted); }
+.pkg-result-action-buttons { display: flex; width: 100%; }
+.pkg-result-book-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pkg-espresso);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
-  transition: background .15s;
-  white-space: nowrap;
+  min-height: 40px;
 }
-.pkg-card-btn-book:hover { background: var(--brown-dark); color: var(--white); }
+.pkg-result-book-btn:hover { background: #3A2110; }
+.pkg-result-book-btn:focus-visible { outline: 2px solid var(--pkg-espresso); outline-offset: 2px; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    SECTION 4 · PACKAGE DETAIL PANEL
@@ -524,26 +566,109 @@ body { background: var(--cream); }
   padding: 48px 0 64px;
 }
 
-/* Left-accent panel — anchors the section visually */
+/* Plain page-content wrapper — NOT a card. The 4px left-accent + asymmetric
+   radius this used to carry was designed for a component docking against a
+   colored section background (its old in-page-panel context); as the
+   standalone page's own top-level wrapper, that accent rendered as a stray
+   vertical bar down the entire page height. No component on this page
+   currently uses that accent treatment — if one is wanted later (e.g. a
+   Policies info card), give it its own scoped class rather than reviving
+   this rule. `overflow` is deliberately NOT hidden here: any ancestor with
+   overflow other than visible disables `position: sticky` on the booking
+   sidebar nested inside it. */
 .pkg-detail-panel {
   background: var(--white);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--brown-primary);
-  border-radius: 0 10px 10px 0;
-  box-shadow: 0 4px 24px rgba(44,20,6,.06);
-  overflow: hidden;
+  border: 0.5px solid #E5DBCC;
+  border-radius: 10px;
 }
 
-/* ── Two-column header ─────────────────────────────────────────────── */
-.pkg-detail-head {
+/* ── Category + title — sit directly above the gallery ────────────────── */
+.pkg-title-block { padding: 24px 36px 0; }
+.pkg-title-block .pkg-detail-eyebrow { margin-bottom: 6px; }
+.pkg-title-block .pkg-detail-name { margin-bottom: 0; }
+
+/* ── Photo gallery hero — symmetrical Agoda-style 1-large+2x2 grid.
+   border-radius + overflow:hidden live on the CONTAINER (not each tile),
+   so only the outer corners of the whole block are ever rounded — inner
+   edges between tiles stay perfectly square regardless of how many tiles
+   or which layout variant is active. */
+.pkg-gallery-hero {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 32px;
-  align-items: start;
-  padding: 32px 36px 28px;
-  border-bottom: 1px solid var(--border);
-  background: var(--cream);
+  gap: 6px;
+  height: 300px;
+  margin: 16px 36px 0;
+  border-radius: 10px;
+  overflow: hidden;
 }
+.pkg-gallery-hero--single { grid-template-columns: 1fr; }
+.pkg-gallery-hero--double { grid-template-columns: 1fr 1fr; }
+.pkg-gallery-hero--triple { grid-template-columns: 1.4fr 1fr; grid-template-rows: 1fr 1fr; }
+.pkg-gallery-hero--triple .pkg-gallery-tile:first-child { grid-row: 1 / 3; }
+.pkg-gallery-hero--quad,
+.pkg-gallery-hero--five-plus {
+  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.pkg-gallery-hero--quad .pkg-gallery-tile:first-child,
+.pkg-gallery-hero--five-plus .pkg-gallery-tile:first-child { grid-row: 1 / 3; grid-column: 1; }
+
+.pkg-gallery-tile {
+  position: relative;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: var(--cream-dark);
+  /* Grid/flex items default to min-height/min-width: auto, which lets a
+     tall source photo's intrinsic size force this tile (and the whole
+     .pkg-gallery-hero row) taller than the fixed height above — this is
+     what let images render "full natural height" instead of being cropped
+     by object-fit: cover. Zeroing it is what makes the fixed-height crop
+     actually take effect. */
+  min-height: 0;
+  min-width: 0;
+}
+.pkg-gallery-tile img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.pkg-gallery-tile:focus-visible { outline: 2px solid var(--brown-primary); outline-offset: -2px; z-index: 1; }
+
+/* Floating "Gallery (N)" pill — opens the same lightbox as any tile */
+.pkg-gallery-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  color: #3E2418;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(20,8,2,.22);
+}
+.pkg-gallery-badge i { font-size: 14px; }
+.pkg-gallery-badge:hover { background: #FAF6F0; }
+.pkg-gallery-badge:focus-visible { outline: 2px solid #4A2C17; outline-offset: 2px; }
+
+.pkg-gallery-hero--empty { height: 220px; margin: 16px 36px 0; }
+.pkg-gallery-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--cream-dark);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-light);
+  font-size: 13px;
+}
+.pkg-gallery-placeholder i { font-size: 30px; }
 
 .pkg-detail-eyebrow {
   display: inline-block;
@@ -553,6 +678,20 @@ body { background: var(--cream); }
   text-transform: uppercase;
   color: var(--brown-light);
   margin-bottom: 8px;
+  margin-right: 10px;
+}
+.pkg-most-booked-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #FCEBEB;
+  color: #A34F2E;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  vertical-align: middle;
 }
 .pkg-detail-name {
   font-family: var(--font-display);
@@ -562,31 +701,17 @@ body { background: var(--cream); }
   line-height: 1.15;
   margin-bottom: 12px;
 }
-.pkg-detail-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.pkg-detail-head-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  flex-shrink: 0;
-}
 
 /* Price — Inter font prevents ₱ glyph fallback rendering issue */
 .pkg-detail-price {
   font-family: 'Inter', system-ui, sans-serif;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 700;
-  color: var(--brown-primary);
+  color: #4A2C17;
   line-height: 1;
-  text-align: right;
 }
 .pkg-detail-price--contact {
-  font-size: 20px;
+  font-size: 18px;
   font-style: italic;
   color: var(--text-light);
 }
@@ -594,110 +719,201 @@ body { background: var(--cream); }
   font-size: 11px;
   color: var(--text-light);
   margin-top: 3px;
-  text-align: right;
+  margin-bottom: 16px;
 }
 .pkg-detail-book-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  background: var(--brown-primary);
-  color: var(--white);
+  width: 100%;
+  background: #4A2C17;
+  color: #fff;
   text-decoration: none;
-  border-radius: 6px;
-  padding: 12px 20px;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 8px;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
   transition: background .15s;
+  min-height: 44px;
+  box-sizing: border-box;
 }
-.pkg-detail-book-btn:hover { background: var(--brown-dark); color: var(--white); }
+.pkg-detail-book-btn:hover { background: #3A2110; color: #fff; }
 
-/* "Hide details" text link (replaces ✕ modal-style close) */
-.pkg-hide-link {
-  display: block;
-  background: none;
-  border: none;
-  padding: 8px 36px;
-  font-size: 12px;
-  color: var(--text-light);
-  cursor: pointer;
-  text-align: left;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: color .15s;
-}
-.pkg-hide-link:hover { color: var(--text-mid); }
-
-/* ── Tabs ─────────────────────────────────────────────────────────── */
-.pkg-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  padding: 0 36px;
-  background: var(--cream);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.pkg-tabs::-webkit-scrollbar { display: none; }
-
-.pkg-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 14px 18px;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-light);
-  cursor: pointer;
-  white-space: nowrap;
-  margin-bottom: -1px;
-  transition: color .15s, border-color .15s;
-}
-.pkg-tab:hover { color: var(--text-mid); }
-.pkg-tab.active {
-  color: var(--brown-primary);
-  border-bottom-color: var(--brown-primary);
-}
-
-/* ── Tab panels ──────────────────────────────────────────────────── */
-.pkg-tab-panels { padding: 36px; }
-.pkg-tab-panel  {}
-
-.pkg-overview-content { max-width: 760px; }
-
-.pkg-gallery {
+/* ── At a Glance (left) + compact price card (right) ───────────────────
+   align-items: start is what keeps the shorter price card from stretching
+   to match the glance card's height and stops it from sticking — it's a
+   normal top-aligned grid item now, not the old sticky sidebar. */
+.pkg-summary-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.pkg-gallery-img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+  margin: 20px 36px 0;
 }
 
-.pkg-overview-para {
-  font-size: 14.5px;
-  color: var(--text-mid);
-  line-height: 1.82;
-  margin-bottom: 16px;
+.pkg-glance-card {
+  background: #F7F2EA;
+  border-radius: 10px;
+  padding: 20px 22px;
 }
-
-.pkg-tier-label {
-  font-size: 11px;
+.pkg-glance-heading {
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--text-light);
-  margin-top: 24px;
+  color: #3E2418;
+  margin: 0 0 14px;
 }
-.pkg-tier-block { margin-bottom: 28px; }
+.pkg-glance-divider { border-top: 0.5px solid #EEE5D8; margin: 14px 0; }
+.pkg-glance-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.pkg-glance-fact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #3E2418;
+}
+.pkg-glance-fact i { font-size: 16px; color: #0F6E56; }
+.pkg-glance-desc {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #6B5A47;
+  margin: 0;
+}
+.pkg-glance-desc--clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pkg-glance-readmore {
+  display: inline-block;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #A34F2E;
+  cursor: pointer;
+}
+.pkg-glance-readmore:hover { text-decoration: underline; }
+.pkg-glance-readmore:focus-visible { outline: 2px solid #A34F2E; outline-offset: 2px; }
+
+.pkg-price-card {
+  position: relative;
+  min-width: 0;
+  background: #FFFFFF;
+  border: 0.5px solid #E5DBCC;
+  border-radius: 10px;
+  padding: 20px;
+}
+.pkg-sidebar-price-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #8A7965;
+  margin: 0 0 4px;
+}
+.pkg-price-card .pkg-most-booked-chip { margin-bottom: 10px; }
+.pkg-admin-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.pkg-admin-badges:not(:empty) { margin-bottom: 10px; }
+
+/* ── Full-width stacked section cards (What's Included / Area Coverage /
+   Policies) — replace the old tab bar; the page is now one continuous
+   scroll of cards, each a sibling of .pkg-summary-row rather than tab
+   panels inside a shared container. ───────────────────────────────────── */
+.pkg-section-card {
+  background: #FFFFFF;
+  border: 0.5px solid #E5DBCC;
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin: 16px 36px 0;
+}
+.pkg-section-card:last-child { margin-bottom: 20px; }
+.pkg-section-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: #3E2418;
+  margin: 0;
+}
+.pkg-section-divider { border-top: 0.5px solid #F2EADD; margin: 14px 0; }
+.pkg-section-empty { font-size: 13.5px; color: #8A7965; margin: 0; }
+
+/* ── Gallery lightbox ─────────────────────────────────────────────────── */
+.pkg-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(20,8,2,.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pkg-lightbox-img { max-width: 88vw; max-height: 82vh; object-fit: contain; border-radius: 6px; }
+.pkg-lightbox-close,
+.pkg-lightbox-nav {
+  position: absolute;
+  background: rgba(255,255,255,.12);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+}
+.pkg-lightbox-close:hover,
+.pkg-lightbox-nav:hover { background: rgba(255,255,255,.22); }
+.pkg-lightbox-close:focus-visible,
+.pkg-lightbox-nav:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.pkg-lightbox-close { top: 20px; right: 20px; }
+.pkg-lightbox-prev { left: 20px; top: 50%; transform: translateY(-50%); }
+.pkg-lightbox-next { right: 20px; top: 50%; transform: translateY(-50%); }
+.pkg-lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(255,255,255,.12);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+/* ── What's Included — flat two-column checklist ───────────────────── */
+.pkg-checklist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 9px;
+  column-gap: 24px;
+}
+.pkg-checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13.5px;
+  color: #3E2418;
+  line-height: 1.5;
+}
+.pkg-checklist-item i { color: #0F6E56; font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+
+.pkg-tier-block { margin-bottom: 22px; }
+.pkg-tier-block:last-child { margin-bottom: 0; }
 .pkg-tier-head {
   padding: 14px 0 12px;
   border-bottom: 1px solid var(--border);
@@ -713,7 +929,6 @@ body { background: var(--cream); }
 .pkg-tier-sub { font-size: 13px; color: var(--text-light); }
 
 /* Area coverage */
-.pkg-area-content { max-width: 680px; }
 .pkg-area-note {
   display: flex;
   gap: 16px;
@@ -743,38 +958,58 @@ body { background: var(--cream); }
 .pkg-area-loc { font-size: 13.5px; font-weight: 500; color: var(--text-dark); margin-bottom: 2px; }
 .pkg-area-note-text { font-size: 11.5px; color: var(--text-light); }
 
-/* Policies */
-.pkg-policies {
-  max-width: 680px;
+/* ── Policies — structured label/value rows ──────────────────────────── */
+.pkg-policy-rows { display: flex; flex-direction: column; }
+.pkg-policy-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 16px;
+  padding: 13px 0;
+  border-top: 0.5px solid #F2EADD;
 }
-.pkg-policy-item {
+.pkg-policy-row:first-child { border-top: none; padding-top: 0; }
+.pkg-policy-row-label {
   display: flex;
-  gap: 16px;
-  padding: 18px 20px;
-  background: var(--cream);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: #8A7965;
 }
-.pkg-policy-item > i { font-size: 20px; color: var(--brown-primary); flex-shrink: 0; margin-top: 2px; }
-.pkg-policy-item strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
-.pkg-policy-item p { font-size: 13px; color: var(--text-mid); line-height: 1.7; margin: 0; }
+.pkg-policy-row-label i { font-size: 16px; color: #A34F2E; flex-shrink: 0; }
+.pkg-policy-row-value {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #3E2418;
+  text-align: right;
+}
 
-.pkg-policy-terms-link {
+.pkg-policy-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 0.5px solid #F2EADD;
+}
+.pkg-policy-footer-caption { font-size: 12.5px; color: #8A7965; margin: 0; }
+.pkg-policy-terms-btn {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  padding: 4px 2px;
+  white-space: nowrap;
+  border: 1px solid #E5DBCC;
+  border-radius: 8px;
+  padding: 9px 16px;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--brown-primary);
+  font-weight: 600;
+  color: #A34F2E;
   text-decoration: none;
+  min-height: 40px;
 }
-.pkg-policy-terms-link:hover { text-decoration: underline; }
-.pkg-policy-terms-link i { font-size: 14px; }
+.pkg-policy-terms-btn:hover { background: #FAF6F0; }
+.pkg-policy-terms-btn:focus-visible { outline: 2px solid #A34F2E; outline-offset: 2px; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    RESPONSIVE
@@ -782,49 +1017,104 @@ body { background: var(--cream); }
 
 @media (max-width: 1024px) {
   .pkg-wrap { padding: 0 32px; }
-  .pkg-detail-head { padding: 28px 28px 24px; gap: 24px; }
-  .pkg-tabs { padding: 0 28px; }
-  .pkg-tab-panels { padding: 28px; }
+  .pkg-title-block { padding: 24px 28px 0; }
+  .pkg-gallery-hero { margin: 16px 28px 0; height: 280px; }
+  .pkg-gallery-hero--empty { margin: 16px 28px 0; }
+  .pkg-summary-row { margin: 20px 28px 0; gap: 14px; }
+  .pkg-section-card { margin: 16px 28px 0; }
 }
 
 @media (max-width: 900px) {
-  .pkg-detail-head { grid-template-columns: 1fr; gap: 20px; }
-  .pkg-detail-head-right { flex-direction: row; align-items: center; justify-content: space-between; }
-  .pkg-detail-price { text-align: left; }
-  .pkg-detail-price-note { text-align: left; }
+  /* At a Glance and the price card stack (glance card first, then price —
+     already their DOM order, so no reordering is needed here). */
+  .pkg-summary-row { grid-template-columns: 1fr; }
+
+  /* Sidebar collapses into a slide-in panel triggered by the "Filters"
+     button; the panel reuses the exact same filter markup/JS. */
+  .pkg-browse-wrap { display: block; }
+  .pkg-filters-toggle { display: flex; margin-bottom: 16px; }
+
+  .pkg-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(320px, 86vw);
+    max-height: none;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    z-index: 1200;
+  }
+  .pkg-sidebar.is-open { transform: translateX(0); }
+  .pkg-sidebar-close { display: flex; }
+  .pkg-sidebar-footer { display: block; }
+
+  .pkg-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(42,18,8,.4);
+    z-index: 1100;
+  }
+  .pkg-sidebar-backdrop:not(.hidden) { display: block; }
+
+  body.pkg-no-scroll { overflow: hidden; }
 }
 
 @media (max-width: 640px) {
   .pkg-wrap { padding: 0 18px; }
   .page-hero { height: 300px; }
-  .pkg-cat-section { padding: 28px 0 24px; }
-
-  .pkg-cat-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
-  .pkg-cat-card { padding: 18px 12px 14px; }
-  .pkg-cat-icon { font-size: 20px; }
-  .pkg-cat-name { font-size: 12px; }
-  .pkg-cat-count { display: none; }
-
-  .pkg-options-section { padding: 40px 0; }
-  /* 3-column grid collapses to 2 at 640px — 3 cards at 604px usable
-     would be ~185px each, too narrow for readable pricing cards.    */
-  .pkg-cards-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .pkg-card-body { padding: 14px; }
-  .pkg-card-name { font-size: 12.5px; }
-  .pkg-card-price { font-size: 17px; }
+  .pkg-browse-section { padding: 32px 0 48px; }
 
   .pkg-detail-section { padding: 32px 0 48px; }
-  .pkg-detail-head { padding: 20px; }
-  .pkg-detail-head-right { flex-direction: column; align-items: stretch; }
-  .pkg-detail-book-btn { justify-content: center; }
-  .pkg-hide-link { padding: 6px 20px; }
-  .pkg-tabs { padding: 0 16px; }
-  .pkg-tab { padding: 12px 10px; font-size: 12.5px; gap: 4px; }
-  .pkg-tab-panels { padding: 20px; }
-  .pkg-incl-grid { grid-template-columns: repeat(2, 1fr); }
+  .pkg-title-block { padding: 18px 16px 0; }
+  .pkg-gallery-hero { margin: 12px 16px 0; height: 220px; }
+  .pkg-gallery-hero--empty { height: 180px; margin: 12px 16px 0; }
+  .pkg-summary-row { margin: 16px 16px 0; grid-template-columns: 1fr; }
+  .pkg-section-card { margin: 16px 16px 0; padding: 18px; }
+  .pkg-checklist { grid-template-columns: 1fr; }
+  .pkg-policy-row { align-items: flex-start; }
+  .pkg-policy-footer { flex-direction: column; align-items: flex-start; }
+  .pkg-policy-terms-btn { align-self: stretch; justify-content: center; }
+
+  .pkg-lightbox-nav { width: 36px; height: 36px; font-size: 16px; }
+  .pkg-lightbox-close { top: 12px; right: 12px; }
+
+  /* Gallery reflows to: large tile full-width on top, remaining tiles in a
+     2-column mini-grid below — the desktop grid's 3-column layout gets too
+     narrow to read at 375px. .pkg-gallery-hero--double stacks both tiles
+     full-width instead, since a 2-column "mini-grid" of just one leftover
+     tile looks lopsided. */
+  .pkg-gallery-hero { height: auto; }
+  .pkg-gallery-hero--double {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 160px;
+  }
+  .pkg-gallery-hero--triple,
+  .pkg-gallery-hero--quad,
+  .pkg-gallery-hero--five-plus {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: 110px;
+  }
+  .pkg-gallery-hero--triple .pkg-gallery-tile:first-child,
+  .pkg-gallery-hero--quad .pkg-gallery-tile:first-child,
+  .pkg-gallery-hero--five-plus .pkg-gallery-tile:first-child {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    height: 200px;
+  }
 }
 
-@media (max-width: 420px) {
-  .pkg-cat-grid { grid-template-columns: repeat(2, 1fr); }
-  .pkg-cards-grid { grid-template-columns: 1fr; }
+/* Horizontal result cards get too cramped once the image + text + price
+   columns can't each keep a readable width — verified against actual
+   rendered widths down to 375px, where the row layout overlaps text. */
+@media (max-width: 560px) {
+  .pkg-result-card { flex-direction: column; }
+  .pkg-result-img-wrap { width: 100%; }
+  .pkg-result-img,
+  .pkg-result-img--placeholder { width: 100%; height: 180px; }
+  .pkg-result-action { width: 100%; align-items: stretch; text-align: left; }
+  .pkg-result-price-note, .pkg-result-price { text-align: left; }
 }
