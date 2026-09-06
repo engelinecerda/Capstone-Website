@@ -18,7 +18,6 @@ let visibleCount = REVIEWS_PER_PAGE;
 let currentUser = null;
 let eligibleReservations = [];
 let activeReviewReservation = null;
-let openedReviewFromPicker = false;
 let reviewPromptRatingValue = 0;
 
 /* ============================================================
@@ -309,6 +308,14 @@ function updateWriteReviewVisibility() {
     section.classList.toggle('hidden', eligibleReservations.length === 0);
 }
 
+function getReviewReservationIdFromUrl() {
+    try {
+        return new URLSearchParams(window.location.search).get('review_reservation_id');
+    } catch (err) {
+        return null;
+    }
+}
+
 async function initWriteReview() {
     try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -317,6 +324,22 @@ async function initWriteReview() {
         currentUser = session.user;
         eligibleReservations = await fetchMyReviewableReservations(currentUser.id);
         updateWriteReviewVisibility();
+
+        const deepLinkedId = getReviewReservationIdFromUrl();
+        if (deepLinkedId) {
+            const targetReservation = eligibleReservations.find(
+                (reservation) => String(reservation.reservation_id) === deepLinkedId
+            );
+
+            // Strip the param either way so a refresh or re-visit doesn't reopen the modal.
+            const url = new URL(window.location.href);
+            url.searchParams.delete('review_reservation_id');
+            window.history.replaceState({}, '', url);
+
+            if (targetReservation) {
+                openReviewPromptModal(targetReservation);
+            }
+        }
     } catch (err) {
         console.error('[reviews] failed to check reviewable reservations:', err);
     }
@@ -383,9 +406,8 @@ function setReviewPromptBusy(isBusy) {
     document.getElementById('review-prompt-submit')?.toggleAttribute('disabled', isBusy);
 }
 
-function openReviewPromptModal(reservation, { fromPicker = false } = {}) {
+function openReviewPromptModal(reservation) {
     activeReviewReservation = reservation;
-    openedReviewFromPicker = fromPicker;
 
     setReviewPromptBusy(false);
     setReviewPromptMessage('');
@@ -496,7 +518,7 @@ async function submitReservationReview() {
 function setupWriteReviewListeners() {
     document.getElementById('writeReviewBtn')?.addEventListener('click', () => {
         if (eligibleReservations.length === 1) {
-            openReviewPromptModal(eligibleReservations[0], { fromPicker: false });
+            openReviewPromptModal(eligibleReservations[0]);
         } else if (eligibleReservations.length > 1) {
             openReviewPickerModal();
         }
@@ -512,13 +534,18 @@ function setupWriteReviewListeners() {
         const reservation = eligibleReservations.find(
             (entry) => String(entry.reservation_id) === item.dataset.reservationId
         );
-        if (reservation) openReviewPromptModal(reservation, { fromPicker: true });
+        if (reservation) openReviewPromptModal(reservation);
     });
 
     document.getElementById('review-prompt-close')?.addEventListener('click', closeReviewPromptModal);
     document.getElementById('review-prompt-back')?.addEventListener('click', () => {
         closeReviewPromptModal();
-        if (openedReviewFromPicker && eligibleReservations.length > 1) {
+        // Whenever there's more than one reservation still left to review,
+        // Back returns to that list — regardless of whether this modal was
+        // reached via the picker or a direct "Leave a Review" deep link
+        // from My Reservations. With only one eligible reservation, there's
+        // nothing to go back to, so Back just closes.
+        if (eligibleReservations.length > 1) {
             openReviewPickerModal();
         }
     });

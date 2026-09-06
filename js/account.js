@@ -1362,7 +1362,11 @@ function buildReservationCard(reservation, view) {
                         <button type="button" class="reservation-card-cta open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Continue Payment <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
                     ` : ''}
                     <a class="reservation-card-cta-secondary" href="${escapeHtml(detailsUrl)}">View details <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-                    ${review ? `<span class="reservation-reviewed-badge"><i class="fa-solid fa-check" aria-hidden="true"></i> Reviewed</span>` : ''}
+                    ${review
+                        ? `<span class="reservation-reviewed-badge"><i class="fa-solid fa-check" aria-hidden="true"></i> Reviewed</span>`
+                        : (view === 'past' && reservationStatus.key === 'completed'
+                            ? `<a class="reservation-card-cta-secondary" href="/reviews.html?review_reservation_id=${encodeURIComponent(reservation.reservation_id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Leave a Review</a>`
+                            : '')}
                 </div>
             </div>
         </article>

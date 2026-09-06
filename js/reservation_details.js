@@ -738,14 +738,29 @@ function buildExtensionSection(reservation, extensions, effectiveStatus) {
     `;
 }
 
-function buildReviewRow(effectiveStatus, review) {
-    if (effectiveStatus !== 'completed' || !review) return '';
+function buildReviewRow(effectiveStatus, review, reservationId) {
+    if (effectiveStatus !== 'completed') return '';
 
+    if (review) {
+        return `
+            <div class="rd-reschedule-row">
+                <div class="rd-reschedule-row-left">
+                    <i class="fa-solid fa-star" aria-hidden="true"></i>
+                    <span>You reviewed this event (${escapeHtml(String(review.rating || 0))}/5).</span>
+                </div>
+            </div>
+        `;
+    }
+
+    const reviewUrl = `/reviews.html?review_reservation_id=${encodeURIComponent(reservationId)}`;
     return `
         <div class="rd-reschedule-row">
             <div class="rd-reschedule-row-left">
                 <i class="fa-solid fa-star" aria-hidden="true"></i>
-                <span>You reviewed this event (${escapeHtml(String(review.rating || 0))}/5).</span>
+                <span>How was your event?</span>
+            </div>
+            <div class="rd-reschedule-row-actions">
+                <a class="rd-btn-outline" href="${escapeHtml(reviewUrl)}">Leave a review</a>
             </div>
         </div>
     `;
@@ -834,7 +849,7 @@ function render() {
 
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules, rescheduleBlockReason)}
         ${buildExtensionSection(reservation, extensions, effectiveStatus)}
-        ${buildReviewRow(effectiveStatus, review)}
+        ${buildReviewRow(effectiveStatus, review, reservation.reservation_id)}
     `;
 }
 
