@@ -15,6 +15,7 @@
 
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPageHeader } from './page_content.js';
+import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
@@ -515,7 +516,7 @@ function buildResultCard(pkg) {
     : `<p class="pkg-result-price-note">Custom pricing</p><p class="pkg-result-price pkg-result-price--contact">Contact for Quote</p>`;
 
   const imgHtml = pkg._coverPhoto?.image_url
-    ? `<img class="pkg-result-img" src="${esc(pkg._coverPhoto.image_url)}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
+    ? `<img class="pkg-result-img" src="${esc(optimizedImageUrl(pkg._coverPhoto.image_url))}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
     : `<div class="pkg-result-img pkg-result-img--placeholder"><i class="ti ti-photo"></i></div>`;
 
   const mostBookedHtml = pkg.package_id === mostBookedPackageId

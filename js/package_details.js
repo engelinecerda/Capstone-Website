@@ -8,6 +8,7 @@
 // states a toggled-visibility panel never needed.
 import { customerSupabase as supabase } from './supabase.js';
 import { loadReservationRules, loadPaymentRules } from './customer_payments.js';
+import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
@@ -131,7 +132,7 @@ async function init() {
     ]);
 
     pkg._categoryName = categoryName;
-    pkg._photos = photos || [];
+    pkg._photos = (photos || []).map(ph => ({ ...ph, image_url: optimizedImageUrl(ph.image_url) }));
     pkg._tiers = tiers || [];
     pkg._badges = await fetchBadgesForPackage(packageId);
 

@@ -18,6 +18,7 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { fetchPageHeader, loadGalleryImages, loadAboutSections, revealConfigContent, withConfigTimeout } from './page_content.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
+import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m =>
@@ -115,7 +116,7 @@ async function initServices() {
 
     grid.innerHTML = data.map((s, i) => `
       <div class="service-card">
-        ${s.image_url ? `<img class="service-card-img" src="${escapeHtml(s.image_url)}" alt="${escapeHtml(s.title)}" />` : ''}
+        ${s.image_url ? `<img class="service-card-img" src="${escapeHtml(optimizedImageUrl(s.image_url))}" alt="${escapeHtml(s.title)}" />` : ''}
         <div class="service-card-body">
           <p class="service-num">${String(i + 1).padStart(2, '0')}</p>
           <h3 class="service-title">${escapeHtml(s.title)}</h3>

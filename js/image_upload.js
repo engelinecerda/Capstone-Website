@@ -45,27 +45,66 @@ export function validateImageFile(file) {
   return null;
 }
 
-// Caps the long edge at maxEdge before upload — unresized phone photos make
-// image-heavy customer pages unusable on mobile data.
+// Feature-detected once per page load (cheap: a single toDataURL check) and
+// cached — no per-image alpha inspection needed since WebP natively supports
+// transparency.
+let _webpSupported = null;
+function supportsWebP() {
+  if (_webpSupported !== null) return _webpSupported;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    _webpSupported = canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+  } catch {
+    _webpSupported = false;
+  }
+  return _webpSupported;
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+// Caps the long edge at maxEdge (if needed) and converts to WebP before
+// upload, with a size-guard: if the encoded result isn't actually smaller
+// than the original, the original is uploaded instead — so this can never
+// make an upload larger. Falls back to today's resize-only behavior on
+// browsers that can't encode WebP.
 export function resizeImageFile(file, maxEdge = MAX_PHOTO_EDGE) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         let { width, height } = img;
-        if (width <= maxEdge && height <= maxEdge) { resolve(file); return; }
-        const scale = maxEdge / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
+        const oversized = width > maxEdge || height > maxEdge;
+        if (oversized) {
+          const scale = maxEdge / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          resolve(blob ? new File([blob], file.name, { type: file.type }) : file);
-        }, file.type, 0.9);
+
+        if (supportsWebP()) {
+          const webpBlob = await canvasToBlob(canvas, 'image/webp', 0.85);
+          if (webpBlob && webpBlob.size < file.size) {
+            const webpName = file.name.replace(/\.[^.]+$/, '') + '.webp';
+            resolve(new File([webpBlob], webpName, { type: 'image/webp' }));
+            return;
+          }
+          // WebP didn't win on size — fall through to the resize-only path
+          // below (or the original file, if it wasn't oversized either).
+        }
+
+        if (!oversized) { resolve(file); return; }
+        const blob = await canvasToBlob(canvas, file.type, 0.9);
+        resolve(blob ? new File([blob], file.name, { type: file.type }) : file);
       };
       img.onerror = () => resolve(file);
       img.src = e.target.result;

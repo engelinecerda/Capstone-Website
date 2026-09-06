@@ -4,6 +4,7 @@
 // uniquely identify each target (aria-label, icon class, heading text) so
 // no page's footer markup needs to change — only a script tag is added.
 import { customerSupabase as supabase } from './supabase.js';
+import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m =>
@@ -33,7 +34,7 @@ async function loadBusinessContact() {
     // Navbar logo only — the footer keeps its own separate image
     // (.footer-new-logo, a different crop meant for its dark background).
     const navLogoEl = document.querySelector('.logo');
-    if (navLogoEl && data.logo_url) navLogoEl.src = data.logo_url;
+    if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url);
     if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
   } catch (err) {
     // Falls back to the static footer text already in the HTML.
