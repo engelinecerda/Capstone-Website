@@ -620,28 +620,13 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
 }
 
 function buildReviewRow(effectiveStatus, review) {
-    if (effectiveStatus !== 'completed') return '';
+    if (effectiveStatus !== 'completed' || !review) return '';
 
-    if (review) {
-        return `
-            <div class="rd-reschedule-row">
-                <div class="rd-reschedule-row-left">
-                    <i class="fa-solid fa-star" aria-hidden="true"></i>
-                    <span>You reviewed this event (${escapeHtml(String(review.rating || 0))}/5).</span>
-                </div>
-            </div>
-        `;
-    }
-
-    const openReviewUrl = `/account.html?section=reservations&open=review&reservation_id=${encodeURIComponent(reservationId)}`;
     return `
         <div class="rd-reschedule-row">
             <div class="rd-reschedule-row-left">
                 <i class="fa-solid fa-star" aria-hidden="true"></i>
-                <span>How was your event?</span>
-            </div>
-            <div class="rd-reschedule-row-actions">
-                <a class="rd-btn-outline" href="${escapeHtml(openReviewUrl)}">Leave a review</a>
+                <span>You reviewed this event (${escapeHtml(String(review.rating || 0))}/5).</span>
             </div>
         </div>
     `;

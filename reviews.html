@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/reviews.css" />
     <link rel="stylesheet" href="/css/home.css" />
+    <link rel="stylesheet" href="/css/account.css" />
     <link rel="stylesheet" href="/css/announcement_banner.css" />
     <style>.hidden { display: none !important; }</style>
 </head>
@@ -88,6 +89,16 @@
             <div class="reviews-summary__breakdown" id="ratingBreakdown">
                 <!-- Rating bars (5★ → 1★) populated by JS -->
             </div>
+        </div>
+    </section>
+
+    <!-- WRITE A REVIEW CTA (only shown for signed-in customers with a completed, unreviewed reservation) -->
+    <section class="reviews-write-cta hidden" id="writeReviewSection">
+        <div class="reviews-write-cta__inner">
+            <p class="reviews-write-cta__copy">Had an event with us? Share how it went.</p>
+            <button type="button" class="reviews-write-cta__btn" id="writeReviewBtn">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i> Write a Review
+            </button>
         </div>
     </section>
 
@@ -208,6 +219,69 @@
             <span>Designed with care for every cup.</span>
         </div>
     </footer>
+
+    <!-- RESERVATION PICKER (shown when there's more than one completed reservation left to review) -->
+    <div class="account-modal-backdrop hidden" id="review-picker-backdrop" aria-hidden="true">
+        <div class="account-modal-card review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-picker-title">
+            <button type="button" class="account-modal-close" id="review-picker-close" aria-label="Close reservation picker">x</button>
+            <p class="account-modal-eyebrow">Select a Reservation</p>
+            <h2 class="account-modal-title" id="review-picker-title">Which Event Would You Like to Review?</h2>
+            <p class="account-modal-copy">You have more than one completed reservation without a review yet. Choose one to continue.</p>
+            <div class="review-picker-list" id="reviewPickerList"></div>
+        </div>
+    </div>
+
+    <!-- WRITE REVIEW MODAL -->
+    <div class="account-modal-backdrop hidden" id="review-prompt-backdrop" aria-hidden="true">
+        <div class="account-modal-card review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-prompt-title">
+            <button type="button" class="account-modal-close" id="review-prompt-close" aria-label="Close review form">x</button>
+            <p class="account-modal-eyebrow">Completed Reservation</p>
+            <h2 class="account-modal-title" id="review-prompt-title">Share Your Experience</h2>
+            <p class="account-modal-copy">Let us know how your event went.</p>
+
+            <div class="review-reservation-summary" id="review-prompt-reservation-meta"></div>
+
+            <div class="review-form-shell">
+                <div class="review-field-block">
+                    <span class="review-field-label">Rating</span>
+                    <div class="review-rating-picker" id="review-prompt-rating" role="radiogroup" aria-label="Rate your reservation from 1 to 5 stars">
+                        <button type="button" class="review-star-btn" data-rating-value="1" role="radio" aria-checked="false" aria-label="1 star">&#9733;</button>
+                        <button type="button" class="review-star-btn" data-rating-value="2" role="radio" aria-checked="false" aria-label="2 stars">&#9733;</button>
+                        <button type="button" class="review-star-btn" data-rating-value="3" role="radio" aria-checked="false" aria-label="3 stars">&#9733;</button>
+                        <button type="button" class="review-star-btn" data-rating-value="4" role="radio" aria-checked="false" aria-label="4 stars">&#9733;</button>
+                        <button type="button" class="review-star-btn" data-rating-value="5" role="radio" aria-checked="false" aria-label="5 stars">&#9733;</button>
+                    </div>
+                    <p class="review-rating-copy" id="review-prompt-rating-copy">Choose a rating before you submit.</p>
+                </div>
+
+                <label class="review-field-block" for="review-prompt-comment">
+                    <span class="review-field-label">Comment</span>
+                    <textarea id="review-prompt-comment" class="review-comment-input" rows="5" maxlength="800" placeholder="Optional: tell us what went well or what could be improved."></textarea>
+                </label>
+            </div>
+
+            <p class="account-modal-message" id="review-prompt-message"></p>
+
+            <div class="account-modal-actions">
+                <button type="button" class="account-modal-btn secondary" id="review-prompt-back">Back</button>
+                <button type="button" class="account-modal-btn primary" id="review-prompt-submit">Submit Review</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUBMISSION CONFIRMATION -->
+    <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
+        <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
+            <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
+            <div class="submission-feedback-icon" aria-hidden="true">&#10003;</div>
+            <p class="account-modal-eyebrow" id="submission-feedback-eyebrow">Submitted</p>
+            <h2 class="account-modal-title" id="submission-feedback-title">Submission Received</h2>
+            <p class="account-modal-copy" id="submission-feedback-copy">Your submission has been received.</p>
+            <div class="account-modal-actions">
+                <button type="button" class="account-modal-btn primary" id="submission-feedback-dismiss">Okay</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/js/app.js"></script>
     <script type="module" src="/js/navbar.js"></script>
