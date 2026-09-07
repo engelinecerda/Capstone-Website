@@ -1242,3 +1242,32 @@ left join lateral (
 ) p on true;
 
 grant select on public.reservation_payment_summary to authenticated;
+
+-- ============================================================
+-- 10. Critical fix — the customer INSERT policy on public.payment
+--     (20260912_payment_page_server_guard.sql, "customer insert own base
+--     payment") whitelists payment_type explicitly and did not, and could
+--     not have, included 'extension_fee' (this feature didn't exist yet).
+--     Without this, RLS silently rejects every customer's extension-fee
+--     payment submission — the whole request/pay/approve flow would be
+--     unreachable from the client despite everything else in this file
+--     being correct. Reproduced verbatim from that migration with only
+--     'extension_fee' added to the payment_type list, same convention as
+--     every other full-body reproduction in this file. This is additive
+--     alongside whatever other (undocumented, live-only) customer INSERT
+--     policy already exists on this table per that migration's own note —
+--     PostgreSQL OR's multiple permissive policies together, so widening
+--     this one can only ever grant more, never take anything away.
+-- ============================================================
+drop policy if exists "customer insert own base payment" on public.payment;
+create policy "customer insert own base payment"
+  on public.payment for insert
+  with check (
+    payment_type in ('reservation_fee', 'down_payment', 'full_payment', 'partial_payment', 'reschedule_fee', 'extension_fee')
+    and payment_status = 'pending_review'
+    and exists (
+      select 1 from public.reservations r
+      where r.reservation_id = payment.reservation_id
+        and r.user_id = auth.uid()
+    )
+  );

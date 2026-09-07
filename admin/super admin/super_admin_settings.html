@@ -253,6 +253,29 @@
         </div>
       </div>
 
+      <!-- ── EXTENSION RULES ── -->
+      <div class="card" id="extension-rules">
+        <p class="card-title">Extension Rules</p>
+        <p class="card-sub">A customer's request to add hours to an already-booked reservation holds that extra time on the calendar while the fee is unpaid, then requires Manager approval like any other payment. The per-hour rate is set per package in <a href="/admin/super%20admin/super_admin_packages.html" style="color:var(--active-bg);font-weight:600;">Packages</a> ("Extension Price" — leave blank on a package to disable extensions for it).</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Payment hold duration</p>
+            <p class="pr-row-desc">How long the requested extra time stays reserved while the customer pays the extension fee, before it auto-releases back to the calendar. Extension holds are meant to be short — this is in minutes, not hours.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-extension-hold-minutes" min="1">
+            <span class="field-note" style="margin:0;">minutes</span>
+          </div>
+        </div>
+
+        <p class="form-message" id="extension-rules-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveExtensionRulesBtn">Save Extension Rules</button>
+        </div>
+      </div>
+
       <!-- ── BUFFER & CAPACITY ── -->
       <div class="card" id="buffer-capacity">
         <p class="card-title">Buffer &amp; Capacity</p>

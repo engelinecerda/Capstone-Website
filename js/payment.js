@@ -1105,7 +1105,7 @@ function isReservationActionable(reservation) {
         reservation,
         state.bundle.paymentsByReservationId,
         state.bundle.reschedulesByReservationId,
-        { formatDate, reservationRules: state.reservationRules }
+        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId }
     ];
     if (isCompletedPaymentOverview(...overviewArgs)) return false;
     if (isPendingPaymentOverview(...overviewArgs)) return false;
@@ -1144,14 +1144,14 @@ function renderReservationPaymentPage() {
             reservation,
             state.bundle.paymentsByReservationId,
             state.bundle.reschedulesByReservationId,
-            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules }
+            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId }
         )
             ? renderCompleteCard(reservation)
             : isPendingPaymentOverview(
                 reservation,
                 state.bundle.paymentsByReservationId,
                 state.bundle.reschedulesByReservationId,
-                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules }
+                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId }
             )
                 ? renderPendingCard(reservation)
                 : renderActionableCard(reservation);

@@ -437,8 +437,71 @@ async function saveReschedulePolicy() {
         );
 
       if (error) { setReschedulePolicyMsg('Failed to save: ' + error.message, true); return; }
-      await logAudit({ action: 'Updated Reschedule Policy', category: 'scheduling_config', details: `hold_hours=${holdHours}, min_notice=${minNoticeDays}, max_count=${maxCount}` });
+      await logAudit({ action: 'Updated Reschedule Policy', category: 'scheduling_config', details: `hold=${holdHours}h, min_notice=${minNoticeDays}, max_count=${maxCount}` });
       setReschedulePolicyMsg('Reschedule policy saved successfully.');
+    }
+  );
+}
+
+// ── Extension Rules ──────────────────────────────────────────────────────────
+// Same system_settings.payment_rules blob, same load/save pattern as
+// Cancellation Notice Rules / Reschedule Policy above. The fee itself
+// (package.extension_price) is per-package and edited on the Packages page
+// instead — this only governs the payment hold window
+// (set_extension_request_defaults(), 20260920_package_extension_hours.sql).
+function setExtensionRulesMsg(msg, isError = false) {
+  const el = document.getElementById('extension-rules-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+async function loadExtensionRules() {
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+
+  const parsed = data ? JSON.parse(data.setting_value) : {};
+  const holdMinutesInput = document.getElementById('pr-extension-hold-minutes');
+  if (holdMinutesInput) holdMinutesInput.value = parsed.extension_hold_minutes ?? 45;
+}
+
+async function saveExtensionRules() {
+  const holdMinutes = Number(document.getElementById('pr-extension-hold-minutes')?.value);
+
+  if (!Number.isFinite(holdMinutes) || holdMinutes < 1) {
+    setExtensionRulesMsg('Payment hold duration must be at least 1 minute.', true); return;
+  }
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'payment_rules')
+    .maybeSingle();
+  const existing = current ? JSON.parse(current.setting_value) : {};
+  const merged = {
+    ...existing,
+    extension_hold_minutes: holdMinutes
+  };
+
+  showSettingsConfirm(
+    'Change Extension Rules',
+    `Payment hold: ${existing.extension_hold_minutes ?? 'default'} minutes`,
+    `Payment hold: ${holdMinutes} minutes`,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'payment_rules', setting_value: JSON.stringify(merged), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+
+      if (error) { setExtensionRulesMsg('Failed to save: ' + error.message, true); return; }
+      await logAudit({ action: 'Updated Extension Rules', category: 'scheduling_config', details: `hold=${holdMinutes}m` });
+      setExtensionRulesMsg('Extension rules saved successfully.');
     }
   );
 }
@@ -686,6 +749,7 @@ async function init() {
   await loadEventTypeAdvanceOverrides();
   await loadCancellationNoticeRules();
   await loadReschedulePolicy();
+  await loadExtensionRules();
   await loadSchedulingSettings();
   await loadScopeCapacity();
 
@@ -702,6 +766,7 @@ async function init() {
     if (input) input.disabled = !e.target.checked;
   });
   document.getElementById('saveReschedulePolicyBtn')?.addEventListener('click', saveReschedulePolicy);
+  document.getElementById('saveExtensionRulesBtn')?.addEventListener('click', saveExtensionRules);
   document.getElementById('pr-reschedule-min-notice-enabled')?.addEventListener('change', (e) => {
     const input = document.getElementById('pr-reschedule-min-notice-days');
     if (input) input.disabled = !e.target.checked;

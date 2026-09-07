@@ -5,6 +5,7 @@ import {
     fetchPayments as fetchSharedPayments,
     fetchReceipts as fetchSharedReceipts,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
+    fetchExtensions as fetchSharedExtensions,
     getReservationBalanceDetails as getSharedReservationBalanceDetails,
     getPaymentSummary as getSharedPaymentSummary,
     isReservationPaymentEnabled as isSharedReservationPaymentEnabled,
@@ -51,6 +52,7 @@ import {
     getCancellationBlockReason,
     isCancellationFeeOwed,
     isRescheduleFeeOwed,
+    isExtensionFeeOwed,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel
@@ -153,6 +155,7 @@ const state = {
     paymentsByReservationId: {},
     receiptsByPaymentId: {},
     reschedulesByReservationId: {},
+    extensionsByReservationId: {},
     reviewsByReservationId: {},
     profile: null,
     emailSecurityReady: true,
@@ -264,6 +267,10 @@ function getReservationReceipts(reservationId) {
 
 function getReservationRescheduleRequests(reservationId) {
     return state.reschedulesByReservationId[reservationId] || [];
+}
+
+function getReservationExtensions(reservationId) {
+    return state.extensionsByReservationId[reservationId] || [];
 }
 
 function getReservationReview(reservationId) {
@@ -397,15 +404,16 @@ function roundCurrency(value) {
 }
 
 function getNormalPayments(reservationId) {
-    return getReservationPayments(reservationId).filter((payment) => !payment.reschedule_request_id);
+    return getReservationPayments(reservationId).filter((payment) => !payment.reschedule_request_id && !payment.extension_id);
 }
 
-// Excludes cancellation_fee/reschedule_fee the same way public.
-// reservation_payment_summary does (see 20260725_payment_ledger.sql) — a
-// penalty fee isn't progress toward paying off the reservation total. An
-// approved cancellation_fee row carries no reschedule_request_id, so
+// Excludes cancellation_fee/reschedule_fee/extension_fee the same way
+// public.reservation_payment_summary does (see 20260725_payment_ledger.sql,
+// 20260920_package_extension_hours.sql) — a penalty/change fee isn't
+// progress toward paying off the reservation total. An approved
+// cancellation_fee row carries no reschedule_request_id/extension_id, so
 // without this it would inflate "amount paid" here.
-const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee']);
+const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee', 'extension_fee']);
 
 function getApprovedBasePaymentsTotal(reservationId) {
     return getNormalPayments(reservationId)
@@ -519,7 +527,8 @@ function buildPaymentOption(reservation, paymentType, amount, overrides = {}) {
         displayLabel,
         description: baseDescription,
         displayDescription: overrides.displayDescription || baseDescription,
-        rescheduleRequestId: overrides.rescheduleRequestId || ''
+        rescheduleRequestId: overrides.rescheduleRequestId || '',
+        extensionId: overrides.extensionId || ''
     };
 }
 
@@ -628,6 +637,23 @@ function getAvailablePaymentOptions(reservation) {
             }
         });
 
+    // Package Extension Hours — mirrors the reschedule_fee block above.
+    getReservationExtensions(reservationId)
+        .filter((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
+        .forEach((extension) => {
+            const hasExistingExtensionFee = getReservationPayments(reservationId).some((payment) => (
+                String(payment.extension_id || '') === String(extension.extension_id)
+                && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+            ));
+
+            if (!hasExistingExtensionFee) {
+                options.push(buildPaymentOption(reservation, 'extension_fee', Number(extension.total_price || 0), {
+                    displayDescription: `Fee for your requested extension hours (${extension.requested_hours} hour${Number(extension.requested_hours) === 1 ? '' : 's'})`,
+                    extensionId: extension.extension_id
+                }));
+            }
+        });
+
     return options.filter((option) => option.amount > 0);
 }
 
@@ -641,7 +667,8 @@ function getPaymentSummary(reservation) {
     return getSharedPaymentSummary(reservation, state.paymentsByReservationId, state.reschedulesByReservationId, {
         formatDate,
         reservationRules: state.reservationRules,
-        paymentRules: state.paymentRules
+        paymentRules: state.paymentRules,
+        extensionsByReservationId: state.extensionsByReservationId
     });
 }
 
@@ -1386,8 +1413,14 @@ function buildReservationCard(reservation, view) {
     const paymentIsActionable = getAvailablePaymentOptions(reservation).length > 0;
     const cancellationFeeOwed = isCancellationFeeOwed(reservation, getReservationPayments(reservation.reservation_id));
     const rescheduleFeeOwed = isRescheduleFeeOwed(getReservationRescheduleRequests(reservation.reservation_id), getReservationPayments(reservation.reservation_id));
+    // Unlike cancellation/reschedule (a shared config amount), an extension
+    // fee's amount comes from the specific open request's own snapshotted
+    // total_price — so this is the row itself (or null), not a boolean.
+    const openExtension = isExtensionFeeOwed(getReservationExtensions(reservation.reservation_id), getReservationPayments(reservation.reservation_id))
+        ? getReservationExtensions(reservation.reservation_id).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
+        : null;
     const reviewState = view === 'past' ? getReservationReviewState(reservation) : null;
-    const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed);
+    const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed || Boolean(openExtension));
     const statusIcon = getReservationStatusIcon(reservationStatus.key);
 
     const detailsUrl = `reservation-details.html?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
@@ -1428,12 +1461,14 @@ function buildReservationCard(reservation, view) {
             </div>
 
             ${paymentIsActionable ? `
-                <div class="reservation-balance-line ${escapeHtml(cancellationFeeOwed || rescheduleFeeOwed ? 'pending' : balance.toneKey)}">
+                <div class="reservation-balance-line ${escapeHtml(cancellationFeeOwed || rescheduleFeeOwed || openExtension ? 'pending' : balance.toneKey)}">
                     ${cancellationFeeOwed
                         ? `<strong>${escapeHtml(formatCurrency(getCancellationFee(reservation, state.paymentRules)))}</strong> cancellation fee due`
                         : (rescheduleFeeOwed
                             ? `<strong>${escapeHtml(formatCurrency(getRescheduleFee(state.paymentRules)))}</strong> reschedule fee due`
-                            : `<strong>${escapeHtml(formatCurrency(balance.remainingBalance))}</strong> due by ${escapeHtml(balance.dueDateLabel)}`)
+                            : (openExtension
+                                ? `<strong>${escapeHtml(formatCurrency(openExtension.total_price))}</strong> extension fee due`
+                                : `<strong>${escapeHtml(formatCurrency(balance.remainingBalance))}</strong> due by ${escapeHtml(balance.dueDateLabel)}`))
                     }
                 </div>
             ` : ''}
@@ -1896,6 +1931,7 @@ async function fetchPayments(reservationIds) {
             payment_id,
             reservation_id,
             reschedule_request_id,
+            extension_id,
             payment_type,
             payment_method,
             amount,
@@ -2071,6 +2107,7 @@ async function loadReservations({ silent = false } = {}) {
         state.contractsByReservationId = await fetchContracts(reservationIds);
         state.paymentsByReservationId = await fetchSharedPayments(supabase, reservationIds);
         state.reschedulesByReservationId = await fetchSharedRescheduleRequests(supabase, reservationIds);
+        state.extensionsByReservationId = await fetchSharedExtensions(supabase, reservationIds);
         state.reviewsByReservationId = await fetchReviews(reservationIds);
 
         const paymentIds = Object.values(state.paymentsByReservationId)
