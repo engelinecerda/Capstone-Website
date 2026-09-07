@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css');
+@import url('./admin_reservations.css?v=1');
 
 /* ============================================================
    Hidden-state overrides.
@@ -1174,33 +1174,6 @@
 
 .record-payment-inline-warning.hidden {
   display: none;
-}
-
-.method-select-row {
-  display: flex;
-  gap: 8px;
-}
-
-.method-chip {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  border-radius: 8px;
-  border: 0.5px solid #E8DFD3;
-  background: #FFFFFF;
-  color: #6B3F23;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.method-chip:hover {
-  background: #F5EEE4;
 }
 
 .method-chip.active {

@@ -1,11 +1,4 @@
-export const DAILY_BOOKING_LIMIT = 2;
-
 export const BLOCKING_RESERVATION_STATUSES = new Set(['pending', 'approved', 'confirmed', 'rescheduled']);
-
-export const DEFAULT_TIME_OPTIONS = [
-    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
-    '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM'
-];
 
 export const BLACKOUT_DATE_COLUMNS = ['closed_date', 'date'];
 export const BLACKOUT_REASON_COLUMNS = ['note', 'reason'];
@@ -68,36 +61,6 @@ export function getScopeLabel(scope) {
 
 export function isBlockingReservationStatus(status) {
     return BLOCKING_RESERVATION_STATUSES.has(String(status || '').toLowerCase());
-}
-
-export function getOccupiedScopesFromReservations(reservations, dateKey, excludeReservationId = null) {
-    const occupiedScopes = new Set();
-    (reservations || []).forEach((reservation) => {
-        if (!isBlockingReservationStatus(reservation?.status)) return;
-        if (formatDateKey(reservation?.event_date) !== formatDateKey(dateKey)) return;
-        if (excludeReservationId && String(reservation?.reservation_id) === String(excludeReservationId)) return;
-
-        const scope = getBookingScope(reservation);
-        if (scope) occupiedScopes.add(scope);
-    });
-    return Array.from(occupiedScopes);
-}
-
-export function isDateFullyBooked(occupiedScopes) {
-    const scopeSet = new Set(occupiedScopes || []);
-    return ['onsite_vip', 'onsite_main_hall', 'offsite'].every((scope) => scopeSet.has(scope));
-}
-
-export function isScopeOccupied(occupiedScopes, scope) {
-    if (!scope) return false;
-    return new Set(occupiedScopes || []).has(scope);
-}
-
-export function getAvailabilitySummaryMessage(occupiedScopes, scope = '') {
-    if ((occupiedScopes || []).length) {
-        return 'This date is fully booked.';
-    }
-    return 'This date is available.';
 }
 
 function normalizeAvailabilityPayload(payload, fallbackDate = '') {

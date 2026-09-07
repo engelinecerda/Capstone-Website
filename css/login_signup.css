@@ -71,18 +71,6 @@
     padding: 56px 52px;
 }
 
-/* Logo at top */
-.auth-panel-logo-link {
-    display: inline-block;
-}
-
-.auth-panel-logo {
-    height: 50px;
-    width: auto;
-    filter: brightness(0) invert(1);
-    opacity: 0.90;
-}
-
 /* Tagline block pushed to vertical center */
 .auth-panel-body {
     margin: auto 0;
@@ -177,7 +165,6 @@
     width: 100%;
     max-width: 420px;
 }
-
 
 /* ================================================
    Form Head — title & subtitle

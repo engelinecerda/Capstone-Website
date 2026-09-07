@@ -1,4 +1,18 @@
-   import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+// Deliberately NOT `import { createClient } from '.../supabase-js@2/+esm'`
+// anymore — jsDelivr's +esm endpoint resolves this package's internal
+// dependency graph (auth-js, postgrest-js, realtime-js, storage-js,
+// functions-js, tslib, phoenix, ...) as separate chained module fetches
+// instead of one bundled file, each a full round trip that has to resolve
+// before the next one is even requested. A PageSpeed critical-request-chain
+// audit measured this at 8 sequential hops, ~1000ms+ each. createClient is
+// read off window.supabase instead — the UMD bundle every page's <head>
+// loads via a plain (non-module) `defer`red <script> tag, which bundles all
+// of the above into the ONE file already verified end-to-end (a real
+// Supabase query) before this switch was made. Read lazily inside
+// makeClient() below, not destructured at this top level, so this module
+// has no load-order dependency on that <script> tag beyond "loaded by the
+// time a page actually calls a Supabase method" — already true today since
+// every real call happens well after both scripts finish.
 
 const DEFAULT_SUPABASE_URL = 'https://gznemevovvcfjnuwsixl.supabase.co'
 const DEFAULT_SUPABASE_KEY = 'sb_publishable_CeGNCGlslM9tB2WD7Vrlvw_Da--_DIM'
@@ -46,7 +60,10 @@ const supabaseUrl = supabaseOverride?.url || DEFAULT_SUPABASE_URL
 const supabaseKey = supabaseOverride?.key || DEFAULT_SUPABASE_KEY
 
 function makeClient(storageKey) {
-    return createClient(supabaseUrl, supabaseKey, {
+    if (typeof window === 'undefined' || !window.supabase || typeof window.supabase.createClient !== 'function') {
+        throw new Error('Supabase UMD bundle not loaded — add <script src=".../supabase-js@2.../dist/umd/supabase.js" defer> before this page\'s module scripts.')
+    }
+    return window.supabase.createClient(supabaseUrl, supabaseKey, {
         auth: {
             storageKey,
             persistSession: true,

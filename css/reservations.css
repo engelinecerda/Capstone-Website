@@ -64,7 +64,6 @@
    Utility
 ======================== */
 
-
 .hidden {
     display: none !important;
 }
@@ -102,10 +101,6 @@
 /* ========================
    Venue Wrapper (Step 2)
 ======================== */
-.venue-wrapper {
-    width: 100%;
-    margin-top: 30px;
-}
 
 .venue-map-hint {
     font-size: 0.85rem;
@@ -179,72 +174,14 @@
 }
 
 /* ========================
-   Snack Add-on Banner (Step 3)
-======================== */
-.addon-banner {
-    width: 100%;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px dashed #e0d0c0;
-}
-
-/* ========================
-   Offsite Sub-section (Step 3)
-======================== */
-.offsite-sub-section {
-    margin-top: 24px;
-}
-
-/* ========================
    Food Tray Builder (Step 4)
 ======================== */
-.tray-section {
-    width: 100%;
-    margin-bottom: 8px;
-}
-
-.tray-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.tray-header h4 {
-    font-size: 15px;
-    font-weight: 700;
-    color: #2A1408;
-}
-
-.tray-icon {
-    font-size: 20px;
-}
 
 .dish-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
-}
-
-.pax-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.pax-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #6B3A1F;
-}
-
-.tray-divider {
-    border: none;
-    border-top: 1px solid #eee;
-    margin: 12px 0 16px;
 }
 
 /* ========================
@@ -264,28 +201,6 @@
     font-weight: 700;
     color: #2A1408;
     margin-bottom: 12px;
-}
-
-.tray-cart-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-    color: #2A1408;
-    padding: 6px 0;
-    border-bottom: 1px solid #e0d0c0;
-}
-
-.tray-cart-row:last-of-type {
-    border-bottom: none;
-}
-
-.tray-cart-total {
-    font-size: 15px;
-    font-weight: 700;
-    color: #6B3A1F;
-    text-align: right;
-    margin-top: 10px;
 }
 
 .reservation-section {
@@ -316,40 +231,12 @@
         .res-step.active { display: block; }
         .res-step h2 { font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif); font-weight: 400; color: var(--brown-dark, #1E0C03); font-size: 30px; margin-bottom: 6px; }
         .res-step > p { color: #777; font-size: 14px; margin-bottom: 20px; }
-        .smart-step-section {
-            margin-top: 24px;
-            padding-top: 22px;
-            border-top: 1px solid #f0e5db;
-        }
-        .smart-step-section:first-of-type {
-            margin-top: 0;
-            padding-top: 0;
-            border-top: none;
-        }
-        .smart-step-heading {
-            margin-bottom: 16px;
-        }
-        .smart-step-kicker {
-            display: inline-block;
-            margin-bottom: 6px;
-            font-size: 10.5px;
-            font-weight: 600;
-            color: var(--brown-light, #B07D5A);
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-        }
-        .smart-step-heading h3 {
-            margin: 0 0 6px;
-            font-size: 18px;
-            font-weight: 700;
-            color: #2A1408;
-        }
-        .smart-step-heading p {
-            margin: 0;
-            font-size: 13px;
-            color: #7b6a5d;
-            line-height: 1.6;
-        }
+        
+        
+        
+        
+        
+        
 
         /* Inputs */
         .res-input {
@@ -359,7 +246,7 @@
         }
         .res-input:focus { outline: none; border-color: #6B3A1F; }
         textarea.res-input { height: 100px; resize: vertical; }
-        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        
 
         .availability-panel {
             margin-top: 8px;
@@ -688,7 +575,7 @@
         }
 
         /* Add-on Banner */
-        .addon-banner { border-top: 1px dashed #e0d0c0; margin-top: 24px; padding-top: 20px; }
+        
 
         /* Catering Inclusions Banner */
         .catering-inclusions {
@@ -784,7 +671,7 @@
         }
 
         /* Pills */
-        .pills-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        
         .pill { padding: 7px 14px; border: 1px solid #ddd; border-radius: 20px; background: #fafafa; cursor: pointer; font-size: 13px; transition: all 0.2s; }
         .pill:hover  { border-color: #6B3A1F; background: #FFF8F0; }
         .pill.active { border-color: #6B3A1F; background: #FFEDE0; color: #6B3A1F; font-weight: 600; }
@@ -1904,32 +1791,6 @@
 }
 
 /* ── Event-type chips ───────────────────────────────────────────────────────── */
-.event-type-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.event-chip {
-    padding: 10px 20px;
-    border-radius: 50px;
-    border: 1.5px solid var(--brown-light, #B07D5A);
-    background: #fff;
-    color: var(--brown-primary, #3D1A0A);
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.18s, border-color 0.18s, color 0.18s;
-    user-select: none;
-    line-height: 1.4;
-}
-
-.event-chip:hover {
-    border-color: var(--brown-primary, #3D1A0A);
-    background: var(--cream-dark, #F2EBE0);
-}
 
 .event-chip.active {
     background: var(--brown-primary, #3D1A0A);
@@ -2083,7 +1944,6 @@
     padding-top: 0;
     border-top: none;
 }
-
 
 .res-section h2 {
     /* Inherit existing h2 styling from the step; just ensure consistent spacing */

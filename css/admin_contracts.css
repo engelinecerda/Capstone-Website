@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css');
+@import url('./admin_reservations.css?v=1');
 
 /* admin_contracts.css */
 
@@ -293,23 +293,6 @@
 .contract-activity-stack {
   display: grid;
   gap: 6px;
-}
-
-.contract-note-preview {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.action-stack {
-  display: grid;
-  gap: 12px;
-}
-
-.contract-note-field {
-  margin-top: 4px;
 }
 
 .table-note {

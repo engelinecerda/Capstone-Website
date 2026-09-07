@@ -778,15 +778,29 @@ function updateSignatureCapturedBadge() {
 // the smallest step still doesn't fit).
 const SIGNATURE_TYPE_FONT_MAX = 32;
 const SIGNATURE_TYPE_FONT_MIN = 18;
+// Runs on every keystroke (see the 'input' listener below) — the old
+// version looped "write font-size, read scrollWidth" up to 7 times per
+// call, and each iteration forces the browser to synchronously flush
+// layout to answer that read (a "forced reflow"/layout thrashing; this
+// showed up directly in a PageSpeed audit as ~63ms of forced-reflow time).
+// Measuring once at max size and computing the fitted size by ratio
+// instead needs exactly one write + two reads (clientWidth/scrollWidth,
+// taken back-to-back with no write between them, so they share a single
+// layout flush) + one final write with no read after it — no reflow loop.
+// A script font's width doesn't scale *perfectly* linearly with px size,
+// so this can occasionally land a shade looser/tighter than the old
+// iterative version — safe, since the preview's own overflow:hidden is
+// already the documented hard backstop for exactly that case.
 function fitSignatureTypePreview() {
     if (!signatureTypePreview) return;
-    let size = SIGNATURE_TYPE_FONT_MAX;
-    signatureTypePreview.style.fontSize = `${size}px`;
+    signatureTypePreview.style.fontSize = `${SIGNATURE_TYPE_FONT_MAX}px`;
     const maxWidth = signatureTypePreview.clientWidth;
-    while (signatureTypePreview.scrollWidth > maxWidth && size > SIGNATURE_TYPE_FONT_MIN) {
-        size -= 2;
-        signatureTypePreview.style.fontSize = `${size}px`;
-    }
+    const naturalWidth = signatureTypePreview.scrollWidth;
+    if (naturalWidth <= maxWidth || naturalWidth === 0) return; // already fits at max size
+
+    const fittedSize = Math.floor(SIGNATURE_TYPE_FONT_MAX * (maxWidth / naturalWidth));
+    const size = Math.max(SIGNATURE_TYPE_FONT_MIN, Math.min(SIGNATURE_TYPE_FONT_MAX, fittedSize));
+    signatureTypePreview.style.fontSize = `${size}px`;
 }
 
 function setSignatureMode(mode) {

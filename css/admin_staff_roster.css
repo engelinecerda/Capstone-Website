@@ -8,10 +8,6 @@
    piece definitions below mirror admin_payment_options.css (those pieces
    aren't in manager-theme.css, only base colors are). */
 
-.staff-roster-stat-row {
-  grid-template-columns: repeat(2, minmax(0, 220px));
-}
-
 .card-header-row {
   display: flex;
   justify-content: space-between;

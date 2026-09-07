@@ -516,7 +516,7 @@ function buildResultCard(pkg) {
     : `<p class="pkg-result-price-note">Custom pricing</p><p class="pkg-result-price pkg-result-price--contact">Contact for Quote</p>`;
 
   const imgHtml = pkg._coverPhoto?.image_url
-    ? `<img class="pkg-result-img" src="${esc(optimizedImageUrl(pkg._coverPhoto.image_url))}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
+    ? `<img class="pkg-result-img" src="${esc(optimizedImageUrl(pkg._coverPhoto.image_url, 700))}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`
     : `<div class="pkg-result-img pkg-result-img--placeholder"><i class="ti ti-photo"></i></div>`;
 
   const mostBookedHtml = pkg.package_id === mostBookedPackageId
@@ -599,5 +599,5 @@ loadPageHeader(supabase, 'packages', {
   imgEl: document.querySelector('.page-hero-img'),
   headingEl: document.querySelector('.page-hero-title'),
   subEl: document.querySelector('.page-hero-sub')
-});
+}, 1920);
 loadCatalog();

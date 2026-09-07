@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - ELI Coffee Events</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/super_admin_only.css">
-    <link rel="stylesheet" href="/css/admin_homepage.css">
-  <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="stylesheet" href="/css/super_admin_only.css?v=1">
+    <link rel="stylesheet" href="/css/admin_homepage.css?v=1">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=1">
 </head>
 <body>
   <aside class="sidebar">
@@ -248,6 +251,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="../js/admin_homepage.js"></script>
 </body>
 </html>

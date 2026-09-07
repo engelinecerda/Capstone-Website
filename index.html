@@ -6,12 +6,16 @@
   <title>ELI Coffee Events Cafe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="/css/styles.css" />
-  <link rel="stylesheet" href="/css/home.css" />
-  <link rel="stylesheet" href="/css/announcement_banner.css" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
+  <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=1" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=1"></noscript>
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
+  <link rel="stylesheet" href="/css/styles.css?v=1" />
+  <link rel="stylesheet" href="/css/home.css?v=1" />
+  <link rel="stylesheet" href="/css/announcement_banner.css?v=1" />
   <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -50,10 +54,16 @@
 
   <!-- HERO -->
   <section class="hero-section">
+    <!-- Not wrapped in <picture>/webp — js/home_content.js's initHero()
+         overwrites this <img>'s src directly with an admin-configured
+         (already Cloudinary-optimized) image; a <picture> here would keep
+         showing this static fallback forever, since a matching <source>
+         always wins over whatever src the img element ends up with. -->
     <img
       class="hero-bg"
       src="/images/637347619_904793605590427_6779978724130647558_n.jpg"
       alt="ELI Coffee Events Cafe at night"
+      fetchpriority="high"
     />
     <div class="hero-overlay"></div>
     <div class="hero-body">
@@ -106,7 +116,10 @@
     <div class="services-grid cfg-loading">
 
       <div class="service-card">
-        <img class="service-card-img" src="/images/group-order.jpg" alt="Cafe and lounge" />
+        <picture>
+      <source type="image/webp" srcset="/images/group-order.webp">
+      <img class="service-card-img" src="/images/group-order.jpg" alt="Cafe and lounge" />
+    </picture>
         <div class="service-card-body">
           <p class="service-num">01</p>
           <h3 class="service-title">Cafe &amp; Lounge</h3>
@@ -116,7 +129,10 @@
       </div>
 
       <div class="service-card">
-        <img class="service-card-img" src="/images/crop-background-img.jpg" alt="Private events" />
+        <picture>
+      <source type="image/webp" srcset="/images/crop-background-img.webp">
+      <img class="service-card-img" src="/images/crop-background-img.jpg" alt="Private events" loading="lazy" />
+    </picture>
         <div class="service-card-body">
           <p class="service-num">02</p>
           <h3 class="service-title">Private Events</h3>
@@ -126,7 +142,10 @@
       </div>
 
       <div class="service-card">
-        <img class="service-card-img" src="/images/catering img.jpg" alt="Catering" />
+        <picture>
+      <source type="image/webp" srcset="/images/catering%20img.webp">
+      <img class="service-card-img" src="/images/catering img.jpg" alt="Catering" loading="lazy" />
+    </picture>
         <div class="service-card-body">
           <p class="service-num">03</p>
           <h3 class="service-title">Catering</h3>
@@ -147,22 +166,40 @@
     </div>
     <div class="gallery-grid cfg-loading">
       <div class="g-item gi1">
-        <img src="/images/snack bar corner.jpg" alt="ELI Coffee lounge" />
+        <picture>
+      <source type="image/webp" srcset="/images/snack%20bar%20corner.webp">
+      <img src="/images/snack bar corner.jpg" alt="ELI Coffee lounge" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi2">
-        <img src="/images/625975201_26971266315797097_6450646982903854248_n.jpg" alt="Coffee and desserts" />
+        <picture>
+      <source type="image/webp" srcset="/images/625975201_26971266315797097_6450646982903854248_n.webp">
+      <img src="/images/625975201_26971266315797097_6450646982903854248_n.jpg" alt="Coffee and desserts" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi3">
-        <img src="/images/crop-background-img.jpg" alt="Event decor" />
+        <picture>
+      <source type="image/webp" srcset="/images/crop-background-img.webp">
+      <img src="/images/crop-background-img.jpg" alt="Event decor" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi4">
-        <img src="/images/629336028_26971264995797229_7811559806777201812_n.jpg" alt="Food spread" />
+        <picture>
+      <source type="image/webp" srcset="/images/629336028_26971264995797229_7811559806777201812_n.webp">
+      <img src="/images/629336028_26971264995797229_7811559806777201812_n.jpg" alt="Food spread" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi5">
-        <img src="/images/vip.jpg" alt="Private gathering" />
+        <picture>
+      <source type="image/webp" srcset="/images/vip.webp">
+      <img src="/images/vip.jpg" alt="Private gathering" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi6">
-        <img src="/images/cafe.jpg" alt="Interior dining" />
+        <picture>
+      <source type="image/webp" srcset="/images/cafe.webp">
+      <img src="/images/cafe.jpg" alt="Interior dining" loading="lazy" />
+    </picture>
       </div>
     </div>
   </section>
@@ -206,11 +243,15 @@
 
   <!-- CTA BANNER -->
   <section class="cta-banner">
-    <img
+    <picture>
+      <source type="image/webp" srcset="/images/background-img.webp">
+      <img
       class="cta-banner-img"
       src="/images/background-img.jpg"
       alt="Private event at ELI Coffee"
+      loading="lazy"
     />
+    </picture>
     <div class="cta-banner-overlay">
       <h2 class="cta-banner-title">Plan your next<br><em>event with us</em></h2>
       <p class="cta-banner-sub">Whether it's an intimate birthday or a grand celebration, our team is ready to make it unforgettable.</p>
@@ -223,7 +264,7 @@
     <div class="footer-new-grid">
 
       <div>
-        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
+        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" loading="lazy" />
         <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
         <div class="footer-new-social">
           <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
@@ -281,7 +322,8 @@
     </div>
   </footer>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/navbar.js"></script>
   <script type="module" src="/js/home_content.js"></script>
   <script type="module" src="/js/footer_content.js"></script>

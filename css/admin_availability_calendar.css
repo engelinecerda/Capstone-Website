@@ -3,7 +3,7 @@
    day-panel, and blackout-modal rules already established there (see
    .calendar-grid-wrap / .calendar-cell / .day-panel-* / .blackout-modal-card)
    — only page-layout-specific rules live here. */
-@import url('./admin_reservations.css');
+@import url('./admin_reservations.css?v=1');
 
 .availability-stat-row {
   grid-template-columns: repeat(3, 1fr);

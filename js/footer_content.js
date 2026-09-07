@@ -34,7 +34,7 @@ async function loadBusinessContact() {
     // Navbar logo only — the footer keeps its own separate image
     // (.footer-new-logo, a different crop meant for its dark background).
     const navLogoEl = document.querySelector('.logo');
-    if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url);
+    if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url, 480);
     if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
   } catch (err) {
     // Falls back to the static footer text already in the HTML.

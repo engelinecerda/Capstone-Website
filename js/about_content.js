@@ -41,7 +41,7 @@ async function initHero() {
     // nothing left to apply and simply gets discarded. That's what stops
     // the fallback (revealed below) from being silently overwritten a
     // moment after the customer already sees it.
-    const data = await withConfigTimeout(fetchPageHeader(supabase, 'about'), null);
+    const data = await withConfigTimeout(fetchPageHeader(supabase, 'about', 1920), null);
     if (!data) return; // keep the existing hardcoded fallback
 
     if (imgEl && data.image_url) {

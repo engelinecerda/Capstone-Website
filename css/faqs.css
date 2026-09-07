@@ -194,53 +194,6 @@
 }
 
 /* ========================
-   CTA Strip
-======================== */
-.faq-cta-strip {
-    background: var(--brown-dark, #1E0C03);
-    text-align: center;
-    padding: 72px 24px 80px;
-}
-
-.faq-cta-eyebrow {
-    color: var(--brown-pale, #DFC3A8) !important;
-    opacity: 0.8;
-    margin-bottom: 14px;
-}
-
-.faq-cta-title {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(30px, 4vw, 48px);
-    font-weight: 300;
-    color: #fff;
-    margin: 0 0 14px;
-    line-height: 1.2;
-}
-
-.faq-cta-title em {
-    font-style: italic;
-    font-weight: 400;
-}
-
-.faq-cta-desc {
-    font-size: 14px;
-    color: rgba(255,255,255,0.58);
-    margin: 0 0 32px;
-    line-height: 1.7;
-    max-width: 440px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.faq-cta-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-/* ========================
    Responsive
 ======================== */
 @media (max-width: 768px) {

@@ -113,22 +113,3 @@ export function resizeImageFile(file, maxEdge = MAX_PHOTO_EDGE) {
     reader.readAsDataURL(file);
   });
 }
-
-export function previewImageFile(file, previewEl, placeholderEl, fileNameEl) {
-  fileNameEl.textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = e => {
-    previewEl.src = e.target.result;
-    previewEl.classList.remove('hidden');
-    placeholderEl.style.display = 'none';
-  };
-  reader.readAsDataURL(file);
-}
-
-export function clearImageUI(previewEl, placeholderEl, fileNameEl, inputEl) {
-  previewEl.src = '';
-  previewEl.classList.add('hidden');
-  placeholderEl.style.display = '';
-  fileNameEl.textContent = 'No file chosen';
-  if (inputEl) inputEl.value = '';
-}

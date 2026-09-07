@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css');
+@import url('./admin_reservations.css?v=1');
 
 /* admin_payments.css */
 
@@ -117,20 +117,6 @@
 .payment-amount-cell .payment-cell-main {
   font-size: 18px;
   line-height: 1.2;
-}
-
-.payment-method-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid #E2D8CB;
-  color: #5f5144;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .payment-method-pill.cash {

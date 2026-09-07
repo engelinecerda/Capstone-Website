@@ -62,11 +62,6 @@ html {
 /* ========================
    Nav Account Wrapper
 ======================== */
-.nav-account-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
 
 .logout-btn {
     background: transparent;
@@ -85,7 +80,6 @@ html {
     background-color: #6B3A1F;
     color: #fff;
 }
-
 
 .logo {
     width: 240px;
@@ -622,111 +616,19 @@ body.nav-open {
     background-repeat: no-repeat;
     overflow: hidden;
 }
-.overlay-private-event-packages {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    padding-top: 20vh;
-    pointer-events: none;
-}
-.private-event-packages {
-    max-width: 80%;
-    height: auto;
-    display: block;
-    pointer-events: auto;
-    margin-bottom: 20px;
-}
-.overlay-private-event-packages p {
-    color: #fff;
-    font-size: 18px;
-    font-weight: bold;
-    text-align: center;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    -webkit-text-stroke: 1px #6B3A1F;
-    pointer-events: auto;
-}
-.hero-text-link {
-    margin-top: 18px;
-    color: #fff7ef;
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    text-decoration: none;
-    border-bottom: 1px solid rgba(255, 247, 239, 0.8);
-    padding-bottom: 6px;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.45);
-    pointer-events: auto;
-    transition: color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
-}
-
-.hero-text-link:hover {
-    color: #ffffff;
-    border-color: #ffffff;
-    transform: translateY(-2px);
-}
 
 /* ========================
    Welcome Section
 ======================== */
-.welcome-section{
-    margin-top: 50px;
-    background-color: white;
-}
-.welcome-section h1{
-    text-align: center;
-    font-size: 36px;
-    color: #6B3A1F;
-    padding: 20px 0;
-}
-.welcome-section p{
-    text-align: center;
-    font-size: 18px;
-    color: #241208;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 20px;
-    line-height: 2;
-}
 
 /* ========================
    Services Section
 ======================== */
-.services-section {
-    margin-top: 50px;
-    padding: 50px 40px;
-    text-align: center;
-    background-color: #FFF8F0;
-}
-.services-section h1 {
-    color: #6B3A1F;
-    font-size: 36px;
-    margin-bottom: 10px;
-    padding: 20px 0;
-}
-.services-section > p {
-    color: #241208;
-    font-size: 16px;
-    max-width: 900px;
-    margin: 0 auto 30px auto;
-}
 
 /* ========================
    Cards
 ======================== */
-.cards-container {
-    display: flex;
-    gap: 24px;
-    justify-content: center;
-    flex-wrap: wrap;
-    padding: 20px 0;
-}
+
 .card {
     width: 300px;
     border-radius: 16px;
@@ -774,20 +676,6 @@ body.nav-open {
     line-height: 1.5;
 }
 
-
-.store-locations-section{
-    background-color: white;
-    padding: 50px 20px;
-}
-
-
-.store-locations-section h1{
-    text-align: center;
-    font-size: 36px;
-    color: #6B3A1F;
-    padding: 20px 0;
-}
-
 .location-row {
     display: flex;
     align-items: stretch;
@@ -800,7 +688,6 @@ body.nav-open {
     flex: 1;
 }
 
-
 @media (max-width: 768px) {
     .location-row {
         flex-direction: column;
@@ -809,8 +696,6 @@ body.nav-open {
         width: 100%;
     }
 }
-
-
 
 .location-card {
     margin-top: 20px;
@@ -825,101 +710,10 @@ body.nav-open {
     max-width: 500px;
 }
 
-.location-icon {
-    background-color: #F5F0EB;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 20px;
-    flex-shrink: 0;
-}
-
-.location-details h3 {
-    font-size: 16px;
-    font-weight: 700;
-    color: #2A1408;
-    margin-bottom: 4px;
-}
-
-.location-details p {
-    font-size: 14px;
-    color: #7a6a60;
-    margin-bottom: 8px;
-    line-height: 1.6;
-}
-
-.location-details p strong {
-    color: #2A1408;
-}
-
 .footer {
     background-color: #6B3A1F;
     color: #fff;
     margin-top: 50px;
-}
-
-.footer-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 40px;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 50px 40px;
-}
-
-.footer-brand,
-.footer-contact,
-.footer-social {
-    flex: 1;
-}
-
-.footer-brand .footer-logo {
-    width: 150px;
-    height: auto;
-    margin-bottom: 12px;
-   
-}
-
-.footer-brand p {
-    font-size: 14px;
-    color: #f5d9c8;
-    line-height: 1.6;
-}
-
-.footer-top h3 {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 14px;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.footer-top p {
-    font-size: 14px;
-    color: #f5d9c8;
-    margin-bottom: 8px;
-    line-height: 1.6;
-}
-
-.footer-bottom {
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    text-align: center;
-    padding: 16px 20px;
-}
-
-.footer-bottom p {
-    font-size: 13px;
-    color: #f5d9c8;
-}
-
-.footer-social.logo-facebook{
-  font-size: 20px;       
-}
-
-.footer-top i {
-    margin-right: 8px;
-    color: #f5d9c8;
 }
 
 .footer p a,
@@ -927,10 +721,6 @@ body.nav-open {
   color: #f5d9c8;
   text-decoration: none;
 }
-
-
-
-
 
 @media (max-width: 768px) {
     .footer-top {

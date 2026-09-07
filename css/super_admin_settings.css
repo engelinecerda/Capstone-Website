@@ -10,7 +10,7 @@
    that's why the sidebar looked outdated here specifically. Fixed the same
    way admin_reservation_form.css already was: no local :root, reuse the
    shared component classes instead of redeclaring them. */
-@import url('./admin_payment_options.css');
+@import url('./admin_payment_options.css?v=1');
 
 /* Keeps the jumped-to section clear of the viewport edge when the sidebar's
    Availability and scheduling sub-links (admin_nav_data.js) land on

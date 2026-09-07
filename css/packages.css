@@ -560,11 +560,6 @@ body { background: var(--cream); }
 /* ══════════════════════════════════════════════════════════════════════════
    SECTION 4 · PACKAGE DETAIL PANEL
    ══════════════════════════════════════════════════════════════════════════ */
-.pkg-detail-section {
-  background: var(--cream-dark);
-  border-top: 1px solid var(--border);
-  padding: 48px 0 64px;
-}
 
 /* Plain page-content wrapper — NOT a card. The 4px left-accent + asymmetric
    radius this used to carry was designed for a component docking against a

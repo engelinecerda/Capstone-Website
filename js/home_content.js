@@ -35,7 +35,7 @@ async function initHero() {
     // nothing left to apply and simply gets discarded. That's what stops
     // the fallback (revealed below) from being silently overwritten a
     // moment after the customer already sees it.
-    const data = await withConfigTimeout(fetchPageHeader(supabase, 'home'), null);
+    const data = await withConfigTimeout(fetchPageHeader(supabase, 'home', 1920), null);
     if (!data) return; // keep the existing hardcoded fallback
 
     if (imgEl && data.image_url) {
@@ -54,7 +54,7 @@ async function initGallery() {
   if (!grid) return;
 
   try {
-    const images = await withConfigTimeout(loadGalleryImages(supabase), []);
+    const images = await withConfigTimeout(loadGalleryImages(supabase, 800), []);
     if (!images.length) return; // keep the existing hardcoded 6 images as fallback
 
     // The mosaic layout (css/home.css .gi1-.gi6) is a fixed 6-tile grid — show
@@ -116,7 +116,7 @@ async function initServices() {
 
     grid.innerHTML = data.map((s, i) => `
       <div class="service-card">
-        ${s.image_url ? `<img class="service-card-img" src="${escapeHtml(optimizedImageUrl(s.image_url))}" alt="${escapeHtml(s.title)}" />` : ''}
+        ${s.image_url ? `<img class="service-card-img" src="${escapeHtml(optimizedImageUrl(s.image_url, 800))}" alt="${escapeHtml(s.title)}" />` : ''}
         <div class="service-card-body">
           <p class="service-num">${String(i + 1).padStart(2, '0')}</p>
           <h3 class="service-title">${escapeHtml(s.title)}</h3>

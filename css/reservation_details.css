@@ -4,7 +4,7 @@
    account.css (imported below) — this file only adds the components that
    are unique to the single-reservation view.
 ======================== */
-@import url("account.css");
+@import url("account.css?v=1");
 
 .rd-page {
     padding-top: 28px;
@@ -434,16 +434,6 @@
     color: var(--acc-text-muted);
 }
 
-.rd-dl-label-plain {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--acc-text-muted);
-    margin-bottom: 8px;
-}
-
 /* ========================
    Payment & contract — receipt lines
 ======================== */
@@ -524,17 +514,6 @@
     color: var(--acc-text-muted);
 }
 
-.rd-inline-note-warning {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12.5px;
-    color: var(--acc-amber-text);   
-    background-color: var(--acc-amber-bg);
-    padding: 10px 12px;
-    border-radius: 8px;
-    line-height: 1.4;
-}
 /* ========================
    Buttons
 ======================== */
@@ -577,35 +556,6 @@
 .rd-btn-outline:disabled:focus-visible {
     border-color: #E5DBCC;
     background: #EFEAE1;
-}
-
-.rd-btn-solid {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 40px;
-    padding: 9px 18px;
-    border-radius: 6px;
-    border: none;
-    background: var(--acc-espresso);
-    color: #FAF6F0;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-    align-self: flex-start;
-}
-
-.rd-btn-solid:hover,
-.rd-btn-solid:focus-visible {
-    background: var(--acc-espresso-dark);
-    outline: none;
-}
-
-.rd-btn-solid:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
 }
 
 /* Full-width payment CTA */

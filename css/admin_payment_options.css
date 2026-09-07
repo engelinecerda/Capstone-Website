@@ -2,7 +2,7 @@
    Built on the same design system as Reservations/Payments/Contracts (dark
    sidebar, .card/.table/.modal-* component language) instead of the older
    Settings/Packages look this page was originally extracted from. */
-@import url('./admin_reservations.css');
+@import url('./admin_reservations.css?v=1');
 
 /* ── Section spacing ─────────────────────────────────────────────────────── */
 .card + .card { margin-top: 20px; }

@@ -10,6 +10,16 @@
 // (home/about/packages/faqs/menu headers, the home gallery, menu sections
 // and banner) gets optimized images automatically without needing its own
 // import. Board item #47.
+//
+// Each loader below also takes an optional targetWidth, forwarded straight
+// to optimizedImageUrl() so Cloudinary downscales server-side to roughly
+// the caller's own display size instead of shipping the full upload
+// resolution into a small card/hero slot (PageSpeed's "Properly size
+// images" / "Efficiently encode images" audits — q_auto,f_auto alone only
+// fixes quality/format, not dimensions). Every call site below defaults to
+// undefined (no constraint) so a caller that hasn't been updated with its
+// real display width yet keeps today's exact behavior rather than silently
+// getting under-sized images.
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 // ── Config-loading skeleton helper ──────────────────────────────────────
@@ -53,7 +63,7 @@ export function withConfigTimeout(fetchPromise, timeoutValue, ms = 6000) {
 // the "hardcoded content flashes, then gets replaced" bug this avoids —
 // see loadPageHeader()'s own comment for why it's the one loader that
 // couldn't safely be raced directly).
-export async function fetchPageHeader(supabase, pageKey) {
+export async function fetchPageHeader(supabase, pageKey, targetWidth) {
   try {
     const { data, error } = await supabase
       .from('page_header')
@@ -61,7 +71,7 @@ export async function fetchPageHeader(supabase, pageKey) {
       .eq('page_key', pageKey)
       .maybeSingle();
     if (error || !data) return null;
-    return data.image_url ? { ...data, image_url: optimizedImageUrl(data.image_url) } : data;
+    return data.image_url ? { ...data, image_url: optimizedImageUrl(data.image_url, targetWidth) } : data;
   } catch (err) {
     return null;
   }
@@ -76,8 +86,8 @@ export async function fetchPageHeader(supabase, pageKey) {
 // unobserved in the background, and it would still overwrite the revealed
 // fallback whenever it eventually resolves. Use fetchPageHeader() above for
 // any caller that needs to race against a timeout.
-export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}) {
-  const data = await fetchPageHeader(supabase, pageKey);
+export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subEl } = {}, targetWidth) {
+  const data = await fetchPageHeader(supabase, pageKey, targetWidth);
   if (!data) return;
 
   if (imgEl && data.image_url) {
@@ -88,7 +98,7 @@ export async function loadPageHeader(supabase, pageKey, { imgEl, headingEl, subE
   if (subEl && data.subheading) subEl.textContent = data.subheading;
 }
 
-export async function loadGalleryImages(supabase) {
+export async function loadGalleryImages(supabase, targetWidth) {
   try {
     const { data, error } = await supabase
       .from('gallery_image')
@@ -96,7 +106,7 @@ export async function loadGalleryImages(supabase) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     if (error) return [];
-    return (data || []).map((row) => ({ ...row, image_url: optimizedImageUrl(row.image_url) }));
+    return (data || []).map((row) => ({ ...row, image_url: optimizedImageUrl(row.image_url, targetWidth) }));
   } catch (err) {
     return [];
   }
@@ -129,7 +139,7 @@ export async function loadFaqs(supabase) {
   }
 }
 
-export async function loadMenuSections(supabase) {
+export async function loadMenuSections(supabase, targetWidth) {
   try {
     const { data, error } = await supabase
       .from('menu_section')
@@ -137,7 +147,7 @@ export async function loadMenuSections(supabase) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
     if (error) return [];
-    return (data || []).map((row) => ({ ...row, image_url: optimizedImageUrl(row.image_url) }));
+    return (data || []).map((row) => ({ ...row, image_url: optimizedImageUrl(row.image_url, targetWidth) }));
   } catch (err) {
     return [];
   }
@@ -157,7 +167,7 @@ export async function loadAboutValues(supabase) {
   }
 }
 
-export async function loadMenuBanner(supabase) {
+export async function loadMenuBanner(supabase, targetWidth) {
   try {
     const { data, error } = await supabase
       .from('menu_banner')
@@ -165,7 +175,7 @@ export async function loadMenuBanner(supabase) {
       .eq('id', true)
       .maybeSingle();
     if (error || !data) return null;
-    return { ...data, image_url: optimizedImageUrl(data.image_url) };
+    return { ...data, image_url: optimizedImageUrl(data.image_url, targetWidth) };
   } catch (err) {
     return null;
   }

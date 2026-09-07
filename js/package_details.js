@@ -132,7 +132,12 @@ async function init() {
     ]);
 
     pkg._categoryName = categoryName;
-    pkg._photos = (photos || []).map(ph => ({ ...ph, image_url: optimizedImageUrl(ph.image_url) }));
+    // Left un-optimized here on purpose — this same array backs both the
+    // small gallery tiles and the near-fullscreen lightbox, which need very
+    // different Cloudinary target widths. Each renderer (renderGalleryHero's
+    // tile <img>, renderLightboxFrame) calls optimizedImageUrl() itself with
+    // its own width instead.
+    pkg._photos = photos || [];
     pkg._tiers = tiers || [];
     pkg._badges = await fetchBadgesForPackage(packageId);
 
@@ -269,7 +274,7 @@ function renderGalleryHero(pkg) {
 
   const tilesHtml = visible.map((ph, i) => `
     <button type="button" class="pkg-gallery-tile" data-index="${i}" aria-label="View photo ${i + 1} of ${count} for ${esc(name)}">
-      <img src="${esc(ph.image_url)}" alt="${esc(ph.alt_text || `${name} photo ${i + 1}`)}" loading="${i === 0 ? 'eager' : 'lazy'}">
+      <img src="${esc(optimizedImageUrl(ph.image_url, 900))}" alt="${esc(ph.alt_text || `${name} photo ${i + 1}`)}" loading="${i === 0 ? 'eager' : 'lazy'}">
     </button>`).join('');
 
   // A single photo has nothing to "gallery-browse" — badge only shows once
@@ -305,7 +310,7 @@ function closeLightbox() {
 function renderLightboxFrame(name) {
   const photo = lightboxPhotos[lightboxIndex];
   if (!photo) return;
-  pkgLightboxImg.src = photo.image_url;
+  pkgLightboxImg.src = optimizedImageUrl(photo.image_url, 1600);
   pkgLightboxImg.alt = photo.alt_text || `${name || 'Package'} photo ${lightboxIndex + 1}`;
   pkgLightboxCounter.textContent = `${lightboxIndex + 1} / ${lightboxPhotos.length}`;
 }

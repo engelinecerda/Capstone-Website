@@ -256,34 +256,12 @@
 /* ── Admin sidebar bell ─────────────────────────────────────────────────────── */
 .sidebar-header { position: relative; }
 
-.notif-sidebar-btn-wrap {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-}
-
 /* Admin inline panel */
-.notif-sidebar-panel {
-  margin: 0 8px 8px;
-  background: #fdf9f5;
-  border: 1px solid #ecddd2;
-  border-radius: 10px;
-  overflow: hidden;
-}
 
 .notif-sidebar-panel .notif-panel-header  { padding: 9px 12px; }
 .notif-sidebar-panel .notif-list          { max-height: 260px; }
 .notif-sidebar-panel .notif-item          { padding: 9px 12px; }
 .notif-sidebar-panel .notif-item.unread   { padding-left: 9px; }
-
-/* Nav-item used as the bell toggle in sidebar */
-.notif-nav-item { cursor: pointer; user-select: none; }
-
-.notif-nav-item:focus-visible {
-  outline: 2px solid #6b3c11;
-  outline-offset: -2px;
-  border-radius: 6px;
-}
 
 /* ── Customer dropdown — brand palette ──────────────────────────────────────
    Scoped under .notif-navbar-wrapper (customer-only mount point) rather than

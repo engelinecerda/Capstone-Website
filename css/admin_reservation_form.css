@@ -4,7 +4,7 @@
    .status-pill/.et-action-btn, which redeclared its own cream/Kumbh-Sans
    :root and silently overrode the shared dark-sidebar theme on this page
    only. Those classes are now defined locally, in the shared palette. */
-@import url('admin_payment_options.css');
+@import url('admin_payment_options.css?v=1');
 
 /* ── TOP-LEVEL TABS ── */
 .settings-tabs {

@@ -1,4 +1,4 @@
-@import url('./admin_homepage.css');
+@import url('./admin_homepage.css?v=1');
 
 .reports-shell {
   display: grid;

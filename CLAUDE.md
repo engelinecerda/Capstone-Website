@@ -118,6 +118,12 @@ Page-specific CSS is one-to-one with HTML pages. Some files use `@import` chains
 
 The hamburger button and overlay are injected dynamically by `js/admin_sidebar_counts.js` — no HTML files contain a hamburger element.
 
+### CSS cache-busting — bump on every CSS edit
+
+`vercel.json` caches everything under `/css/*` for a full year (`immutable`), which is only safe because every reference to a first-party stylesheet — both `<link href="/css/*.css">` tags across every HTML file and the `@import url('./*.css')` statements between CSS files — carries a `?v=1` query string. **Whenever you edit any file in `css/`, you must bump that version number everywhere** (currently a single shared `?v=1` used site-wide, not per-file), or returning visitors keep getting the old cached copy for up to a year. To bump it: find-and-replace `?v=1` → `?v=2` (next integer) across every `.html` and `.css` file in the repo.
+
+This does **not** apply to `/js/*` — JS here is native ES modules with deep transitive `import` chains (most real logic lives in files reached only via `import ... from './x.js'` inside other JS files, never via `<script src>` directly), so versioning only the HTML entry-point `<script>` tags would leave everything they import silently uncached-busted. JS is instead capped at a 1-day cache (`vercel.json`, `/js/(.*)`) as a safer middle ground that needs no manual bumping.
+
 ## Key Shared Modules
 
 - `js/admin_sidebar_counts.js` — runs on every admin page; injects hamburger, subscribes to Supabase Realtime for live nav badge counts
