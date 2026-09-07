@@ -109,7 +109,7 @@ body { background: var(--cream); }
   --pkg-chip-bg:       #F7F2EA;
   --pkg-chip-border:   #EEE5D8;
   --pkg-text:          #3E2418;
-  --pkg-text-muted:    #8A7965;
+  --pkg-text-muted:    #756756;
   --pkg-text-muted-2:  #6B5A47;
   --pkg-terracotta:    #A34F2E;
   --pkg-espresso:      #4A2C17;
@@ -814,7 +814,7 @@ body { background: var(--cream); }
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #8A7965;
+  color: #756756;
   margin: 0 0 4px;
 }
 .pkg-price-card .pkg-most-booked-chip { margin-bottom: 10px; }
@@ -840,7 +840,7 @@ body { background: var(--cream); }
   margin: 0;
 }
 .pkg-section-divider { border-top: 0.5px solid #F2EADD; margin: 14px 0; }
-.pkg-section-empty { font-size: 13.5px; color: #8A7965; margin: 0; }
+.pkg-section-empty { font-size: 13.5px; color: #756756; margin: 0; }
 
 /* ── Gallery lightbox ─────────────────────────────────────────────────── */
 .pkg-lightbox-backdrop {
@@ -969,7 +969,7 @@ body { background: var(--cream); }
   align-items: center;
   gap: 10px;
   font-size: 13.5px;
-  color: #8A7965;
+  color: #756756;
 }
 .pkg-policy-row-label i { font-size: 16px; color: #A34F2E; flex-shrink: 0; }
 .pkg-policy-row-value {
@@ -988,7 +988,7 @@ body { background: var(--cream); }
   padding-top: 16px;
   border-top: 0.5px solid #F2EADD;
 }
-.pkg-policy-footer-caption { font-size: 12.5px; color: #8A7965; margin: 0; }
+.pkg-policy-footer-caption { font-size: 12.5px; color: #756756; margin: 0; }
 .pkg-policy-terms-btn {
   flex-shrink: 0;
   display: inline-flex;

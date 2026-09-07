@@ -4,7 +4,7 @@
    account.css (imported below) — this file only adds the components that
    are unique to the single-reservation view.
 ======================== */
-@import url("account.css?v=1");
+@import url("account.css?v=7");
 
 .rd-page {
     padding-top: 28px;
@@ -590,6 +590,22 @@
     background: var(--acc-border-tan);
     color: var(--acc-text-muted);
     cursor: not-allowed;
+}
+
+/* Nothing currently owed (paid in full / cancelled / declined / completed)
+   — still a real, always-present entry point to payment history/receipts,
+   just visually a lighter-weight "view" action rather than a "pay" one. */
+.rd-pay-cta.outline {
+    background: #fff;
+    color: var(--acc-text);
+    border: 1px solid var(--acc-border-tan);
+}
+
+.rd-pay-cta.outline:hover,
+.rd-pay-cta.outline:focus-visible {
+    border-color: var(--acc-espresso);
+    background: var(--acc-cream);
+    outline: none;
 }
 
 .rd-pay-caption {

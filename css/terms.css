@@ -12,7 +12,11 @@
   --acc-cream-alt:     #FFFDFA;
   --acc-border-tan:    #E5DBCC;
   --acc-text:          #3E2418;
-  --acc-text-muted:    #8A7965;
+  /* Was #8A7965 (~3.5:1 on this page's cream backgrounds, fails AA) — this
+     token isn't just captions here, .terms-body p/li (the actual legal text)
+     use it too. #756756 keeps the same hue, ~4.6:1, matches the darkening
+     applied to this same #8A7965 value elsewhere in the site. */
+  --acc-text-muted:    #756756;
   --acc-terracotta:    #A34F2E;
 }
 

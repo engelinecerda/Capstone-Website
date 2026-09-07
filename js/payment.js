@@ -67,6 +67,15 @@ const state = {
         extensionsByReservationId: {}
     },
     reservationId: new URLSearchParams(window.location.search).get('reservation_id') || '',
+    // Routing hint only, from buildCustomerPaymentUrl's target param — used
+    // once, in syncSelections, to pre-select the matching option chip if
+    // one exists. Carries no authority of its own: what actually gets
+    // submitted is whatever option the customer has selected when they hit
+    // Submit, and that's re-validated against the real target record
+    // server-side regardless of how they arrived here (see
+    // validate_payment_submission(), 20260921_payment_target_validation.sql).
+    targetType: new URLSearchParams(window.location.search).get('target_type') || '',
+    targetId: new URLSearchParams(window.location.search).get('target_id') || '',
     reservationRules: null,
     paymentRules: null,
     paymentTypes: null,
@@ -340,6 +349,25 @@ function syncSelections(reservation) {
     if (!visibleOptions.length) {
         state.selectedOptionKey = '';
         return;
+    }
+
+    // Entry-point routing hint, consumed once on first load only (an
+    // already-made selection is never overridden by it). 'reservation'
+    // deliberately matches nothing specific here — which of the four base
+    // payment types to use is the customer's own choice at this page, not
+    // something an entry point should dictate.
+    if (!state.selectedOptionKey && state.targetType) {
+        const wantedPaymentType = state.targetType === 'extension' ? 'extension_fee'
+            : state.targetType === 'reschedule' ? 'reschedule_fee'
+            : state.targetType === 'cancellation' ? 'cancellation_fee'
+            : null;
+        const matched = wantedPaymentType && visibleOptions.find((option) => {
+            if (option.paymentType !== wantedPaymentType) return false;
+            if (state.targetType === 'extension') return String(option.extensionId || '') === String(state.targetId || '');
+            if (state.targetType === 'reschedule') return String(option.rescheduleRequestId || '') === String(state.targetId || '');
+            return true;
+        });
+        if (matched) state.selectedOptionKey = getPaymentOptionKey(matched);
     }
 
     const selectedStillVisible = visibleOptions.some((option) => getPaymentOptionKey(option) === state.selectedOptionKey);
@@ -820,8 +848,22 @@ function renderActionableCard(reservation) {
         `;
     }
 
+    // Unmistakable "what is this payment for", ahead of any payment details
+    // — built from selectedOption (getAvailablePaymentOptions, sourced from
+    // the loaded reservation/reschedule/extension bundle), never from the
+    // URL's target_type/target_id hint directly, so a stale or edited URL
+    // can't mislead the customer about what they're about to pay: whatever
+    // this line says is exactly what validate_payment_submission() will
+    // re-check server-side on submit.
+    const payingSummary = `${escapeHtml(reservation.event_type || 'Event')} — ${escapeHtml(selectedOption.displayLabel || selectedOption.label)}`;
+
     return `
         <section class="payment-focus-card">
+            <div class="payment-target-summary">
+                <p class="payment-target-summary-label">Paying: <strong>${payingSummary}</strong></p>
+                ${selectedOption.displayDescription ? `<p class="payment-target-summary-desc">${escapeHtml(selectedOption.displayDescription)}</p>` : ''}
+            </div>
+
             <section class="payment-step-section">
                 <div>
                     <p class="payment-step-label">Step 1</p>

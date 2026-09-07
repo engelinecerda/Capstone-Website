@@ -685,8 +685,16 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
 //   'cancellation_fee_due' - cancelled, fee unpaid — the only thing payable
 //   'cancelled_settled'    - cancelled, nothing left to pay
 //   'reschedule_fee_due'   - an approved reschedule is awaiting its fee
+//   'extension_fee_due'    - an approved extension is awaiting its fee
 //   'paid_in_full'         - base balance fully paid, nothing else owed
 //   'balance_due'          - base balance (still) owed, reservation active
+//
+// Every returned state also carries targetType/targetId — the same
+// reservation|extension|reschedule|cancellation vocabulary
+// buildCustomerPaymentUrl()'s target param uses, and exactly what this
+// state is FOR, so callers (account.js's Continue Payment button,
+// payment.js's own "Paying: X" summary) can build a routing hint or a
+// display line directly from this object instead of re-deriving it.
 export function getPaymentPageState(reservation, paymentsByReservationId, reschedulesByReservationId, options = {}) {
     const reservationId = reservation.reservation_id;
     const payments = getReservationPayments(paymentsByReservationId, reservationId);
@@ -699,6 +707,8 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             submittable: true,
             amountDue,
             balance,
+            targetType: 'cancellation',
+            targetId: reservationId,
             label: 'Cancellation fee due',
             key: 'rejected',
             sublabel: `${safeFormatCurrency(amountDue)} required to finalize your cancellation`
@@ -711,6 +721,8 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             submittable: false,
             amountDue: 0,
             balance,
+            targetType: 'cancellation',
+            targetId: reservationId,
             label: 'Cancelled',
             key: 'cancelled',
             sublabel: 'This reservation has been cancelled'
@@ -727,11 +739,18 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             paymentsByReservationId,
             options
         );
+        const pendingTargetType = pendingPayment.payment_type === 'extension_fee' ? 'extension'
+            : pendingPayment.payment_type === 'reschedule_fee' ? 'reschedule'
+            : pendingPayment.payment_type === 'cancellation_fee' ? 'cancellation'
+            : 'reservation';
+        const pendingTargetId = pendingPayment.extension_id || pendingPayment.reschedule_request_id || reservationId;
         return {
             mode: 'pending_review',
             submittable: false,
             amountDue: Number(pendingPayment.amount || 0),
             balance,
+            targetType: pendingTargetType,
+            targetId: pendingTargetId,
             label: `${pendingLabel} pending review`,
             key: 'pending',
             sublabel: 'Waiting for admin confirmation'
@@ -748,6 +767,8 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             submittable: false,
             amountDue: 0,
             balance,
+            targetType: 'reservation',
+            targetId: reservationId,
             label: 'Awaiting approval',
             key: 'pending',
             sublabel: 'Payment becomes available once your reservation is approved.'
@@ -755,13 +776,16 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
     }
 
     const rescheduleRequests = reschedulesByReservationId?.[reservationId] || [];
-    if (isRescheduleFeeOwed(rescheduleRequests, payments)) {
+    const openReschedule = rescheduleRequests.find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
+    if (openReschedule && isRescheduleFeeOwed(rescheduleRequests, payments)) {
         const amountDue = getSharedRescheduleFee(options.paymentRules);
         return {
             mode: 'reschedule_fee_due',
             submittable: true,
             amountDue,
             balance,
+            targetType: 'reschedule',
+            targetId: openReschedule.reschedule_request_id,
             label: 'Reschedule fee pending',
             key: 'info',
             sublabel: 'Complete the reschedule fee to finalize the change'
@@ -777,6 +801,8 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             submittable: true,
             amountDue,
             balance,
+            targetType: 'extension',
+            targetId: openExtension?.extension_id || null,
             label: 'Extension fee pending',
             key: 'info',
             sublabel: 'Complete the extension fee to confirm your added hours'
@@ -789,6 +815,8 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             submittable: false,
             amountDue: 0,
             balance,
+            targetType: 'reservation',
+            targetId: reservationId,
             label: 'Paid in full',
             key: 'approved',
             sublabel: 'All required payments recorded'
@@ -796,6 +824,8 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
     }
 
     return {
+        targetType: 'reservation',
+        targetId: reservationId,
         mode: 'balance_due',
         submittable: true,
         amountDue: balance.remainingBalance,
@@ -1212,10 +1242,22 @@ export async function submitCustomerPayment({
     };
 }
 
-export function buildCustomerPaymentUrl(reservationId) {
+// target (optional): { type: 'reservation'|'extension'|'reschedule'|
+// 'cancellation', id }. This is a ROUTING HINT ONLY — it just pre-selects
+// the matching option on arrival (js/payment.js's syncSelections), same as
+// clicking a different option chip would. It carries no authority: every
+// actual submission is re-validated server-side (validate_payment_
+// submission(), supabase/migrations/20260921_payment_target_validation.sql)
+// against the real reservation_extensions/reschedule_requests/reservation
+// row, never against this URL string.
+export function buildCustomerPaymentUrl(reservationId, target = null) {
     const url = new URL('/payment.html', window.location.href);
     if (reservationId) {
         url.searchParams.set('reservation_id', reservationId);
+    }
+    if (target?.type) {
+        url.searchParams.set('target_type', target.type);
+        if (target.id) url.searchParams.set('target_id', target.id);
     }
     return url.href;
 }

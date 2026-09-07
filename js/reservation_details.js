@@ -458,7 +458,16 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     const paymentDone = baseBalancePaid && !cancellationFeeOwed && !rescheduleFeeOwed && !extensionFeeOwed;
     const verificationDone = isReservationPaymentEnabled(reservation);
     const hideActions = ['cancelled', 'declined', 'completed'].includes(effectiveStatus);
-    const showPaymentCta = !hideActions && !paymentDone;
+    // The CTA itself is now always shown — js/payment.js renders a graceful
+    // card for every one of these states already (paid-in-full history,
+    // the cancelled/declined card, etc. — see 20260912_payment_page_
+    // server_guard.sql's "Always-Viewable Customer Payment Page"), so there
+    // is no state where hiding the one entry point to it is correct. It
+    // used to disappear entirely once paymentDone or hideActions was true,
+    // which meant a customer with nothing currently owed had no way at all
+    // to reach their payment/receipt history from this page.
+    const showPaymentCta = true;
+    const nothingOwed = hideActions || paymentDone;
     const locked = !verificationDone;
 
     return `
@@ -516,11 +525,11 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
             ${showPaymentCta ? `
                 <button
                     type="button"
-                    class="rd-pay-cta ${locked ? 'locked' : 'primary'}"
+                    class="rd-pay-cta ${locked ? 'locked' : (nothingOwed ? 'outline' : 'primary')}"
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : 'Continue payment'))}
+                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : (nothingOwed ? 'View payment history' : 'Continue payment')))}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your reservation is verified</p>` : ''}
             ` : ''}
@@ -778,15 +787,30 @@ function render() {
     const canCancel = computeCanCancel(reservation.status, payments, reservation, paymentRules);
     const cancelBlockReason = getCancellationBlockReason(reservation, paymentRules);
     const isTerminalCancelled = ['cancelled', 'declined'].includes(effectiveStatus);
-    const paymentUrl = buildCustomerPaymentUrl(reservationId);
     const cancellationFeeOwed = isCancellationFeeOwed(reservation, payments);
     const rescheduleFeeOwed = isRescheduleFeeOwed(rescheduleRequests, payments);
+    const openReschedule = rescheduleFeeOwed
+        ? (rescheduleRequests || []).find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment')
+        : null;
     // Unlike cancellation/reschedule (a shared config amount), an extension
     // fee's amount comes from the specific open request's own snapshotted
     // total_price — so this is the row itself (or null), not a boolean.
     const openExtension = isExtensionFeeOwed(extensions, payments)
         ? (extensions || []).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
         : null;
+    // Same priority order as js/customer_payments.js's getPaymentPageState
+    // (cancellation > reschedule > extension > base balance) — the "View
+    // Payment" CTA below already picks its label this way; this makes the
+    // URL it routes to carry the matching explicit target instead of just
+    // the reservation id, so payment.js pre-selects the same fee this page
+    // told the customer they're about to pay.
+    const paymentUrl = cancellationFeeOwed
+        ? buildCustomerPaymentUrl(reservationId, { type: 'cancellation', id: reservationId })
+        : openReschedule
+            ? buildCustomerPaymentUrl(reservationId, { type: 'reschedule', id: openReschedule.reschedule_request_id })
+            : openExtension
+                ? buildCustomerPaymentUrl(reservationId, { type: 'extension', id: openExtension.extension_id })
+                : buildCustomerPaymentUrl(reservationId, { type: 'reservation', id: reservationId });
     // The 4-step booking stepper (Submitted/Verification/Payment/Confirmed)
     // describes progress toward a *new* booking — showing it while a
     // cancellation fee is owed read as if the original reservation was

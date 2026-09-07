@@ -209,14 +209,14 @@
 
 .notif-item-time {
   font-size: 11px;
-  color: #9ca3af;
+  color: #606876;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .notif-item-body {
   font-size: 12px;
-  color: #6b7280;
+  color: #626875;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -239,7 +239,7 @@
 .notif-empty {
   padding: 36px 16px;
   text-align: center;
-  color: #9ca3af;
+  color: #606876;
   font-size: 12.5px;
   display: flex;
   flex-direction: column;
@@ -308,20 +308,20 @@
    was under 4.5:1 for the read state before). #3E2418 on #FFFDFA ≈ 14:1. */
 .notif-navbar-wrapper .notif-item-title { color: #3E2418; font-weight: 600; }
 
-/* Body copy — was #8A7965 (≈4.1:1, fails AA); #6B5A47 ≈ 6.5:1 on this
+/* Body copy — was #756756 (≈4.1:1, fails AA); #6B5A47 ≈ 6.5:1 on this
    panel's #FFFDFA/#FBF8F2 backgrounds, still reads as secondary vs. title. */
 .notif-navbar-wrapper .notif-item-body { color: #6B5A47; }
 
 /* Timestamp stays the lighter/faint tone — secondary metadata, not the
    primary reading content. */
-.notif-navbar-wrapper .notif-item-time { color: #8A7965; }
+.notif-navbar-wrapper .notif-item-time { color: #756756; }
 
 /* Always rendered — .is-read makes it an invisible spacer instead of being
    removed from the DOM, so read/unread rows stay aligned. */
 .notif-navbar-wrapper .notif-unread-dot { background: #A34F2E; }
 .notif-navbar-wrapper .notif-unread-dot.is-read { background: transparent; }
 
-.notif-navbar-wrapper .notif-empty { color: #A89880; }
+.notif-navbar-wrapper .notif-empty { color: #766751; }
 .notif-navbar-wrapper .notif-empty-icon { opacity: 0.5; }
 .notif-navbar-wrapper .notif-empty-icon svg { display: block; margin: 0 auto; }
 

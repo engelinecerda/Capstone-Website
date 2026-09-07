@@ -907,22 +907,33 @@ function closeReceiptModal() {
   receiptModal?.setAttribute('aria-hidden', 'true');
 }
 
-// "Expected this payment" only has a well-defined, system-configured value
-// for the two flat-fee payment types — cancellation_fee and reschedule_fee
-// both come from system_settings.payment_rules via the same
-// getCancellationFee/getRescheduleFee helpers the cancellation/reschedule
-// flows themselves use (js/reservation_shared.js), so the comparison here
-// can never disagree with what the customer was actually charged.
-// Everything else (reservation_fee/down_payment/full_payment/
-// partial_payment) is a variable amount negotiated per booking — there's
-// no fixed figure to compare against, so this returns null rather than
-// fabricating one.
+// "Expected this payment" has a well-defined value for all three flat-fee
+// payment types. cancellation_fee/reschedule_fee come from system_settings.
+// payment_rules via the same getCancellationFee/getRescheduleFee helpers
+// the cancellation/reschedule flows themselves use (js/reservation_shared.
+// js), so the comparison here can never disagree with what the customer
+// was actually charged. extension_fee is per-request rather than a shared
+// config value — its expected amount is the specific reservation_
+// extensions row's own snapshotted total_price (extensionRequestMap, same
+// lookup the queue row's own detail line already uses), so an extension
+// payment gets the same mismatch-detection coverage the other two fee
+// types always had instead of silently skipping it. Everything else
+// (reservation_fee/down_payment/full_payment/partial_payment) is a
+// variable amount negotiated per booking — there's no fixed figure to
+// compare against, so this returns null rather than fabricating one.
 function getExpectedPaymentAmount(payment, reservation, paymentRules) {
   if (payment.payment_type === 'cancellation_fee') {
     return { amount: getCancellationFee(reservation, paymentRules), label: 'Cancellation fee' };
   }
   if (payment.payment_type === 'reschedule_fee') {
     return { amount: getRescheduleFee(paymentRules), label: 'Reschedule fee' };
+  }
+  if (payment.payment_type === 'extension_fee') {
+    const extensionRequest = payment.extension_id ? getExtensionRequest(payment.extension_id) : null;
+    return {
+      amount: extensionRequest ? Number(extensionRequest.total_price) : null,
+      label: 'Extension fee'
+    };
   }
   return { amount: null, label: 'No fixed amount for this payment type' };
 }

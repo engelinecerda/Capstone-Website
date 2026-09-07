@@ -1330,13 +1330,39 @@ function buildReservationCard(reservation, view) {
     // (base balance, reschedule fee, cancellation fee) correctly.
     const paymentIsActionable = getAvailablePaymentOptions(reservation).length > 0;
     const cancellationFeeOwed = isCancellationFeeOwed(reservation, getReservationPayments(reservation.reservation_id));
-    const rescheduleFeeOwed = isRescheduleFeeOwed(getReservationRescheduleRequests(reservation.reservation_id), getReservationPayments(reservation.reservation_id));
+    const rescheduleRequests = getReservationRescheduleRequests(reservation.reservation_id);
+    const rescheduleFeeOwed = isRescheduleFeeOwed(rescheduleRequests, getReservationPayments(reservation.reservation_id));
+    // Row (not just the boolean) so the "Continue Payment" button below can
+    // pass its reschedule_request_id as an explicit payment target — a
+    // reservation can cycle through more than one reschedule over its life,
+    // each with its own fee, so "this reservation" alone isn't specific
+    // enough once one is open.
+    const openReschedule = rescheduleFeeOwed
+        ? rescheduleRequests.find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment')
+        : null;
     // Unlike cancellation/reschedule (a shared config amount), an extension
     // fee's amount comes from the specific open request's own snapshotted
     // total_price — so this is the row itself (or null), not a boolean.
     const openExtension = isExtensionFeeOwed(getReservationExtensions(reservation.reservation_id), getReservationPayments(reservation.reservation_id))
         ? getReservationExtensions(reservation.reservation_id).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
         : null;
+    // Same priority order as js/customer_payments.js's getPaymentPageState
+    // (cancellation > reschedule > extension > base balance) — drives both
+    // the "Continue Payment" button's label and the explicit target it
+    // routes to, so the button never says one thing and pays for another.
+    // Deliberately only relevant while paymentIsActionable is true — this
+    // button is the "you have something to pay, act now" CTA specifically
+    // for My Reservations, not a general-purpose link to the payment page.
+    // Viewing settled payment history for a reservation with nothing owed
+    // belongs on the Reservation Details page ("View Payment History"),
+    // not here.
+    const paymentTarget = cancellationFeeOwed
+        ? { type: 'cancellation', id: reservation.reservation_id, label: 'Pay Cancellation Fee' }
+        : openReschedule
+            ? { type: 'reschedule', id: openReschedule.reschedule_request_id, label: 'Pay Reschedule Fee' }
+            : openExtension
+                ? { type: 'extension', id: openExtension.extension_id, label: 'Pay Extension Fee' }
+                : { type: 'reservation', id: reservation.reservation_id, label: 'Continue Payment' };
     const review = view === 'past' ? getReservationReview(reservation.reservation_id) : null;
     const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed || Boolean(openExtension));
     const statusIcon = getReservationStatusIcon(reservationStatus.key);
@@ -1394,7 +1420,7 @@ function buildReservationCard(reservation, view) {
             <div class="reservation-card-footer">
                 <div class="reservation-summary-actions">
                     ${paymentIsActionable ? `
-                        <button type="button" class="reservation-card-cta open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Continue Payment <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                        <button type="button" class="reservation-card-cta open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-target-type="${escapeHtml(paymentTarget.type)}" data-target-id="${escapeHtml(paymentTarget.id)}">${escapeHtml(paymentTarget.label)} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
                     ` : ''}
                     <a class="reservation-card-cta-secondary" href="${escapeHtml(detailsUrl)}">View details <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
                     ${review
@@ -2494,7 +2520,9 @@ function wireReservationActions() {
         const openPaymentsBtn = event.target.closest('.open-payments-btn');
         if (openPaymentsBtn) {
             const reservationId = openPaymentsBtn.dataset.reservationId;
-            window.location.href = buildCustomerPaymentUrl(reservationId);
+            const targetType = openPaymentsBtn.dataset.targetType;
+            const targetId = openPaymentsBtn.dataset.targetId;
+            window.location.href = buildCustomerPaymentUrl(reservationId, targetType ? { type: targetType, id: targetId } : null);
         }
     });
 }
