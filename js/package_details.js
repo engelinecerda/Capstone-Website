@@ -7,7 +7,7 @@
 // unaffected. This page still owns its own URL/fetch and loading/not-found
 // states a toggled-visibility panel never needed.
 import { customerSupabase as supabase } from './supabase.js';
-import { loadReservationRules, loadPaymentRules } from './customer_payments.js';
+import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 const CATEGORY_TABLE = 'package_category';
@@ -17,8 +17,8 @@ const PHOTO_TABLE    = 'package_photo';
 const BADGE_TABLE    = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
 
-let reservationRules = null;
 let paymentRules = null;
+let paymentTypes = null;
 let mostBookedPackageId = null;
 let lightboxPhotos = [];
 let lightboxIndex = 0;
@@ -93,9 +93,9 @@ async function init() {
   }
 
   try {
-    [reservationRules, paymentRules] = await Promise.all([
-      loadReservationRules(supabase),
-      loadPaymentRules(supabase)
+    [paymentRules, paymentTypes] = await Promise.all([
+      loadPaymentRules(supabase),
+      loadPaymentTypes(supabase)
     ]);
 
     const { data: pkg, error: pkgErr } = await supabase
@@ -437,7 +437,12 @@ function buildAreaContent() {
 function renderPolicyCard(pkg, loc) {
   const rows = [];
 
-  const depositPct = reservationRules?.deposit_pct;
+  // Down payment % lives on payment_type (code='down_payment'), the same
+  // source customer_payments.js's actual down-payment calculation reads —
+  // NOT reservation_rules.deposit_pct, which a prior refactor moved off of
+  // (see the comment above RESERVATION_RULES_DEFAULTS in customer_payments.js)
+  // and can still hold a stale pre-migration value in existing DB rows.
+  const depositPct = paymentTypes?.down_payment?.percent_of_total;
   if (depositPct != null) {
     const amount = Math.round(Number(pkg.price || 0) * (depositPct / 100));
     rows.push({
