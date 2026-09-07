@@ -551,3 +551,112 @@
         width: 100%;
     }
 }
+/* ========================
+   Write a Review CTA
+======================== */
+.reviews-write-cta {
+    max-width: 1100px;
+    margin: 0 auto 24px;
+    padding: 0 20px;
+}
+
+.reviews-write-cta__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: linear-gradient(135deg, #fff8f0 0%, #fffdf9 100%);
+    border: 1px solid #eadbcf;
+    border-radius: 4px;
+    padding: 18px 24px;
+}
+
+.reviews-write-cta__copy {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--brown-primary, #3D1A0A);
+}
+
+.reviews-write-cta__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: var(--brown-primary, #3D1A0A);
+    color: #fff;
+    padding: 12px 22px;
+    border-radius: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color 0.2s ease;
+}
+
+.reviews-write-cta__btn:hover {
+    background: var(--brown-mid, #6B3820);
+}
+
+/* ========================
+   Reservation Picker (Write a Review)
+======================== */
+.review-picker-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.review-picker-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    text-align: left;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid #eadbcf;
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+}
+
+.review-picker-item:hover,
+.review-picker-item:focus-visible {
+    outline: none;
+    border-color: #d09358;
+    background: #fff8f0;
+    transform: translateY(-1px);
+}
+
+.review-picker-item__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #2A1408;
+}
+
+.review-picker-item__meta {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #7a6a5f;
+}
+
+.review-picker-item__chevron {
+    color: #d09358;
+    font-size: 14px;
+    flex: none;
+}
+
+@media (max-width: 640px) {
+    .reviews-write-cta__inner {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+}

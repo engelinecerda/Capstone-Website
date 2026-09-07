@@ -738,7 +738,7 @@ function buildExtensionSection(reservation, extensions, effectiveStatus) {
     `;
 }
 
-function buildReviewRow(effectiveStatus, review) {
+function buildReviewRow(effectiveStatus, review, reservationId) {
     if (effectiveStatus !== 'completed') return '';
 
     if (review) {
@@ -752,7 +752,7 @@ function buildReviewRow(effectiveStatus, review) {
         `;
     }
 
-    const openReviewUrl = `/account.html?section=reservations&open=review&reservation_id=${encodeURIComponent(reservationId)}`;
+    const reviewUrl = `/reviews.html?review_reservation_id=${encodeURIComponent(reservationId)}`;
     return `
         <div class="rd-reschedule-row">
             <div class="rd-reschedule-row-left">
@@ -760,7 +760,7 @@ function buildReviewRow(effectiveStatus, review) {
                 <span>How was your event?</span>
             </div>
             <div class="rd-reschedule-row-actions">
-                <a class="rd-btn-outline" href="${escapeHtml(openReviewUrl)}">Leave a review</a>
+                <a class="rd-btn-outline" href="${escapeHtml(reviewUrl)}">Leave a review</a>
             </div>
         </div>
     `;
@@ -849,7 +849,7 @@ function render() {
 
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules, rescheduleBlockReason)}
         ${buildExtensionSection(reservation, extensions, effectiveStatus)}
-        ${buildReviewRow(effectiveStatus, review)}
+        ${buildReviewRow(effectiveStatus, review, reservation.reservation_id)}
     `;
 }
 

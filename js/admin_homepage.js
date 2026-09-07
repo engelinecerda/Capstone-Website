@@ -722,6 +722,34 @@ async function loadSystemOverview() {
 }
 
 // MANUAL FORECAST GENERATION
+//
+// /forecast/generate returns immediately (ack) and runs the actual Prophet
+// training in the background on the server — it no longer blocks until the
+// new forecast is ready (see python/main.py). That fixed the cron-job.org
+// 30s timeout. Rather than guessing how long generation will take with a
+// fixed poll schedule, we poll GET /forecast/status — which reflects the
+// server's actual in-memory run state — until it reports "done" or "error",
+// then refresh the chart exactly once.
+function refreshDemandChart(fresh) {
+    fullData = Array.isArray(fresh) ? fresh : [];
+    if (demandYearSelect && fullData.length) {
+        const years = [...new Set(fullData.map((d) => d.year))].sort();
+        demandYearSelect.innerHTML = '';
+        years.forEach((year) => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            demandYearSelect.appendChild(option);
+        });
+        const currentYear = new Date().getFullYear().toString();
+        demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
+    }
+    const selectedYear = demandYearSelect?.value;
+    if (selectedYear) renderDemandChart(selectedYear);
+}
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 generateForecastBtn?.addEventListener('click', async () => {
     generateForecastBtn.disabled = true;
     generateForecastBtn.textContent = 'Generating…';
@@ -739,24 +767,42 @@ generateForecastBtn?.addEventListener('click', async () => {
         const result = await res.json();
         if (!res.ok) throw new Error(result.detail || 'Unknown error');
 
-        const fresh = await loadForecast();
-        fullData = Array.isArray(fresh) ? fresh : [];
-        if (demandYearSelect && fullData.length) {
-            const years = [...new Set(fullData.map((d) => d.year))].sort();
-            demandYearSelect.innerHTML = '';
-            years.forEach((year) => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                demandYearSelect.appendChild(option);
-            });
-            const currentYear = new Date().getFullYear().toString();
-            demandYearSelect.value = years.includes(currentYear) ? currentYear : years[years.length - 1];
-        }
-        const selectedYear = demandYearSelect?.value;
-        if (selectedYear) renderDemandChart(selectedYear);
+        setDashboardMessage('Forecast generation started…');
 
-        setDashboardMessage('Forecast regenerated successfully.');
+        // Poll actual server-side status rather than a fixed timer. Checks
+        // every 1.5s; bails out after ~45s as a safety net in case
+        // something wedges (e.g. server restarted mid-run and the
+        // in-memory status got reset).
+        const POLL_INTERVAL_MS = 1500;
+        const MAX_WAIT_MS = 45000;
+        const startedPolling = Date.now();
+        let finalStatus = null;
+
+        while (Date.now() - startedPolling < MAX_WAIT_MS) {
+            await delay(POLL_INTERVAL_MS);
+            const statusRes = await fetch(`${API}/forecast/status`);
+            const status = await statusRes.json();
+
+            if (status.state === 'done' || status.state === 'error') {
+                finalStatus = status;
+                break;
+            }
+            // state is "running" (or "idle", e.g. briefly before the
+            // background task starts) — keep waiting.
+        }
+
+        if (finalStatus?.state === 'error') {
+            throw new Error(finalStatus.error || 'Forecast generation failed on the server.');
+        }
+
+        const fresh = await loadForecast();
+        refreshDemandChart(fresh);
+
+        setDashboardMessage(
+            finalStatus?.state === 'done'
+                ? 'Forecast regenerated successfully.'
+                : 'Still generating in the background — refresh in a bit to see the update.'
+        );
     } catch (err) {
         setDashboardMessage(`Forecast generation failed: ${err.message}`, true);
     } finally {

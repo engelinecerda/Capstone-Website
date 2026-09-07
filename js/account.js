@@ -130,15 +130,6 @@ const cancelModalConfirm = document.getElementById('cancel-modal-confirm');
 const cancelModalMessage = document.getElementById('cancel-modal-message');
 const cancelFeeAmount = document.getElementById('cancel-fee-amount');
 const cancelReasonInput = document.getElementById('cancel-reason-input');
-const reviewPromptBackdrop = document.getElementById('review-prompt-backdrop');
-const reviewPromptClose = document.getElementById('review-prompt-close');
-const reviewPromptDismiss = document.getElementById('review-prompt-dismiss');
-const reviewPromptSubmit = document.getElementById('review-prompt-submit');
-const reviewPromptReservationMeta = document.getElementById('review-prompt-reservation-meta');
-const reviewPromptRating = document.getElementById('review-prompt-rating');
-const reviewPromptRatingCopy = document.getElementById('review-prompt-rating-copy');
-const reviewPromptComment = document.getElementById('review-prompt-comment');
-const reviewPromptMessage = document.getElementById('review-prompt-message');
 const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
 const submissionFeedbackClose = document.getElementById('submission-feedback-close');
 const submissionFeedbackDismiss = document.getElementById('submission-feedback-dismiss');
@@ -162,9 +153,6 @@ const state = {
     reservationView: 'active',
     reservationPage: 1,
     receiptModalPaymentId: null,
-    reviewPromptReservationId: null,
-    reviewPromptRating: 0,
-    reviewPromptEvaluated: false,
     rescheduleModal: {
         reservationId: null,
         month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -211,24 +199,9 @@ function isMissingReviewsTableError(error) {
         || message.includes("relation \"reviews\" does not exist");
 }
 
-function getReviewFeatureErrorMessage(error, action = 'use') {
-    const message = error?.message || '';
-    const details = error?.details || '';
-    const code = error?.code || '';
-    const combined = `${message} ${details}`;
-
-    if (isMissingReviewsTableError(error) || isMissingColumnError(error, 'reservations', 'review_prompt_dismissed_at')) {
-        return 'The review feature is not fully set up in Supabase yet. Apply the review migrations in `supabase/migrations/`, then reload this page.';
-    }
-
-    if (code === '23505' || combined.includes('duplicate key value') || combined.includes('unique (reservation_id)')) {
-        return 'A review for this reservation was already submitted. Reload the page and check your completed reservation details.';
-    }
-
-    if (combined.toLowerCase().includes('row-level security') || code === '42501') {
-        return action === 'dismiss'
-            ? 'Supabase rejected this review prompt update. Apply the review migrations in `supabase/migrations/` and make sure this reservation belongs to the signed-in customer.'
-            : 'Supabase rejected this review submission. Apply the review migrations in `supabase/migrations/`, then make sure the reservation is completed or already past its event date/time in Manila time before submitting again.';
+function getReviewFeatureErrorMessage(error) {
+    if (isMissingReviewsTableError(error)) {
+        return 'The reviews feature is not fully set up in Supabase yet. Apply the review migrations in `supabase/migrations/`, then reload this page.';
     }
 
     return 'Something went wrong. Please try again.';
@@ -312,61 +285,6 @@ function getReservationBuckets() {
         }
         return groups;
     }, { active: [], past: [] });
-}
-
-function getReservationReviewState(reservation) {
-    const review = getReservationReview(reservation?.reservation_id);
-    const isCompleted = getEffectiveReservationStatus(reservation) === 'completed';
-    const dismissedAt = reservation?.review_prompt_dismissed_at || '';
-
-    return {
-        review,
-        isCompleted,
-        dismissedAt,
-        isDismissed: Boolean(dismissedAt) && !review,
-        canReview: isCompleted && !review,
-        canAutoPrompt: isCompleted && !review && !dismissedAt
-    };
-}
-
-function getReviewPromptCandidate() {
-    return state.reservations
-        .filter((reservation) => getReservationReviewState(reservation).canAutoPrompt)
-        .sort((left, right) => {
-            const leftTime = getReservationEventDateTime(left)?.getTime() || new Date(left?.created_at || 0).getTime() || 0;
-            const rightTime = getReservationEventDateTime(right)?.getTime() || new Date(right?.created_at || 0).getTime() || 0;
-            return rightTime - leftTime;
-        })[0] || null;
-}
-
-function getReviewRatingLabel(rating) {
-    const normalizedRating = Number(rating || 0);
-    if (!normalizedRating) return 'Not rated';
-    if (normalizedRating === 1) return '1 out of 5';
-    return `${normalizedRating} out of 5`;
-}
-
-function buildReviewStarsMarkup(rating, { interactive = false } = {}) {
-    const normalizedRating = Math.max(0, Math.min(5, Number(rating || 0)));
-    return Array.from({ length: 5 }, (_, index) => {
-        const filled = index < normalizedRating;
-        if (interactive) {
-            const value = index + 1;
-            return `
-                <button
-                    type="button"
-                    class="review-star-btn ${value <= normalizedRating ? 'active' : ''}"
-                    data-rating-value="${value}"
-                    aria-label="${value} star${value === 1 ? '' : 's'}"
-                    aria-checked="${value === normalizedRating ? 'true' : 'false'}"
-                >
-                    &#9733;
-                </button>
-            `;
-        }
-
-        return `<span class="review-display-star ${filled ? 'filled' : ''}" aria-hidden="true">${filled ? '&#9733;' : '&#9734;'}</span>`;
-    }).join('');
 }
 
 function getBookingScope(reservation) {
@@ -1419,7 +1337,7 @@ function buildReservationCard(reservation, view) {
     const openExtension = isExtensionFeeOwed(getReservationExtensions(reservation.reservation_id), getReservationPayments(reservation.reservation_id))
         ? getReservationExtensions(reservation.reservation_id).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
         : null;
-    const reviewState = view === 'past' ? getReservationReviewState(reservation) : null;
+    const review = view === 'past' ? getReservationReview(reservation.reservation_id) : null;
     const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed || Boolean(openExtension));
     const statusIcon = getReservationStatusIcon(reservationStatus.key);
 
@@ -1479,8 +1397,11 @@ function buildReservationCard(reservation, view) {
                         <button type="button" class="reservation-card-cta open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Continue Payment <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
                     ` : ''}
                     <a class="reservation-card-cta-secondary" href="${escapeHtml(detailsUrl)}">View details <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-                    ${reviewState?.review ? `<span class="reservation-reviewed-badge"><i class="fa-solid fa-check" aria-hidden="true"></i> Reviewed</span>` : ''}
-                    ${reviewState?.canReview ? `<button type="button" class="res-secondary-btn open-review-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">Leave a Review</button>` : ''}
+                    ${review
+                        ? `<span class="reservation-reviewed-badge"><i class="fa-solid fa-check" aria-hidden="true"></i> Reviewed</span>`
+                        : (view === 'past' && reservationStatus.key === 'completed'
+                            ? `<a class="reservation-card-cta-secondary" href="/reviews.html?review_reservation_id=${encodeURIComponent(reservation.reservation_id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Leave a Review</a>`
+                            : '')}
                 </div>
             </div>
         </article>
@@ -1506,151 +1427,6 @@ function buildReservationEmptyState(view) {
             ${view === 'active' ? '<a href="/reservations.html" class="res-book-btn">Book an Event</a>' : ''}
         </div>
     `;
-}
-
-function setReviewPromptMessage(message, type = '') {
-    if (!reviewPromptMessage) return;
-    reviewPromptMessage.textContent = message;
-    reviewPromptMessage.classList.remove('error', 'success');
-    if (type) {
-        reviewPromptMessage.classList.add(type);
-    }
-}
-
-function setReviewPromptRating(rating) {
-    state.reviewPromptRating = Math.max(0, Math.min(5, Number(rating || 0)));
-
-    reviewPromptRating?.querySelectorAll('[data-rating-value]').forEach((button, index) => {
-        const value = Number(button.dataset.ratingValue || index + 1);
-        const isActive = value <= state.reviewPromptRating;
-        const isSelected = value === state.reviewPromptRating;
-        button.classList.toggle('active', isActive);
-        button.setAttribute('aria-checked', isSelected ? 'true' : 'false');
-    });
-
-    if (reviewPromptRatingCopy) {
-        reviewPromptRatingCopy.textContent = state.reviewPromptRating
-            ? `${getReviewRatingLabel(state.reviewPromptRating)} selected`
-            : 'Choose a rating before you submit.';
-    }
-}
-
-function setReviewPromptBusy(isBusy) {
-    reviewPromptClose?.toggleAttribute('disabled', isBusy);
-    reviewPromptDismiss?.toggleAttribute('disabled', isBusy);
-    reviewPromptSubmit?.toggleAttribute('disabled', isBusy);
-}
-
-function openReviewPromptModal(reservationId) {
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
-    const reviewState = reservation ? getReservationReviewState(reservation) : null;
-
-    if (!reservation || !reviewState?.canReview) {
-        return;
-    }
-
-    state.reviewPromptReservationId = reservation.reservation_id;
-    setReviewPromptBusy(false);
-    setReviewPromptMessage('');
-    setReviewPromptRating(0);
-    if (reviewPromptComment) {
-        reviewPromptComment.value = '';
-    }
-    if (reviewPromptReservationMeta) {
-        reviewPromptReservationMeta.innerHTML = `
-            <div class="review-reservation-title">${escapeHtml(reservation.event_type || 'Event')}</div>
-            <div class="review-reservation-copy">
-                ${escapeHtml(getReservationPackageName(reservation))} • ${escapeHtml(formatDate(reservation.event_date))} • ${escapeHtml(reservation.event_time || 'No time selected')}
-            </div>
-        `;
-    }
-
-    reviewPromptBackdrop?.classList.remove('hidden');
-    reviewPromptBackdrop?.setAttribute('aria-hidden', 'false');
-}
-
-function closeReviewPromptModal() {
-    state.reviewPromptReservationId = null;
-    setReviewPromptBusy(false);
-    setReviewPromptMessage('');
-    reviewPromptBackdrop?.classList.add('hidden');
-    reviewPromptBackdrop?.setAttribute('aria-hidden', 'true');
-}
-
-function openEligibleReviewPrompt() {
-    const reservation = getReviewPromptCandidate();
-    if (!reservation) return;
-    openReviewPromptModal(reservation.reservation_id);
-}
-
-async function dismissReviewPrompt() {
-    const reservationId = state.reviewPromptReservationId;
-    if (!reservationId) return;
-
-    try {
-        setReviewPromptBusy(true);
-        setReviewPromptMessage('Saving your choice...');
-
-        const { error } = await supabase.rpc('dismiss_reservation_review_prompt', {
-            p_reservation_id: reservationId
-        });
-
-        if (error) throw error;
-
-        closeReviewPromptModal();
-        await loadReservations();
-    } catch (error) {
-        setReviewPromptBusy(false);
-        setReviewPromptMessage(`Failed to update this review prompt: ${getReviewFeatureErrorMessage(error, 'dismiss')}`, 'error');
-    }
-}
-
-async function submitReservationReview() {
-    const reservationId = state.reviewPromptReservationId;
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
-    if (!reservation) {
-        setReviewPromptMessage('This reservation could not be found.', 'error');
-        return;
-    }
-
-    if (!getReservationReviewState(reservation).canReview) {
-        setReviewPromptMessage('This reservation is no longer open for review.', 'error');
-        return;
-    }
-
-    if (!state.reviewPromptRating) {
-        setReviewPromptMessage('Choose a rating before you submit your review.', 'error');
-        return;
-    }
-
-    try {
-        setReviewPromptBusy(true);
-        setReviewPromptMessage('Submitting your review...');
-
-        const payload = {
-            reservation_id: reservationId,
-            user_id: user.id,
-            rating: state.reviewPromptRating,
-            comment: reviewPromptComment?.value.trim() || null
-        };
-
-        const { error } = await supabase
-            .from('reviews')
-            .insert(payload);
-
-        if (error) throw error;
-
-        closeReviewPromptModal();
-        await loadReservations();
-        openSubmissionFeedbackModal({
-            eyebrow: 'Review Submitted',
-            title: 'Thank You for the Feedback',
-            copy: 'Your review has been saved to your completed reservation.'
-        });
-    } catch (error) {
-        setReviewPromptBusy(false);
-        setReviewPromptMessage(`Failed to submit your review: ${getReviewFeatureErrorMessage(error, 'submit')}`, 'error');
-    }
 }
 
 function renderReservations() {
@@ -2073,31 +1849,11 @@ async function loadReservations({ silent = false } = {}) {
             package:package_id ( package_name, package_type, duration_hours ),
             add_on:add_on_id ( package_name, package_type )
         `;
-        const reservationSelectWithReviewPrompt = `
-            ${baseReservationSelect},
-            review_prompt_dismissed_at
-        `;
-
-        let reservationResponse = await supabase
+        const reservationResponse = await supabase
             .from('reservations')
-            .select(reservationSelectWithReviewPrompt)
+            .select(baseReservationSelect)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
-
-        if (reservationResponse.error && isMissingColumnError(reservationResponse.error, 'reservations', 'review_prompt_dismissed_at')) {
-            reservationResponse = await supabase
-                .from('reservations')
-                .select(baseReservationSelect)
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-
-            if (!reservationResponse.error) {
-                reservationResponse.data = (reservationResponse.data || []).map((reservation) => ({
-                    ...reservation,
-                    review_prompt_dismissed_at: null
-                }));
-            }
-        }
 
         if (reservationResponse.error) throw reservationResponse.error;
 
@@ -2120,10 +1876,6 @@ async function loadReservations({ silent = false } = {}) {
         renderPaymentsModule();
         if (!silent) {
             maybeAutoOpenReservationModal();
-        }
-        if (!state.reviewPromptEvaluated) {
-            state.reviewPromptEvaluated = true;
-            openEligibleReviewPrompt();
         }
     } catch (error) {
         if (silent) {
@@ -2158,8 +1910,6 @@ function maybeAutoOpenReservationModal() {
         openRescheduleModal(reservationId);
     } else if (action === 'cancel') {
         openCancelModal(reservationId);
-    } else if (action === 'review') {
-        openReviewPromptModal(reservationId);
     }
 
     const cleanUrl = new URL(window.location.href);
@@ -2741,12 +2491,6 @@ function wireReservationActions() {
             return;
         }
 
-        const reviewBtn = event.target.closest('.open-review-btn');
-        if (reviewBtn) {
-            openReviewPromptModal(reviewBtn.dataset.reservationId);
-            return;
-        }
-
         const openPaymentsBtn = event.target.closest('.open-payments-btn');
         if (openPaymentsBtn) {
             const reservationId = openPaymentsBtn.dataset.reservationId;
@@ -2855,26 +2599,6 @@ function wireCancelModal() {
     cancelModalConfirm?.addEventListener('click', submitCancellationRequest);
     cancelReservationBackdrop?.addEventListener('click', (event) => {
         if (event.target === cancelReservationBackdrop) closeCancelModal();
-    });
-}
-
-function wireReviewPromptModal() {
-    reviewPromptClose?.addEventListener('click', closeReviewPromptModal);
-    reviewPromptDismiss?.addEventListener('click', async () => {
-        await dismissReviewPrompt();
-    });
-    reviewPromptSubmit?.addEventListener('click', async () => {
-        await submitReservationReview();
-    });
-    reviewPromptBackdrop?.addEventListener('click', (event) => {
-        if (event.target === reviewPromptBackdrop) {
-            closeReviewPromptModal();
-        }
-    });
-    reviewPromptRating?.addEventListener('click', (event) => {
-        const starBtn = event.target.closest('[data-rating-value]');
-        if (!starBtn) return;
-        setReviewPromptRating(starBtn.dataset.ratingValue);
     });
 }
 
@@ -3303,7 +3027,6 @@ function wireLogout() {
         if (event.key === 'Escape') {
             if (state.receiptModalPaymentId) closeReceiptModal();
             if (state.rescheduleModal.reservationId) closeRescheduleModal();
-            if (state.reviewPromptReservationId) closeReviewPromptModal();
             if (submissionFeedbackBackdrop && !submissionFeedbackBackdrop.classList.contains('hidden')) {
                 closeSubmissionFeedbackModal();
             }
@@ -3378,7 +3101,6 @@ wirePaymentActions();
 wireReceiptModal();
 wireRescheduleModal();
 wireCancelModal();
-wireReviewPromptModal();
 wireSubmissionFeedbackModal();
 wireProfileForm();
 wirePasswordForm();

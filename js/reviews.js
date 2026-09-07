@@ -1,6 +1,7 @@
 // /js/reviews.js
 import { customerSupabase as supabase } from './supabase.js';
 import { shouldHideReview } from './reviews_filter.js';
+import { getEffectiveReservationStatus, getReservationPackageName } from './reservation_shared.js';
 
 /* ============================================================
    STATE
@@ -11,6 +12,13 @@ let allReviews = [];
 let currentFilter = 'all';
 let currentSort = 'newest';
 let visibleCount = REVIEWS_PER_PAGE;
+
+// Write-a-review flow: only relevant for a signed-in customer with at
+// least one completed reservation that doesn't have a review yet.
+let currentUser = null;
+let eligibleReservations = [];
+let activeReviewReservation = null;
+let reviewPromptRatingValue = 0;
 
 /* ============================================================
    FETCH REVIEWS
@@ -248,6 +256,317 @@ function showError(message) {
 }
 
 /* ============================================================
+   WRITE A REVIEW
+============================================================ */
+function getReservationEventMeta(reservation) {
+    const packageName = getReservationPackageName(reservation);
+    const date = formatDate(reservation.event_date);
+    const time = reservation.event_time || 'No time selected';
+    return `${escapeHtml(packageName)} • ${escapeHtml(date)} • ${escapeHtml(time)}`;
+}
+
+async function fetchMyReviewableReservations(userId) {
+    const { data: reservations, error } = await supabase
+        .from('reservations')
+        .select(`
+            reservation_id,
+            event_type,
+            event_date,
+            event_time,
+            status,
+            package:package_id ( package_name )
+        `)
+        .eq('user_id', userId)
+        .order('event_date', { ascending: false });
+
+    if (error) throw error;
+
+    const completed = (reservations || []).filter(
+        (reservation) => getEffectiveReservationStatus(reservation) === 'completed'
+    );
+
+    if (!completed.length) return [];
+
+    const reservationIds = completed.map((reservation) => reservation.reservation_id);
+
+    const { data: existingReviews, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('reservation_id')
+        .eq('user_id', userId)
+        .in('reservation_id', reservationIds);
+
+    if (reviewsError) throw reviewsError;
+
+    const reviewedIds = new Set((existingReviews || []).map((review) => review.reservation_id));
+
+    return completed.filter((reservation) => !reviewedIds.has(reservation.reservation_id));
+}
+
+function updateWriteReviewVisibility() {
+    const section = document.getElementById('writeReviewSection');
+    if (!section) return;
+    section.classList.toggle('hidden', eligibleReservations.length === 0);
+}
+
+function getReviewReservationIdFromUrl() {
+    try {
+        return new URLSearchParams(window.location.search).get('review_reservation_id');
+    } catch (err) {
+        return null;
+    }
+}
+
+async function initWriteReview() {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        currentUser = session.user;
+        eligibleReservations = await fetchMyReviewableReservations(currentUser.id);
+        updateWriteReviewVisibility();
+
+        const deepLinkedId = getReviewReservationIdFromUrl();
+        if (deepLinkedId) {
+            const targetReservation = eligibleReservations.find(
+                (reservation) => String(reservation.reservation_id) === deepLinkedId
+            );
+
+            // Strip the param either way so a refresh or re-visit doesn't reopen the modal.
+            const url = new URL(window.location.href);
+            url.searchParams.delete('review_reservation_id');
+            window.history.replaceState({}, '', url);
+
+            if (targetReservation) {
+                openReviewPromptModal(targetReservation);
+            }
+        }
+    } catch (err) {
+        console.error('[reviews] failed to check reviewable reservations:', err);
+    }
+}
+
+function renderReviewPickerList() {
+    const list = document.getElementById('reviewPickerList');
+    if (!list) return;
+
+    list.innerHTML = eligibleReservations.map((reservation) => `
+        <button type="button" class="review-picker-item" data-reservation-id="${escapeHtml(reservation.reservation_id)}">
+            <div>
+                <div class="review-picker-item__title">${escapeHtml(reservation.event_type || 'Event')}</div>
+                <div class="review-picker-item__meta">${getReservationEventMeta(reservation)}</div>
+            </div>
+            <i class="fa-solid fa-chevron-right review-picker-item__chevron" aria-hidden="true"></i>
+        </button>
+    `).join('');
+}
+
+function openReviewPickerModal() {
+    renderReviewPickerList();
+    const backdrop = document.getElementById('review-picker-backdrop');
+    backdrop?.classList.remove('hidden');
+    backdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeReviewPickerModal() {
+    const backdrop = document.getElementById('review-picker-backdrop');
+    backdrop?.classList.add('hidden');
+    backdrop?.setAttribute('aria-hidden', 'true');
+}
+
+function setReviewPromptRating(rating) {
+    reviewPromptRatingValue = Math.max(0, Math.min(5, Number(rating || 0)));
+    const ratingLabels = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+
+    document.querySelectorAll('#review-prompt-rating [data-rating-value]').forEach((button) => {
+        const value = Number(button.dataset.ratingValue);
+        const isActive = value <= reviewPromptRatingValue;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-checked', String(value === reviewPromptRatingValue));
+    });
+
+    const ratingCopy = document.getElementById('review-prompt-rating-copy');
+    if (ratingCopy) {
+        ratingCopy.textContent = reviewPromptRatingValue
+            ? `${ratingLabels[reviewPromptRatingValue]} selected`
+            : 'Choose a rating before you submit.';
+    }
+}
+
+function setReviewPromptMessage(message, type = '') {
+    const messageEl = document.getElementById('review-prompt-message');
+    if (!messageEl) return;
+    messageEl.textContent = message;
+    messageEl.classList.remove('error', 'success');
+    if (type) messageEl.classList.add(type);
+}
+
+function setReviewPromptBusy(isBusy) {
+    document.getElementById('review-prompt-close')?.toggleAttribute('disabled', isBusy);
+    document.getElementById('review-prompt-back')?.toggleAttribute('disabled', isBusy);
+    document.getElementById('review-prompt-submit')?.toggleAttribute('disabled', isBusy);
+}
+
+function openReviewPromptModal(reservation) {
+    activeReviewReservation = reservation;
+
+    setReviewPromptBusy(false);
+    setReviewPromptMessage('');
+    setReviewPromptRating(0);
+
+    const commentInput = document.getElementById('review-prompt-comment');
+    if (commentInput) commentInput.value = '';
+
+    const meta = document.getElementById('review-prompt-reservation-meta');
+    if (meta) {
+        meta.innerHTML = `
+            <div class="review-reservation-title">${escapeHtml(reservation.event_type || 'Event')}</div>
+            <div class="review-reservation-copy">${getReservationEventMeta(reservation)}</div>
+        `;
+    }
+
+    closeReviewPickerModal();
+    const backdrop = document.getElementById('review-prompt-backdrop');
+    backdrop?.classList.remove('hidden');
+    backdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeReviewPromptModal() {
+    activeReviewReservation = null;
+    setReviewPromptBusy(false);
+    setReviewPromptMessage('');
+    const backdrop = document.getElementById('review-prompt-backdrop');
+    backdrop?.classList.add('hidden');
+    backdrop?.setAttribute('aria-hidden', 'true');
+}
+
+function openSubmissionFeedbackModal() {
+    const backdrop = document.getElementById('submission-feedback-backdrop');
+    document.getElementById('submission-feedback-eyebrow').textContent = 'Review Submitted';
+    document.getElementById('submission-feedback-title').textContent = 'Thank You for the Feedback';
+    document.getElementById('submission-feedback-copy').textContent = 'Your review has been saved to your completed reservation.';
+    backdrop?.classList.remove('hidden');
+    backdrop?.setAttribute('aria-hidden', 'false');
+}
+
+function closeSubmissionFeedbackModal() {
+    const backdrop = document.getElementById('submission-feedback-backdrop');
+    backdrop?.classList.add('hidden');
+    backdrop?.setAttribute('aria-hidden', 'true');
+}
+
+async function submitReservationReview() {
+    const reservation = activeReviewReservation;
+    if (!reservation || !currentUser) {
+        setReviewPromptMessage('This reservation could not be found.', 'error');
+        return;
+    }
+
+    if (!reviewPromptRatingValue) {
+        setReviewPromptMessage('Choose a rating before you submit your review.', 'error');
+        return;
+    }
+
+    try {
+        setReviewPromptBusy(true);
+        setReviewPromptMessage('Submitting your review...');
+
+        const comment = document.getElementById('review-prompt-comment')?.value.trim() || null;
+
+        const { error } = await supabase
+            .from('reviews')
+            .insert({
+                reservation_id: reservation.reservation_id,
+                user_id: currentUser.id,
+                rating: reviewPromptRatingValue,
+                comment
+            });
+
+        if (error) throw error;
+
+        closeReviewPromptModal();
+
+        // That reservation is no longer eligible; if it was opened from the
+        // picker and others remain, the customer can reopen the picker from
+        // the (still-visible) CTA button.
+        eligibleReservations = eligibleReservations.filter(
+            (entry) => entry.reservation_id !== reservation.reservation_id
+        );
+        updateWriteReviewVisibility();
+
+        openSubmissionFeedbackModal();
+
+        // Refresh the public list so the new review appears right away.
+        try {
+            const raw = await fetchReviews();
+            allReviews = raw.filter((r) => !shouldHideReview(r.comment).hide);
+            renderSummary();
+            renderReviews();
+        } catch (refreshError) {
+            console.error('[reviews] failed to refresh reviews after submit:', refreshError);
+        }
+    } catch (error) {
+        setReviewPromptBusy(false);
+        const message = String(error?.message || '');
+        if (message.includes('duplicate key value') || message.includes('reviews_reservation_id_key')) {
+            setReviewPromptMessage('A review for this reservation was already submitted.', 'error');
+        } else {
+            setReviewPromptMessage('Failed to submit your review. Please try again.', 'error');
+        }
+    }
+}
+
+function setupWriteReviewListeners() {
+    document.getElementById('writeReviewBtn')?.addEventListener('click', () => {
+        if (eligibleReservations.length === 1) {
+            openReviewPromptModal(eligibleReservations[0]);
+        } else if (eligibleReservations.length > 1) {
+            openReviewPickerModal();
+        }
+    });
+
+    document.getElementById('review-picker-close')?.addEventListener('click', closeReviewPickerModal);
+    document.getElementById('review-picker-backdrop')?.addEventListener('click', (event) => {
+        if (event.target.id === 'review-picker-backdrop') closeReviewPickerModal();
+    });
+    document.getElementById('reviewPickerList')?.addEventListener('click', (event) => {
+        const item = event.target.closest('.review-picker-item');
+        if (!item) return;
+        const reservation = eligibleReservations.find(
+            (entry) => String(entry.reservation_id) === item.dataset.reservationId
+        );
+        if (reservation) openReviewPromptModal(reservation);
+    });
+
+    document.getElementById('review-prompt-close')?.addEventListener('click', closeReviewPromptModal);
+    document.getElementById('review-prompt-back')?.addEventListener('click', () => {
+        closeReviewPromptModal();
+        // Whenever there's more than one reservation still left to review,
+        // Back returns to that list — regardless of whether this modal was
+        // reached via the picker or a direct "Leave a Review" deep link
+        // from My Reservations. With only one eligible reservation, there's
+        // nothing to go back to, so Back just closes.
+        if (eligibleReservations.length > 1) {
+            openReviewPickerModal();
+        }
+    });
+    document.getElementById('review-prompt-backdrop')?.addEventListener('click', (event) => {
+        if (event.target.id === 'review-prompt-backdrop') closeReviewPromptModal();
+    });
+    document.getElementById('review-prompt-rating')?.addEventListener('click', (event) => {
+        const starBtn = event.target.closest('[data-rating-value]');
+        if (!starBtn) return;
+        setReviewPromptRating(starBtn.dataset.ratingValue);
+    });
+    document.getElementById('review-prompt-submit')?.addEventListener('click', submitReservationReview);
+
+    document.getElementById('submission-feedback-close')?.addEventListener('click', closeSubmissionFeedbackModal);
+    document.getElementById('submission-feedback-dismiss')?.addEventListener('click', closeSubmissionFeedbackModal);
+    document.getElementById('submission-feedback-backdrop')?.addEventListener('click', (event) => {
+        if (event.target.id === 'submission-feedback-backdrop') closeSubmissionFeedbackModal();
+    });
+}
+
+/* ============================================================
    LISTENERS
 ============================================================ */
 function setupListeners() {
@@ -286,8 +605,13 @@ function setupListeners() {
 ============================================================ */
 async function init() {
     setupListeners();
+    setupWriteReviewListeners();
 
     const loadingEl = document.getElementById('reviewsLoading');
+
+    // The write-a-review eligibility check runs independently of the public
+    // reviews list so a slow or failed check never blocks the page.
+    initWriteReview();
 
     try {
         const raw = await fetchReviews();

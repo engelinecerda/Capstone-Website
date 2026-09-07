@@ -1,24 +1,34 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from supabase import create_client
 from datetime import datetime
 from fastapi import HTTPException
 from pydantic import BaseModel
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 import pandas as pd
-import subprocess
+import logging
+import asyncio
+import sys
 import os
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import forecast as forecast_module
+
+logger = logging.getLogger("uvicorn.error")
+
+_forecast_executor = ThreadPoolExecutor(max_workers=1)
+
+_forecast_status = {
+    "state": "idle",       # "idle" | "running" | "done" | "error"
+    "started_at": None,    # ISO timestamp, set when a run begins
+    "finished_at": None,   # ISO timestamp, set when a run ends (done or error)
+    "error": None,         # error message, only set when state == "error"
+}
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
 
-# This backend runs server-side and needs to read across all reservations
-# for analytics (package distribution, forecasting), regardless of which
-# staff member is logged in on the dashboard. That's a trusted, cross-cutting
-# read the anon/publishable key was never meant to satisfy — RLS correctly
-# blocks it from reading `reservations` (it holds customer PII), which is
-# what was causing the 500s on /forecast and /analytics/package-distribution.
-# The service role key bypasses RLS the same way the Supabase Edge Functions
-# in this project already do (see supabase/functions/*). It must be set as
-# an env var on Render — never hardcode it, it grants full DB access.
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 if not SUPABASE_SERVICE_ROLE_KEY:
     raise RuntimeError(
@@ -120,31 +130,61 @@ async def get_forecast():
     return result
 
 # =========================
-# FORECAST (manual trigger — kept for the "Update Forecast" button in the dashboard)
+# FORECAST (manual trigger — kept for the "Update Forecast" button in the
+# dashboard, and also hit daily by the cron-job.org "daily forecast" job)
 # =========================
 class GenerateForecastRequest(BaseModel):
     user_id: str | None = None
 
-@app.post("/forecast/generate")
-async def generate_forecast(body: GenerateForecastRequest):
-    import asyncio
-    from concurrent.futures import ThreadPoolExecutor
-
-    def run():
-        args = ["python", "python/forecast.py"]
-        if body.user_id:
-            args.append(body.user_id)
-        result = subprocess.run(args, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr)
+async def _run_forecast_generation(user_id: str | None):
+    logger.info("forecast/generate: starting background run (user_id=%s)", user_id)
+    _forecast_status["state"] = "running"
+    _forecast_status["started_at"] = datetime.utcnow().isoformat() + "Z"
+    _forecast_status["finished_at"] = None
+    _forecast_status["error"] = None
 
     loop = asyncio.get_event_loop()
     try:
-        with ThreadPoolExecutor() as pool:
-            await loop.run_in_executor(pool, run)
-        return {"success": True, "message": "Forecast generated successfully."}
+        # run_forecast() is a blocking, CPU-bound call (Prophet fit) — run
+        # it on the dedicated worker thread so it doesn't block the event
+        # loop (and therefore /health and every other request) for the
+        # duration of the fit.
+        await loop.run_in_executor(_forecast_executor, forecast_module.run_forecast, user_id)
+        _forecast_status["state"] = "done"
+        logger.info("forecast/generate: completed successfully")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _forecast_status["state"] = "error"
+        _forecast_status["error"] = str(e)
+        logger.exception("forecast/generate: failed")
+    finally:
+        _forecast_status["finished_at"] = datetime.utcnow().isoformat() + "Z"
+
+@app.post("/forecast/generate")
+async def generate_forecast(
+    background_tasks: BackgroundTasks,
+    body: GenerateForecastRequest = GenerateForecastRequest(),
+):
+    # Guard against overlapping runs (e.g. the cron job firing while
+    # someone's mid-click on "Update Forecast") — the ThreadPoolExecutor
+    # above is single-worker anyway, so a second run would just queue up
+    # invisibly; better to say so explicitly.
+    if _forecast_status["state"] == "running":
+        logger.info("forecast/generate: request received, but a run is already in progress")
+        return {"success": True, "message": "Forecast generation already in progress.", "already_running": True}
+
+    logger.info("forecast/generate: request received")
+    background_tasks.add_task(_run_forecast_generation, body.user_id)
+    return {"success": True, "message": "Forecast generation started.", "already_running": False}
+
+# =========================
+# FORECAST GENERATION STATUS
+# =========================
+# Lets the frontend poll for actual completion instead of guessing on a
+# fixed timer. "idle" also covers server-restart cases (in-memory status
+# resets), which is fine — the caller just treats it the same as "done".
+@app.get("/forecast/status")
+async def get_forecast_status():
+    return _forecast_status
 
 # =========================
 # MONTHLY RESERVATIONS
