@@ -9,15 +9,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=8" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=8"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=13" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=13"></noscript>
     <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
-    <link rel="stylesheet" href="/css/styles.css?v=8" />
-    <link rel="stylesheet" href="/css/reviews.css?v=8" />
-    <link rel="stylesheet" href="/css/home.css?v=8" />
-    <link rel="stylesheet" href="/css/account.css?v=8" />
-    <link rel="stylesheet" href="/css/announcement_banner.css?v=8" />
+    <link rel="stylesheet" href="/css/styles.css?v=13" />
+    <link rel="stylesheet" href="/css/reviews.css?v=13" />
+    <link rel="stylesheet" href="/css/home.css?v=13" />
+    <link rel="stylesheet" href="/css/account.css?v=13" />
+    <link rel="stylesheet" href="/css/announcement_banner.css?v=13" />
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -70,12 +70,17 @@
 
     <!-- PAGE HERO -->
     <section class="page-hero">
+        <!-- Heading/subheading are overwritten by js/reviews_content.js once the
+             admin-configured Page Content > Page Headers row loads (page_key
+             'reviews'); the hardcoded copy below stays as the fallback if that
+             fetch is slow, missing, or fails. Hero background photo is left out
+             of the .cfg-loading treatment, same as about.html/index.html. -->
         <img class="page-hero-img" src="/images/eli coffee binangonan.jpg" alt="ELI Coffee Events Cafe interior" />
         <div class="page-hero-overlay"></div>
         <div class="page-hero-body">
             <p class="hero-eyebrow">ELI Coffee Events Cafe</p>
-            <h1 class="page-hero-title">Guest <em>Reviews</em></h1>
-            <p class="page-hero-sub">See what our guests have to say about their experience</p>
+            <h1 class="page-hero-title cfg-loading">Guest <em>Reviews</em></h1>
+            <p class="page-hero-sub cfg-loading">See what our guests have to say about their experience</p>
         </div>
     </section>
 
@@ -291,6 +296,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
     <script type="module" src="/js/navbar.js"></script>
     <script type="module" src="/js/reviews.js"></script>
+    <script type="module" src="/js/reviews_content.js"></script>
     <script type="module" src="/js/footer_content.js"></script>
     <script type="module" src="/js/announcement_banner.js"></script>
 </body>

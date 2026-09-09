@@ -112,14 +112,16 @@ export async function loadGalleryImages(supabase, targetWidth) {
   }
 }
 
-export async function loadAboutSections(supabase) {
+export async function loadAboutSections(supabase, targetWidth) {
   try {
     const { data, error } = await supabase
       .from('about_section')
-      .select('section_key, title, body')
+      .select('section_key, title, body, image_url, alt_text')
       .order('sort_order', { ascending: true });
     if (error) return [];
-    return data || [];
+    return (data || []).map((row) => (
+      row.image_url ? { ...row, image_url: optimizedImageUrl(row.image_url, targetWidth) } : row
+    ));
   } catch (err) {
     return [];
   }

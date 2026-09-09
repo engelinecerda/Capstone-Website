@@ -310,6 +310,18 @@
     margin-bottom: 28px;
 }
 
+/* Label row for the password field — label on the left, "Forgot password?" on the right */
+.form-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+}
+
+.form-label-row label {
+    margin-bottom: 0;
+}
+
 .forgot {
     font-size: 13px;
     color: var(--brown-primary, #3D1A0A);

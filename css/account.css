@@ -1607,19 +1607,23 @@ body {
 .payment-history-list,
 .receipt-history-list {
     display: grid;
-    gap: 10px;
+    gap: 0;
 }
 
 .payment-history-item,
 .receipt-history-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 14px;
-    border: 1px solid #e5e5e5;
-    border-radius: 12px;
-    background: #fff;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: start;
+    padding: 14px 0;
+    border-top: 1px solid var(--acc-border-hair);
+}
+
+.payment-history-item:first-child,
+.receipt-history-item:first-child {
+    border-top: none;
+    padding-top: 0;
 }
 
 .payment-history-main,

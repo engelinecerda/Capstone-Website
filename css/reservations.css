@@ -965,9 +965,26 @@
 
         /* Time Grid */
         .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .time-card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; color: #2A1408; transition: all 0.2s; }
-        .time-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .time-card.active { border-color: #6B3A1F; background: #FFEDE0; }
+        .time-card {
+            border: 0.5px solid var(--acc-border-tan, #E5DBCC);
+            background: transparent;
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--acc-text, #3E2418);
+            transition: background .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .time-card:hover  { border-color: var(--acc-terracotta, #A34F2E); background: #FFFDFA; }
+        .time-card:focus-visible { outline: 2px solid var(--acc-terracotta, #A34F2E); outline-offset: 2px; }
+        .time-card.active {
+            border-color: var(--acc-espresso, #4A2C17);
+            background: var(--acc-espresso, #4A2C17);
+            color: #F5EDE2;
+        }
+        .time-card.active:hover { background: var(--acc-espresso-dark, #3A2110); }
         .time-card.disabled {
             cursor: not-allowed;
             background: #f5f1eb;
@@ -980,6 +997,7 @@
         }
         .time-status-note {
             margin-top: 14px;
+            margin-bottom: 18px;
             font-size: 13px;
             color: #6B3A1F;
             line-height: 1.6;
@@ -1028,18 +1046,22 @@
         .guest-warning i { font-size: 18px; line-height: 1.4; flex-shrink: 0; }
         .guest-warning a { color: #6B3A1F; font-weight: 700; }
 
-        /* Contract — three numbered cards (Contract / Signature / Consent),
-           each sharing the same white background + darker border used by
-           the Reservation Summary step's cards. */
-        .contract-box { width: 100%; display: flex; flex-direction: column; gap: 14px; }
-        .rs-contract-card { background: #FFFFFF; border: 1px solid #C9A98E; border-radius: 10px; padding: 18px 20px; box-sizing: border-box; }
-        .rs-contract-card-label { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #A34F2E; margin-bottom: 12px; }
+        /* Contract — three plain sections (Contract / Signature / Consent)
+           sitting flat on the white page, separated by hairline dividers.
+           Only the contract preview box and the signature canvas keep a
+           visible border (they're genuine functional boundaries — a
+           scrollable region and a drawing surface); everything else here
+           is unboxed. */
+        .contract-box { width: 100%; display: flex; flex-direction: column; }
+        .contract-section { width: 100%; }
+        .rs-contract-divider { border: none; border-top: 0.5px solid var(--acc-border-tan, #E5DBCC); margin: 28px 0; }
+        .contract-section-title { font-size: 14px; font-weight: 600; color: var(--acc-text, #3E2418); margin: 0; }
 
-        .contract-viewer-head { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
-        .contract-icon { font-size: 22px; color: #6B3A1F; flex-shrink: 0; width: 32px; text-align: center; }
+        .contract-viewer-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+        .contract-icon { font-size: 16px; color: #8A5A3B; flex-shrink: 0; }
         .contract-info { flex: 1; }
-        .contract-info h4 { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 3px; }
-        .contract-info p  { font-size: 13px; color: #686868; margin: 0; }
+        .contract-info h4 { font-size: 14px; font-weight: 600; color: var(--acc-text, #3E2418); margin-bottom: 3px; }
+        .contract-info p  { font-size: 12px; color: #8A7965; margin: 0; }
         .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; display: inline-block; }
         .dl-btn:hover { background: var(--brown-dark, #1E0C03); }
 
@@ -1051,13 +1073,13 @@
            scrollHeight/clientHeight already drive the "read to the end"
            agreement-gating check elsewhere, so its structure/scroll
            behavior must stay exactly as it is. */
-        .contract-viewer-wrap { position: relative; margin-bottom: 12px; }
+        .contract-viewer-wrap { position: relative; margin-bottom: 10px; }
         .contract-viewer {
-            max-height: 190px;
+            max-height: 110px;
             overflow-y: auto;
-            border: 1px solid #e0d0c0;
-            border-radius: 12px;
-            padding: 20px 22px;
+            border: 0.5px solid var(--acc-border-tan, #E5DBCC);
+            border-radius: 8px;
+            padding: 16px 18px;
             background: #fff;
             margin-bottom: 0;
             scrollbar-width: thin;
@@ -1067,7 +1089,7 @@
         .contract-viewer::-webkit-scrollbar-track { background: #F7F2EA; }
         .contract-viewer::-webkit-scrollbar-thumb { background: #C9A98E; border-radius: 4px; }
         .contract-viewer:focus-visible {
-            outline: 2px solid #6B3A1F;
+            outline: 2px solid #A34F2E;
             outline-offset: 2px;
         }
         .contract-viewer-fade {
@@ -1075,7 +1097,7 @@
             left: 1px; right: 1px; bottom: 1px;
             height: 34px;
             background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #FFFFFF);
-            border-radius: 0 0 11px 11px;
+            border-radius: 0 0 7px 7px;
             pointer-events: none;
         }
         .contract-viewer p { font-size: 13.5px; line-height: 1.7; color: #6B5A47; margin-bottom: 12px; }
@@ -1109,35 +1131,36 @@
         .contract-viewer-actions {
             display: flex;
             justify-content: flex-start;
+            margin-top: 10px;
         }
         .contract-view-full-btn {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            min-height: 40px;
-            padding: 9px 18px;
-            border: 1px solid #6B3A1F;
-            border-radius: 8px;
-            background: #fff;
-            color: #6B3A1F;
+            gap: 6px;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background: none;
+            color: #A34F2E;
             font: inherit;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.15s ease, color 0.15s ease;
+            transition: color 0.15s ease;
         }
+        .contract-view-full-btn i { font-size: 13px; }
         .contract-view-full-btn:hover,
         .contract-view-full-btn:focus-visible {
-            background: #6B3A1F;
-            color: #fff;
+            color: #3E2418;
             outline: none;
+            text-decoration: underline;
         }
 
-        /* Header row: card label on the left, Draw/Type-instead toggle on
-           the right — wraps to two lines at narrow widths (the toggle
-           drops beneath the label) rather than compressing the buttons. */
+        /* Header row: plain "Sign below" text on the left, Draw/Type-instead
+           underline-tab toggle on the right — wraps to two lines at narrow
+           widths (the toggle drops beneath the label) rather than
+           compressing the tabs. */
         .signature-header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-        .signature-header-row .rs-contract-card-label { margin-bottom: 0; }
         .signature-captured-badge {
             display: inline-flex;
             align-items: center;
@@ -1152,20 +1175,24 @@
             transition: opacity .15s ease;
         }
         .signature-captured-badge.is-hidden { display: none; }
-        .signature-mode-tabs { display: flex; gap: 8px; }
+        /* Underline tab pair — matches the tab style used for Overview /
+           Inclusions / Policies elsewhere: no fill, active tab reads by its
+           terracotta text + bottom border alone. */
+        .signature-mode-tabs { display: flex; gap: 16px; }
         .signature-mode-btn {
-            border: 1px solid #e0d0c0;
-            background: #fff;
-            color: #6B3A1F;
+            border: none;
+            border-bottom: 2px solid transparent;
+            background: none;
+            color: #6B5A47;
             font-size: 12.5px;
             font-weight: 600;
-            padding: 7px 14px;
-            border-radius: 999px;
+            padding: 0 0 4px;
+            border-radius: 0;
             cursor: pointer;
-            transition: background 0.15s, color 0.15s;
+            transition: color 0.15s, border-color 0.15s;
         }
-        .signature-mode-btn.active { background: #6B3A1F; color: #fff; border-color: #6B3A1F; }
-        .signature-mode-btn:not(.active):hover { background: #FFF8F0; }
+        .signature-mode-btn.active { background: none; color: #A34F2E; border-bottom-color: #A34F2E; }
+        .signature-mode-btn:not(.active):hover { color: #3E2418; }
 
         .signature-draw-panel.hidden, .signature-type-panel.hidden { display: none; }
 
@@ -1178,9 +1205,9 @@
         .signature-canvas-wrap {
             position: relative;
             width: 100%;
-            height: 180px;
-            border: 2px dashed #D8C9AE;
-            border-radius: 12px;
+            height: 110px;
+            border: 1px dashed #D8C9AE;
+            border-radius: 8px;
             background: #fff;
             overflow: hidden;
         }
@@ -1234,17 +1261,18 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            margin-top: 8px;
-            border: 1px solid #e0d0c0;
-            background: #fff;
-            color: #6B3A1F;
+            margin-top: 10px;
+            border: none;
+            background: none;
+            color: #6B5A47;
             font-size: 12px;
-            font-weight: 600;
-            padding: 6px 14px;
-            border-radius: 6px;
+            font-weight: 500;
+            padding: 0;
+            border-radius: 0;
             cursor: pointer;
         }
-        .signature-clear-btn:hover { background: #FFF8F0; }
+        .signature-clear-btn i { font-size: 13px; }
+        .signature-clear-btn:hover { color: #3E2418; text-decoration: underline; }
 
         /* Type-instead: the real <input> sits on top (transparent text, a
            visible caret so typing position stays legible) with the live
@@ -1296,15 +1324,12 @@
         .signature-status.error { color: #b42318; }
 
         @media (max-width: 480px) {
-            .signature-canvas-wrap { height: 140px; }
+            .signature-canvas-wrap { height: 100px; }
             .signature-guide-placeholder { bottom: 30px; }
             .signature-type-preview { font-size: 26px; }
+            .rs-contract-divider { margin: 20px 0; }
         }
 
-        /* Plain wrapper now — the tinted amber box/border was replaced by
-           the shared .rs-contract-card treatment (white bg, #C9A98E border)
-           applied to its parent, so this card matches Cards 1 and 2 exactly. */
-        .contract-agreement-box { width: 100%; }
         /* Each row is its own self-contained flex line: checkbox +
            exactly one sibling item holding all of that row's text (a
            .contract-agreement-copy div/label). align-items: flex-start
@@ -1330,19 +1355,20 @@
             cursor: not-allowed;
             opacity: 0.55;
         }
-        .contract-agreement-divider {
-            height: 0;
-            margin: 16px 0;
-            border-top: 0.5px solid #EEE5D8;
+        /* Second row gets its own fixed top margin so the ~18px gap between
+           the two checkboxes holds steady whether or not the helper text
+           below the first row is currently shown. */
+        .contract-agreement-row-second {
+            margin-top: 18px;
         }
         /* Indented to the start of the row's text (checkbox width 17px +
            row gap 10px = 27px) so it reads as attached to the first
-           checkbox row specifically, not floating between both rows. */
+           checkbox row specifically. */
         .contract-agreement-helper {
             margin: 6px 0 0 27px;
             font-size: 12px;
             line-height: 1.5;
-            color: #766751;
+            color: #A89880;
             font-style: italic;
         }
         .contract-agreement-copy {
@@ -1707,6 +1733,18 @@
         .btn-back:hover { background: var(--cream-dark, #F2EBE0); border-color: #4A2C17; }
         .btn-next { display: inline-flex; align-items: center; gap: 8px; background: #4A2C17; color: #F5EDE2; border: none; padding: 12px 32px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; transition: background 0.2s; }
         .btn-next:hover { background: var(--brown-dark, #1E0C03); }
+        .btn-next:disabled { background: #EFE8DC; color: #A89880; cursor: not-allowed; }
+
+        /* rs7 already draws its own hairline footer divider (below) right
+           above this shared button row — suppress the row's own top
+           border/spacing only while rs7 is active, so the two dividers
+           don't stack into an empty bordered gap between Consent and the
+           buttons. */
+        .res-step#rs7.active ~ .reservation-buttons {
+            border-top: none;
+            margin-top: 0;
+            padding-top: 0;
+        }
 
         .hidden { display: none !important; }
 
@@ -1844,28 +1882,6 @@
     border-top: 1px solid #f0ece8;
 }
 
-/* ── Time-slot info note ────────────────────────────────────────────────────── */
-.time-alt-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin-top: 22px;
-    padding: 14px 18px;
-    background: var(--cream, #FAF8F4);
-    border: 1.5px solid var(--brown-pale, #DFC3A8);
-    border-radius: 10px;
-    font-size: 13px;
-    line-height: 1.65;
-    color: var(--brown-mid, #6B3820);
-}
-
-.time-alt-note i {
-    font-size: 18px;
-    color: var(--brown-light, #B07D5A);
-    flex-shrink: 0;
-    margin-top: 1px;
-}
-
 /* ── Venue map ──────────────────────────────────────────────────────────────── */
 .venue-search-row {
     display: flex;
@@ -1929,6 +1945,12 @@
     border: none;
     border-top: 1px solid #E5DBCC;
     margin: 20px 0 0;
+}
+/* rs7's own footer divider — thinner hairline, spaced per the redesigned
+   Contract step (28px above, 18px below, before the shared button row). */
+#rs7 .rs-summary-footer-divider {
+    border-top: 0.5px solid #E5DBCC;
+    margin: 28px 0 18px;
 }
 
 /* ── Single-page event-info sub-sections ────────────────────────────────────── */

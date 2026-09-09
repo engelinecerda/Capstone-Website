@@ -160,6 +160,8 @@
 }
 .about-body-input:focus { border-color: var(--input-focus); }
 .about-section-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.about-image-field { margin-top: 14px; }
+.about-image-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .about-preview-body h4 { font-family: 'Fraunces', serif; margin: 14px 0 6px; }
 .about-preview-body h4:first-child { margin-top: 0; }
 .about-preview-body p { font-size: 13.5px; line-height: 1.7; color: var(--text); margin-bottom: 8px; }

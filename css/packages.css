@@ -1042,7 +1042,7 @@ body { background: var(--cream); }
     z-index: 1200;
   }
   .pkg-sidebar.is-open { transform: translateX(0); }
-  .pkg-sidebar-close { display: flex; }
+  .pkg-sidebar-close { display: flex; margin-left: auto; }
   .pkg-sidebar-footer { display: block; }
 
   .pkg-sidebar-backdrop {

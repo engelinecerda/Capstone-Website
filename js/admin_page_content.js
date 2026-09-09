@@ -11,7 +11,7 @@ import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 
-const PAGE_LABELS = { home: 'Home', packages: 'Packages', about: 'About', faqs: 'FAQs', menu: 'Menu' };
+const PAGE_LABELS = { home: 'Home', packages: 'Packages', about: 'About', faqs: 'FAQs', menu: 'Menu', reviews: 'Reviews' };
 
 // Curated set only — mirrors the DB check constraint in
 // 20260809_about_values.sql (about_value.icon). Never freeform text: a
@@ -51,6 +51,8 @@ let menuBannerPendingFile  = null;
 let editingValueId  = null;
 let valueModalIcon  = DEFAULT_VALUE_ICON;
 let pendingConfirmAction = null;
+let aboutImagePendingFile = null;  // resized File chosen but not yet uploaded/saved (who_we_are story image)
+let aboutImageRemoveFlag  = false; // true once "Remove image" is clicked, until Save/reload
 
 // ── DOM refs ─────────────────────────────────────────────────────
 const pageHeaderRows = document.getElementById('pageHeaderRows');
@@ -212,7 +214,7 @@ async function loadAll() {
 // PAGE HEADERS
 // ═══════════════════════════════════════════════════════════════════════════
 function renderPageHeaders() {
-  const order = ['home', 'packages', 'about', 'faqs', 'menu'];
+  const order = ['home', 'packages', 'about', 'faqs', 'menu', 'reviews'];
   const rows = order
     .map(key => pageHeaders.find(h => h.page_key === key))
     .filter(Boolean);
@@ -526,6 +528,24 @@ function renderAboutSections() {
         <span class="about-section-title">${escapeHtml(s.title)}</span>
       </div>
       <textarea class="about-body-input" data-about-body="${escapeHtml(s.section_key)}" rows="6">${escapeHtml(s.body || '')}</textarea>
+      ${s.section_key === 'who_we_are' ? `
+      <div class="modal-field about-image-field">
+        <label class="modal-label">Story Image</label>
+        <p class="modal-hint">Shown beside this text on the About page.</p>
+        <div class="uploader" data-about-uploader="${escapeHtml(s.section_key)}">
+          <img class="uploader-preview ${s.image_url ? '' : 'hidden'}" data-about-img-preview="${escapeHtml(s.section_key)}" src="${escapeHtml(s.image_url || '')}" alt="">
+          <div class="uploader-placeholder" data-about-img-placeholder="${escapeHtml(s.section_key)}" style="${s.image_url ? 'display:none' : ''}">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span>Click or drag an image here</span>
+          </div>
+          <input type="file" data-about-file-input="${escapeHtml(s.section_key)}" accept="image/png,image/jpeg,image/webp" hidden>
+        </div>
+        <div class="about-image-actions">
+          <span class="modal-hint" data-about-file-name="${escapeHtml(s.section_key)}">No file chosen</span>
+          <button type="button" class="btn-outline-sm" data-about-remove-image="${escapeHtml(s.section_key)}" style="${s.image_url ? '' : 'display:none'}">Remove image</button>
+        </div>
+        <input type="text" class="modal-input" data-about-alt-input="${escapeHtml(s.section_key)}" value="${escapeHtml(s.alt_text || '')}" placeholder="Describe the image for screen readers">
+      </div>` : ''}
       <div class="about-section-actions">
         <button type="button" class="btn-outline-sm" data-about-preview="${escapeHtml(s.section_key)}">Preview</button>
         <button type="button" class="btn-primary" data-about-save="${escapeHtml(s.section_key)}">Save</button>
@@ -546,18 +566,50 @@ aboutSectionsEl.addEventListener('click', async e => {
   if (saveBtn) {
     const key = saveBtn.dataset.aboutSave;
     const textarea = aboutSectionsEl.querySelector(`textarea[data-about-body="${key}"]`);
+    const isWhoWeAre = key === 'who_we_are';
+    const altInput = isWhoWeAre ? aboutSectionsEl.querySelector(`input[data-about-alt-input="${key}"]`) : null;
+    const altText = altInput ? altInput.value.trim() : '';
+    const section = aboutSections.find(s => s.section_key === key);
+
+    const willHaveImage = isWhoWeAre && !aboutImageRemoveFlag && (aboutImagePendingFile || section?.image_url);
+    if (willHaveImage && !altText) {
+      setMsg(aboutMsg, 'Alt text is required for the story image.', 'error');
+      return;
+    }
+
     saveBtn.disabled = true;
     setMsg(aboutMsg, 'Saving…');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('about_section').update({
+      const payload = {
         body: textarea.value.trim() || null,
         updated_at: new Date().toISOString(),
-        updated_by: user?.id ?? null
-      }).eq('section_key', key);
+      };
+
+      let oldImageUrl = null;
+      if (isWhoWeAre) {
+        let imageUrl = section?.image_url || null;
+        if (aboutImageRemoveFlag) {
+          oldImageUrl = section?.image_url || null;
+          imageUrl = null;
+        } else if (aboutImagePendingFile) {
+          imageUrl = await uploadToCloudinary(aboutImagePendingFile, 'eli_coffee_page_content');
+          oldImageUrl = section?.image_url || null;
+        }
+        payload.image_url = imageUrl;
+        payload.alt_text = altText || null;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      payload.updated_by = user?.id ?? null;
+
+      const { error } = await supabase.from('about_section').update(payload).eq('section_key', key);
       if (error) throw error;
-      const section = aboutSections.find(s => s.section_key === key);
-      if (section) section.body = textarea.value.trim() || null;
+
+      if (oldImageUrl) await destroyCloudinaryImage(supabase, oldImageUrl);
+
+      if (section) Object.assign(section, payload);
+      if (isWhoWeAre) { aboutImagePendingFile = null; aboutImageRemoveFlag = false; }
+
       await logAudit({ action: 'Updated About Section', category: 'page_content', details: `Updated "${section?.title || key}"`, entityId: key });
       setMsg(aboutMsg, 'Saved successfully.', 'success');
     } catch (err) {
@@ -565,8 +617,69 @@ aboutSectionsEl.addEventListener('click', async e => {
     } finally {
       saveBtn.disabled = false;
     }
+    return;
+  }
+
+  const removeImageBtn = e.target.closest('[data-about-remove-image]');
+  if (removeImageBtn) {
+    const key = removeImageBtn.dataset.aboutRemoveImage;
+    aboutImageRemoveFlag = true;
+    aboutImagePendingFile = null;
+    const preview = aboutSectionsEl.querySelector(`img[data-about-img-preview="${key}"]`);
+    const placeholder = aboutSectionsEl.querySelector(`[data-about-img-placeholder="${key}"]`);
+    const fileName = aboutSectionsEl.querySelector(`[data-about-file-name="${key}"]`);
+    if (preview) { preview.src = ''; preview.classList.add('hidden'); }
+    if (placeholder) placeholder.style.display = '';
+    if (fileName) fileName.textContent = 'No file chosen';
+    removeImageBtn.style.display = 'none';
+    return;
+  }
+
+  const uploader = e.target.closest('[data-about-uploader]');
+  if (uploader) {
+    aboutSectionsEl.querySelector(`input[data-about-file-input="${uploader.dataset.aboutUploader}"]`)?.click();
   }
 });
+
+aboutSectionsEl.addEventListener('dragover', e => {
+  if (e.target.closest('[data-about-uploader]')) e.preventDefault();
+});
+aboutSectionsEl.addEventListener('drop', e => {
+  const uploader = e.target.closest('[data-about-uploader]');
+  if (!uploader) return;
+  e.preventDefault();
+  const file = e.dataTransfer.files?.[0];
+  if (file) handleAboutImageFile(uploader.dataset.aboutUploader, file);
+});
+aboutSectionsEl.addEventListener('change', e => {
+  const input = e.target.closest('[data-about-file-input]');
+  if (!input) return;
+  const file = input.files?.[0];
+  if (file) handleAboutImageFile(input.dataset.aboutFileInput, file);
+});
+
+async function handleAboutImageFile(key, file) {
+  const err = validateImageFile(file);
+  if (err) { setMsg(aboutMsg, err, 'error'); return; }
+  setMsg(aboutMsg, '');
+  const resized = await resizeImageFile(file);
+  aboutImagePendingFile = resized;
+  aboutImageRemoveFlag = false;
+
+  const preview = aboutSectionsEl.querySelector(`img[data-about-img-preview="${key}"]`);
+  const placeholder = aboutSectionsEl.querySelector(`[data-about-img-placeholder="${key}"]`);
+  const fileName = aboutSectionsEl.querySelector(`[data-about-file-name="${key}"]`);
+  const removeBtn = aboutSectionsEl.querySelector(`[data-about-remove-image="${key}"]`);
+  if (fileName) fileName.textContent = file.name;
+  if (removeBtn) removeBtn.style.display = '';
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    if (preview) { preview.src = ev.target.result; preview.classList.remove('hidden'); }
+    if (placeholder) placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(resized);
+}
 
 document.getElementById('aboutPreviewClose').addEventListener('click', () => closeModal(aboutPreviewModal));
 document.getElementById('aboutPreviewDone').addEventListener('click', () => closeModal(aboutPreviewModal));
