@@ -261,50 +261,28 @@ async function fetchProfiles() {
   return data || [];
 }
 
-async function fetchReservationActivity() {
-  const { data, error } = await supabase
-    .from('reservations')
-    .select(`
-      reservation_id,
-      user_id,
-      status,
-      created_at,
-      event_type,
-      event_date,
-      package:package_id ( package_name )
-    `);
-
+// Per-customer totals (total reservations, approved count, most recent
+// date) used to come from fetching every reservation row and reducing it
+// in JS — see get_customer_reservation_activity() in
+// supabase/migrations/20260927_customer_reservation_activity_rpc.sql for
+// why that's now one aggregate query, computing the exact same three
+// numbers per user_id.
+async function fetchCustomerReservationActivity() {
+  const { data, error } = await supabase.rpc('get_customer_reservation_activity');
   if (error) {
     throw error;
   }
-
   return data || [];
 }
 
-function mergeCustomersWithActivity(profiles, reservations) {
-  const activityByUser = reservations.reduce((map, reservation) => {
-    const userId = reservation.user_id;
-    if (!userId) return map;
-
-    if (!map[userId]) {
-      map[userId] = {
-        totalReservations: 0,
-        approvedReservations: 0,
-        lastReservationDate: null
-      };
-    }
-
-    map[userId].totalReservations += 1;
-
-    const status = (reservation.status || '').toLowerCase();
-    if (status === 'approved' || status === 'confirmed') {
-      map[userId].approvedReservations += 1;
-    }
-
-    if (!map[userId].lastReservationDate || new Date(reservation.created_at) > new Date(map[userId].lastReservationDate)) {
-      map[userId].lastReservationDate = reservation.created_at;
-    }
-
+function mergeCustomersWithActivity(profiles, activityRows) {
+  const activityByUser = activityRows.reduce((map, row) => {
+    if (!row.user_id) return map;
+    map[row.user_id] = {
+      totalReservations: row.total_reservations || 0,
+      approvedReservations: row.approved_reservations || 0,
+      lastReservationDate: row.last_reservation_date || null
+    };
     return map;
   }, {});
 
@@ -316,10 +294,6 @@ function mergeCustomersWithActivity(profiles, reservations) {
   }));
 }
 
-function countPendingReservations(reservations) {
-  return reservations.filter((reservation) => String(reservation?.status || '').toLowerCase() === 'pending').length;
-}
-
 // silent=true is used by the auto-refresh triggers: it skips the
 // "Loading..." message so existing rows stay on screen, and on failure it
 // keeps the last-good data and fails quietly instead of blanking the table.
@@ -329,12 +303,12 @@ async function loadCustomers({ silent = false } = {}) {
   }
 
   try {
-    const [profiles, reservations] = await Promise.all([
+    const [profiles, activity] = await Promise.all([
       fetchProfiles(),
-      fetchReservationActivity()
+      fetchCustomerReservationActivity()
     ]);
 
-    allCustomers = mergeCustomersWithActivity(profiles, reservations);
+    allCustomers = mergeCustomersWithActivity(profiles, activity);
 
     updateStats(allCustomers);
     initAdminSidebarBadges(supabase)

@@ -4,7 +4,7 @@
    account.css (imported below) — this file only adds the components that
    are unique to the single-reservation view.
 ======================== */
-@import url("account.css?v=7");
+@import url("account.css?v=8");
 
 .rd-page {
     padding-top: 28px;

@@ -37,7 +37,11 @@ if (pageDate) {
 }
 
 let fullData = [];
-let fullReservations = [];
+// Replaces fullReservations (the whole reservations table, held in memory
+// just so the year dropdown could re-slice it client-side) — this is the
+// pre-aggregated { year, month, submitted, completed } array straight
+// from get_admin_dashboard_stats(), tiny regardless of table size.
+let dashboardMonthlyBreakdown = [];
 let barChart;
 let pieChart;
 let demandChart;
@@ -145,16 +149,6 @@ function getContractStatusMeta(contract) {
     return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
 }
 
-function isSameLocalDay(a, b) {
-    return a.getFullYear() === b.getFullYear()
-        && a.getMonth() === b.getMonth()
-        && a.getDate() === b.getDate();
-}
-
-function isSameLocalMonth(a, b) {
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-}
-
 function setTrend(elId, delta, wordSuffix) {
     const el = document.getElementById(elId);
     if (!el) return;
@@ -167,83 +161,47 @@ function setTrend(elId, delta, wordSuffix) {
     el.innerHTML = `<span class="trend-delta">+${delta}</span><span class="trend-word">${escapeHtml(wordSuffix)}</span>`;
 }
 
-function updateTrends(reservations) {
-    const now = new Date();
-    let pendingToday = 0;
-    let approvedThisMonth = 0;
-    let completedThisMonth = 0;
-    const firstSeenByCustomer = new Map();
-
-    reservations.forEach((reservation) => {
-        const status = (reservation.status || 'pending').toLowerCase();
-        const createdAt = reservation.created_at ? new Date(reservation.created_at) : null;
-        const eventDate = reservation.event_date ? new Date(reservation.event_date) : null;
-
-        if (status === 'pending' && createdAt && isSameLocalDay(createdAt, now)) pendingToday += 1;
-        if ((status === 'confirmed' || status === 'approved') && createdAt && isSameLocalMonth(createdAt, now)) approvedThisMonth += 1;
-        if (status === 'completed' && eventDate && isSameLocalMonth(eventDate, now)) completedThisMonth += 1;
-
-        if (reservation.user_id && createdAt) {
-            const existing = firstSeenByCustomer.get(reservation.user_id);
-            if (!existing || createdAt < existing) firstSeenByCustomer.set(reservation.user_id, createdAt);
-        }
-    });
-
-    let newCustomersThisMonth = 0;
-    firstSeenByCustomer.forEach((firstDate) => {
-        if (isSameLocalMonth(firstDate, now)) newCustomersThisMonth += 1;
-    });
-
-    setTrend('pendingTrend', pendingToday, 'today');
-    setTrend('approvedTrend', approvedThisMonth, 'this month');
-    setTrend('completedTrend', completedThisMonth, 'this month');
-    setTrend('customersTrend', newCustomersThisMonth, 'this month');
+// stats is get_admin_dashboard_stats()'s JSONB result — the trend counts
+// (pending_today / approved_this_month / completed_this_month) and
+// new_customers_this_month are all computed server-side now, against a
+// fixed Asia/Manila "today", rather than iterating every reservation
+// against the viewing admin's own browser clock.
+function updateTrends(stats) {
+    const counts = stats?.status_counts || {};
+    setTrend('pendingTrend', counts.pending_today || 0, 'today');
+    setTrend('approvedTrend', counts.approved_this_month || 0, 'this month');
+    setTrend('completedTrend', counts.completed_this_month || 0, 'this month');
+    setTrend('customersTrend', stats?.new_customers_this_month || 0, 'this month');
 }
 
-// Now takes an optional `year` — defaults to the current year — so the
-// monthly reservations chart can be driven by the new year dropdown
-// instead of always showing a trailing 6-month window.
-function computeMonthlyBreakdown(reservations, year) {
+// dashboardMonthlyBreakdown (module state) is get_admin_dashboard_stats()'s
+// pre-aggregated [{ year, month, submitted, completed }] — already grouped
+// server-side across ALL reservations, not just the ones on this page.
+// This just picks the target year's 12 months out of it and zero-fills any
+// month with no rows, same shape renderMonthlyChart always expected.
+function monthsForYear(year) {
     const targetYear = year ? Number(year) : new Date().getFullYear();
     const months = [];
     for (let m = 0; m <= 11; m += 1) {
         const d = new Date(targetYear, m, 1);
-        months.push({
-            key: `${targetYear}-${m}`,
-            label: d.toLocaleDateString('en-US', { month: 'short' }),
-            submitted: 0,
-            completed: 0
-        });
+        months.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), submitted: 0, completed: 0 });
     }
-    const monthByKey = new Map(months.map((m) => [m.key, m]));
-
-    reservations.forEach((reservation) => {
-        if (reservation.created_at) {
-            const created = new Date(reservation.created_at);
-            const bucket = monthByKey.get(`${created.getFullYear()}-${created.getMonth()}`);
-            if (bucket) bucket.submitted += 1;
-        }
-        if ((reservation.status || '').toLowerCase() === 'completed' && reservation.event_date) {
-            const eventDate = new Date(reservation.event_date);
-            const bucket = monthByKey.get(`${eventDate.getFullYear()}-${eventDate.getMonth()}`);
-            if (bucket) bucket.completed += 1;
+    dashboardMonthlyBreakdown.forEach((row) => {
+        if (row.year === targetYear && months[row.month]) {
+            months[row.month].submitted = row.submitted || 0;
+            months[row.month].completed = row.completed || 0;
         }
     });
-
     return months;
 }
 
 // Builds the year dropdown for the monthly reservations chart from whatever
-// years actually appear in the reservation data (created_at / event_date),
-// always including the current year, and preserves the user's current
-// selection across refreshes when possible.
-function populateMonthlyYearOptions(reservations) {
+// years actually appear in dashboardMonthlyBreakdown, always including the
+// current year, and preserves the user's current selection across
+// refreshes when possible.
+function populateMonthlyYearOptions() {
     if (!monthlyYearSelect) return;
-    const years = new Set();
-    reservations.forEach((r) => {
-        if (r.created_at) years.add(new Date(r.created_at).getFullYear());
-        if (r.event_date) years.add(new Date(r.event_date).getFullYear());
-    });
+    const years = new Set(dashboardMonthlyBreakdown.map((row) => row.year));
     const currentYear = new Date().getFullYear();
     years.add(currentYear);
 
@@ -263,8 +221,8 @@ function populateMonthlyYearOptions(reservations) {
         : String(currentYear);
 }
 
-function renderMonthlyChart(reservations, year) {
-    const months = computeMonthlyBreakdown(reservations, year);
+function renderMonthlyChart(year) {
+    const months = monthsForYear(year);
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
     if (barChart) barChart.destroy();
@@ -455,29 +413,29 @@ function renderStatusDonut(totals, total) {
     }
 }
 
-function updateStats(reservations) {
-    const totals = { pending: 0, approved: 0, declined: 0, completed: 0, cancelled: 0, rescheduled: 0 };
-    const customerIds = new Set();
-    reservations.forEach((reservation) => {
-        const status = (reservation.status || 'pending').toLowerCase();
-        if (status === 'pending') totals.pending += 1;
-        if (status === 'confirmed' || status === 'approved') totals.approved += 1;
-        if (status === 'declined') totals.declined += 1;
-        if (status === 'completed') totals.completed += 1;
-        if (status === 'cancelled') totals.cancelled += 1;
-        if (status === 'rescheduled') totals.rescheduled += 1;
-        if (reservation.user_id) customerIds.add(reservation.user_id);
-    });
+// stats is get_admin_dashboard_stats()'s JSONB result (or null/undefined
+// for the pre-load blank state) — status totals, the customer count, and
+// the trend deltas are all computed server-side now, across every
+// reservation, not just whatever this page happened to fetch.
+function updateStats(stats) {
+    const counts = stats?.status_counts || {};
+    const totals = {
+        pending: counts.pending || 0,
+        approved: counts.approved || 0,
+        declined: counts.declined || 0,
+        completed: counts.completed || 0,
+        cancelled: counts.cancelled || 0,
+        rescheduled: counts.rescheduled || 0
+    };
     if (statTargets.pending) statTargets.pending.textContent = String(totals.pending);
     if (statTargets.approved) statTargets.approved.textContent = String(totals.approved);
     if (statTargets.completed) statTargets.completed.textContent = String(totals.completed);
-    if (statTargets.customers) statTargets.customers.textContent = String(customerIds.size);
+    if (statTargets.customers) statTargets.customers.textContent = String(counts.total_customers || 0);
     if (qaPendingCount) qaPendingCount.textContent = `${totals.pending} pending approval`;
 
-    updateTrends(reservations);
+    updateTrends(stats);
 
-    const total = reservations.length;
-    renderStatusDonut(totals, total);
+    renderStatusDonut(totals, counts.total || 0);
 }
 
 function renderReservationsTable(reservations, contractsByReservationId = {}) {
@@ -511,33 +469,70 @@ function renderReservationsTable(reservations, contractsByReservationId = {}) {
     }).join('');
 }
 
-async function fetchReservations() {
+// Status totals, the customer count, and the monthly submitted/completed
+// chart used to come from fetching every reservation row and reducing it
+// in JS (see git history) — that fetch grows linearly with the table and
+// discarded almost everything it pulled. get_admin_dashboard_stats() (see
+// supabase/migrations/20260923_admin_dashboard_stats_rpc.sql) computes the
+// exact same numbers as one aggregate query instead.
+async function fetchDashboardStats() {
+    const { data, error } = await supabase.rpc('get_admin_dashboard_stats');
+    if (error) throw error;
+    return data || {};
+}
+
+// Only the reservations table actually needs row-level data, and it only
+// ever shows the 10 most recent (renderReservationsTable used to fetch
+// everything and slice(0, 10) client-side) — bounded at the query level
+// instead, so this scales with what's displayed, not with table size.
+async function fetchRecentReservations() {
     const { data, error } = await supabase
         .from('reservations')
         .select(`
-            reservation_id, user_id, event_type, event_date, event_time,
+            reservation_id, event_type, event_date, event_time,
             guest_count, location_type, venue_location, contact_name,
-            contact_email, total_price, status, created_at,
+            contact_email, status, created_at,
             package:package_id (package_name, package_type)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(10);
     if (error) throw error;
-    const reservations = data || [];
+    return data || [];
+}
 
-    const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
-    const { data: summaries } = reservationIds.length
+// The auto-complete-past-events side effect used to ride along on the
+// full unbounded reservations fetch above (every row got checked against
+// shouldPersistCompletedStatus). Now that that fetch is bounded to 10
+// rows, this runs the same check independently — but only against rows
+// that could possibly qualify (COMPLETABLE_STATUSES in
+// js/reservation_status.js), which the database can filter far more
+// cheaply than fetching every reservation ever made just to reject most
+// of them in JS. Delegates the actual date/time/balance decision to the
+// exact same syncCompletedReservations() as before — only the candidate
+// set is narrowed, not the logic.
+const SYNC_CANDIDATE_STATUSES = ['confirmed', 'partially_paid', 'fully_paid'];
+
+async function syncPastDueReservations() {
+    const { data: candidates, error } = await supabase
+        .from('reservations')
+        .select('reservation_id, status, event_date, event_time')
+        .in('status', SYNC_CANDIDATE_STATUSES);
+    if (error || !candidates?.length) return;
+
+    const candidateIds = candidates.map((r) => r.reservation_id).filter(Boolean);
+    const { data: summaries } = candidateIds.length
         ? await supabase
             .from('reservation_payment_summary')
             .select('reservation_id, outstanding_balance')
-            .in('reservation_id', reservationIds)
+            .in('reservation_id', candidateIds)
         : { data: [] };
     const balanceByReservationId = new Map(
         (summaries || []).map((row) => [String(row.reservation_id), Number(row.outstanding_balance)])
     );
 
-    return syncCompletedReservations({
+    await syncCompletedReservations({
         supabase,
-        reservations,
+        reservations: candidates,
         getOutstandingBalance: (reservation) => balanceByReservationId.get(String(reservation?.reservation_id))
     });
 }
@@ -588,9 +583,9 @@ async function loadPaymentsTodayStat() {
 async function loadDashboard({ silent = false } = {}) {
     if (!silent) {
         setDashboardMessage('Loading reservations...');
-        updateStats([]);
+        updateStats(null);
         renderReservationsTable([], {});
-        renderMonthlyChart([]);
+        renderMonthlyChart();
     }
     loadPaymentsTodayStat();
 
@@ -599,17 +594,25 @@ async function loadDashboard({ silent = false } = {}) {
 
     const fastPath = (async () => {
         try {
-            const reservations = await fetchReservations();
-            fullReservations = reservations;
-            reservationsCount = reservations.length;
-            updateStats(reservations);
-            renderReservationsTable(reservations, {});
-            populateMonthlyYearOptions(reservations);
-            renderMonthlyChart(reservations, monthlyYearSelect?.value);
+            // Sequential (not raced with the stats/table fetch below) so a
+            // reservation that just became eligible for auto-completion is
+            // reflected in the stats this same load, not next refresh.
+            await syncPastDueReservations();
+
+            const [stats, recentReservations] = await Promise.all([
+                fetchDashboardStats(),
+                fetchRecentReservations()
+            ]);
+            dashboardMonthlyBreakdown = stats.monthly_breakdown || [];
+            reservationsCount = stats.status_counts?.total || 0;
+            updateStats(stats);
+            renderReservationsTable(recentReservations, {});
+            populateMonthlyYearOptions();
+            renderMonthlyChart(monthlyYearSelect?.value);
             refreshSidebarBadges();
-            const reservationIds = reservations.map((r) => r.reservation_id).filter(Boolean);
+            const reservationIds = recentReservations.map((r) => r.reservation_id).filter(Boolean);
             const contractsByReservationId = await fetchContracts(reservationIds);
-            renderReservationsTable(reservations, contractsByReservationId);
+            renderReservationsTable(recentReservations, contractsByReservationId);
         } catch (error) {
             hasError = true;
             if (silent) {
@@ -851,7 +854,7 @@ initAutoRefresh(() => {
 });
 
 demandYearSelect?.addEventListener('change', () => { renderDemandChart(demandYearSelect.value); });
-monthlyYearSelect?.addEventListener('change', () => { renderMonthlyChart(fullReservations, monthlyYearSelect.value); });
+monthlyYearSelect?.addEventListener('change', () => { renderMonthlyChart(monthlyYearSelect.value); });
 
 wireLogoutButton();
 watchAuthState();

@@ -1,4 +1,5 @@
 // notifications.js — In-app notification bell for customer navbar and admin sidebar
+import { initAutoRefresh } from './auto_refresh.js';
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 (function injectCSS() {
@@ -168,16 +169,21 @@ async function markOne(supabase, userId, id, listEl, badgeEl) {
   } catch { /* ignore */ }
 }
 
-function subscribeRealtime(supabase, userId, listEl, badgeEl) {
-  supabase
-    .channel(`notif_bell_${userId}`)
-    .on('postgres_changes', {
-      event: '*',   // INSERT + UPDATE + DELETE — catches mark-read from any tab
-      schema: 'public',
-      table: 'notifications',
-      filter: `user_id=eq.${userId}`,
-    }, () => fetchAndRender(supabase, userId, listEl, badgeEl))
-    .subscribe();
+// Was a realtime postgres_changes subscription — every customer page load
+// (this bell mounts on 19 pages via navbar.js) opened its own channel, and
+// each open channel polls Supabase's realtime backend continuously for as
+// long as the tab stays open. That was the single largest contributor to
+// this project's Disk IO budget usage (2.1M+ realtime.list_changes calls,
+// ~58% of all tracked query time — see the disk-IO investigation this
+// session). A plain interval costs one query pair every pollMs regardless
+// of how many tabs are open, instead of a standing connection per tab —
+// trades instant badge updates for a bounded, predictable cost, which
+// matters a lot more once beta testing multiplies how many customer tabs
+// are open at once. initAutoRefresh also fires immediately on tab
+// focus/visibility/bfcache-restore, so returning to a tab still feels
+// current, not just the fixed 60s cadence.
+function startPolling(supabase, userId, listEl, badgeEl) {
+  initAutoRefresh(() => fetchAndRender(supabase, userId, listEl, badgeEl));
 }
 
 function wirePanelEvents({ supabase, userId, bellBtn, panel, listEl, badgeEl, markAllBtn }) {
@@ -217,7 +223,7 @@ function wirePanelEvents({ supabase, userId, bellBtn, panel, listEl, badgeEl, ma
     }
   });
 
-  subscribeRealtime(supabase, userId, listEl, badgeEl);
+  startPolling(supabase, userId, listEl, badgeEl);
 }
 
 // ── Customer navbar bell ───────────────────────────────────────────────────────

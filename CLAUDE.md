@@ -35,7 +35,7 @@ npx supabase functions deploy <function-name>
 
 Functions live in `supabase/functions/<name>/index.ts` and run on Deno:
 - `verify-contract` — Google Cloud Vision signature detection on uploaded PDFs
-- `ocr-payment` — Google Cloud Vision text extraction from payment receipts
+- `ocr-payment` — Gemini Flash (vision) assists payment-proof field extraction (amount/reference/date), replacing rigid text parsing to handle receipt layout variation; every payment is still verified by a manager against the original image. Extraction is advisory with a manual-review fallback on any failure (timeout, quota, safety block, malformed output) — never an automated approval mechanism. Provider is swappable by editing the `extractPaymentFields()` wrapper only.
 - `send-notification-email` — Resend email dispatch triggered by `notifications` table inserts
 - `delete-payment-method` — admin-only hard delete of an unreferenced `payment_method` row; also destroys its Cloudinary QR asset (signed request — the admin UI's unsigned upload preset cannot delete)
 - `generate-signed-contract` — renders and uploads the signed reservation contract PDF to Cloudinary, merging `{{token}}` template text (see the merge-token sync note in `js/merge_tokens.js`)
@@ -44,7 +44,7 @@ Functions live in `supabase/functions/<name>/index.ts` and run on Deno:
 - `delete-cloudinary-image` — signed Cloudinary `image/destroy` call for any admin-managed image (page content, business profile logo, etc.) whose upload preset is unsigned-only
 - `reset-board-password` — admin-only password reset restricted to the shared kiosk `is_board_account` profile
 
-Required secrets: `GCP_VISION_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
+Required secrets: `GCP_VISION_API_KEY`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Optional: `GEMINI_MODEL` (defaults to the current Flash model — see `ocr-payment/index.ts` — override without a redeploy if Google renames/retires it).
 
 ## Supabase Client Setup
 

@@ -486,7 +486,6 @@ async function fetchReservations() {
         .from('reservations')
         .select(`
             reservation_id,
-            user_id,
             contact_name,
             contact_email,
             event_type,
@@ -496,7 +495,6 @@ async function fetchReservations() {
             location_type,
             total_price,
             status,
-            created_at,
             package:package_id (
                 package_name,
                 package_type
