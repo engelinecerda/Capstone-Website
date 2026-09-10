@@ -35,7 +35,7 @@ async function initHero() {
     // nothing left to apply and simply gets discarded. That's what stops
     // the fallback (revealed below) from being silently overwritten a
     // moment after the customer already sees it.
-    const data = await withConfigTimeout(fetchPageHeader(supabase, 'home'), null);
+    const data = await withConfigTimeout(fetchPageHeader(supabase, 'home', 1920), null);
     if (!data) return; // keep the existing hardcoded fallback
 
     if (imgEl && data.image_url) {
@@ -54,7 +54,14 @@ async function initGallery() {
   if (!grid) return;
 
   try {
-    const images = await withConfigTimeout(loadGalleryImages(supabase), []);
+    // The 6-slot gallery grid mixes narrow (~240px mobile / ~320px desktop)
+    // and wide (~372px mobile / ~530px desktop) cells (css/home.css .gi1-.gi6
+    // span 3-5 of 12 columns) and any configured image can land in either, so
+    // this can't be tuned per-cell — 640 covers the wide cells at a safe
+    // ~1.2-1.7x and the narrow cells at ~2x+, instead of shipping every slot
+    // at a flat 800 (Lighthouse mobile flagged this as ~500KB of oversized/
+    // wasted image bytes on the narrow cells specifically).
+    const images = await withConfigTimeout(loadGalleryImages(supabase, 640), []);
     if (!images.length) return; // keep the existing hardcoded 6 images as fallback
 
     // The mosaic layout (css/home.css .gi1-.gi6) is a fixed 6-tile grid — show
@@ -116,7 +123,7 @@ async function initServices() {
 
     grid.innerHTML = data.map((s, i) => `
       <div class="service-card">
-        ${s.image_url ? `<img class="service-card-img" src="${escapeHtml(optimizedImageUrl(s.image_url))}" alt="${escapeHtml(s.title)}" />` : ''}
+        ${s.image_url ? `<img class="service-card-img" src="${escapeHtml(optimizedImageUrl(s.image_url, 800))}" alt="${escapeHtml(s.title)}" />` : ''}
         <div class="service-card-body">
           <p class="service-num">${String(i + 1).padStart(2, '0')}</p>
           <h3 class="service-title">${escapeHtml(s.title)}</h3>

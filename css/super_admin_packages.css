@@ -53,27 +53,6 @@
 }
 .btn-danger:hover { background: #8a2424; }
 
-.btn-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 36px;
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-text);
-  border: none;
-  border-radius: 8px;
-  padding: 0 16px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background .15s;
-  white-space: nowrap;
-}
-.btn-toggle:hover { background: var(--btn-primary-hover); }
-.btn-toggle.showing-active { background: var(--card-bg); color: var(--text); border: 0.5px solid var(--btn-secondary-border); }
-.btn-toggle.showing-active:hover { background: var(--btn-secondary-hover); }
-
 /* ── FILTER BAR ── */
 .filter-bar {
   display: flex;
@@ -175,13 +154,6 @@
   font-size: 12.5px;
   color: var(--muted);
 }
-
-.breadcrumb-link {
-  color: var(--muted);
-  text-decoration: none;
-  cursor: pointer;
-}
-.breadcrumb-link:hover { color: var(--text); text-decoration: underline; }
 
 .breadcrumb-current {
   color: var(--text);
@@ -298,8 +270,6 @@
   color: var(--muted);
   margin-top: 2px;
 }
-
-.clickable-cat { cursor: pointer; }
 
 /* Category / type pill */
 .category-pill, .count-pill {
@@ -538,39 +508,7 @@
 }
 
 /* ── IMAGE UPLOAD (category image — the one remaining single-image field) ── */
-.image-upload-area {
-  border: 2px dashed var(--border);
-  border-radius: 10px;
-  padding: 24px 18px 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  background: var(--bg);
-  text-align: center;
-  transition: border-color .2s, background .2s;
-}
-.image-upload-area:hover { border-color: var(--btn-secondary-border); background: var(--btn-secondary-hover); }
 
-.image-upload-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.image-hint { font-size: 11px; color: var(--muted); font-weight: 400; }
-
-.image-preview {
-  width: 100%;
-  max-height: 150px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-}
 .image-preview.hidden { display: none; }
 
 /* Pinned to the modal's own top-left (not "auto") and shrunk to 1px so that
@@ -604,30 +542,6 @@
 }
 .choose-file-btn:hover { background: var(--btn-secondary-hover); }
 
-.image-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.remove-image-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid #F3C9C9;
-  background: #FCEBEB;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  color: #A32D2D;
-  transition: background .15s;
-}
-.remove-image-btn:hover { background: #f8d7d7; }
 .remove-image-btn.hidden { display: none; }
 
 .file-name { font-size: 12px; color: var(--muted); }

@@ -811,7 +811,7 @@ function renderPayment() {
 
   paymentStatusPill.textContent = statusMeta.label;
   paymentStatusPill.className = `status-pill ${escapeHtml(statusMeta.key)}`;
-  openPaymentsLink.href = `/admin/payments.html?reservation=${encodeURIComponent(reservation.reservation_id)}`;
+  openPaymentsLink.href = `/admin/payments?reservation=${encodeURIComponent(reservation.reservation_id)}`;
 
   paymentDetailsGrid.innerHTML = [
     dlRow('Reservation total', formatCurrency(summary.reservation_total)),

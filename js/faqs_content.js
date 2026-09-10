@@ -47,5 +47,5 @@ loadPageHeader(supabase, 'faqs', {
   imgEl: document.querySelector('.page-hero-img'),
   headingEl: document.querySelector('.page-hero-title'),
   subEl: document.querySelector('.page-hero-sub')
-});
+}, 1920);
 initFaqs();

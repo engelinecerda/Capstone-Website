@@ -35,7 +35,7 @@ npx supabase functions deploy <function-name>
 
 Functions live in `supabase/functions/<name>/index.ts` and run on Deno:
 - `verify-contract` — Google Cloud Vision signature detection on uploaded PDFs
-- `ocr-payment` — Google Cloud Vision text extraction from payment receipts
+- `ocr-payment` — Gemini Flash (vision) assists payment-proof field extraction (amount/reference/date), replacing rigid text parsing to handle receipt layout variation; every payment is still verified by a manager against the original image. Extraction is advisory with a manual-review fallback on any failure (timeout, quota, safety block, malformed output) — never an automated approval mechanism. Provider is swappable by editing the `extractPaymentFields()` wrapper only.
 - `send-notification-email` — Resend email dispatch triggered by `notifications` table inserts
 - `delete-payment-method` — admin-only hard delete of an unreferenced `payment_method` row; also destroys its Cloudinary QR asset (signed request — the admin UI's unsigned upload preset cannot delete)
 - `generate-signed-contract` — renders and uploads the signed reservation contract PDF to Cloudinary, merging `{{token}}` template text (see the merge-token sync note in `js/merge_tokens.js`)
@@ -44,7 +44,7 @@ Functions live in `supabase/functions/<name>/index.ts` and run on Deno:
 - `delete-cloudinary-image` — signed Cloudinary `image/destroy` call for any admin-managed image (page content, business profile logo, etc.) whose upload preset is unsigned-only
 - `reset-board-password` — admin-only password reset restricted to the shared kiosk `is_board_account` profile
 
-Required secrets: `GCP_VISION_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
+Required secrets: `GCP_VISION_API_KEY`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Optional: `GEMINI_MODEL` (defaults to the current Flash model — see `ocr-payment/index.ts` — override without a redeploy if Google renames/retires it).
 
 ## Supabase Client Setup
 
@@ -117,6 +117,12 @@ Page-specific CSS is one-to-one with HTML pages. Some files use `@import` chains
 `admin_sidebar.css` loads on every admin page and owns all responsive breakpoints + hamburger menu styles. It uses `!important` on `.main` margin/padding and sidebar `transform` to win against page-specific CSS loaded after it.
 
 The hamburger button and overlay are injected dynamically by `js/admin_sidebar_counts.js` — no HTML files contain a hamburger element.
+
+### CSS cache-busting — bump on every CSS edit
+
+`vercel.json` caches everything under `/css/*` for a full year (`immutable`), which is only safe because every reference to a first-party stylesheet — both `<link href="/css/*.css">` tags across every HTML file and the `@import url('./*.css')` statements between CSS files — carries a `?v=1` query string. **Whenever you edit any file in `css/`, you must bump that version number everywhere** (currently a single shared `?v=1` used site-wide, not per-file), or returning visitors keep getting the old cached copy for up to a year. To bump it: find-and-replace `?v=1` → `?v=2` (next integer) across every `.html` and `.css` file in the repo.
+
+This does **not** apply to `/js/*` — JS here is native ES modules with deep transitive `import` chains (most real logic lives in files reached only via `import ... from './x.js'` inside other JS files, never via `<script src>` directly), so versioning only the HTML entry-point `<script>` tags would leave everything they import silently uncached-busted. JS is instead capped at a 1-day cache (`vercel.json`, `/js/(.*)`) as a safer middle ground that needs no manual bumping.
 
 ## Key Shared Modules
 

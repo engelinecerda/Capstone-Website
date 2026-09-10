@@ -34,7 +34,7 @@ async function loadBusinessContact() {
     // Navbar logo only — the footer keeps its own separate image
     // (.footer-new-logo, a different crop meant for its dark background).
     const navLogoEl = document.querySelector('.logo');
-    if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url);
+    if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url, 480);
     if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
   } catch (err) {
     // Falls back to the static footer text already in the HTML.
@@ -78,7 +78,7 @@ async function loadFooterServices() {
     if (!servicesList || servicesList.tagName !== 'UL') return;
 
     servicesList.innerHTML = data.map(s =>
-      `<li><a href="${escapeHtml(s.link_url || '/packages.html')}">${escapeHtml(s.title)}</a></li>`
+      `<li><a href="${escapeHtml(s.link_url || '/packages')}">${escapeHtml(s.title)}</a></li>`
     ).join('');
   } catch (err) {
     // Falls back to the static footer text already in the HTML.

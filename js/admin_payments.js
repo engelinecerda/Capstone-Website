@@ -140,7 +140,7 @@ function escapeHtml(value) {
 }
 
 function redirectLogin() {
-  window.location.replace('/admin/index.html');
+  window.location.replace('/admin');
 }
 
 async function validateAdmin() {
@@ -704,12 +704,15 @@ function getPaymentById(paymentId) {
 // ── OCR helpers ─────────────────────────────────────────────────────────────
 const OCR_HINT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 
-// No confidence badge here on purpose: Cloud Vision's confidence score
-// measures character legibility, not whether the parser picked the right
-// field out of the receipt text — a badge next to a wrong value tells a
-// manager "trust this" when the real risk is field selection, not OCR
-// accuracy. These values are demoted to a hint block the manager verifies
-// against the image, never a claim of correctness.
+// No confidence badge here on purpose: the stored confidence (see
+// supabase/functions/ocr-payment) is just "how many of amount/reference/
+// date extraction found something", not a claim that the value found is
+// correct — a badge next to a wrong value tells a manager "trust this"
+// when the real risk is a misread field, not whether extraction ran.
+// These values are demoted to a hint block the manager verifies against
+// the image, never a claim of correctness.
+const OCR_RETRY_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>';
+
 function buildOcrPanel(payment) {
   // Café-issued payments (cash/card confirmed at the counter) don't have a
   // proof image to OCR — skip the panel.
@@ -719,10 +722,15 @@ function buildOcrPanel(payment) {
   if (!payment.proof_url) return '';
 
   const ocr = payment.ocr_extracted;
+  // Available in every state (not-yet-run / failed / succeeded) — a
+  // manager can always force a fresh read, e.g. after a transient Gemini
+  // timeout, or to double-check a low-confidence result.
+  const retryBtn = `<button type="button" class="ocr-retry-btn" data-action="retry-ocr" data-payment-id="${payment.payment_id}">${OCR_RETRY_ICON} Retry</button>`;
   const panelHead = `
     <div class="ocr-panel-head">
       <span class="ocr-panel-icon">${OCR_HINT_ICON}</span>
       <span class="ocr-panel-title">Read automatically from the proof</span>
+      ${retryBtn}
     </div>
   `;
 
@@ -907,22 +915,33 @@ function closeReceiptModal() {
   receiptModal?.setAttribute('aria-hidden', 'true');
 }
 
-// "Expected this payment" only has a well-defined, system-configured value
-// for the two flat-fee payment types — cancellation_fee and reschedule_fee
-// both come from system_settings.payment_rules via the same
-// getCancellationFee/getRescheduleFee helpers the cancellation/reschedule
-// flows themselves use (js/reservation_shared.js), so the comparison here
-// can never disagree with what the customer was actually charged.
-// Everything else (reservation_fee/down_payment/full_payment/
-// partial_payment) is a variable amount negotiated per booking — there's
-// no fixed figure to compare against, so this returns null rather than
-// fabricating one.
+// "Expected this payment" has a well-defined value for all three flat-fee
+// payment types. cancellation_fee/reschedule_fee come from system_settings.
+// payment_rules via the same getCancellationFee/getRescheduleFee helpers
+// the cancellation/reschedule flows themselves use (js/reservation_shared.
+// js), so the comparison here can never disagree with what the customer
+// was actually charged. extension_fee is per-request rather than a shared
+// config value — its expected amount is the specific reservation_
+// extensions row's own snapshotted total_price (extensionRequestMap, same
+// lookup the queue row's own detail line already uses), so an extension
+// payment gets the same mismatch-detection coverage the other two fee
+// types always had instead of silently skipping it. Everything else
+// (reservation_fee/down_payment/full_payment/partial_payment) is a
+// variable amount negotiated per booking — there's no fixed figure to
+// compare against, so this returns null rather than fabricating one.
 function getExpectedPaymentAmount(payment, reservation, paymentRules) {
   if (payment.payment_type === 'cancellation_fee') {
     return { amount: getCancellationFee(reservation, paymentRules), label: 'Cancellation fee' };
   }
   if (payment.payment_type === 'reschedule_fee') {
     return { amount: getRescheduleFee(paymentRules), label: 'Reschedule fee' };
+  }
+  if (payment.payment_type === 'extension_fee') {
+    const extensionRequest = payment.extension_id ? getExtensionRequest(payment.extension_id) : null;
+    return {
+      amount: extensionRequest ? Number(extensionRequest.total_price) : null,
+      label: 'Extension fee'
+    };
   }
   return { amount: null, label: 'No fixed amount for this payment type' };
 }
@@ -1463,6 +1482,37 @@ function wireModals() {
     if (action === 'cancel-reject-payment') {
       rejectReasonPaymentId = null;
       renderPaymentReviewModal(paymentId);
+      return;
+    }
+
+    if (action === 'retry-ocr') {
+      const payment = getPaymentById(paymentId);
+      if (!payment?.proof_url) return;
+
+      const btn = actionTarget;
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = 'Retrying…';
+
+      (async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('ocr-payment', {
+            body: { payment_id: paymentId, image_url: payment.proof_url }
+          });
+          if (error) throw error;
+          // getPaymentById returns the live paymentsCache row (not a
+          // copy), so this mutation is what renderPaymentReviewModal
+          // below actually re-reads.
+          payment.ocr_extracted = data?.ocr ?? payment.ocr_extracted;
+          renderPaymentReviewModal(paymentId);
+        } catch (err) {
+          // Still on the pre-retry panel here (we didn't re-render), so
+          // it's safe to restore this same button in place.
+          btn.disabled = false;
+          btn.innerHTML = originalLabel;
+          setPaymentReviewMessage(`OCR retry failed: ${err.message}`, true);
+        }
+      })();
       return;
     }
 

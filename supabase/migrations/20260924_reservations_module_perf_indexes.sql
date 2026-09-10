@@ -1,0 +1,33 @@
+-- Performance index for the admin Reservations module (js/admin_reservations.js),
+-- the next page in the same audit that produced
+-- 20260922_admin_dashboard_perf_indexes.sql. That earlier migration
+-- already covers everything this page touches EXCEPT reschedule_requests:
+--   - reservations.status / reservations.created_at  -> already indexed
+--   - payment.reservation_id / payment.payment_status -> already indexed
+--   - reservation_contracts.reservation_id -> already covered by the
+--     reservation_contracts_reservation_id_key UNIQUE constraint
+--     (20260824_fix_contract_resubmission_immutability.sql)
+--   - reservation_staff_assignments.reservation_id -> already covered by
+--     the UNIQUE (reservation_id, roster_staff_id) constraint
+--     (20260810_staff_roster_email_and_assignment_unique.sql) — a leading
+--     column of a composite unique index is usable for a plain
+--     reservation_id lookup too
+--   - staff_roster -> small roster table, not worth indexing
+--
+-- reschedule_requests is the one real gap: per its own note in
+-- 20260906_reschedule_requests_manager_read_write.sql ("public.
+-- reschedule_requests was never created through a tracked migration"),
+-- this table has never had ANY index added for it in this repo — grepping
+-- every migration for it turns up zero CREATE INDEX statements. It's hit
+-- two ways in the app, both against the same two columns:
+--   - js/admin_reservations.js:629-642 — .in('reservation_id', ids)
+--     .order('requested_at', { ascending: false }) (fan-out from the
+--     reservations list, once bounded, will be a handful of ids)
+--   - js/admin_reservation_details.js:556-559 — .eq('reservation_id', id)
+--     .order('requested_at', { ascending: false }) (single-reservation
+--     lookup, ordered)
+-- A composite index with reservation_id leading covers the equality/IN
+-- filter in both call sites and lets Postgres use the same index for the
+-- requested_at ordering that follows, instead of a full-table scan.
+create index if not exists reschedule_requests_reservation_id_requested_at_idx
+  on public.reschedule_requests (reservation_id, requested_at);

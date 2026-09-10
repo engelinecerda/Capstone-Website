@@ -472,12 +472,6 @@ body.kiosk-mode {
   color: var(--sidebar-cream);
 }
 
-.board-week-empty {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--board-text-secondary);
-}
-
 /* ============================================================
    FOOTER
    ============================================================ */

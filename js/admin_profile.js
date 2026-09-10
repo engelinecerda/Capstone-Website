@@ -33,6 +33,9 @@ const profileLastName = document.getElementById('profileLastName');
 const profileEmail = document.getElementById('profileEmail');
 const profilePhone = document.getElementById('profilePhone');
 const profileDateRegistered = document.getElementById('profileDateRegistered');
+const profileEditToggleBtn = document.getElementById('profileEditToggleBtn');
+const profileFormActions = document.getElementById('profileFormActions');
+const profileCancelBtn = document.getElementById('profileCancelBtn');
 
 const mfaStatusRow = document.getElementById('mfaStatusRow');
 const mfaStatusChip = document.getElementById('mfaStatusChip');
@@ -44,6 +47,78 @@ const mfaEnrollCode = document.getElementById('mfaEnrollCode');
 const mfaEnrollMessage = document.getElementById('mfaEnrollMessage');
 const mfaVerifyBtn = document.getElementById('mfaVerifyBtn');
 const mfaCancelEnrollBtn = document.getElementById('mfaCancelEnrollBtn');
+const mfaDisableConfirmPanel = document.getElementById('mfaDisableConfirmPanel');
+const mfaDisableCode = document.getElementById('mfaDisableCode');
+const mfaDisableMessage = document.getElementById('mfaDisableMessage');
+const mfaConfirmDisableBtn = document.getElementById('mfaConfirmDisableBtn');
+const mfaCancelDisableBtn = document.getElementById('mfaCancelDisableBtn');
+
+// ── Personal Information — view/edit toggle ─────────────────────────────
+// First/Middle/Last Name and Phone are the account holder's own contact
+// details, so they're editable in place (unlike Email, which is the login
+// identity managed by Supabase Auth, and Date Registered, which is purely
+// informational — both stay permanently `disabled`, in view mode and edit
+// mode alike).
+const EDITABLE_PROFILE_INPUTS = [profileFirstName, profileMiddleName, profileLastName, profilePhone];
+const EDIT_ICON_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const CANCEL_ICON_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+let isProfileEditing = false;
+let profileEditSnapshot = null;
+
+function captureProfileSnapshot() {
+  return {
+    first: profileFirstName.value,
+    middle: profileMiddleName.value,
+    last: profileLastName.value,
+    phone: profilePhone.value
+  };
+}
+
+function isProfileDirty() {
+  if (!profileEditSnapshot) return false;
+  const current = captureProfileSnapshot();
+  return Object.keys(current).some((key) => current[key] !== profileEditSnapshot[key]);
+}
+
+function setProfileEditToggleUI() {
+  if (!profileEditToggleBtn) return;
+  profileEditToggleBtn.innerHTML = isProfileEditing
+    ? `${CANCEL_ICON_SVG}<span>Cancel edit</span>`
+    : `${EDIT_ICON_SVG}<span>Edit profile</span>`;
+  profileEditToggleBtn.setAttribute('aria-expanded', String(isProfileEditing));
+}
+
+function enterProfileEditMode() {
+  isProfileEditing = true;
+  profileEditSnapshot = captureProfileSnapshot();
+  EDITABLE_PROFILE_INPUTS.forEach((el) => el?.removeAttribute('readonly'));
+  if (profileFormActions) profileFormActions.hidden = false;
+  setProfileEditToggleUI();
+  setFormMessage(profileMessage, '');
+  profileFirstName?.focus();
+}
+
+function exitProfileEditMode({ discard = false } = {}) {
+  if (discard) populateProfileForm(); // restore last-saved values
+  isProfileEditing = false;
+  profileEditSnapshot = null;
+  EDITABLE_PROFILE_INPUTS.forEach((el) => el?.setAttribute('readonly', ''));
+  if (profileFormActions) profileFormActions.hidden = true;
+  setProfileEditToggleUI();
+}
+
+profileEditToggleBtn?.addEventListener('click', () => {
+  if (isProfileEditing) exitProfileEditMode({ discard: true });
+  else enterProfileEditMode();
+});
+profileCancelBtn?.addEventListener('click', () => exitProfileEditMode({ discard: true }));
+
+window.addEventListener('beforeunload', (event) => {
+  if (!isProfileEditing || !isProfileDirty()) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 
 const state = {
   session: null,
@@ -154,6 +229,7 @@ async function handleProfileSubmit(event) {
     localStorage.setItem('profile', JSON.stringify(state.profile));
 
     renderProfileShell();
+    exitProfileEditMode({ discard: false });
     setFormMessage(profileMessage, 'Profile updated successfully.', 'success');
   } catch (error) {
     setFormMessage(profileMessage, `Failed to update profile: ${error.message}`, 'error');
@@ -218,6 +294,12 @@ function setMfaEnrollMsg(message, tone = '') {
   mfaEnrollMessage.className = 'form-message' + (tone ? ` ${tone}` : '');
 }
 
+function setMfaDisableMsg(message, tone = '') {
+  if (!mfaDisableMessage) return;
+  mfaDisableMessage.textContent = message;
+  mfaDisableMessage.className = 'form-message' + (tone ? ` ${tone}` : '');
+}
+
 async function loadMfaStatus() {
   const { data, error } = await supabase.auth.mfa.listFactors();
   if (error) { setMfaMsg('Could not load 2FA status.', 'error'); return; }
@@ -225,14 +307,15 @@ async function loadMfaStatus() {
   const totp = data?.totp?.find((f) => f.status === 'verified');
 
   if (mfaStatusChip) {
-    mfaStatusChip.textContent = totp ? '2FA is enabled' : '2FA is not enabled';
+    // Text carries the state, not just the chip's colour (mfa-chip-on/off).
+    mfaStatusChip.textContent = totp ? '2FA is on' : '2FA is not enabled';
     mfaStatusChip.className = `mfa-status-chip ${totp ? 'mfa-chip-on' : 'mfa-chip-off'}`;
   }
 
   if (mfaActionArea) {
     if (totp) {
-      mfaActionArea.innerHTML = `<button type="button" class="secondary-btn mfa-remove-btn" id="mfaRemoveBtn" data-factor-id="${totp.id}">Remove 2FA</button>`;
-      document.getElementById('mfaRemoveBtn')?.addEventListener('click', handleUnenrollMfa);
+      mfaActionArea.innerHTML = `<button type="button" class="secondary-btn mfa-remove-btn" id="mfaDisableBtn" data-factor-id="${totp.id}">Disable 2FA</button>`;
+      document.getElementById('mfaDisableBtn')?.addEventListener('click', handleStartDisable);
     } else {
       mfaActionArea.innerHTML = `<button type="button" class="primary-btn" id="mfaEnableBtn">Enable 2FA</button>`;
       document.getElementById('mfaEnableBtn')?.addEventListener('click', handleStartEnroll);
@@ -240,6 +323,7 @@ async function loadMfaStatus() {
   }
 
   if (mfaStatusRow) mfaStatusRow.style.display = '';
+  if (mfaDisableConfirmPanel) mfaDisableConfirmPanel.style.display = 'none';
 }
 
 async function handleStartEnroll() {
@@ -283,8 +367,27 @@ async function handleStartEnroll() {
     if (data.totp.secret) {
       const fallback = document.createElement('div');
       fallback.className = 'mfa-manual-secret';
-      fallback.innerHTML = `<p class="mfa-manual-label">Can't scan? Enter this key manually in your app:</p><code class="mfa-secret-code">${data.totp.secret}</code>`;
+      fallback.innerHTML = `
+        <p class="mfa-manual-label">Can't scan? Enter this key manually:</p>
+        <div class="mfa-secret-row">
+          <code class="mfa-secret-code">${data.totp.secret}</code>
+          <button type="button" class="secondary-btn mfa-copy-key-btn" aria-label="Copy secret key to clipboard">Copy</button>
+        </div>
+      `;
       mfaQrWrap.appendChild(fallback);
+
+      const copyBtn = fallback.querySelector('.mfa-copy-key-btn');
+      copyBtn?.addEventListener('click', async () => {
+        const originalLabel = copyBtn.textContent;
+        try {
+          await navigator.clipboard.writeText(data.totp.secret);
+          copyBtn.textContent = 'Copied!';
+        } catch (err) {
+          setMfaEnrollMsg('Could not copy automatically — select and copy the key manually.', 'error');
+          return;
+        }
+        setTimeout(() => { copyBtn.textContent = originalLabel; }, 1500);
+      });
     }
   }
 
@@ -319,18 +422,61 @@ async function handleVerifyEnroll() {
   setMfaMsg('Two-factor authentication has been enabled.', 'success');
 }
 
-async function handleUnenrollMfa(event) {
+// Disabling 2FA is gated two ways: an explicit confirm() dialog, and proof
+// of current possession of the second factor (a live TOTP code, verified
+// through the same challengeAndVerify() call enrollment uses) before the
+// unenroll call is ever made — rather than trusting a bare "Remove" click.
+let pendingDisableFactorId = '';
+
+function handleStartDisable(event) {
   const factorId = event.currentTarget.dataset.factorId;
   if (!factorId) return;
-  if (!confirm('Remove two-factor authentication? You will no longer need a code to sign in.')) return;
-
-  setMfaMsg('Removing 2FA...');
-  const { error } = await supabase.auth.mfa.unenroll({ factorId });
-  if (error) { setMfaMsg('Could not remove 2FA: ' + error.message, 'error'); return; }
-
-  await loadMfaStatus();
-  setMfaMsg('Two-factor authentication has been removed.', 'success');
+  pendingDisableFactorId = factorId;
+  if (mfaDisableCode) mfaDisableCode.value = '';
+  setMfaDisableMsg('');
+  if (mfaStatusRow) mfaStatusRow.style.display = 'none';
+  if (mfaDisableConfirmPanel) mfaDisableConfirmPanel.style.display = '';
+  mfaDisableCode?.focus();
 }
+
+async function handleConfirmDisable() {
+  const code = (mfaDisableCode?.value || '').replace(/\s/g, '');
+  if (!code || code.length !== 6) {
+    setMfaDisableMsg('Enter the current 6-digit code from your authenticator app.', 'error');
+    return;
+  }
+  if (!confirm('Turn off two-factor authentication? You will no longer need a code to sign in.')) return;
+
+  setMfaDisableMsg('Verifying...');
+  if (mfaConfirmDisableBtn) mfaConfirmDisableBtn.disabled = true;
+
+  const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({ factorId: pendingDisableFactorId, code });
+  if (verifyError) {
+    if (mfaConfirmDisableBtn) mfaConfirmDisableBtn.disabled = false;
+    setMfaDisableMsg('Invalid code. Check your authenticator app and try again.', 'error');
+    return;
+  }
+
+  const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId: pendingDisableFactorId });
+  if (mfaConfirmDisableBtn) mfaConfirmDisableBtn.disabled = false;
+  if (unenrollError) {
+    setMfaDisableMsg('Could not disable 2FA: ' + unenrollError.message, 'error');
+    return;
+  }
+
+  pendingDisableFactorId = '';
+  await loadMfaStatus();
+  setMfaMsg('Two-factor authentication has been turned off.', 'success');
+}
+
+function cancelDisable() {
+  pendingDisableFactorId = '';
+  if (mfaDisableConfirmPanel) mfaDisableConfirmPanel.style.display = 'none';
+  if (mfaStatusRow) mfaStatusRow.style.display = '';
+}
+
+mfaConfirmDisableBtn?.addEventListener('click', handleConfirmDisable);
+mfaCancelDisableBtn?.addEventListener('click', cancelDisable);
 
 async function cancelEnroll() {
   if (state.mfaFactorId) {

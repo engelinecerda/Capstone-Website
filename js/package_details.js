@@ -7,7 +7,7 @@
 // unaffected. This page still owns its own URL/fetch and loading/not-found
 // states a toggled-visibility panel never needed.
 import { customerSupabase as supabase } from './supabase.js';
-import { loadReservationRules, loadPaymentRules } from './customer_payments.js';
+import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 
 const CATEGORY_TABLE = 'package_category';
@@ -17,8 +17,8 @@ const PHOTO_TABLE    = 'package_photo';
 const BADGE_TABLE    = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
 
-let reservationRules = null;
 let paymentRules = null;
+let paymentTypes = null;
 let mostBookedPackageId = null;
 let lightboxPhotos = [];
 let lightboxIndex = 0;
@@ -93,9 +93,9 @@ async function init() {
   }
 
   try {
-    [reservationRules, paymentRules] = await Promise.all([
-      loadReservationRules(supabase),
-      loadPaymentRules(supabase)
+    [paymentRules, paymentTypes] = await Promise.all([
+      loadPaymentRules(supabase),
+      loadPaymentTypes(supabase)
     ]);
 
     const { data: pkg, error: pkgErr } = await supabase
@@ -132,7 +132,12 @@ async function init() {
     ]);
 
     pkg._categoryName = categoryName;
-    pkg._photos = (photos || []).map(ph => ({ ...ph, image_url: optimizedImageUrl(ph.image_url) }));
+    // Left un-optimized here on purpose — this same array backs both the
+    // small gallery tiles and the near-fullscreen lightbox, which need very
+    // different Cloudinary target widths. Each renderer (renderGalleryHero's
+    // tile <img>, renderLightboxFrame) calls optimizedImageUrl() itself with
+    // its own width instead.
+    pkg._photos = photos || [];
     pkg._tiers = tiers || [];
     pkg._badges = await fetchBadgesForPackage(packageId);
 
@@ -229,8 +234,8 @@ function renderPackageDetail(pkg) {
 
   if (pkgDetailBookBtn) {
     pkgDetailBookBtn.href = pkg.package_id
-      ? `/reservations.html?package=${encodeURIComponent(pkg.package_id)}`
-      : '/reservations.html';
+      ? `/reservations?package=${encodeURIComponent(pkg.package_id)}`
+      : '/reservations';
   }
 
   renderInclusionsCard(pkg);
@@ -269,7 +274,7 @@ function renderGalleryHero(pkg) {
 
   const tilesHtml = visible.map((ph, i) => `
     <button type="button" class="pkg-gallery-tile" data-index="${i}" aria-label="View photo ${i + 1} of ${count} for ${esc(name)}">
-      <img src="${esc(ph.image_url)}" alt="${esc(ph.alt_text || `${name} photo ${i + 1}`)}" loading="${i === 0 ? 'eager' : 'lazy'}">
+      <img src="${esc(optimizedImageUrl(ph.image_url, 900))}" alt="${esc(ph.alt_text || `${name} photo ${i + 1}`)}" loading="${i === 0 ? 'eager' : 'lazy'}">
     </button>`).join('');
 
   // A single photo has nothing to "gallery-browse" — badge only shows once
@@ -305,7 +310,7 @@ function closeLightbox() {
 function renderLightboxFrame(name) {
   const photo = lightboxPhotos[lightboxIndex];
   if (!photo) return;
-  pkgLightboxImg.src = photo.image_url;
+  pkgLightboxImg.src = optimizedImageUrl(photo.image_url, 1600);
   pkgLightboxImg.alt = photo.alt_text || `${name || 'Package'} photo ${lightboxIndex + 1}`;
   pkgLightboxCounter.textContent = `${lightboxIndex + 1} / ${lightboxPhotos.length}`;
 }
@@ -432,7 +437,12 @@ function buildAreaContent() {
 function renderPolicyCard(pkg, loc) {
   const rows = [];
 
-  const depositPct = reservationRules?.deposit_pct;
+  // Down payment % lives on payment_type (code='down_payment'), the same
+  // source customer_payments.js's actual down-payment calculation reads —
+  // NOT reservation_rules.deposit_pct, which a prior refactor moved off of
+  // (see the comment above RESERVATION_RULES_DEFAULTS in customer_payments.js)
+  // and can still hold a stale pre-migration value in existing DB rows.
+  const depositPct = paymentTypes?.down_payment?.percent_of_total;
   if (depositPct != null) {
     const amount = Math.round(Number(pkg.price || 0) * (depositPct / 100));
     rows.push({

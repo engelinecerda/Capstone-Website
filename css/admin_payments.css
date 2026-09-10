@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css');
+@import url('./admin_reservations.css?v=18');
 
 /* admin_payments.css */
 
@@ -117,20 +117,6 @@
 .payment-amount-cell .payment-cell-main {
   font-size: 18px;
   line-height: 1.2;
-}
-
-.payment-method-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid #E2D8CB;
-  color: #5f5144;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .payment-method-pill.cash {
@@ -640,9 +626,42 @@
 }
 
 .ocr-panel-title {
+  flex: 1;
   font-size: 12px;
   font-weight: 500;
   color: #5A2E16;
+}
+
+/* Low-key on purpose, matching the "hint, not a claim" tone of the whole
+   panel — a manager re-running extraction isn't a primary action. */
+.ocr-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 3px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-2);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.ocr-retry-btn:hover:not(:disabled),
+.ocr-retry-btn:focus-visible {
+  background: rgba(90, 46, 22, 0.08);
+  color: #5A2E16;
+  outline: none;
+}
+.ocr-retry-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ocr-retry-btn svg {
+  flex-shrink: 0;
 }
 
 .ocr-panel-note {

@@ -64,7 +64,6 @@
    Utility
 ======================== */
 
-
 .hidden {
     display: none !important;
 }
@@ -93,7 +92,7 @@
 
 .section-label-optional {
     font-weight: 400;
-    color: #aaa;
+    color: #686868;
     text-transform: none;
     letter-spacing: 0;
     font-size: 12px;
@@ -102,10 +101,6 @@
 /* ========================
    Venue Wrapper (Step 2)
 ======================== */
-.venue-wrapper {
-    width: 100%;
-    margin-top: 30px;
-}
 
 .venue-map-hint {
     font-size: 0.85rem;
@@ -179,72 +174,14 @@
 }
 
 /* ========================
-   Snack Add-on Banner (Step 3)
-======================== */
-.addon-banner {
-    width: 100%;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px dashed #e0d0c0;
-}
-
-/* ========================
-   Offsite Sub-section (Step 3)
-======================== */
-.offsite-sub-section {
-    margin-top: 24px;
-}
-
-/* ========================
    Food Tray Builder (Step 4)
 ======================== */
-.tray-section {
-    width: 100%;
-    margin-bottom: 8px;
-}
-
-.tray-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.tray-header h4 {
-    font-size: 15px;
-    font-weight: 700;
-    color: #2A1408;
-}
-
-.tray-icon {
-    font-size: 20px;
-}
 
 .dish-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
-}
-
-.pax-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.pax-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #6B3A1F;
-}
-
-.tray-divider {
-    border: none;
-    border-top: 1px solid #eee;
-    margin: 12px 0 16px;
 }
 
 /* ========================
@@ -264,28 +201,6 @@
     font-weight: 700;
     color: #2A1408;
     margin-bottom: 12px;
-}
-
-.tray-cart-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-    color: #2A1408;
-    padding: 6px 0;
-    border-bottom: 1px solid #e0d0c0;
-}
-
-.tray-cart-row:last-of-type {
-    border-bottom: none;
-}
-
-.tray-cart-total {
-    font-size: 15px;
-    font-weight: 700;
-    color: #6B3A1F;
-    text-align: right;
-    margin-top: 10px;
 }
 
 .reservation-section {
@@ -315,41 +230,13 @@
         .res-step { display: none; }
         .res-step.active { display: block; }
         .res-step h2 { font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif); font-weight: 400; color: var(--brown-dark, #1E0C03); font-size: 30px; margin-bottom: 6px; }
-        .res-step > p { color: #777; font-size: 14px; margin-bottom: 20px; }
-        .smart-step-section {
-            margin-top: 24px;
-            padding-top: 22px;
-            border-top: 1px solid #f0e5db;
-        }
-        .smart-step-section:first-of-type {
-            margin-top: 0;
-            padding-top: 0;
-            border-top: none;
-        }
-        .smart-step-heading {
-            margin-bottom: 16px;
-        }
-        .smart-step-kicker {
-            display: inline-block;
-            margin-bottom: 6px;
-            font-size: 10.5px;
-            font-weight: 600;
-            color: var(--brown-light, #B07D5A);
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-        }
-        .smart-step-heading h3 {
-            margin: 0 0 6px;
-            font-size: 18px;
-            font-weight: 700;
-            color: #2A1408;
-        }
-        .smart-step-heading p {
-            margin: 0;
-            font-size: 13px;
-            color: #7b6a5d;
-            line-height: 1.6;
-        }
+        .res-step > p { color: #686868; font-size: 14px; margin-bottom: 20px; }
+        
+        
+        
+        
+        
+        
 
         /* Inputs */
         .res-input {
@@ -359,7 +246,7 @@
         }
         .res-input:focus { outline: none; border-color: #6B3A1F; }
         textarea.res-input { height: 100px; resize: vertical; }
-        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        
 
         .availability-panel {
             margin-top: 8px;
@@ -383,7 +270,7 @@
         }
         .availability-head p {
             font-size: 13px;
-            color: #7b6a5d;
+            color: #756559;
             margin: 0;
         }
         .availability-head p.availability-event-type-note {
@@ -472,7 +359,7 @@
         }
         .availability-day.outside-month {
             background: transparent;
-            color: #b5a89a;
+            color: #756656;
             cursor: default;
             box-shadow: none;
         }
@@ -571,7 +458,7 @@
         .availability-message {
             margin-top: 14px;
             font-size: 12px;
-            color: #7b6a5d;
+            color: #756559;
             line-height: 1.5;
         }
         .availability-message.error {
@@ -641,7 +528,7 @@
         }
         .loc-sub {
             font-size: 11px;
-            color: var(--acc-text-muted, #8A7965);
+            color: var(--acc-text-muted, #756756);
             line-height: 1.3;
             white-space: nowrap;
             overflow: hidden;
@@ -688,7 +575,7 @@
         }
 
         /* Add-on Banner */
-        .addon-banner { border-top: 1px dashed #e0d0c0; margin-top: 24px; padding-top: 20px; }
+        
 
         /* Catering Inclusions Banner */
         .catering-inclusions {
@@ -744,6 +631,7 @@
             color: #aaa;
             cursor: pointer;
             transition: transform 0.15s ease;
+            color: #686868;
         }
         .pt-item:hover { transform: translateY(-1px); }
         .pt-item.done { color: #0F6E56; }
@@ -760,7 +648,7 @@
             font-size: 10px;
             flex-shrink: 0;
             background: #fff;
-            color: #bbb;
+            color: #696969;
         }
         .pt-item.done .pt-dot {
             background: #E1F5EE;
@@ -789,13 +677,13 @@
         }
         .builder-hint {
             font-size: 13px;
-            color: #888;
+            color: #696969;
             margin-bottom: 20px;
             line-height: 1.6;
         }
 
         /* Pills */
-        .pills-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        
         .pill { padding: 7px 14px; border: 1px solid #ddd; border-radius: 20px; background: #fafafa; cursor: pointer; font-size: 13px; transition: all 0.2s; }
         .pill:hover  { border-color: #6B3A1F; background: #FFF8F0; }
         .pill.active { border-color: #6B3A1F; background: #FFEDE0; color: #6B3A1F; font-weight: 600; }
@@ -823,7 +711,7 @@
         }
         .cat-tag {
             font-size: 11px;
-            color: #aaa;
+            color: #686868;
             font-weight: 400;
             margin-left: 2px;
         }
@@ -939,7 +827,7 @@
         }
         .pax-hint {
             font-size: 11px;
-            color: #aaa;
+            color: #686868;
             margin-top: 8px;
         }
         .cat-divider {
@@ -1070,7 +958,7 @@
             padding: 24px 18px;
             text-align: center;
             font-size: 13px;
-            color: #bbb;
+            color: #696969;
         }
         .cart-item {
             display: flex;
@@ -1102,7 +990,7 @@
         }
         .ci-pax {
             font-size: 11px;
-            color: #888;
+            color: #696969;
             margin-top: 1px;
         }
         .ci-right {
@@ -1122,7 +1010,7 @@
             border-radius: 6px;
             padding: 3px 8px;
             font-size: 11px;
-            color: #aaa;
+            color: #686868;
             cursor: pointer;
             font-family: inherit;
             transition: all 0.15s;
@@ -1142,7 +1030,7 @@
         }
         .cart-footer-left {
             font-size: 12px;
-            color: #888;
+            color: #696969;
         }
         .cart-footer-right {
             font-size: 16px;
@@ -1170,9 +1058,26 @@
 
         /* Time Grid */
         .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .time-card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; color: #2A1408; transition: all 0.2s; }
-        .time-card:hover  { border-color: #6B3A1F; background: #FFF8F0; }
-        .time-card.active { border-color: #6B3A1F; background: #FFEDE0; }
+        .time-card {
+            border: 0.5px solid var(--acc-border-tan, #E5DBCC);
+            background: transparent;
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--acc-text, #3E2418);
+            transition: background .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .time-card:hover  { border-color: var(--acc-terracotta, #A34F2E); background: #FFFDFA; }
+        .time-card:focus-visible { outline: 2px solid var(--acc-terracotta, #A34F2E); outline-offset: 2px; }
+        .time-card.active {
+            border-color: var(--acc-espresso, #4A2C17);
+            background: var(--acc-espresso, #4A2C17);
+            color: #F5EDE2;
+        }
+        .time-card.active:hover { background: var(--acc-espresso-dark, #3A2110); }
         .time-card.disabled {
             cursor: not-allowed;
             background: #f5f1eb;
@@ -1185,6 +1090,7 @@
         }
         .time-status-note {
             margin-top: 14px;
+            margin-bottom: 18px;
             font-size: 13px;
             color: #6B3A1F;
             line-height: 1.6;
@@ -1198,33 +1104,57 @@
         .time-grid-loading {
             grid-column: 1 / -1;
             font-size: 13px;
-            color: #9c8f84;
+            color: #72665c;
             text-align: center;
             padding: 12px 0;
         }
 
-        /* Summary */
-        .summary-box { background: var(--cream, #FAF8F4); border: 1px solid var(--border, rgba(61,26,10,0.10)); border-radius: 4px; padding: 22px 24px; width: 100%; box-sizing: border-box; }
-        .summary-row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 14px; color: #2A1408; padding: 6px 0; border-bottom: 1px solid #e8ddd5; }
-        .summary-row:last-child { border-bottom: none; }
-        .summary-row .s-label { font-weight: 600; color: #6B3A1F; flex-shrink: 0; margin-right: 16px; }
-        .summary-row .s-value { text-align: right; }
-        .summary-divider { display: none; }
-        .summary-total { font-size: 17px; font-weight: 700; color: #6B3A1F; display: flex; justify-content: space-between; padding-top: 14px; margin-top: 14px; }
-        .summary-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #aaa; margin: 16px 0 6px; padding-top: 14px; }
-        .summary-box .summary-section-title:first-child { margin-top: 0; padding-top: 0; }
+        /* Summary — three stacked cards (Event / Contact / Total), each with
+           a visibly darker border so they read as distinct cards against
+           the white page background (the page itself has no gray box to
+           separate them from, unlike a card sitting on a tinted section). */
+        .rs-summary-cards { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .rs-summary-card { background: #FFFFFF; border: 1px solid #C9A98E; border-radius: 10px; padding: 18px 20px; box-sizing: border-box; }
+        .rs-summary-card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #A34F2E; margin-bottom: 8px; }
+
+        .rs-summary-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 8px 0; border-bottom: 0.5px solid #EEE5D8; }
+        .rs-summary-row:last-child { border-bottom: none; }
+        .rs-row-label { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 400; color: #3E2418; }
+        .rs-row-label i { font-size: 15px; color: #8A5A3B; flex-shrink: 0; }
+        .rs-row-value { font-size: 14px; font-weight: 600; color: #2A1208; text-align: right; min-width: 0; word-break: break-word; }
+
+        /* Total — the receipt-style closing line, given more visual weight
+           than every other row so it reads as the number that matters. */
+        .rs-summary-total-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 10px; }
+        .rs-summary-total-row .rs-row-label { font-size: 17px; font-weight: 600; color: #2A1208; }
+        .rs-summary-total-row .rs-row-value { font-size: 17px; font-weight: 700; color: #2A1208; }
+
+        /* Post-submission success message box (unrelated to the Review-step
+           summary cards above — just borrows the same plain boxed-container
+           treatment the old single summary box used to provide). */
+        .rs-submit-success-box { background: var(--cream, #FAF8F4); border: 1px solid var(--border, rgba(61,26,10,0.10)); border-radius: 4px; width: 100%; box-sizing: border-box; }
 
         /* Guest Warning */
         .guest-warning { display: flex; align-items: flex-start; gap: 12px; background: #FFF3CD; border: 1px solid #FFD966; border-radius: 12px; padding: 14px 18px; margin-top: 16px; font-size: 14px; color: #6B4C00; }
+        .guest-warning i { font-size: 18px; line-height: 1.4; flex-shrink: 0; }
         .guest-warning a { color: #6B3A1F; font-weight: 700; }
 
-        /* Contract */
-        .contract-box { width: 100%; }
-        .contract-viewer-head { display: flex; align-items: center; gap: 16px; background: #FFF8F0; border: 1px solid #e0d0c0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; flex-wrap: wrap; }
-        .contract-icon { font-size: 22px; color: #6B3A1F; flex-shrink: 0; width: 32px; text-align: center; }
+        /* Contract — three plain sections (Contract / Signature / Consent)
+           sitting flat on the white page, separated by hairline dividers.
+           Only the contract preview box and the signature canvas keep a
+           visible border (they're genuine functional boundaries — a
+           scrollable region and a drawing surface); everything else here
+           is unboxed. */
+        .contract-box { width: 100%; display: flex; flex-direction: column; }
+        .contract-section { width: 100%; }
+        .rs-contract-divider { border: none; border-top: 0.5px solid var(--acc-border-tan, #E5DBCC); margin: 28px 0; }
+        .contract-section-title { font-size: 14px; font-weight: 600; color: var(--acc-text, #3E2418); margin: 0; }
+
+        .contract-viewer-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+        .contract-icon { font-size: 16px; color: #8A5A3B; flex-shrink: 0; }
         .contract-info { flex: 1; }
-        .contract-info h4 { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 3px; }
-        .contract-info p  { font-size: 13px; color: #777; margin: 0; }
+        .contract-info h4 { font-size: 14px; font-weight: 600; color: var(--acc-text, #3E2418); margin-bottom: 3px; }
+        .contract-info p  { font-size: 12px; color: #8A7965; margin: 0; }
         .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; display: inline-block; }
         .dl-btn:hover { background: var(--brown-dark, #1E0C03); }
 
@@ -1236,13 +1166,13 @@
            scrollHeight/clientHeight already drive the "read to the end"
            agreement-gating check elsewhere, so its structure/scroll
            behavior must stay exactly as it is. */
-        .contract-viewer-wrap { position: relative; margin-bottom: 12px; }
+        .contract-viewer-wrap { position: relative; margin-bottom: 10px; }
         .contract-viewer {
-            max-height: 190px;
+            max-height: 110px;
             overflow-y: auto;
-            border: 1px solid #e0d0c0;
-            border-radius: 12px;
-            padding: 20px 22px;
+            border: 0.5px solid var(--acc-border-tan, #E5DBCC);
+            border-radius: 8px;
+            padding: 16px 18px;
             background: #fff;
             margin-bottom: 0;
             scrollbar-width: thin;
@@ -1252,7 +1182,7 @@
         .contract-viewer::-webkit-scrollbar-track { background: #F7F2EA; }
         .contract-viewer::-webkit-scrollbar-thumb { background: #C9A98E; border-radius: 4px; }
         .contract-viewer:focus-visible {
-            outline: 2px solid #6B3A1F;
+            outline: 2px solid #A34F2E;
             outline-offset: 2px;
         }
         .contract-viewer-fade {
@@ -1260,14 +1190,14 @@
             left: 1px; right: 1px; bottom: 1px;
             height: 34px;
             background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #FFFFFF);
-            border-radius: 0 0 11px 11px;
+            border-radius: 0 0 7px 7px;
             pointer-events: none;
         }
         .contract-viewer p { font-size: 13.5px; line-height: 1.7; color: #6B5A47; margin-bottom: 12px; }
         .contract-viewer-title { font-size: 15px; font-weight: 500; color: #A34F2E; }
         .contract-viewer-heading { font-size: 13.5px; font-weight: 500; color: #3E2418; }
         .contract-viewer-gap { height: 6px; }
-        .contract-viewer-loading { font-size: 13px; color: #9c8f84; text-align: center; padding: 24px 0; }
+        .contract-viewer-loading { font-size: 13px; color: #72665c; text-align: center; padding: 24px 0; }
         .contract-viewer-error { color: #b42318; }
 
         .contract-retry-btn {
@@ -1294,38 +1224,41 @@
         .contract-viewer-actions {
             display: flex;
             justify-content: flex-start;
-            margin-bottom: 20px;
+            margin-top: 10px;
         }
         .contract-view-full-btn {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            min-height: 40px;
-            padding: 9px 18px;
-            border: 1px solid #6B3A1F;
-            border-radius: 8px;
-            background: #fff;
-            color: #6B3A1F;
+            gap: 6px;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background: none;
+            color: #A34F2E;
             font: inherit;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.15s ease, color 0.15s ease;
+            transition: color 0.15s ease;
         }
+        .contract-view-full-btn i { font-size: 13px; }
         .contract-view-full-btn:hover,
         .contract-view-full-btn:focus-visible {
-            background: #6B3A1F;
-            color: #fff;
+            color: #3E2418;
             outline: none;
+            text-decoration: underline;
         }
 
-        .signature-section { margin-bottom: 20px; }
-        .signature-heading-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-        .signature-heading { font-size: 15px; font-weight: 700; color: #2A1408; margin-bottom: 0; }
+        /* Header row: plain "Sign below" text on the left, Draw/Type-instead
+           underline-tab toggle on the right — wraps to two lines at narrow
+           widths (the toggle drops beneath the label) rather than
+           compressing the tabs. */
+        .signature-header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
         .signature-captured-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            margin-bottom: 10px;
             padding: 4px 12px;
             border-radius: 999px;
             background: #E1F5EE;
@@ -1335,20 +1268,24 @@
             transition: opacity .15s ease;
         }
         .signature-captured-badge.is-hidden { display: none; }
-        .signature-mode-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+        /* Underline tab pair — matches the tab style used for Overview /
+           Inclusions / Policies elsewhere: no fill, active tab reads by its
+           terracotta text + bottom border alone. */
+        .signature-mode-tabs { display: flex; gap: 16px; }
         .signature-mode-btn {
-            border: 1px solid #e0d0c0;
-            background: #fff;
-            color: #6B3A1F;
+            border: none;
+            border-bottom: 2px solid transparent;
+            background: none;
+            color: #6B5A47;
             font-size: 12.5px;
             font-weight: 600;
-            padding: 7px 14px;
-            border-radius: 999px;
+            padding: 0 0 4px;
+            border-radius: 0;
             cursor: pointer;
-            transition: background 0.15s, color 0.15s;
+            transition: color 0.15s, border-color 0.15s;
         }
-        .signature-mode-btn.active { background: #6B3A1F; color: #fff; border-color: #6B3A1F; }
-        .signature-mode-btn:not(.active):hover { background: #FFF8F0; }
+        .signature-mode-btn.active { background: none; color: #A34F2E; border-bottom-color: #A34F2E; }
+        .signature-mode-btn:not(.active):hover { color: #3E2418; }
 
         .signature-draw-panel.hidden, .signature-type-panel.hidden { display: none; }
 
@@ -1361,9 +1298,9 @@
         .signature-canvas-wrap {
             position: relative;
             width: 100%;
-            height: 180px;
-            border: 2px dashed #D8C9AE;
-            border-radius: 12px;
+            height: 110px;
+            border: 1px dashed #D8C9AE;
+            border-radius: 8px;
             background: #fff;
             overflow: hidden;
         }
@@ -1398,7 +1335,7 @@
             align-items: center;
             justify-content: center;
             font-size: 15px;
-            color: #C9BBA8;
+            color: #79654b;
             transition: opacity .15s ease;
         }
         .signature-guide-placeholder.is-hidden { opacity: 0; }
@@ -1417,17 +1354,18 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            margin-top: 8px;
-            border: 1px solid #e0d0c0;
-            background: #fff;
-            color: #6B3A1F;
+            margin-top: 10px;
+            border: none;
+            background: none;
+            color: #6B5A47;
             font-size: 12px;
-            font-weight: 600;
-            padding: 6px 14px;
-            border-radius: 6px;
+            font-weight: 500;
+            padding: 0;
+            border-radius: 0;
             cursor: pointer;
         }
-        .signature-clear-btn:hover { background: #FFF8F0; }
+        .signature-clear-btn i { font-size: 13px; }
+        .signature-clear-btn:hover { color: #3E2418; text-decoration: underline; }
 
         /* Type-instead: the real <input> sits on top (transparent text, a
            visible caret so typing position stays legible) with the live
@@ -1474,23 +1412,17 @@
             min-height: 18px;
             margin-top: 8px;
             font-size: 12px;
-            color: #7b6a5d;
+            color: #756559;
         }
         .signature-status.error { color: #b42318; }
 
         @media (max-width: 480px) {
-            .signature-canvas-wrap { height: 140px; }
+            .signature-canvas-wrap { height: 100px; }
             .signature-guide-placeholder { bottom: 30px; }
             .signature-type-preview { font-size: 26px; }
+            .rs-contract-divider { margin: 20px 0; }
         }
 
-        .contract-agreement-box {
-            margin-top: 18px;
-            padding: 16px 18px;
-            border: 1px solid #F0DFBB;
-            border-radius: 12px;
-            background: #FDF8EE;
-        }
         /* Each row is its own self-contained flex line: checkbox +
            exactly one sibling item holding all of that row's text (a
            .contract-agreement-copy div/label). align-items: flex-start
@@ -1516,14 +1448,15 @@
             cursor: not-allowed;
             opacity: 0.55;
         }
-        .contract-agreement-divider {
-            height: 0;
-            margin: 16px 0;
-            border-top: 0.5px solid #F0DFBB;
+        /* Second row gets its own fixed top margin so the ~18px gap between
+           the two checkboxes holds steady whether or not the helper text
+           below the first row is currently shown. */
+        .contract-agreement-row-second {
+            margin-top: 18px;
         }
         /* Indented to the start of the row's text (checkbox width 17px +
            row gap 10px = 27px) so it reads as attached to the first
-           checkbox row specifically, not floating between both rows. */
+           checkbox row specifically. */
         .contract-agreement-helper {
             margin: 6px 0 0 27px;
             font-size: 12px;
@@ -1558,7 +1491,7 @@
             margin-top: 10px;
             font-size: 12px;
             line-height: 1.5;
-            color: #7b6a5d;
+            color: #756559;
         }
         .contract-inline-message.error {
             color: #b42318;
@@ -1609,7 +1542,7 @@
             font-weight: 700;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #8b735e;
+            color: #796452;
         }
         .policy-modal-title {
             margin: 0 0 18px;
@@ -1791,7 +1724,7 @@
             margin: 0;
             font-size: 14px;
             font-weight: 400;
-            color: #8A7965;
+            color: #756756;
         }
         .agreement-detail-row dd {
             margin: 0;
@@ -1889,10 +1822,22 @@
 
         /* Buttons */
         .reservation-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border, rgba(61,26,10,0.10)); }
-        .btn-back { background: transparent; color: var(--brown-primary, #3D1A0A); border: 1px solid var(--border, rgba(61,26,10,0.20)); padding: 12px 28px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; transition: all 0.2s; }
-        .btn-back:hover { background: var(--cream-dark, #F2EBE0); border-color: var(--brown-mid, #6B3820); }
-        .btn-next { background: var(--brown-primary, #3D1A0A); color: #fff; border: none; padding: 12px 32px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; transition: background 0.2s; }
+        .btn-back { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: #4A2C17; border: 0.5px solid #C9A98E; padding: 12px 28px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; transition: all 0.2s; }
+        .btn-back:hover { background: var(--cream-dark, #F2EBE0); border-color: #4A2C17; }
+        .btn-next { display: inline-flex; align-items: center; gap: 8px; background: #4A2C17; color: #F5EDE2; border: none; padding: 12px 32px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; transition: background 0.2s; }
         .btn-next:hover { background: var(--brown-dark, #1E0C03); }
+        .btn-next:disabled { background: #EFE8DC; color: #A89880; cursor: not-allowed; }
+
+        /* rs7 already draws its own hairline footer divider (below) right
+           above this shared button row — suppress the row's own top
+           border/spacing only while rs7 is active, so the two dividers
+           don't stack into an empty bordered gap between Consent and the
+           buttons. */
+        .res-step#rs7.active ~ .reservation-buttons {
+            border-top: none;
+            margin-top: 0;
+            padding-top: 0;
+        }
 
         .hidden { display: none !important; }
 
@@ -2000,32 +1945,6 @@
 }
 
 /* ── Event-type chips ───────────────────────────────────────────────────────── */
-.event-type-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.event-chip {
-    padding: 10px 20px;
-    border-radius: 50px;
-    border: 1.5px solid var(--brown-light, #B07D5A);
-    background: #fff;
-    color: var(--brown-primary, #3D1A0A);
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.18s, border-color 0.18s, color 0.18s;
-    user-select: none;
-    line-height: 1.4;
-}
-
-.event-chip:hover {
-    border-color: var(--brown-primary, #3D1A0A);
-    background: var(--cream-dark, #F2EBE0);
-}
 
 .event-chip.active {
     background: var(--brown-primary, #3D1A0A);
@@ -2053,33 +1972,11 @@
 .guest-count-hint {
     margin-top: 10px;
     font-size: 13px;
-    color: #999;
+    color: #696969;
     font-style: italic;
     line-height: 1.55;
     padding-top: 2px;
     border-top: 1px solid #f0ece8;
-}
-
-/* ── Time-slot info note ────────────────────────────────────────────────────── */
-.time-alt-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin-top: 22px;
-    padding: 14px 18px;
-    background: var(--cream, #FAF8F4);
-    border: 1.5px solid var(--brown-pale, #DFC3A8);
-    border-radius: 10px;
-    font-size: 13px;
-    line-height: 1.65;
-    color: var(--brown-mid, #6B3820);
-}
-
-.time-alt-note i {
-    font-size: 18px;
-    color: var(--brown-light, #B07D5A);
-    flex-shrink: 0;
-    margin-top: 1px;
 }
 
 /* ── Venue map ──────────────────────────────────────────────────────────────── */
@@ -2123,7 +2020,7 @@
 
 .venue-map-hint {
     font-size: 13px;
-    color: #777;
+    color: #686868;
     margin-bottom: 14px;
     line-height: 1.55;
 }
@@ -2133,36 +2030,24 @@
     padding: 20px 16px;
     text-align: center;
     font-size: 13.5px;
-    color: #8a7a6c;
+    color: #73665a;
     background: #F7F3EC;
     border: 1px dashed #E2D6C6;
     border-radius: 10px;
 }
 
-/* ── Summary divider + section title ───────────────────────────────────────── */
-.summary-divider {
+/* ── Summary footer divider ──────────────────────────────────────────────────
+   Sits between the Total card and the (shared, page-level) Back/Next row. */
+.rs-summary-footer-divider {
     border: none;
-    border-top: 1px solid var(--brown-pale, #DFC3A8);
-    margin: 14px 0;
+    border-top: 1px solid #E5DBCC;
+    margin: 20px 0 0;
 }
-
-.summary-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--brown-light, #B07D5A);
-    margin-bottom: 10px;
-}
-
-.summary-total {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--brown-primary, #3D1A0A);
-    margin-top: 4px;
+/* rs7's own footer divider — thinner hairline, spaced per the redesigned
+   Contract step (28px above, 18px below, before the shared button row). */
+#rs7 .rs-summary-footer-divider {
+    border-top: 0.5px solid #E5DBCC;
+    margin: 28px 0 18px;
 }
 
 /* ── Single-page event-info sub-sections ────────────────────────────────────── */
@@ -2180,7 +2065,6 @@
     border-top: none;
 }
 
-
 .res-section h2 {
     /* Inherit existing h2 styling from the step; just ensure consistent spacing */
     margin-bottom: 8px;
@@ -2192,7 +2076,7 @@
 .section-status-note {
     display: block;
     font-size: 14px;
-    color: #999;
+    color: #696969;
     font-style: italic;
     margin: 6px 0 0;
     line-height: 1.6;
@@ -2247,7 +2131,7 @@
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: #888;
+    color: #696969;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     margin-bottom: 8px;
@@ -2279,7 +2163,7 @@
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: #888;
+    color: #696969;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     margin-bottom: 8px;
@@ -2307,7 +2191,7 @@
     --acc-border-tan:    #E5DBCC;
     --acc-border-hair:   #EEE5D8;
     --acc-text:          #3E2418;
-    --acc-text-muted:    #8A7965;
+    --acc-text-muted:    #756756;
     --acc-terracotta:    #A34F2E;
 }
 

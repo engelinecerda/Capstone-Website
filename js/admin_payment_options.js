@@ -938,7 +938,7 @@ async function init() {
   if (!result) return;
 
   if (result.profile.role !== 'admin') {
-    window.location.replace('/admin/dashboard.html');
+    window.location.replace('/admin/dashboard');
     return;
   }
 

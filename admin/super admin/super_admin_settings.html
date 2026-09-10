@@ -4,11 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Availability and Scheduling - ELI Coffee Events</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/super_admin_only.css">
-  <link rel="stylesheet" href="/css/manager-theme.css">
-  <link rel="stylesheet" href="/css/super_admin_settings.css">
-  <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=18">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=18">
+  <link rel="stylesheet" href="/css/super_admin_settings.css?v=18">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=18">
 </head>
 <body>
 
@@ -28,7 +32,7 @@
       <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
 
       <div class="sidebar-user">
-        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+        <a href="/admin/profile" class="sidebar-user-link" title="View profile">
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
@@ -62,7 +66,7 @@
         <div class="usage-bar-track">
           <div class="usage-bar-fill" id="usageBarFill" style="width:0%"></div>
         </div>
-        <p class="usage-card-sub" id="usageCardSub">Used for contract signature verification and payment receipt OCR. Google Cloud Vision's free tier covers 1,000 units/month.</p>
+        <p class="usage-card-sub" id="usageCardSub">Used for contract signature verification. Google Cloud Vision's free tier covers 1,000 units/month. (Payment receipt extraction now uses Gemini, billed separately — not counted here.)</p>
       </div>
 
       <!-- ── OPERATING HOURS ── -->
@@ -144,7 +148,7 @@
       <!-- ── CANCELLATION NOTICE RULES ── -->
       <div class="card" id="cancellation-notice">
         <p class="card-title">Cancellation Notice Rules</p>
-        <p class="card-sub">How much lead time a customer needs to cancel an existing reservation — separate from the Booking Notice Window above, which governs new bookings instead. Fees for cancelling live in <a href="/admin/config/payment-options.html" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
+        <p class="card-sub">How much lead time a customer needs to cancel an existing reservation — separate from the Booking Notice Window above, which governs new bookings instead. Fees for cancelling live in <a href="/admin/config/payment-options" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
 
         <div class="pr-row">
           <div class="pr-row-copy">
@@ -208,7 +212,7 @@
       <!-- ── RESCHEDULE POLICY ── -->
       <div class="card" id="reschedule-policy">
         <p class="card-title">Reschedule Policy</p>
-        <p class="card-sub">Rescheduling has no manager approval step — a customer picks any date the calendar shows open. These rules control the hold on that date while the fee is unpaid. The fee itself lives in <a href="/admin/config/payment-options.html" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
+        <p class="card-sub">Rescheduling has no manager approval step — a customer picks any date the calendar shows open. These rules control the hold on that date while the fee is unpaid. The fee itself lives in <a href="/admin/config/payment-options" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
 
         <div class="pr-row">
           <div class="pr-row-copy">
@@ -250,6 +254,29 @@
 
         <div class="action-bar">
           <button type="button" class="btn-primary" id="saveReschedulePolicyBtn">Save Reschedule Policy</button>
+        </div>
+      </div>
+
+      <!-- ── EXTENSION RULES ── -->
+      <div class="card" id="extension-rules">
+        <p class="card-title">Extension Rules</p>
+        <p class="card-sub">A customer's request to add hours to an already-booked reservation holds that extra time on the calendar while the fee is unpaid, then requires Manager approval like any other payment. The per-hour rate is set per package in <a href="/admin/super%20admin/super_admin_packages" style="color:var(--active-bg);font-weight:600;">Packages</a> ("Extension Price" — leave blank on a package to disable extensions for it).</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Payment hold duration</p>
+            <p class="pr-row-desc">How long the requested extra time stays reserved while the customer pays the extension fee, before it auto-releases back to the calendar. Extension holds are meant to be short — this is in minutes, not hours.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-extension-hold-minutes" min="1">
+            <span class="field-note" style="margin:0;">minutes</span>
+          </div>
+        </div>
+
+        <p class="form-message" id="extension-rules-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveExtensionRulesBtn">Save Extension Rules</button>
         </div>
       </div>
 
@@ -306,7 +333,7 @@
       </div>
 
       <div class="settings-note">
-        <p>Closures and maintenance dates are set by the Manager in the <a href="/admin/availability-calendar.html">Availability Calendar</a> — not here.</p>
+        <p>Closures and maintenance dates are set by the Manager in the <a href="/admin/availability-calendar">Availability Calendar</a> — not here.</p>
       </div>
 
     </section>
@@ -325,6 +352,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/super_admin_settings.js"></script>
 </body>
 </html>

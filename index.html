@@ -6,12 +6,17 @@
   <title>ELI Coffee Events Cafe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="/css/styles.css" />
-  <link rel="stylesheet" href="/css/home.css" />
-  <link rel="stylesheet" href="/css/announcement_banner.css" />
+  <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
+  <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=18" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=18"></noscript>
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
+  <link rel="stylesheet" href="/css/styles.css?v=18" />
+  <link rel="stylesheet" href="/css/home.css?v=18" />
+  <link rel="stylesheet" href="/css/announcement_banner.css?v=18" />
   <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -19,7 +24,7 @@
   <!-- NAVBAR — class names kept for navbar.js and app.js compatibility -->
   <nav class="navbar">
     <div class="navbar__container">
-      <a href="/index.html" id="navbar__logo">
+      <a href="/" id="navbar__logo">
         <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo" />
       </a>
       <div class="navbar__toggle" id="mobile-menu">
@@ -35,13 +40,13 @@
             <i class="ti ti-x"></i>
           </button>
         </li>
-        <li class="navbar__item"><a href="/index.html" class="navbar__links">Home</a></li>
-        <li class="navbar__item"><a href="/menu.html" class="navbar__links">Menu</a></li>
-        <li class="navbar__item"><a href="/packages.html" class="navbar__links">Packages</a></li>
-        <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
-        <li class="navbar__item"><a href="/reviews.html" class="navbar__links">Reviews</a></li>
-        <li class="navbar__item"><a href="/faqs.html" class="navbar__links">FAQs</a></li>
-        <li class="navbar__item"><a href="/about.html" class="navbar__links">About</a></li>
+        <li class="navbar__item"><a href="/" class="navbar__links">Home</a></li>
+        <li class="navbar__item"><a href="/menu" class="navbar__links">Menu</a></li>
+        <li class="navbar__item"><a href="/packages" class="navbar__links">Packages</a></li>
+        <li class="navbar__item"><a href="/reservations" class="navbar__links">Reservations</a></li>
+        <li class="navbar__item"><a href="/reviews" class="navbar__links">Reviews</a></li>
+        <li class="navbar__item"><a href="/faqs" class="navbar__links">FAQs</a></li>
+        <li class="navbar__item"><a href="/about" class="navbar__links">About</a></li>
         <li class="navbar__btn"></li>
       </ul>
     </div>
@@ -50,10 +55,16 @@
 
   <!-- HERO -->
   <section class="hero-section">
+    <!-- Not wrapped in <picture>/webp — js/home_content.js's initHero()
+         overwrites this <img>'s src directly with an admin-configured
+         (already Cloudinary-optimized) image; a <picture> here would keep
+         showing this static fallback forever, since a matching <source>
+         always wins over whatever src the img element ends up with. -->
     <img
       class="hero-bg"
       src="/images/637347619_904793605590427_6779978724130647558_n.jpg"
       alt="ELI Coffee Events Cafe at night"
+      fetchpriority="high"
     />
     <div class="hero-overlay"></div>
     <div class="hero-body">
@@ -61,8 +72,8 @@
       <h1 class="hero-title">Ground with passion. Brewed with love.</h1>
       <p class="hero-sub">Specialty coffee, desserts, and cozy lounge spaces for meetups, study sessions, and private gatherings.</p>
       <div class="hero-actions">
-        <a href="/packages.html" class="btn-primary">Explore Packages</a>
-        <a href="/about.html" class="btn-ghost">Our Story</a>
+        <a href="/packages" class="btn-primary">Explore Packages</a>
+        <a href="/about" class="btn-ghost">Our Story</a>
       </div>
     </div>
   </section>
@@ -89,7 +100,7 @@
         </blockquote>
         <p class="about-body cfg-loading">ELI Coffee Events Cafe is more than your neighborhood coffee shop. We are a warm, inviting space in the heart of Binangonan, Rizal, designed for those who appreciate the finer moments — a quiet afternoon with a book, a milestone celebration with loved ones, or an intimate corporate gathering.</p>
         <p class="about-body cfg-loading">From handcrafted specialty beverages to full event catering, every detail is curated with care to give you an experience worth returning to.</p>
-        <a href="/about.html" class="btn-primary" style="margin-top: 8px;">Learn More</a>
+        <a href="/about" class="btn-primary" style="margin-top: 8px;">Learn More</a>
       </div>
     </div>
   </section>
@@ -106,32 +117,41 @@
     <div class="services-grid cfg-loading">
 
       <div class="service-card">
-        <img class="service-card-img" src="/images/group-order.jpg" alt="Cafe and lounge" />
+        <picture>
+      <source type="image/webp" srcset="/images/group-order.webp">
+      <img class="service-card-img" src="/images/group-order.jpg" alt="Cafe and lounge" />
+    </picture>
         <div class="service-card-body">
           <p class="service-num">01</p>
           <h3 class="service-title">Cafe &amp; Lounge</h3>
           <p class="service-desc">A cozy spot for relaxation, conversation, or the perfect cup. Enjoy specialty coffee, teas, and homemade desserts in a warm, welcoming atmosphere.</p>
-          <a href="/menu.html" class="service-link">View Menu</a>
+          <a href="/menu" class="service-link">View Menu</a>
         </div>
       </div>
 
       <div class="service-card">
-        <img class="service-card-img" src="/images/crop-background-img.jpg" alt="Private events" />
+        <picture>
+      <source type="image/webp" srcset="/images/crop-background-img.webp">
+      <img class="service-card-img" src="/images/crop-background-img.jpg" alt="Private events" loading="lazy" />
+    </picture>
         <div class="service-card-body">
           <p class="service-num">02</p>
           <h3 class="service-title">Private Events</h3>
           <p class="service-desc">Book the lounge exclusively for birthdays, bridal showers, team gatherings, and more. We handle the setup so you can focus on the moments that matter.</p>
-          <a href="/packages.html" class="service-link">View packages</a>
+          <a href="/packages" class="service-link">View packages</a>
         </div>
       </div>
 
       <div class="service-card">
-        <img class="service-card-img" src="/images/catering img.jpg" alt="Catering" />
+        <picture>
+      <source type="image/webp" srcset="/images/catering%20img.webp">
+      <img class="service-card-img" src="/images/catering img.jpg" alt="Catering" loading="lazy" />
+    </picture>
         <div class="service-card-body">
           <p class="service-num">03</p>
           <h3 class="service-title">Catering</h3>
           <p class="service-desc">Customizable menus for weddings, birthdays, and corporate events. Our kitchen brings the ELI Coffee experience directly to your chosen venue.</p>
-          <a href="/packages.html" class="service-link">Get a quote</a>
+          <a href="/packages" class="service-link">Get a quote</a>
         </div>
       </div>
 
@@ -147,22 +167,40 @@
     </div>
     <div class="gallery-grid cfg-loading">
       <div class="g-item gi1">
-        <img src="/images/snack bar corner.jpg" alt="ELI Coffee lounge" />
+        <picture>
+      <source type="image/webp" srcset="/images/snack%20bar%20corner.webp">
+      <img src="/images/snack bar corner.jpg" alt="ELI Coffee lounge" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi2">
-        <img src="/images/625975201_26971266315797097_6450646982903854248_n.jpg" alt="Coffee and desserts" />
+        <picture>
+      <source type="image/webp" srcset="/images/625975201_26971266315797097_6450646982903854248_n.webp">
+      <img src="/images/625975201_26971266315797097_6450646982903854248_n.jpg" alt="Coffee and desserts" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi3">
-        <img src="/images/crop-background-img.jpg" alt="Event decor" />
+        <picture>
+      <source type="image/webp" srcset="/images/crop-background-img.webp">
+      <img src="/images/crop-background-img.jpg" alt="Event decor" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi4">
-        <img src="/images/629336028_26971264995797229_7811559806777201812_n.jpg" alt="Food spread" />
+        <picture>
+      <source type="image/webp" srcset="/images/629336028_26971264995797229_7811559806777201812_n.webp">
+      <img src="/images/629336028_26971264995797229_7811559806777201812_n.jpg" alt="Food spread" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi5">
-        <img src="/images/vip.jpg" alt="Private gathering" />
+        <picture>
+      <source type="image/webp" srcset="/images/vip.webp">
+      <img src="/images/vip.jpg" alt="Private gathering" loading="lazy" />
+    </picture>
       </div>
       <div class="g-item gi6">
-        <img src="/images/cafe.jpg" alt="Interior dining" />
+        <picture>
+      <source type="image/webp" srcset="/images/cafe.webp">
+      <img src="/images/cafe.jpg" alt="Interior dining" loading="lazy" />
+    </picture>
       </div>
     </div>
   </section>
@@ -206,15 +244,19 @@
 
   <!-- CTA BANNER -->
   <section class="cta-banner">
-    <img
+    <picture>
+      <source type="image/webp" srcset="/images/background-img.webp">
+      <img
       class="cta-banner-img"
       src="/images/background-img.jpg"
       alt="Private event at ELI Coffee"
+      loading="lazy"
     />
+    </picture>
     <div class="cta-banner-overlay">
       <h2 class="cta-banner-title">Plan your next<br><em>event with us</em></h2>
       <p class="cta-banner-sub">Whether it's an intimate birthday or a grand celebration, our team is ready to make it unforgettable.</p>
-      <a href="/reservations.html" class="btn-primary">Reserve a Date</a>
+      <a href="/reservations" class="btn-primary">Reserve a Date</a>
     </div>
   </section>
 
@@ -223,7 +265,7 @@
     <div class="footer-new-grid">
 
       <div>
-        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" />
+        <img src="/images/ELI COFFEE LOGO.png" alt="ELI Coffee" class="footer-new-logo" loading="lazy" />
         <p class="footer-new-brand-desc">Your go-to events cafe in Binangonan, Rizal. Specialty coffee, desserts, and private event spaces crafted for every occasion.</p>
         <div class="footer-new-social">
           <a href="https://www.facebook.com/elicoffeeph" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
@@ -238,23 +280,23 @@
       <div>
         <p class="footer-new-heading">Explore</p>
         <ul class="footer-new-links">
-          <li><a href="/index.html">Home</a></li>
-          <li><a href="/packages.html">Packages</a></li>
-          <li><a href="/reservations.html">Reservations</a></li>
-          <li><a href="/reviews.html">Reviews</a></li>
-          <li><a href="/faqs.html">FAQs</a></li>
-          <li><a href="/about.html">About</a></li>
-          <li><a href="/terms-and-conditions.html">Terms &amp; Conditions</a></li>
-          <li><a href="/privacy-policy.html">Data Privacy Policy</a></li>
+          <li><a href="/">Home</a></li>
+          <li><a href="/packages">Packages</a></li>
+          <li><a href="/reservations">Reservations</a></li>
+          <li><a href="/reviews">Reviews</a></li>
+          <li><a href="/faqs">FAQs</a></li>
+          <li><a href="/about">About</a></li>
+          <li><a href="/terms-and-conditions">Terms &amp; Conditions</a></li>
+          <li><a href="/privacy-policy">Data Privacy Policy</a></li>
         </ul>
       </div>
 
       <div>
         <p class="footer-new-heading">Services</p>
         <ul class="footer-new-links">
-          <li><a href="/packages.html">Cafe &amp; Lounge</a></li>
-          <li><a href="/packages.html">Private Events</a></li>
-          <li><a href="/packages.html">Catering</a></li>
+          <li><a href="/packages">Cafe &amp; Lounge</a></li>
+          <li><a href="/packages">Private Events</a></li>
+          <li><a href="/packages">Catering</a></li>
         </ul>
       </div>
 
@@ -281,7 +323,8 @@
     </div>
   </footer>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/navbar.js"></script>
   <script type="module" src="/js/home_content.js"></script>
   <script type="module" src="/js/footer_content.js"></script>

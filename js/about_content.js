@@ -41,7 +41,7 @@ async function initHero() {
     // nothing left to apply and simply gets discarded. That's what stops
     // the fallback (revealed below) from being silently overwritten a
     // moment after the customer already sees it.
-    const data = await withConfigTimeout(fetchPageHeader(supabase, 'about'), null);
+    const data = await withConfigTimeout(fetchPageHeader(supabase, 'about', 1920), null);
     if (!data) return; // keep the existing hardcoded fallback
 
     if (imgEl && data.image_url) {
@@ -57,15 +57,23 @@ async function initHero() {
 
 async function initAboutSections() {
   const el = document.getElementById('aboutWhoWeAreBody');
+  const storyImgEl = document.querySelector('.about-story-image img');
   try {
-    const sections = await withConfigTimeout(loadAboutSections(supabase), []);
-    if (!sections.length) return; // keep the existing hardcoded copy as fallback
+    const sections = await withConfigTimeout(loadAboutSections(supabase, 700), []);
+    if (!sections.length) return; // keep the existing hardcoded copy (text + image) as fallback
 
     const targets = { who_we_are: el };
     sections.forEach(section => {
       const target = targets[section.section_key];
-      if (!target || !section.body) return;
-      target.innerHTML = renderPolicyBlocks(parsePolicyBody(section.body));
+      if (target && section.body) target.innerHTML = renderPolicyBlocks(parsePolicyBody(section.body));
+      // The story photo lives on the who_we_are row (image_url/alt_text) rather
+      // than its own page_header entry — it's a second in-page image, not this
+      // page's hero. Swapped only once the fetch settles, same reasoning as
+      // fetchPageHeader() elsewhere in this file.
+      if (section.section_key === 'who_we_are' && storyImgEl && section.image_url) {
+        storyImgEl.src = section.image_url;
+        if (section.alt_text) storyImgEl.alt = section.alt_text;
+      }
     });
   } finally {
     revealConfigContent(el);

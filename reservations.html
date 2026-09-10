@@ -6,21 +6,26 @@
     <title>Reservations — ELI Coffee Events Cafe</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=18" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=18"></noscript>
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"></noscript>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/css/styles.css" />
-    <link rel="stylesheet" href="/css/reservations.css" />
-    <link rel="stylesheet" href="/css/home.css" />
-    <link rel="stylesheet" href="/css/announcement_banner.css" />
+    <link rel="stylesheet" href="/css/styles.css?v=18" />
+    <link rel="stylesheet" href="/css/reservations.css?v=18" />
+    <link rel="stylesheet" href="/css/home.css?v=18" />
+    <link rel="stylesheet" href="/css/announcement_banner.css?v=18" />
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
 
     <nav class="navbar">
         <div class="navbar__container">
-            <a href="/index.html" id="navbar__logo">
+            <a href="/" id="navbar__logo">
                 <img class="logo" src="/images/logo.png" alt="ELI Coffee Events Cafe Logo">
             </a>
             <div class="navbar__toggle" id="mobile-menu">
@@ -34,13 +39,13 @@
                         <i class="ti ti-x"></i>
                     </button>
                 </li>
-                <li class="navbar__item"><a href="/index.html"        class="navbar__links">Home</a></li>
-                <li class="navbar__item"><a href="/menu.html"         class="navbar__links">Menu</a></li>
-                <li class="navbar__item"><a href="/packages.html"     class="navbar__links">Packages</a></li>
-                <li class="navbar__item"><a href="/reservations.html" class="navbar__links">Reservations</a></li>
-                <li class="navbar__item"><a href="/reviews.html"      class="navbar__links">Reviews</a></li>
-                <li class="navbar__item"><a href="/faqs.html"         class="navbar__links">FAQs</a></li>
-                <li class="navbar__item"><a href="/about.html"        class="navbar__links">About</a></li>
+                <li class="navbar__item"><a href="/"        class="navbar__links">Home</a></li>
+                <li class="navbar__item"><a href="/menu"         class="navbar__links">Menu</a></li>
+                <li class="navbar__item"><a href="/packages"     class="navbar__links">Packages</a></li>
+                <li class="navbar__item"><a href="/reservations" class="navbar__links">Reservations</a></li>
+                <li class="navbar__item"><a href="/reviews"      class="navbar__links">Reviews</a></li>
+                <li class="navbar__item"><a href="/faqs"         class="navbar__links">FAQs</a></li>
+                <li class="navbar__item"><a href="/about"        class="navbar__links">About</a></li>
                 <li class="navbar__btn"></li>
             </ul>
         </div>
@@ -49,7 +54,10 @@
 
     <!-- PAGE HERO -->
     <section class="page-hero">
-        <img class="page-hero-img" src="/images/background-img.jpg" alt="Reserve your event at ELI Coffee" />
+        <picture>
+      <source type="image/webp" srcset="/images/background-img.webp">
+      <img class="page-hero-img" src="/images/background-img.jpg" alt="Reserve your event at ELI Coffee" fetchpriority="high" />
+    </picture>
         <div class="page-hero-overlay"></div>
         <div class="page-hero-body">
             <p class="hero-eyebrow">ELI Coffee Events Cafe</p>
@@ -64,7 +72,7 @@
             <!-- GUEST NOTICE — shown by JS for unauthenticated visitors -->
             <div class="res-guest-notice hidden" id="resGuestNotice" role="status" aria-live="polite">
                 <i class="ti ti-info-circle" aria-hidden="true"></i>
-                <p>You're browsing as a guest. <a href="/login.html">Sign in</a> or <a href="/login.html">create an account</a> to complete your booking.</p>
+                <p>You're browsing as a guest. <a href="/login">Sign in</a> or <a href="/login">create an account</a> to complete your booking.</p>
             </div>
 
             <!-- BOOKING BLOCK NOTICE — shown by JS when the customer has an
@@ -284,10 +292,6 @@
                     <p class="time-status-note" id="time-status-note"></p>
                     <div class="time-grid" id="time-grid"></div>
                     <p class="time-end-readout hidden" id="time-end-readout"></p>
-                    <div class="time-alt-note">
-                        <i class="ti ti-info-circle" aria-hidden="true"></i>
-                        <span>Need a different start time? Add a note in the Special Requests field on the next page and our team will reach out to confirm.</span>
-                    </div>
                 </div>
 
             </div><!-- /rs1 -->
@@ -310,11 +314,12 @@
             <div class="res-step" id="rs6">
                 <h2>Reservation <em>Summary</em></h2>
                 <p>Please review all your details before proceeding</p>
-                <div class="summary-box" id="summary-content"></div>
+                <div id="summary-content"></div>
                 <div id="guest-warning" class="guest-warning hidden">
-                    <span>&#9888;&#65039;</span>
-                    <p>You must <a href="/login.html">sign up or log in</a> to complete your booking.</p>
+                    <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                    <p>You must <a href="/login">sign up or log in</a> to complete your booking.</p>
                 </div>
+                <hr class="rs-summary-footer-divider">
             </div>
 
             <!-- ═══════════════════════════════════════════════
@@ -324,43 +329,48 @@
                 <h2>Review &amp; <em>Sign</em></h2>
                 <p>Review your contract and sign right here — no printing, no external apps.</p>
                 <div class="contract-box">
-                    <div class="contract-viewer-head">
-                        <div class="contract-icon"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></div>
-                        <div class="contract-info">
-                            <h4 id="contract-title">ELI Coffee Events Reservation Contract</h4>
-                            <p id="contract-description">This is a short preview. Open the full agreement to read every section.</p>
+
+                    <div class="contract-section" id="contract-section-contract">
+                        <div class="contract-viewer-head">
+                            <i class="ti ti-file-text contract-icon" aria-hidden="true"></i>
+                            <div class="contract-info">
+                                <h4 id="contract-title">ELI Coffee Events Reservation Contract</h4>
+                                <p id="contract-description">This is a short preview. Open the full agreement to read every section.</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="contract-viewer-wrap">
-                        <div
-                            class="contract-viewer"
-                            id="contract-viewer"
-                            aria-live="polite"
-                            role="region"
-                            aria-label="Service agreement preview"
-                            tabindex="0"
-                        >
-                            <p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>
+                        <div class="contract-viewer-wrap">
+                            <div
+                                class="contract-viewer"
+                                id="contract-viewer"
+                                aria-live="polite"
+                                role="region"
+                                aria-label="Service agreement preview"
+                                tabindex="0"
+                            >
+                                <p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>
+                            </div>
+                            <div class="contract-viewer-fade" aria-hidden="true"></div>
                         </div>
-                        <div class="contract-viewer-fade" aria-hidden="true"></div>
-                    </div>
-                    <div class="contract-viewer-actions">
-                        <button type="button" class="contract-view-full-btn" id="contract-view-full-btn">
-                            <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i> View full agreement
-                        </button>
+                        <div class="contract-viewer-actions">
+                            <button type="button" class="contract-view-full-btn" id="contract-view-full-btn">
+                                <i class="ti ti-arrows-maximize" aria-hidden="true"></i> View full agreement
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="signature-section">
-                        <div class="signature-heading-row">
-                            <h4 class="signature-heading">Sign below</h4>
-                            <span class="signature-captured-badge is-hidden" id="signature-captured-badge" aria-hidden="true">
-                                <i class="fa-solid fa-check" aria-hidden="true"></i> Signature captured
-                            </span>
+                    <hr class="rs-contract-divider">
+
+                    <div class="contract-section" id="contract-section-signature">
+                        <div class="signature-header-row">
+                            <h3 class="contract-section-title">Sign below</h3>
+                            <div class="signature-mode-tabs" aria-label="Signature method">
+                                <button type="button" class="signature-mode-btn active" data-mode="draw" id="sig-mode-draw">Draw</button>
+                                <button type="button" class="signature-mode-btn" data-mode="type" id="sig-mode-type">Type instead</button>
+                            </div>
                         </div>
-                        <div class="signature-mode-tabs">
-                            <button type="button" class="signature-mode-btn active" data-mode="draw" id="sig-mode-draw">Draw</button>
-                            <button type="button" class="signature-mode-btn" data-mode="type" id="sig-mode-type">Type instead</button>
-                        </div>
+                        <span class="signature-captured-badge is-hidden" id="signature-captured-badge" aria-hidden="true">
+                            <i class="fa-solid fa-check" aria-hidden="true"></i> Signature captured
+                        </span>
 
                         <div class="signature-draw-panel" id="signature-draw-panel">
                             <div class="signature-canvas-wrap">
@@ -372,7 +382,7 @@
                                 <canvas id="signature-canvas" class="signature-canvas" aria-label="Draw your signature here"></canvas>
                             </div>
                             <button type="button" class="signature-clear-btn" id="signature-clear-btn">
-                                <i class="fa-solid fa-eraser" aria-hidden="true"></i> Clear
+                                <i class="ti ti-eraser" aria-hidden="true"></i> Clear
                             </button>
                         </div>
 
@@ -384,7 +394,9 @@
                         <p class="signature-status" id="signature-status" aria-live="polite"></p>
                     </div>
 
-                    <div class="contract-agreement-box">
+                    <hr class="rs-contract-divider">
+
+                    <div class="contract-section" id="contract-section-consent">
                         <div class="contract-agreement-row">
                             <input type="checkbox" id="contract-agreement-terms" class="contract-agreement-checkbox">
                             <div class="contract-agreement-copy">
@@ -394,23 +406,23 @@
                                 <button type="button" class="contract-policy-link" data-policy="privacy">Data Privacy Policy</button><span>.</span>
                             </div>
                         </div>
+                        <p class="contract-agreement-helper" id="contract-agreement-esign-helper">Read the agreement to enable this checkbox.</p>
 
-                        <div class="contract-agreement-divider"></div>
-
-                        <div class="contract-agreement-row">
+                        <div class="contract-agreement-row contract-agreement-row-second">
                             <input type="checkbox" id="contract-agreement-esign" class="contract-agreement-checkbox" disabled>
                             <label for="contract-agreement-esign" class="contract-agreement-copy">I confirm my reservation details above are accurate, and I am signing this contract electronically.</label>
                         </div>
-                        <p class="contract-agreement-helper" id="contract-agreement-esign-helper">Read the agreement to enable this checkbox.</p>
                         <p class="contract-inline-message" id="contract-policy-message" aria-live="polite"></p>
                     </div>
+
                 </div>
+                <hr class="rs-summary-footer-divider">
             </div>
 
             <!-- Nav Buttons -->
             <div class="reservation-buttons">
-                <button class="btn-back hidden" id="prevBtn">&larr; Back</button>
-                <button class="btn-next" id="nextBtn">Next &rarr;</button>
+                <button class="btn-back hidden" id="prevBtn"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+                <button class="btn-next" id="nextBtn">Next <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
             </div>
 
         </div>
@@ -480,22 +492,22 @@
             <div>
                 <p class="footer-new-heading">Explore</p>
                 <ul class="footer-new-links">
-                    <li><a href="/index.html">Home</a></li>
-                    <li><a href="/packages.html">Packages</a></li>
-                    <li><a href="/reservations.html">Reservations</a></li>
-                    <li><a href="/reviews.html">Reviews</a></li>
-                    <li><a href="/faqs.html">FAQs</a></li>
-                    <li><a href="/about.html">About</a></li>
-                    <li><a href="/terms-and-conditions.html">Terms &amp; Conditions</a></li>
-                    <li><a href="/privacy-policy.html">Data Privacy Policy</a></li>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/packages">Packages</a></li>
+                    <li><a href="/reservations">Reservations</a></li>
+                    <li><a href="/reviews">Reviews</a></li>
+                    <li><a href="/faqs">FAQs</a></li>
+                    <li><a href="/about">About</a></li>
+                    <li><a href="/terms-and-conditions">Terms &amp; Conditions</a></li>
+                    <li><a href="/privacy-policy">Data Privacy Policy</a></li>
                 </ul>
             </div>
             <div>
                 <p class="footer-new-heading">Services</p>
                 <ul class="footer-new-links">
-                    <li><a href="/packages.html">Cafe &amp; Lounge</a></li>
-                    <li><a href="/packages.html">Private Events</a></li>
-                    <li><a href="/packages.html">Catering</a></li>
+                    <li><a href="/packages">Cafe &amp; Lounge</a></li>
+                    <li><a href="/packages">Private Events</a></li>
+                    <li><a href="/packages">Catering</a></li>
                 </ul>
             </div>
             <div>
@@ -511,7 +523,8 @@
         </div>
     </footer>
 
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
     <script type="module" src="/js/navbar.js"></script>
 
     <script type="module" src="/js/reservations.js"></script>

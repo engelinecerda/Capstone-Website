@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <title>Notifications - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css">
-  <link rel="stylesheet" href="/css/manager-theme.css">
-  <link rel="stylesheet" href="/css/admin_notifications_config.css">
-  <link rel="stylesheet" href="/css/admin_sidebar.css">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=18">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=18">
+  <link rel="stylesheet" href="/css/admin_notifications_config.css?v=18">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=18">
 </head>
 <body>
 
@@ -27,7 +28,7 @@
       <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
 
       <div class="sidebar-user">
-        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+        <a href="/admin/profile" class="sidebar-user-link" title="View profile">
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
@@ -152,6 +153,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/admin_notifications_config.js"></script>
 </body>
 </html>

@@ -265,7 +265,7 @@ function getAssignedStaff(reservationId) {
 }
 
 function redirectLogin() {
-  window.location.replace('/admin/index.html');
+  window.location.replace('/admin');
 }
 
 function formatStatusPill(status) {
@@ -851,7 +851,7 @@ async function loadData({ silent = false } = {}) {
 
 function goToReservationDetails(reservationId) {
   if (!reservationId) return;
-  window.location.href = `/admin/reservation-details.html?id=${encodeURIComponent(reservationId)}`;
+  window.location.href = `/admin/reservation-details?id=${encodeURIComponent(reservationId)}`;
 }
 
 function wireTableActions() {
@@ -890,7 +890,7 @@ function applyStatusFilterFromUrl() {
 function redirectLegacyReservationLink() {
   const requestedId = new URLSearchParams(window.location.search).get('reservation');
   if (!requestedId) return false;
-  window.location.replace(`/admin/reservation-details.html?id=${encodeURIComponent(requestedId)}`);
+  window.location.replace(`/admin/reservation-details?id=${encodeURIComponent(requestedId)}`);
   return true;
 }
 

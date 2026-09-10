@@ -23,42 +23,42 @@ export const ADMIN_NAV = [
   {
     section: 'Operations',
     items: [
-      { label: 'Dashboard',        href: '/admin/dashboard.html',                                        iconKey: 'layout-dashboard' },
-      { label: 'Reservations',     href: '/admin/reservations.html',        key: 'reservations',         iconKey: 'calendar-event' },
-      { label: 'Availability calendar', href: '/admin/availability-calendar.html', key: 'availability-calendar', iconKey: 'calendar-check' },
-      { label: 'Payments',         href: '/admin/payments.html',                                          iconKey: 'receipt', adminOverride: { label: 'Payment records' } },
-      { label: 'Contracts',        href: '/admin/contracts.html',                                         iconKey: 'file-text' },
-      { label: 'Customers',        href: '/admin/customers.html',                                         iconKey: 'users' },
-      { label: 'Employees',        href: '/admin/staff-roster.html',        key: 'staff-roster',          iconKey: 'id-badge' },
-      { label: 'Reviews',          href: '/admin/reviews.html',                                           iconKey: 'star' },
-      { label: 'Reports',          href: '/admin/reports.html',                                           iconKey: 'chart-bar' },
+      { label: 'Dashboard',        href: '/admin/dashboard',                                        iconKey: 'layout-dashboard' },
+      { label: 'Reservations',     href: '/admin/reservations',        key: 'reservations',         iconKey: 'calendar-event' },
+      { label: 'Availability calendar', href: '/admin/availability-calendar', key: 'availability-calendar', iconKey: 'calendar-check' },
+      { label: 'Payments',         href: '/admin/payments',                                          iconKey: 'receipt', adminOverride: { label: 'Payment records' } },
+      { label: 'Contracts',        href: '/admin/contracts',                                         iconKey: 'file-text' },
+      { label: 'Customers',        href: '/admin/customers',                                         iconKey: 'users' },
+      { label: 'Employees',        href: '/admin/staff-roster',        key: 'staff-roster',          iconKey: 'id-badge' },
+      { label: 'Reviews',          href: '/admin/reviews',                                           iconKey: 'star' },
+      { label: 'Reports',          href: '/admin/reports',                                           iconKey: 'chart-bar' },
     ]
   },
   {
     section: 'Booking Configuration',
     items: [
-      { label: 'Bookable Inventory',          href: '/admin/super%20admin/super_admin_packages.html', iconKey: 'package' },
-      { label: 'Availability and scheduling', href: '/admin/super%20admin/super_admin_settings.html',  iconKey: 'clock' },
-      { label: 'Reservation Form',            href: '/admin/config/form.html',                          iconKey: 'forms' },
-      { label: 'Payment Settings',            href: '/admin/config/payment-options.html',               iconKey: 'credit-card' },
-      { label: 'Notifications',               href: '/admin/config/notifications.html',                 iconKey: 'bell' },
+      { label: 'Bookable Inventory',          href: '/admin/super%20admin/super_admin_packages', iconKey: 'package' },
+      { label: 'Availability and scheduling', href: '/admin/super%20admin/super_admin_settings',  iconKey: 'clock' },
+      { label: 'Reservation Form',            href: '/admin/config/form',                          iconKey: 'forms' },
+      { label: 'Payment Settings',            href: '/admin/config/payment-options',               iconKey: 'credit-card' },
+      { label: 'Notifications',               href: '/admin/config/notifications',                 iconKey: 'bell' },
     ]
   },
   {
     section: 'Website Content',
     items: [
-      { label: 'Page content',      href: '/admin/system/page-content.html', iconKey: 'photo' },
-      { label: 'Business profile',  href: '/admin/system/business.html',     iconKey: 'building-store' },
+      { label: 'Page content',      href: '/admin/system/page-content', iconKey: 'photo' },
+      { label: 'Business profile',  href: '/admin/system/business',     iconKey: 'building-store' },
     ]
   },
   {
     section: 'Platform Administration',
     items: [
-      { label: 'Users and roles',   href: '/admin/super%20admin/super_admin_accounts.html', iconKey: 'user-cog' },
-      { label: 'Audit trail',       href: '/admin/super%20admin/super_admin_audit.html',     iconKey: 'history' },
-      { label: 'Backup & Restore',  href: '/admin/super%20admin/super_admin_backup.html',    iconKey: 'database-backup' },
-      { label: 'Announcements',     href: '/admin/maintenance/announcements.html',           iconKey: 'speakerphone' },
-      { label: 'Maintenance Mode',  href: '/admin/maintenance/mode.html',                     iconKey: 'alert-triangle' },
+      { label: 'Users and roles',   href: '/admin/super%20admin/super_admin_accounts', iconKey: 'user-cog' },
+      { label: 'Audit trail',       href: '/admin/super%20admin/super_admin_audit',     iconKey: 'history' },
+      { label: 'Backup & Restore',  href: '/admin/super%20admin/super_admin_backup',    iconKey: 'database-backup' },
+      { label: 'Announcements',     href: '/admin/maintenance/announcements',           iconKey: 'speakerphone' },
+      { label: 'Maintenance Mode',  href: '/admin/maintenance/mode',                     iconKey: 'alert-triangle' },
     ]
   }
 ];

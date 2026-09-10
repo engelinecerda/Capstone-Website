@@ -10,7 +10,7 @@ import { customerSupabase as supabase } from './supabase.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-  window.location.href = '/login.html';
+  window.location.href = '/login';
 }
 const userId = session.user.id;
 

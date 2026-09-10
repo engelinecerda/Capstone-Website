@@ -490,7 +490,7 @@ function afterAvailabilityChange(message) {
 
 function goToReservationDetails(reservationId) {
   if (!reservationId) return;
-  window.location.href = `/admin/reservation-details.html?id=${encodeURIComponent(reservationId)}`;
+  window.location.href = `/admin/reservation-details?id=${encodeURIComponent(reservationId)}`;
 }
 
 /* ---------------------------------------------------------------- */

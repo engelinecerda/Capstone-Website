@@ -71,7 +71,7 @@ function escapeHtml(value) {
 }
 
 function redirectLogin() {
-  window.location.replace('/admin/index.html');
+  window.location.replace('/admin');
 }
 
 function formatDate(value) {
