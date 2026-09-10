@@ -128,7 +128,11 @@ html {
     align-items: center;
     font-size: 1.2rem;
     position: sticky;
-    top: 0;
+    /* Docks right under the announcement banner when one is showing —
+       JS (announcement_banner.js) keeps --ann-banner-h in sync with the
+       banner's actual rendered height, and 0px when there isn't one, so
+       this is a no-op on pages/states with no active announcement. */
+    top: var(--ann-banner-h, 0px);
     z-index: 999;
 }
 .navbar__container{
@@ -334,14 +338,14 @@ html {
        the scroll container, causing the navbar to scroll out of view on mobile. */
     .navbar {
         position: fixed;
-        top: 0;
+        top: var(--ann-banner-h, 0px);
         left: 0;
         right: 0;
         height: 64px;
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     }
     body {
-        padding-top: 64px;
+        padding-top: calc(64px + var(--ann-banner-h, 0px));
     }
     .navbar__container {
         display: flex;

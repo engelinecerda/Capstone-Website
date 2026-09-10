@@ -11,8 +11,18 @@ import { initAutoRefresh } from './auto_refresh.js';
 
 const DISMISS_KEY = 'dismissedAnnouncementId';
 
+// Keeps the navbar (css/styles.css, `top: var(--ann-banner-h, 0px)`) docked
+// directly under the banner instead of overlapping it, and reset to 0 when
+// there's no banner. Re-measured on resize too, since the banner can wrap
+// to a second line on a narrower viewport and change height.
+function syncBannerHeightVar() {
+  const banner = document.querySelector('body > .ann-banner');
+  document.documentElement.style.setProperty('--ann-banner-h', banner ? banner.offsetHeight + 'px' : '0px');
+}
+
 function removeBanner() {
   document.querySelector('.ann-banner')?.remove();
+  syncBannerHeightVar();
 }
 
 async function refreshAnnouncementBanner() {
@@ -42,6 +52,7 @@ async function refreshAnnouncementBanner() {
   wrap.innerHTML = renderAnnouncementBannerHtml(active);
   const banner = wrap.firstElementChild;
   document.body.prepend(banner);
+  syncBannerHeightVar();
 
   const dismissBtn = banner.querySelector('.ann-banner-dismiss');
   dismissBtn?.addEventListener('click', () => {
@@ -52,3 +63,4 @@ async function refreshAnnouncementBanner() {
 
 refreshAnnouncementBanner();
 initAutoRefresh(refreshAnnouncementBanner);
+window.addEventListener('resize', syncBannerHeightVar);
