@@ -30,7 +30,7 @@ let customersFiltered = [];
 let customersCurrentPage = 1;
 
 function redirectToAdminLogin() {
-  window.location.replace('/admin/index.html');
+  window.location.replace('/admin');
 }
 
 function setCustomersMessage(message, isError = false) {

@@ -51,7 +51,7 @@ async function fetchPaymentSummaries(reservationIds) {
 }
 
 function redirectToAdminLogin() {
-    window.location.replace('/admin/index.html');
+    window.location.replace('/admin');
 }
 
 function escapeHtml(value) {

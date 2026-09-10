@@ -32,7 +32,7 @@ let reviewsCurrentPage = 1;
 let adminSession = null;
 
 function redirectToAdminLogin() {
-  window.location.replace('/admin/index.html');
+  window.location.replace('/admin');
 }
 
 function setReviewsMessage(message, isError = false) {

@@ -58,8 +58,13 @@ function resolveActiveHref(leaves) {
   // keeps this working once such pages exist.
   const prefixed = leaves.find((item) => {
     const itemUrl = new URL(item.href, window.location.origin);
-    if (!itemUrl.hash && itemUrl.pathname !== '/admin/dashboard.html') {
-      return decodeURIComponent(currentPath).startsWith(decodeURIComponent(itemUrl.pathname).replace(/\.html$/, '/'));
+    if (!itemUrl.hash && itemUrl.pathname !== '/admin/dashboard') {
+      // Nav hrefs are extensionless clean paths now (no more trailing
+      // .html to strip) — append the separator directly so this only
+      // matches a real sub-path, not another page whose name happens to
+      // start with the same characters (e.g. "/admin/reservations" must
+      // not prefix-match a hypothetical "/admin/reservations-archive").
+      return decodeURIComponent(currentPath).startsWith(decodeURIComponent(itemUrl.pathname) + '/');
     }
     return false;
   });

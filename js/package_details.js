@@ -234,8 +234,8 @@ function renderPackageDetail(pkg) {
 
   if (pkgDetailBookBtn) {
     pkgDetailBookBtn.href = pkg.package_id
-      ? `/reservations.html?package=${encodeURIComponent(pkg.package_id)}`
-      : '/reservations.html';
+      ? `/reservations?package=${encodeURIComponent(pkg.package_id)}`
+      : '/reservations';
   }
 
   renderInclusionsCard(pkg);

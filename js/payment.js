@@ -43,7 +43,7 @@ const LEGACY_METHOD_DISPLAY_LABELS = {
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-    window.location.href = '/login.html';
+    window.location.href = '/login';
     throw new Error('Not authenticated');
 }
 
@@ -509,7 +509,7 @@ function renderCancellationCard(reservation, pageState) {
     const payments = getReservationPayments(state.bundle.paymentsByReservationId, reservation.reservation_id);
     const feePayment = payments.find((payment) => payment.payment_type === 'cancellation_fee') || null;
     const feeOwed = pageState.mode === 'cancellation_fee_due';
-    const contractUrl = `/reservation-details.html?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
+    const contractUrl = `/reservation-details?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
     // Previously this card was the entire cancelled-state UI, full stop —
     // no payment method/amount/submit form ever rendered here, regardless

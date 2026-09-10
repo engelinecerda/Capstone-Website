@@ -844,7 +844,7 @@ rescheduleAlertAction?.addEventListener('click', async () => {
     } catch (error) {
         // Non-fatal — worst case the banner re-shows these on next load.
     }
-    window.location.href = '/admin/reservations.html?filter=changed';
+    window.location.href = '/admin/reservations?filter=changed';
 });
 
 refreshChangesAlert();

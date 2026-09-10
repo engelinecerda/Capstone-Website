@@ -499,7 +499,7 @@ confirmBackupOk?.addEventListener('click', async () => {
       p_type: 'admin_backup_completed',
       p_title: 'Backup completed',
       p_body: `Backup created and saved to Google Drive: ${uploaded.name}${skippedNote}`,
-      p_link: '/admin/super%20admin/super_admin_backup.html'
+      p_link: '/admin/super%20admin/super_admin_backup'
     }).catch(() => {});
 
   } catch (err) {
@@ -510,7 +510,7 @@ confirmBackupOk?.addEventListener('click', async () => {
       p_type: 'admin_backup_failed',
       p_title: 'Backup failed',
       p_body: `The scheduled backup did not complete: ${err.message}`,
-      p_link: '/admin/super%20admin/super_admin_backup.html'
+      p_link: '/admin/super%20admin/super_admin_backup'
     }).catch(() => {});
   } finally {
     confirmBackupOk.disabled    = false;
@@ -864,7 +864,7 @@ function init() {
   validateAdminSession({
     onSuccess: async ({ session, profile }) => {
       if (profile.role !== 'admin') {
-        window.location.replace('/admin/dashboard.html');
+        window.location.replace('/admin/dashboard');
         return;
       }
 

@@ -1251,7 +1251,7 @@ export async function submitCustomerPayment({
 // against the real reservation_extensions/reschedule_requests/reservation
 // row, never against this URL string.
 export function buildCustomerPaymentUrl(reservationId, target = null) {
-    const url = new URL('/payment.html', window.location.href);
+    const url = new URL('/payment', window.location.href);
     if (reservationId) {
         url.searchParams.set('reservation_id', reservationId);
     }
@@ -1263,7 +1263,7 @@ export function buildCustomerPaymentUrl(reservationId, target = null) {
 }
 
 export function buildCustomerAccountUrl(section = 'reservations') {
-    const url = new URL('/account.html', window.location.href);
+    const url = new URL('/account', window.location.href);
     if (section) {
         url.searchParams.set('section', section);
     }

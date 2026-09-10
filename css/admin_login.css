@@ -315,6 +315,10 @@ body {
 /* ========================
    MFA Card
 ======================== */
+/* .mfa-icon is no longer used by admin/index.html (Manager/Admin login —
+   icon removed by request) but is still used as-is by board/login.html
+   (the separate staff/kiosk login, out of scope for that change) — both
+   pages share this one stylesheet, so this rule stays for that page. */
 .mfa-icon {
     width: 52px;
     height: 52px;

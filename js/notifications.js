@@ -248,7 +248,7 @@ export async function initCustomerNotificationBell(supabase, userId) {
         </div>
         <ul class="notif-list" id="notifListCustomer"></ul>
         <div class="notif-panel-footer">
-          <a class="notif-see-all-btn" href="/notifications.html">View all notifications</a>
+          <a class="notif-see-all-btn" href="/notifications">View all notifications</a>
         </div>
       </div>
     </span>`;

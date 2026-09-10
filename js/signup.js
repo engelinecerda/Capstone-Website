@@ -105,6 +105,6 @@ form.addEventListener('submit', async function (e) {
     form.reset();
 
     setTimeout(() => {
-        window.location.href = '/login.html';
+        window.location.href = '/login';
     }, 3000);
 });

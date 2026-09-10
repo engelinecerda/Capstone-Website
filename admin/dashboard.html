@@ -8,9 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-    <link rel="stylesheet" href="/css/super_admin_only.css?v=13">
-    <link rel="stylesheet" href="/css/admin_homepage.css?v=13">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=13">
+    <link rel="stylesheet" href="/css/super_admin_only.css?v=18">
+    <link rel="stylesheet" href="/css/admin_homepage.css?v=18">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=18">
 </head>
 <body>
   <aside class="sidebar">
@@ -28,7 +28,7 @@
       <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
 
       <div class="sidebar-user">
-        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+        <a href="/admin/profile" class="sidebar-user-link" title="View profile">
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
@@ -107,7 +107,7 @@
           <ul class="donut-legend" id="statusLegend"></ul>
         </div>
         <div class="card-footer">
-          <a href="/admin/reservations.html" class="view-all-link">View all reservations &rarr;</a>
+          <a href="/admin/reservations" class="view-all-link">View all reservations &rarr;</a>
         </div>
       </div>
 
@@ -115,28 +115,28 @@
         <h2 class="card-title">Quick actions</h2>
         <p class="card-sub">Common tasks and shortcuts</p>
         <div class="quick-actions-grid">
-          <a href="/admin/reservations.html?status=pending" class="quick-action-tile">
+          <a href="/admin/reservations?status=pending" class="quick-action-tile">
             <span class="qa-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
             <span class="qa-copy">
               <span class="qa-title">Review reservations</span>
               <span class="qa-desc" id="qaPendingCount">Pending approval</span>
             </span>
           </a>
-          <a href="/admin/payments.html" class="quick-action-tile">
+          <a href="/admin/payments" class="quick-action-tile">
             <span class="qa-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span>
             <span class="qa-copy">
               <span class="qa-title">Verify payments</span>
               <span class="qa-desc">Review submissions</span>
             </span>
           </a>
-          <a href="/admin/contracts.html" class="quick-action-tile">
+          <a href="/admin/contracts" class="quick-action-tile">
             <span class="qa-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
             <span class="qa-copy">
               <span class="qa-title">Review contracts</span>
               <span class="qa-desc">Check uploads</span>
             </span>
           </a>
-          <a href="/admin/reports.html" class="quick-action-tile">
+          <a href="/admin/reports" class="quick-action-tile">
             <span class="qa-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
             <span class="qa-copy">
               <span class="qa-title">Generate report</span>
@@ -151,25 +151,25 @@
         <p class="card-sub">Configuration at a glance</p>
         <ul class="overview-list">
           <li class="overview-row">
-            <a href="/admin/super%20admin/super_admin_packages.html" class="overview-link">
+            <a href="/admin/super%20admin/super_admin_packages" class="overview-link">
               <span class="overview-label">Active packages</span>
               <span class="overview-value" id="ovPackageCount">—</span>
             </a>
           </li>
           <li class="overview-row">
-            <a href="/admin/super%20admin/super_admin_accounts.html" class="overview-link">
+            <a href="/admin/super%20admin/super_admin_accounts" class="overview-link">
               <span class="overview-label">Active accounts</span>
               <span class="overview-value" id="ovAccountCount">—</span>
             </a>
           </li>
           <li class="overview-row">
-            <a href="/admin/super%20admin/super_admin_backup.html" class="overview-link">
+            <a href="/admin/super%20admin/super_admin_backup" class="overview-link">
               <span class="overview-label">Last backup</span>
               <span class="overview-value" id="ovLastBackup">—</span>
             </a>
           </li>
           <li class="overview-row">
-            <a href="/admin/super%20admin/super_admin_settings.html#hours" class="overview-link">
+            <a href="/admin/super%20admin/super_admin_settings#hours" class="overview-link">
               <span class="overview-label">Booking hours</span>
               <span class="overview-value" id="ovBookingHours">—</span>
             </a>
@@ -225,7 +225,7 @@
           <h2 class="card-title">Recent reservations</h2>
           <p class="card-sub">Latest booking activity</p>
         </div>
-        <a href="/admin/reservations.html" class="view-all-link">View all</a>
+        <a href="/admin/reservations" class="view-all-link">View all</a>
       </div>
 
       <p class="dashboard-message" id="dashboardMessage">Loading reservations...</p>

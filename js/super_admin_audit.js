@@ -487,7 +487,7 @@ function init() {
   validateAdminSession({
     onSuccess: ({ profile }) => {
       if (profile.role !== 'admin') {
-        window.location.replace('/admin/dashboard.html');
+        window.location.replace('/admin/dashboard');
         return;
       }
 

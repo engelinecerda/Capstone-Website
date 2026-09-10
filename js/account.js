@@ -102,7 +102,7 @@ const PAYMENT_STATUS_META = {
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-    window.location.href = '/login.html';
+    window.location.href = '/login';
 }
 
 const user = session.user;
@@ -1367,7 +1367,7 @@ function buildReservationCard(reservation, view) {
     const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed || Boolean(openExtension));
     const statusIcon = getReservationStatusIcon(reservationStatus.key);
 
-    const detailsUrl = `reservation-details.html?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
+    const detailsUrl = `/reservation-details?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
     return `
         <article class="reservation-summary-card tone-${escapeHtml(cardTone)}${view === 'past' ? ' past' : ''}">
@@ -1426,7 +1426,7 @@ function buildReservationCard(reservation, view) {
                     ${review
                         ? `<span class="reservation-reviewed-badge"><i class="fa-solid fa-check" aria-hidden="true"></i> Reviewed</span>`
                         : (view === 'past' && reservationStatus.key === 'completed'
-                            ? `<a class="reservation-card-cta-secondary" href="/reviews.html?review_reservation_id=${encodeURIComponent(reservation.reservation_id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Leave a Review</a>`
+                            ? `<a class="reservation-card-cta-secondary" href="/reviews?review_reservation_id=${encodeURIComponent(reservation.reservation_id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Leave a Review</a>`
                             : '')}
                 </div>
             </div>
@@ -1450,7 +1450,7 @@ function buildReservationEmptyState(view) {
             <span class="reservation-eyebrow">Reservations</span>
             <h3>${copy.title}</h3>
             <p>${copy.message}</p>
-            ${view === 'active' ? '<a href="/reservations.html" class="res-book-btn">Book an Event</a>' : ''}
+            ${view === 'active' ? '<a href="/reservations" class="res-book-btn">Book an Event</a>' : ''}
         </div>
     `;
 }
@@ -1464,7 +1464,7 @@ function renderReservations() {
                 <div class="empty-icon">No reservations yet</div>
                 <h3>No reservations yet</h3>
                 <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
-                <a href="/reservations.html" class="res-book-btn">Book an Event</a>
+                <a href="/reservations" class="res-book-btn">Book an Event</a>
             </div>
         `;
         return;
@@ -2940,7 +2940,7 @@ function wireProfileForm() {
                 return;
             }
 
-            const emailRedirectTo = new URL('/account.html', window.location.href).href;
+            const emailRedirectTo = new URL('/account', window.location.href).href;
             const { error: emailError } = await supabase.auth.updateUser({
                 email: requestedEmail,
                 options: {
@@ -3042,12 +3042,12 @@ function wirePasswordForm() {
 function wireLogout() {
     document.getElementById('tab-logout-btn')?.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        window.location.href = '/login.html';
+        window.location.href = '/login';
     });
 
     supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_OUT') {
-            window.location.href = '/login.html';
+            window.location.href = '/login';
         }
     });
 

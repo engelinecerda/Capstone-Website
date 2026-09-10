@@ -78,7 +78,7 @@ async function loadFooterServices() {
     if (!servicesList || servicesList.tagName !== 'UL') return;
 
     servicesList.innerHTML = data.map(s =>
-      `<li><a href="${escapeHtml(s.link_url || '/packages.html')}">${escapeHtml(s.title)}</a></li>`
+      `<li><a href="${escapeHtml(s.link_url || '/packages')}">${escapeHtml(s.title)}</a></li>`
     ).join('');
   } catch (err) {
     // Falls back to the static footer text already in the HTML.

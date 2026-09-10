@@ -176,7 +176,7 @@ async function loadCatalog() {
     // own page.
     const legacyPackageId = new URLSearchParams(window.location.search).get('package');
     if (legacyPackageId) {
-      window.location.replace(`/package-details.html?id=${encodeURIComponent(legacyPackageId)}`);
+      window.location.replace(`/package-details?id=${encodeURIComponent(legacyPackageId)}`);
       return;
     }
 
@@ -566,7 +566,7 @@ function wireResultCards() {
 }
 
 function triggerDetail(pkgId) {
-  window.location.href = `/package-details.html?id=${encodeURIComponent(pkgId)}`;
+  window.location.href = `/package-details?id=${encodeURIComponent(pkgId)}`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

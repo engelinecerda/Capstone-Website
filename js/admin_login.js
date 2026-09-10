@@ -26,8 +26,8 @@ const mfaState = {
 // staff credential entered here is rejected rather than redirected, since
 // redirecting would land on a page that can't see this session anyway.
 const PORTAL_ROUTES = {
-    manager: '/admin/dashboard.html',
-    admin: '/admin/dashboard.html'
+    manager: '/admin/dashboard',
+    admin: '/admin/dashboard'
 };
 
 const WRONG_PORTAL_MESSAGE = 'Staff should sign in at the staff login page.';

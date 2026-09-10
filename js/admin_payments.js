@@ -140,7 +140,7 @@ function escapeHtml(value) {
 }
 
 function redirectLogin() {
-  window.location.replace('/admin/index.html');
+  window.location.replace('/admin');
 }
 
 async function validateAdmin() {

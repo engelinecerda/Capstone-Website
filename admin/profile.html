@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Profile - ELI Coffee Events</title>
+  <title>My Profile - ELI Coffee Events</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=13">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=13">
-  <link rel="stylesheet" href="/css/admin_profile.css?v=13">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=13">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=18">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=18">
+  <link rel="stylesheet" href="/css/admin_profile.css?v=18">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=18">
 </head>
 <body>
   <aside class="sidebar">
@@ -29,7 +29,7 @@
       <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
 
       <div class="sidebar-user">
-        <a href="/admin/profile.html" class="sidebar-user-link" title="View profile">
+        <a href="/admin/profile" class="sidebar-user-link" title="View profile">
           <div class="sidebar-avatar" id="sidebarAvatar">--</div>
           <div class="sidebar-user-copy">
             <p class="sidebar-user-name" id="sidebarName">Loading...</p>
@@ -60,7 +60,7 @@
       <section class="profile-shell">
         <div class="profile-layout">
           <section class="profile-panel profile-panel-main">
-            <div class="panel-head">
+            <div class="panel-head panel-head-inline">
               <div class="panel-title-wrap">
                 <span class="panel-icon-badge" aria-hidden="true">
                   <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
@@ -70,23 +70,27 @@
                   <p class="section-copy">Update the contact details shown in the management system.</p>
                 </div>
               </div>
+              <button type="button" class="panel-edit-btn" id="profileEditToggleBtn" aria-expanded="false">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                <span>Edit profile</span>
+              </button>
             </div>
 
             <form class="profile-form" id="profileForm">
               <div class="form-row form-row-three">
                 <label class="field">
                   <span class="field-label">First Name</span>
-                  <input type="text" id="profileFirstName" class="field-input" placeholder="First Name" required>
+                  <input type="text" id="profileFirstName" class="field-input" placeholder="First Name" required readonly>
                 </label>
 
                 <label class="field">
                   <span class="field-label">Middle Name</span>
-                  <input type="text" id="profileMiddleName" class="field-input" placeholder="(Optional)">
+                  <input type="text" id="profileMiddleName" class="field-input" placeholder="(Optional)" readonly>
                 </label>
 
                 <label class="field">
                   <span class="field-label">Last Name</span>
-                  <input type="text" id="profileLastName" class="field-input" placeholder="Last Name" required>
+                  <input type="text" id="profileLastName" class="field-input" placeholder="Last Name" required readonly>
                 </label>
               </div>
 
@@ -101,7 +105,7 @@
               <div class="form-row form-row-two">
                 <label class="field">
                   <span class="field-label">Phone Number</span>
-                  <input type="tel" id="profilePhone" class="field-input" placeholder="Phone Number">
+                  <input type="tel" id="profilePhone" class="field-input" placeholder="Phone Number" readonly>
                 </label>
 
                 <label class="field">
@@ -112,8 +116,9 @@
 
               <p class="form-message" id="profileMessage"></p>
 
-              <div class="form-actions">
-                <button type="submit" class="primary-btn">Save Changes</button>
+              <div class="form-actions" id="profileFormActions" hidden>
+                <button type="submit" class="primary-btn">Save changes</button>
+                <button type="button" class="secondary-btn" id="profileCancelBtn">Cancel</button>
               </div>
             </form>
           </section>
@@ -127,7 +132,7 @@
                   </span>
                   <div>
                     <h2 class="section-title">Account details</h2>
-                    <p class="section-copy">These details come from your admin account.</p>
+                    <p class="section-copy">These details come from your portal account.</p>
                   </div>
                 </div>
               </div>
@@ -140,7 +145,7 @@
                     </span>
                     <span class="detail-label">Role</span>
                   </div>
-                  <strong class="detail-value" id="detailPortalRole">Admin</strong>
+                  <strong class="detail-value"><span class="role-badge" id="detailPortalRole">Admin</span></strong>
                 </article>
 
                 <article class="detail-card">
@@ -148,7 +153,7 @@
                     <span class="detail-icon-badge" aria-hidden="true">
                       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
                     </span>
-                    <span class="detail-label">Admin Email</span>
+                    <span class="detail-label">Login Email</span>
                   </div>
                   <strong class="detail-value" id="detailEmail">Checking account...</strong>
                 </article>
@@ -240,6 +245,21 @@
               <div class="form-actions mfa-enroll-actions">
                 <button type="button" class="primary-btn" id="mfaVerifyBtn">Verify &amp; Activate</button>
                 <button type="button" class="secondary-btn" id="mfaCancelEnrollBtn">Cancel</button>
+              </div>
+            </div>
+
+            <div class="mfa-enroll-panel" id="mfaDisableConfirmPanel" style="display:none">
+              <p class="mfa-enroll-instruction">To turn off 2FA, enter the current 6-digit code from your authenticator app to confirm it's you.</p>
+              <div class="form-row">
+                <label class="field">
+                  <span class="field-label">Verification Code</span>
+                  <input type="text" id="mfaDisableCode" class="field-input mfa-enroll-code-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                </label>
+              </div>
+              <p class="form-message" id="mfaDisableMessage"></p>
+              <div class="form-actions mfa-enroll-actions">
+                <button type="button" class="btn-danger" id="mfaConfirmDisableBtn">Confirm Disable</button>
+                <button type="button" class="secondary-btn" id="mfaCancelDisableBtn">Cancel</button>
               </div>
             </div>
 

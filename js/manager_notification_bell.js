@@ -68,7 +68,7 @@ export function initManagerNotificationBell(supabase, userId) {
                 </div>
                 <ul class="notif-dropdown-list" id="notifDropdownList"></ul>
                 <div class="notif-dropdown-footer">
-                    <a href="/admin/notifications.html">View all notifications</a>
+                    <a href="/admin/notifications">View all notifications</a>
                 </div>
             </div>
         </div>

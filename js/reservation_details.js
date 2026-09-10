@@ -44,7 +44,7 @@ import { initAutoRefresh } from './auto_refresh.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
-    window.location.href = '/login.html';
+    window.location.href = '/login';
 }
 const user = session.user;
 
@@ -52,7 +52,7 @@ const pageContainer = document.getElementById('reservation-details-page');
 const reservationId = new URLSearchParams(window.location.search).get('reservation_id');
 
 if (!reservationId) {
-    window.location.href = '/account.html?section=reservations';
+    window.location.href = '/account?section=reservations';
 }
 
 // Cancel-reservation modal — same markup, classes, and behavior as the
@@ -592,7 +592,7 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
     }
 
     const latestRequest = rescheduleRequests[0] || null;
-    const openRescheduleUrl = `/account.html?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
+    const openRescheduleUrl = `/account?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
     // A block reason is only ever shown for the time-based rules (min notice
     // / request window) — computeCanCancel already returns false for other
@@ -761,7 +761,7 @@ function buildReviewRow(effectiveStatus, review, reservationId) {
         `;
     }
 
-    const reviewUrl = `/reviews.html?review_reservation_id=${encodeURIComponent(reservationId)}`;
+    const reviewUrl = `/reviews?review_reservation_id=${encodeURIComponent(reservationId)}`;
     return `
         <div class="rd-reschedule-row">
             <div class="rd-reschedule-row-left">
@@ -1258,6 +1258,6 @@ initAutoRefresh(async () => {
 
 supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
-        window.location.href = '/login.html';
+        window.location.href = '/login';
     }
 });

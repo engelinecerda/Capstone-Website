@@ -31,10 +31,10 @@ async function updateNavbar() {
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </button>
                 <div class="navbar__account-menu" id="navbarAccountMenu" role="menu">
-                    <a href="/account.html" class="navbar__account-menu-item" role="menuitem">
+                    <a href="/account" class="navbar__account-menu-item" role="menuitem">
                         <i class="fa-solid fa-user" aria-hidden="true"></i> My Profile
                     </a>
-                    <a href="/account.html?section=reservations" class="navbar__account-menu-item" role="menuitem">
+                    <a href="/account?section=reservations" class="navbar__account-menu-item" role="menuitem">
                         <i class="fa-solid fa-calendar-check" aria-hidden="true"></i> My Reservations
                     </a>
                     <div class="navbar__account-menu-divider" role="separator"></div>
@@ -43,7 +43,7 @@ async function updateNavbar() {
                     </button>
                 </div>
             </div>
-            <a href="/account.html" class="button navbar__mobile-account-btn">Account</a>
+            <a href="/account" class="button navbar__mobile-account-btn">Account</a>
         `;
         document.body.classList.add('user-logged-in');
 
@@ -74,7 +74,7 @@ async function updateNavbar() {
 
         document.getElementById('navbarLogoutBtn')?.addEventListener('click', async () => {
             await supabase.auth.signOut();
-            window.location.href = '/login.html';
+            window.location.href = '/login';
         });
 
         // Bell lives in navTopbarRight — always in the topbar on mobile (never inside
@@ -89,7 +89,7 @@ async function updateNavbar() {
         initCustomerNotificationBell(supabase, session.user.id);
 
     } else {
-        navBtn.innerHTML = `<a href="/login.html" class="button">Login</a>`;
+        navBtn.innerHTML = `<a href="/login" class="button">Login</a>`;
     }
 }
 
