@@ -147,8 +147,8 @@
 
                             <div class="progress-tracker" id="catering-progress-tracker"></div>
 
-                            <div class="builder-label"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes</div>
-                            <p class="builder-hint">Select one dish per category, then pick the pax count for that tray. You need at least 1 main dish, 1 pasta, and 1 dessert.</p>
+                            <div class="builder-label" id="catering-builder-label"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes</div>
+                            <p class="builder-hint" id="catering-builder-hint">Work through each section below. You need at least 1 main dish, 1 pasta, and 1 dessert — use the checklist above to jump to any section.</p>
 
                             <div id="catering-tray-builder"></div>
 
@@ -159,7 +159,10 @@
                                             <i class="ti ti-shopping-cart" aria-hidden="true"></i> Your Selections
                                             <span class="cart-count-badge" id="catering-cart-badge">0</span>
                                         </div>
-                                        <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
+                                        <div class="cart-header-right">
+                                            <button type="button" class="cart-clear-all-btn" id="catering-cart-clear-all" style="display:none">Remove all</button>
+                                            <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
+                                        </div>
                                     </div>
                                     <div class="cart-empty-state" id="catering-cart-empty">No dishes selected yet</div>
                                     <div id="catering-tray-rows"></div>

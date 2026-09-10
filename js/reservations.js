@@ -91,6 +91,8 @@ const S = {
     offsiteCategory: '',
     offsitePackage: null,
     cateringCart: [],
+    cateringActiveMain: null,
+    cateringOpenSection: null,
     guestCount: '',
     eventType: '',
     eventTypeOther: '',
@@ -201,9 +203,35 @@ function clearDraft() {
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
+// A draft is only worth offering to "resume" if the customer actually made
+// progress — otherwise saveDraft()'s unconditional pagehide/visibilitychange
+// save (see below) would trigger the resume prompt for someone who opened
+// the page, selected nothing, and immediately left.
+function draftHasMeaningfulProgress(saved, step) {
+    if (typeof step === 'number' && step > 1) return true;
+    const s = saved || {};
+    return Boolean(
+        s.locationType ||
+        s.categoryId ||
+        s.miniPackage ||
+        s.snackAddon ||
+        s.offsiteCategory ||
+        s.offsitePackage ||
+        (Array.isArray(s.cateringCart) && s.cateringCart.length) ||
+        s.guestCount ||
+        s.eventType ||
+        s.eventTypeOther ||
+        s.venueLocation ||
+        s.eventDate ||
+        s.time ||
+        s.name || s.phone || s.email || s.requests
+    );
+}
+
 // Reads the saved draft without applying it, so the resume-prompt modal
 // can decide whether to appear before anything is mutated. Returns null
-// if there's no draft, it's malformed, or it's past DRAFT_MAX_AGE_MS.
+// if there's no draft, it's malformed, it's past DRAFT_MAX_AGE_MS, or
+// nothing meaningful was actually filled in.
 function peekDraft() {
     try {
         const raw = localStorage.getItem(DRAFT_KEY);
@@ -211,6 +239,7 @@ function peekDraft() {
         const parsed = JSON.parse(raw);
         if (!parsed?.state || typeof parsed.step !== 'number') return null;
         if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > DRAFT_MAX_AGE_MS) return null;
+        if (!draftHasMeaningfulProgress(parsed.state, parsed.step)) return null;
         return parsed;
     } catch { return null; }
 }
@@ -1742,6 +1771,8 @@ async function selectCategory(cat) {
         S.offsitePackage = null;
         S.snackAddon     = null;
         S.cateringCart   = [];
+        S.cateringActiveMain = null;
+        S.cateringOpenSection = null;
         S.time           = '';
         syncSelectedDate('');
     }
@@ -1829,7 +1860,7 @@ function buildPkgCardInner(p) {
             priceHtml +
             (p.desc ? '<p class="rpkg-desc">' + escapeHtml(p.desc) + '</p>' : '') +
             (chips ? '<div class="rpkg-chips">' + chips + '</div>' : '') +
-            '<a class="rpkg-details-link" href="/package-details.html?id=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener noreferrer">' +
+            '<a class="rpkg-details-link" href="/packages.html?package=' + encodeURIComponent(p.id) + '" target="_blank" rel="noopener noreferrer">' +
                 'View full details <i class="ti ti-arrow-up-right" aria-hidden="true"></i>' +
             '</a>' +
         '</div>'
@@ -1983,12 +2014,45 @@ function buildCateringInclusionsBlock() {
 }
 
 // ── Catering dish builder ──────────────────────────────────────────────
+// A step-by-step wizard (Main Dish -> Pasta -> Dessert -> Rice), matching
+// the progress tracker shown above the builder. The 5 protein categories
+// (Chicken/Pork/Beef/Fish/Vegetables) all share the 'main' tag — the
+// requirement is "at least 1 dish across all of them", not "one from
+// each". They're grouped under one "Main Dish" section below with a
+// protein-type tab switcher, so only one dish grid is visible at a time
+// instead of 5 stacked grids, and one shared instruction line explains
+// the rule instead of a misleading "(required)" badge on each of the 5.
+const CATERING_SECTIONS = [
+    { tag: 'main',    label: 'Main Dish', optional: false, hint: 'Pick at least one dish below for your main course \u2014 add more than one protein if you\u2019d like a bigger spread.' },
+    { tag: 'pasta',   label: 'Pasta',     optional: false, hint: 'Choose 1 pasta dish for your event.' },
+    { tag: 'dessert', label: 'Dessert',   optional: false, hint: 'Choose 1 dessert for your event.' },
+    { tag: 'rice',    label: 'Rice',      optional: true,  hint: 'Optional add-on \u2014 include steamed rice, or skip it.' }
+];
+
 function hasCateringTag(tag) {
     return DISHES.filter(g => g.tag === tag).some(g => S.cateringCart.some(i => i.cat === g.cat && i.pax));
 }
 
 function isCateringSelectionValid() {
     return hasCateringTag('main') && hasCateringTag('pasta') && hasCateringTag('dessert');
+}
+
+function isCateringSectionValid(section) {
+    return section.optional || hasCateringTag(section.tag);
+}
+
+function getFirstIncompleteCateringSection() {
+    return CATERING_SECTIONS.find((section) => !isCateringSectionValid(section)) || null;
+}
+
+function openCateringSection(tag) {
+    S.cateringOpenSection = tag;
+    buildCateringDishBuilder();
+    document.getElementById('catering-section-' + tag)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function scrollToCateringSection(tag) {
+    openCateringSection(tag);
 }
 
 function getCateringCartTotal()  { return S.cateringCart.reduce((s, i) => s + (i && i.pax ? i.price : 0), 0); }
@@ -2003,25 +2067,63 @@ function setCateringSelection(cat, dish, pax) {
 
 function clearCateringSelection(cat) { S.cateringCart = S.cateringCart.filter(i => i.cat !== cat); }
 
+async function clearAllCateringSelections() {
+    if (!S.cateringCart.length) return;
+    const confirmed = await showConfirmModal({
+        title: 'Remove all dishes?',
+        message: 'This clears every dish you\u2019ve added for this catering package. You\u2019ll need to pick your main dish, pasta, and dessert again before continuing.',
+        confirmText: 'Yes, remove all',
+        cancelText: 'Cancel',
+        destructive: true
+    });
+    if (!confirmed) return;
+
+    S.cateringCart = [];
+    S.cateringActiveMain = null;
+    S.cateringOpenSection = CATERING_SECTIONS[0].tag;
+    buildCateringDishBuilder();
+}
+
+// Fires only when a pax count is chosen (the point at which a dish becomes
+// a *complete* pick) — mirrors the "build your bowl" pattern of Chipotle/
+// Cava/Sweetgreen-style ordering flows: finishing the section you're
+// currently working in collapses it into a compact confirmed summary and
+// auto-advances to the next thing still needed, instead of requiring an
+// explicit "Next" click. Only triggers when the section that was just
+// completed is the one currently open, so switching between protein tabs
+// inside an already-satisfied Main Dish section never yanks focus away.
+function handleCateringPaxSelected(cat, dish, pax) {
+    setCateringSelection(cat, dish, pax);
+
+    const group = DISHES.find(g => g.cat === cat);
+    const section = group && CATERING_SECTIONS.find(s => s.tag === group.tag);
+
+    if (section && section.tag === S.cateringOpenSection && isCateringSectionValid(section)) {
+        const currentIdx = CATERING_SECTIONS.indexOf(section);
+        const next = CATERING_SECTIONS.slice(currentIdx + 1).find((s) => !isCateringSectionValid(s));
+        S.cateringOpenSection = next ? next.tag : null;
+        buildCateringDishBuilder();
+        return;
+    }
+
+    buildCateringDishBuilder();
+}
+
+
 function renderCateringProgress() {
     const tracker = document.getElementById('catering-progress-tracker');
     if (!tracker) return;
-    const steps = [
-        { label:'Main Dish', check: () => hasCateringTag('main') },
-        { label:'Pasta',     check: () => hasCateringTag('pasta') },
-        { label:'Dessert',   check: () => hasCateringTag('dessert') },
-        { label:'Rice',      check: () => hasCateringTag('rice'), optional: true }
-    ];
     tracker.innerHTML = '';
-    steps.forEach((step, idx) => {
-        const done = step.check();
+    CATERING_SECTIONS.forEach((section, idx) => {
+        const done = isCateringSectionValid(section);
         const item = document.createElement('div');
-        item.className = 'pt-item' + (done ? ' done' : ' pending');
+        item.className = 'pt-item' + (done ? ' done' : ' pending') + (S.cateringOpenSection === section.tag ? ' active' : '');
         item.innerHTML =
             '<div class="pt-dot">' + (done ? '&#10003;' : idx + 1) + '</div>' +
-            '<span>' + step.label + (step.optional ? ' <em style="font-weight:400;font-style:normal;opacity:0.6">(optional)</em>' : '') + '</span>';
+            '<span>' + section.label + (section.optional ? ' <em style="font-weight:400;font-style:normal;opacity:0.6">(optional)</em>' : '') + '</span>';
+        item.onclick = () => scrollToCateringSection(section.tag);
         tracker.appendChild(item);
-        if (idx < steps.length - 1) {
+        if (idx < CATERING_SECTIONS.length - 1) {
             const div = document.createElement('div'); div.className = 'pt-divider'; tracker.appendChild(div);
         }
     });
@@ -2030,69 +2132,159 @@ function renderCateringProgress() {
 function buildCateringDishBuilder() {
     const builder = document.getElementById('catering-tray-builder');
     if (!builder) return;
+
+    // First-ever render with an empty cart: default to the first section
+    // open. Once anything is picked, an explicit collapse (auto-advance or
+    // manual) is a deliberate state and is never overridden.
+    if (S.cateringOpenSection === null && S.cateringCart.length === 0) {
+        S.cateringOpenSection = CATERING_SECTIONS[0].tag;
+    }
+
     builder.innerHTML = '';
 
-    DISHES.forEach(group => {
-        const selected = getCateringSelection(group.cat);
-        const isDone   = selected && selected.pax;
-        const section  = document.createElement('div'); section.className = 'cat-section';
+    const labelEl = document.getElementById('catering-builder-label');
+    if (labelEl) labelEl.innerHTML = '<i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes';
+    const hintEl = document.getElementById('catering-builder-hint');
+    if (hintEl) hintEl.textContent = 'Tap a section to choose its dish \u2014 it\u2019ll confirm and move you to what\u2019s next automatically.';
 
-        const header = document.createElement('div'); header.className = 'cat-header';
+    CATERING_SECTIONS.forEach((section) => {
+        const groups = DISHES.filter(g => g.tag === section.tag);
+        if (!groups.length) return;
+
+        const valid  = isCateringSectionValid(section);
+        const isOpen = S.cateringOpenSection === section.tag;
+        const titleIcon = groups.length === 1 ? groups[0].icon + ' ' : '';
+
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'catering-accordion-item' + (isOpen ? ' open' : '') + (valid ? ' done' : '');
+        sectionEl.id = 'catering-section-' + section.tag;
+
+        const header = document.createElement('button');
+        header.type = 'button';
+        header.className = 'catering-accordion-header';
         header.innerHTML =
-            '<div class="cat-icon-wrap">' + group.icon + '</div>' +
-            '<span class="cat-title">' + group.cat + '</span>' +
-            '<span class="cat-tag">' + (group.required ? '(required)' : '(optional add-on)') + '</span>' +
-            '<span class="cat-done-badge' + (isDone ? ' visible' : '') + '">&#10003; Added</span>';
-        section.appendChild(header);
+            '<span class="accordion-status-dot' + (valid ? ' visible' : '') + '">' + (valid ? '&#10003;' : '') + '</span>' +
+            '<span class="catering-accordion-title">' + titleIcon + escHtml(section.label) + (section.optional ? ' <span class="cat-tag">(optional)</span>' : '') + '</span>' +
+            '<i class="ti ti-chevron-down accordion-chevron" aria-hidden="true"></i>';
+        header.onclick = () => { S.cateringOpenSection = isOpen ? null : section.tag; buildCateringDishBuilder(); };
+        sectionEl.appendChild(header);
 
-        const grid = document.createElement('div'); grid.className = 'dish-grid';
-        group.items.forEach(item => {
-            const isSelected = selected && selected.dish === item;
-            const dc = document.createElement('div');
-            dc.className = 'dish-card' + (isSelected ? ' selected' : '');
-            dc.innerHTML =
-                '<div class="dish-name">' + item + '</div>' +
-                '<div class="dish-status checked">&#10003; Selected</div>' +
-                '<div class="dish-status remove">&#10005; Click to remove</div>';
-            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat); else setCateringSelection(group.cat, item, null); rebuildCateringUI(); };
-            grid.appendChild(dc);
-        });
-        section.appendChild(grid);
+        if (isOpen) {
+            const body = document.createElement('div'); body.className = 'catering-accordion-body';
+            const hint = document.createElement('p'); hint.className = 'catering-section-hint';
+            hint.textContent = section.hint;
+            body.appendChild(hint);
 
-        if (selected && selected.dish) {
-            const paxWrap = document.createElement('div'); paxWrap.className = 'pax-wrapper visible';
-            const paxTop  = document.createElement('div'); paxTop.className = 'pax-top';
-            paxTop.innerHTML =
-                '<span class="pax-top-label">Pax per tray</span>' +
-                (selected.pax ? '<span class="pax-selected-price">' + fmtPeso(PRICES[group.cat][selected.pax]) + '</span>' : '');
-            paxWrap.appendChild(paxTop);
+            if (groups.length > 1) {
+                // Main Dish: several protein categories share this one
+                // section. Rather than stacking every category's full dish
+                // grid at once (the original clutter), show a tab per
+                // protein with a checkmark once it has a selection, and
+                // only that protein's dish grid below it — selections
+                // across tabs are independent and all still count, so
+                // switching tabs never loses a pick.
+                if (!S.cateringActiveMain || !groups.some(g => g.cat === S.cateringActiveMain)) {
+                    S.cateringActiveMain = groups[0].cat;
+                }
 
-            const paxBtns = document.createElement('div'); paxBtns.className = 'pax-buttons';
-            [20, 30, 40, 50].forEach(n => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'pax-btn' + (selected.pax === n ? ' selected' : '');
-                btn.textContent = n + ' pax';
-                btn.onclick = () => { setCateringSelection(group.cat, selected.dish, n); rebuildCateringUI(); };
-                paxBtns.appendChild(btn);
-            });
-            paxWrap.appendChild(paxBtns);
+                const tabs = document.createElement('div'); tabs.className = 'pills-row catering-protein-tabs';
+                groups.forEach(group => {
+                    const groupSelected = getCateringSelection(group.cat);
+                    const groupDone = groupSelected && groupSelected.pax;
+                    const tab = document.createElement('button');
+                    tab.type = 'button';
+                    tab.className = 'pill' + (group.cat === S.cateringActiveMain ? ' active' : '');
+                    tab.innerHTML = group.icon + ' ' + escHtml(group.cat) + (groupDone ? ' <span class="pill-check">&#10003;</span>' : '');
+                    tab.onclick = (e) => { e.stopPropagation(); S.cateringActiveMain = group.cat; buildCateringDishBuilder(); };
+                    tabs.appendChild(tab);
+                });
+                body.appendChild(tabs);
 
-            if (!selected.pax) {
-                const hint = document.createElement('p'); hint.className = 'pax-hint';
-                hint.textContent = 'Choose the number of pax to add this dish to your cart.';
-                paxWrap.appendChild(hint);
+                const activeGroup = groups.find(g => g.cat === S.cateringActiveMain) || groups[0];
+                body.appendChild(buildCateringCategoryBlock(activeGroup));
+            } else {
+                body.appendChild(buildCateringCategoryBlock(groups[0]));
             }
-            section.appendChild(paxWrap);
+
+            sectionEl.appendChild(body);
+        } else if (valid) {
+            sectionEl.appendChild(buildCateringSectionRecap(groups));
         }
 
-        const divider = document.createElement('hr'); divider.className = 'cat-divider';
-        section.appendChild(divider);
-        builder.appendChild(section);
+        builder.appendChild(sectionEl);
     });
 
     renderCateringCart();
     renderCateringProgress();
+}
+
+// Compact "confirmed" recap shown for a collapsed, completed section — one
+// line per selected dish (Main Dish can have more than one protein picked;
+// Pasta/Dessert/Rice only ever have one). Clicking anywhere on it reopens
+// the section, same as tapping its header.
+function buildCateringSectionRecap(groups) {
+    const recap = document.createElement('div'); recap.className = 'catering-accordion-recap';
+    groups.forEach(group => {
+        const selected = getCateringSelection(group.cat);
+        if (!selected || !selected.pax) return;
+        const row = document.createElement('div'); row.className = 'catering-recap-row';
+        row.innerHTML =
+            '<span class="catering-recap-dish">' + group.icon + ' ' + escHtml(selected.dish) + '</span>' +
+            '<span class="catering-recap-meta">' + selected.pax + ' pax &middot; ' + escHtml(fmtPeso(selected.price)) + '</span>';
+        recap.appendChild(row);
+    });
+    return recap;
+}
+
+// Renders one category's dish grid + pax picker (used both for single-
+// category sections like Pasta/Dessert/Rice, and for whichever protein
+// tab is active under Main Dish).
+function buildCateringCategoryBlock(group) {
+    const selected = getCateringSelection(group.cat);
+    const wrap = document.createElement('div');
+
+    const grid = document.createElement('div'); grid.className = 'dish-grid';
+    group.items.forEach(item => {
+        const isSelected = selected && selected.dish === item;
+        const dc = document.createElement('div');
+        dc.className = 'dish-card' + (isSelected ? ' selected' : '');
+        dc.innerHTML =
+            '<div class="dish-name">' + item + '</div>' +
+            '<div class="dish-status checked">&#10003; Selected</div>' +
+            '<div class="dish-status remove">&#10005; Click to remove</div>';
+        dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat); else setCateringSelection(group.cat, item, null); rebuildCateringUI(); };
+        grid.appendChild(dc);
+    });
+    wrap.appendChild(grid);
+
+    if (selected && selected.dish) {
+        const paxWrap = document.createElement('div'); paxWrap.className = 'pax-wrapper visible';
+        const paxTop  = document.createElement('div'); paxTop.className = 'pax-top';
+        paxTop.innerHTML =
+            '<span class="pax-top-label">Pax per tray</span>' +
+            (selected.pax ? '<span class="pax-selected-price">' + fmtPeso(PRICES[group.cat][selected.pax]) + '</span>' : '');
+        paxWrap.appendChild(paxTop);
+
+        const paxBtns = document.createElement('div'); paxBtns.className = 'pax-buttons';
+        [20, 30, 40, 50].forEach(n => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pax-btn' + (selected.pax === n ? ' selected' : '');
+            btn.textContent = n + ' pax';
+            btn.onclick = () => handleCateringPaxSelected(group.cat, selected.dish, n);
+            paxBtns.appendChild(btn);
+        });
+        paxWrap.appendChild(paxBtns);
+
+        if (!selected.pax) {
+            const hint = document.createElement('p'); hint.className = 'pax-hint';
+            hint.textContent = 'Choose the number of pax to add this dish to your cart.';
+            paxWrap.appendChild(hint);
+        }
+        wrap.appendChild(paxWrap);
+    }
+
+    return wrap;
 }
 
 function renderCateringCart() {
@@ -2105,12 +2297,14 @@ function renderCateringCart() {
     const totalEl   = document.getElementById('catering-tray-total');
     const noticeEl  = document.getElementById('catering-validation-notice');
     const noticeText = document.getElementById('catering-validation-text');
+    const clearAllBtn = document.getElementById('catering-cart-clear-all');
 
     const count = getCateringCartCount();
     const total = getCateringCartTotal();
     rows.innerHTML = '';
     if (badgeEl) badgeEl.textContent = count;
     if (runningEl) runningEl.textContent = fmtPeso(total);
+    if (clearAllBtn) clearAllBtn.style.display = count ? 'inline-flex' : 'none';
 
     if (!count) {
         if (emptyEl)  emptyEl.style.display = 'block';
@@ -2137,6 +2331,8 @@ function renderCateringCart() {
             btn.onclick = () => { clearCateringSelection(btn.dataset.cat); rebuildCateringUI(); };
         });
     }
+
+    if (clearAllBtn) clearAllBtn.onclick = clearAllCateringSelections;
 
     if (noticeEl) {
         noticeEl.className = 'validation-notice' + (isCateringSelectionValid() ? ' success' : '');
@@ -2459,6 +2655,8 @@ function validate(n) {
             }
             if (S.offsiteCategory === 'catering') {
                 if (!isCateringSelectionValid()) {
+                    const firstInvalidSection = getFirstIncompleteCateringSection();
+                    if (firstInvalidSection) scrollToCateringSection(firstInvalidSection.tag);
                     showWarningModal('Please select at least 1 main dish, 1 pasta, and 1 dessert for your catering package.');
                     scrollToSection('sub-pkg'); return false;
                 }

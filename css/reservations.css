@@ -731,6 +731,10 @@
             margin: 20px 0 28px;
             flex-wrap: wrap;
             gap: 10px;
+            position: sticky;
+            top: 70px;
+            z-index: 20;
+            box-shadow: 0 6px 16px rgba(61,26,10,0.08);
         }
         .pt-item {
             display: flex;
@@ -738,9 +742,16 @@
             gap: 8px;
             font-size: 13px;
             color: #aaa;
+            cursor: pointer;
+            transition: transform 0.15s ease;
         }
+        .pt-item:hover { transform: translateY(-1px); }
         .pt-item.done { color: #0F6E56; }
         .pt-item.pending { color: #2A1408; font-weight: 600; }
+        .pt-item.active .pt-dot {
+            box-shadow: 0 0 0 3px rgba(107,58,31,0.22);
+        }
+        .pt-item.active span { text-decoration: underline; text-underline-offset: 3px; }
         .pt-dot {
             width: 20px; height: 20px;
             border-radius: 50%;
@@ -936,6 +947,87 @@
             border-top: 1px solid #f0e8e0;
             margin: 16px 0 20px;
         }
+
+        .catering-accordion-item {
+            border: 1px solid #ead9ca;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            background: #fff;
+            transition: border-color 0.15s ease;
+        }
+        .catering-accordion-item.open { border-color: #d9b98c; }
+        .catering-accordion-item.done:not(.open) { background: #FBFAF7; }
+        .catering-accordion-header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 18px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+        }
+        .accordion-status-dot {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            border: 1.5px solid #ddd;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            background: #fff;
+            color: #bbb;
+        }
+        .accordion-status-dot.visible {
+            background: #E1F5EE;
+            border-color: #1D9E75;
+            color: #0F6E56;
+        }
+        .catering-accordion-title {
+            flex: 1;
+            font-size: 15px;
+            font-weight: 700;
+            color: #2A1408;
+        }
+        .accordion-chevron {
+            color: #b8a494;
+            transition: transform 0.2s ease;
+        }
+        .catering-accordion-item.open .accordion-chevron { transform: rotate(180deg); }
+        .catering-accordion-body {
+            padding: 0 18px 20px;
+        }
+        .catering-section-hint {
+            font-size: 13px;
+            color: #888;
+            margin: -6px 0 16px;
+            line-height: 1.6;
+        }
+        .catering-protein-tabs { margin-bottom: 16px; }
+        .pill-check {
+            color: #0F6E56;
+            font-weight: 700;
+            margin-left: 2px;
+        }
+        .pill.active .pill-check { color: #085041; }
+
+        .catering-accordion-recap {
+            padding: 0 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .catering-recap-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .catering-recap-dish { color: #2A1408; font-weight: 600; }
+        .catering-recap-meta { color: #8a7a6d; white-space: nowrap; }
 
         .cart-section { margin-top: 28px; }
         .cart-box {
@@ -1803,6 +1895,10 @@
         .btn-next:hover { background: var(--brown-dark, #1E0C03); }
 
         .hidden { display: none !important; }
+
+        @media (max-width: 960px) {
+            .progress-tracker { top: 64px; }
+        }
 
         @media (max-width: 600px) {
             .page-hero { height: 320px; }
