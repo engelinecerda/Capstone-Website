@@ -11,6 +11,8 @@ import { computeAnnouncementStatus, renderAnnouncementBannerHtml, KIND_LABELS } 
 // ── STATE ────────────────────────────────────────────────────────
 let announcements = [];
 let editingId = null; // null while creating a new announcement
+let statusTransitionTimer = null; // precise timeout aimed at the next starts_at/ends_at boundary
+let statusFallbackTimer = null; // cheap safety-net interval in case a transition is ever missed
 
 // ── DOM refs ─────────────────────────────────────────────────────
 const tableBody = document.getElementById('announcementsTableBody');
@@ -74,6 +76,7 @@ async function loadAll() {
   }
   announcements = data || [];
   renderTable();
+  scheduleNextStatusUpdate(); // data may have changed which boundary is soonest
 }
 
 function renderTable() {
@@ -99,6 +102,68 @@ function renderTable() {
       </tr>`;
   }).join('');
 }
+
+// Find the soonest upcoming starts_at/ends_at across all loaded, enabled
+// announcements (relative to `now`). Returns a Date or null if nothing is
+// pending a transition (e.g. everything's already live-forever or expired).
+function getNextTransitionTime(now = new Date()) {
+  let soonest = null;
+  for (const a of announcements) {
+    if (!a.is_enabled) continue;
+    for (const iso of [a.starts_at, a.ends_at]) {
+      if (!iso) continue;
+      const t = new Date(iso);
+      if (t > now && (!soonest || t < soonest)) soonest = t;
+    }
+  }
+  return soonest;
+}
+
+// Re-paint status pills/window text using already-loaded data (no Supabase
+// refetch — computeAnnouncementStatus is time-based). Instead of polling on
+// a flat interval, this schedules a single setTimeout aimed precisely at
+// the next boundary so Scheduled → Live → Expired flips within ~a second
+// of the real moment, then reschedules for whatever's next.
+function scheduleNextStatusUpdate() {
+  if (statusTransitionTimer) { clearTimeout(statusTransitionTimer); statusTransitionTimer = null; }
+  const next = getNextTransitionTime();
+  if (!next) return; // nothing pending — fallback interval still covers us if data changes underneath
+
+  const delay = Math.max(250, next.getTime() - Date.now() + 250); // small buffer past the exact boundary
+  statusTransitionTimer = setTimeout(() => {
+    statusTransitionTimer = null;
+    if (announcements.length) renderTable();
+    scheduleNextStatusUpdate();
+  }, delay);
+}
+
+// Cheap safety net — in case a transition is ever missed (e.g. system sleep,
+// throttled background tab, or a bug in the scheduling above), this catches
+// up within 30s worst case and re-arms the precise scheduler.
+function startStatusAutoRefresh() {
+  scheduleNextStatusUpdate();
+  if (statusFallbackTimer) return;
+  statusFallbackTimer = setInterval(() => {
+    if (announcements.length) renderTable();
+    scheduleNextStatusUpdate();
+  }, 30000);
+}
+function stopStatusAutoRefresh() {
+  if (statusTransitionTimer) { clearTimeout(statusTransitionTimer); statusTransitionTimer = null; }
+  if (statusFallbackTimer) { clearInterval(statusFallbackTimer); statusFallbackTimer = null; }
+}
+// Pause timers while tab is hidden (setTimeout/setInterval drift or get
+// throttled in background tabs anyway), and force an immediate repaint +
+// reschedule on return so nothing shows stale right when the admin looks
+// back at the tab.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopStatusAutoRefresh();
+  } else {
+    if (announcements.length) renderTable();
+    startStatusAutoRefresh();
+  }
+});
 
 tableBody.addEventListener('click', async e => {
   const btn = e.target.closest('[data-action]');
@@ -246,7 +311,8 @@ async function init() {
   setupInactivityLogout(result.profile.role);
   initAdminSidebarBadges(supabase);
   initAdminNav({ role: result.profile.role });
-  loadAll();
+  await loadAll();
+  startStatusAutoRefresh();
 }
 
 init();
