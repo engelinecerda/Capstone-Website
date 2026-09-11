@@ -207,6 +207,16 @@ function clearDraft() {
 // progress — otherwise saveDraft()'s unconditional pagehide/visibilitychange
 // save (see below) would trigger the resume prompt for someone who opened
 // the page, selected nothing, and immediately left.
+// A draft is only worth offering to "resume" if the customer actually made
+// progress — otherwise saveDraft()'s unconditional pagehide/visibilitychange
+// save (see below) would trigger the resume prompt for someone who opened
+// the page, selected nothing, and immediately left. name/phone/email are
+// deliberately excluded: prefillReservationContactDetails() auto-fills all
+// three from the logged-in customer's profile on every visit with zero
+// action from them, so their mere presence proves nothing about whether
+// the booking flow itself was touched — counting them made the prompt fire
+// for a customer who never chose anything. requests has no such
+// auto-fill and stays a valid signal.
 function draftHasMeaningfulProgress(saved, step) {
     if (typeof step === 'number' && step > 1) return true;
     const s = saved || {};
@@ -224,7 +234,7 @@ function draftHasMeaningfulProgress(saved, step) {
         s.venueLocation ||
         s.eventDate ||
         s.time ||
-        s.name || s.phone || s.email || s.requests
+        s.requests
     );
 }
 
@@ -577,7 +587,7 @@ function toDateKey(date) {
     return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-');
 }
 
-function fmtPeso(v) { return '₱' + Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtPeso(v) { return '₱' + Number(v || 0).toLocaleString(); }
 
 function formatDisplayDate(dateKey) {
     if (!dateKey) return '';
@@ -807,29 +817,15 @@ function updateSignatureCapturedBadge() {
 // the smallest step still doesn't fit).
 const SIGNATURE_TYPE_FONT_MAX = 32;
 const SIGNATURE_TYPE_FONT_MIN = 18;
-// Runs on every keystroke (see the 'input' listener below) — the old
-// version looped "write font-size, read scrollWidth" up to 7 times per
-// call, and each iteration forces the browser to synchronously flush
-// layout to answer that read (a "forced reflow"/layout thrashing; this
-// showed up directly in a PageSpeed audit as ~63ms of forced-reflow time).
-// Measuring once at max size and computing the fitted size by ratio
-// instead needs exactly one write + two reads (clientWidth/scrollWidth,
-// taken back-to-back with no write between them, so they share a single
-// layout flush) + one final write with no read after it — no reflow loop.
-// A script font's width doesn't scale *perfectly* linearly with px size,
-// so this can occasionally land a shade looser/tighter than the old
-// iterative version — safe, since the preview's own overflow:hidden is
-// already the documented hard backstop for exactly that case.
 function fitSignatureTypePreview() {
     if (!signatureTypePreview) return;
-    signatureTypePreview.style.fontSize = `${SIGNATURE_TYPE_FONT_MAX}px`;
-    const maxWidth = signatureTypePreview.clientWidth;
-    const naturalWidth = signatureTypePreview.scrollWidth;
-    if (naturalWidth <= maxWidth || naturalWidth === 0) return; // already fits at max size
-
-    const fittedSize = Math.floor(SIGNATURE_TYPE_FONT_MAX * (maxWidth / naturalWidth));
-    const size = Math.max(SIGNATURE_TYPE_FONT_MIN, Math.min(SIGNATURE_TYPE_FONT_MAX, fittedSize));
+    let size = SIGNATURE_TYPE_FONT_MAX;
     signatureTypePreview.style.fontSize = `${size}px`;
+    const maxWidth = signatureTypePreview.clientWidth;
+    while (signatureTypePreview.scrollWidth > maxWidth && size > SIGNATURE_TYPE_FONT_MIN) {
+        size -= 2;
+        signatureTypePreview.style.fontSize = `${size}px`;
+    }
 }
 
 function setSignatureMode(mode) {
@@ -2491,27 +2487,6 @@ async function buildTimeGrid() {
 }
 
 // ── Summary ────────────────────────────────────────────────────────────
-// Icon per row label, matched on the LABEL side (not the value) — falls
-// back to 'package' for the dynamic package/catering line items below
-// that don't have their own fixed label (e.g. a per-category cart row).
-const SUMMARY_ROW_ICONS = {
-    'Location':      'building-store',
-    'Package':       'package',
-    'Add-on':        'package',
-    'Service':       'package',
-    'Inclusions':    'list',
-    'Special Offer': 'gift',
-    'Price':         'package',
-    'Guests':        'users',
-    'Event Type':    'confetti',
-    'Date':          'calendar',
-    'Time':          'clock',
-    'Name':          'user',
-    'Email':         'mail',
-    'Phone':         'phone',
-    'Requests':      'message'
-};
-
 function buildSummary() {
     const box = document.getElementById('summary-content');
     if (!box) return;
@@ -2522,11 +2497,11 @@ function buildSummary() {
     if (S.locationType === 'onsite') {
         if (S.miniPackage) {
             total += S.miniPackage.price;
-            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price));
+            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; &#8369;' + S.miniPackage.price.toLocaleString());
         }
         if (S.snackAddon) {
             total += S.snackAddon.price;
-            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; ' + fmtPeso(S.snackAddon.price));
+            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
         }
     } else if (S.offsiteCategory === 'catering') {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
@@ -2540,7 +2515,7 @@ function buildSummary() {
         if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''));
         S.cateringCart.filter(i => i && i.pax).forEach(i => {
             total += i.price;
-            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; ' + fmtPeso(i.price));
+            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; &#8369;' + i.price.toLocaleString());
         });
         if (total === 0) pkgRows += sr('Price', 'Contact for quote');
     } else if (S.offsitePackage) {
@@ -2548,66 +2523,45 @@ function buildSummary() {
         total = S.offsitePackage.price;
         pkgRows += sr('Service', catObj ? catObj.name : '');
         pkgRows += sr('Package', S.offsitePackage.label);
-        if (S.offsitePackage.price > 0) pkgRows += sr('Price', fmtPeso(S.offsitePackage.price));
+        if (S.offsitePackage.price > 0) pkgRows += sr('Price', '&#8369;' + S.offsitePackage.price.toLocaleString());
     }
 
     // Itemised, never folded into the package price — customer sees
     // Subtotal, then the service charge as its own line, then Total.
-    // Total gets its own heavier row style, and per the receipt-style
-    // treatment for this card, Subtotal/Service charge skip the row icon.
     const charge = resolveServiceCharge(total, S.locationType, S.categoryId);
     const totalRowsHtml = total > 0
-        ? plainRow('Subtotal', fmtPeso(total)) +
-          plainRow('Service charge (' + charge.pct + '%)', fmtPeso(charge.amount)) +
-          totalRow(fmtPeso(charge.total))
-        : totalRow('Contact for quote');
+        ? sr('Subtotal', '&#8369;' + total.toLocaleString()) +
+          sr('Service charge (' + charge.pct + '%)', '&#8369;' + charge.amount.toLocaleString()) +
+          '<div class="summary-total"><span>Total</span><span>&#8369;' + charge.total.toLocaleString() + '</span></div>'
+        : '<div class="summary-total"><span>Total</span><span>Contact for quote</span></div>';
 
-    const locStr = S.locationType === 'onsite'
-        ? 'Onsite &mdash; ELI Coffee'
-        : 'Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
+    const locStr   = S.locationType === 'onsite'
+        ? '&#127968; Onsite &mdash; ELI Coffee'
+        : '&#128663; Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
     const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
     box.innerHTML =
-        '<div class="rs-summary-cards">' +
-            '<div class="rs-summary-card">' +
-                '<div class="rs-summary-card-title">Event</div>' +
-                sr('Location',   locStr) +
-                pkgRows +
-                sr('Guests',     S.guestCount) +
-                sr('Event Type', displayEventType) +
-                sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate) +
-                sr('Time',       S.time) +
-            '</div>' +
-            '<div class="rs-summary-card">' +
-                '<div class="rs-summary-card-title">Contact</div>' +
-                sr('Name',  S.name) +
-                sr('Email', S.email) +
-                sr('Phone', S.phone) +
-                (S.requests ? sr('Requests', S.requests) : '') +
-            '</div>' +
-            '<div class="rs-summary-card">' +
-                '<div class="rs-summary-card-title">Total</div>' +
-                totalRowsHtml +
-            '</div>' +
-        '</div>';
+        '<div class="summary-section-title">Event</div>' +
+        sr('Location',   locStr) +
+        pkgRows +
+        sr('Guests',     S.guestCount) +
+        sr('Event Type', displayEventType) +
+        sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate) +
+        sr('Time',       S.time) +
+        '<hr class="summary-divider">' +
+        '<div class="summary-section-title">Contact</div>' +
+        sr('Name',  S.name) +
+        sr('Email', S.email) +
+        sr('Phone', S.phone) +
+        (S.requests ? sr('Requests', S.requests) : '') +
+        '<hr class="summary-divider">' +
+        totalRowsHtml;
 
     document.getElementById('guest-warning').classList.toggle('hidden', isLoggedIn);
 }
 
-// Icon + label on the left, value on the right — used for every row
-// except the receipt-style Subtotal/Service charge/Total lines.
 function sr(label, value) {
-    const icon = SUMMARY_ROW_ICONS[label] || 'package';
-    return '<div class="rs-summary-row"><span class="rs-row-label"><i class="ti ti-' + icon + '" aria-hidden="true"></i>' + label + '</span><span class="rs-row-value">' + value + '</span></div>';
-}
-
-// No icon — the Total card reads like a receipt, not a data sheet.
-function plainRow(label, value) {
-    return '<div class="rs-summary-row"><span class="rs-row-label">' + label + '</span><span class="rs-row-value">' + value + '</span></div>';
-}
-
-function totalRow(value) {
-    return '<div class="rs-summary-total-row"><span class="rs-row-label">Total</span><span class="rs-row-value">' + value + '</span></div>';
+    return '<div class="summary-row"><span class="s-label">' + label + '</span><span class="s-value">' + value + '</span></div>';
 }
 
 // ── Contract download ──────────────────────────────────────────────────
@@ -2652,7 +2606,7 @@ function showStep(n) {
     document.getElementById('step-text').textContent = 'Step ' + n + ' of ' + total() + ': ' + (STEP_LABELS[n - 1] || '');
 
     document.getElementById('prevBtn').classList.toggle('hidden', n === 1);
-    document.getElementById('nextBtn').innerHTML = n === total() ? 'Submit' : 'Next <i class="ti ti-arrow-right" aria-hidden="true"></i>';
+    document.getElementById('nextBtn').textContent = n === total() ? 'Submit' : 'Next →';
 
     populate(sid(n));
     saveDraft();
@@ -3137,7 +3091,7 @@ async function submitDone() {
         document.querySelector('.progress-container').style.display  = 'none';
 
         const msg = document.createElement('div');
-        msg.className = 'rs-submit-success-box';
+        msg.className = 'summary-box';
         msg.style.cssText = 'text-align:center;padding:48px 20px;';
         msg.innerHTML =
             '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
