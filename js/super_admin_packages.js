@@ -264,6 +264,7 @@ const addCateringCategoryBtn              = document.getElementById('addCatering
 const cateringPageMessage                 = document.getElementById('cateringPageMessage');
 const cateringPackagePickerCard           = document.getElementById('cateringPackagePickerCard');
 const cateringPackageSelect               = document.getElementById('cateringPackageSelect');
+const cateringMainDishMax                 = document.getElementById('cateringMainDishMax');
 const activeCateringSection               = document.getElementById('activeCateringSection');
 const archivedCateringSection             = document.getElementById('archivedCateringSection');
 const activeCateringBody                  = document.getElementById('activeCateringBody');
@@ -3231,7 +3232,7 @@ async function loadCateringMenuPackages() {
   try {
     const { data, error } = await supabase
       .from('package')
-      .select('package_id, package_name, is_active')
+      .select('package_id, package_name, is_active, catering_main_dish_max')
       .eq('uses_catering_menu', true)
       .order('sort_order', { ascending: true });
     if (error) throw error;
@@ -3263,6 +3264,7 @@ async function loadCateringMenuPackages() {
     cateringPackageSelect.innerHTML = cateringMenuPackages
       .map(p => `<option value="${p.package_id}" ${p.package_id === cateringMenuActivePackageId ? 'selected' : ''}>${escapeHtml(p.package_name)}${p.is_active ? '' : ' (Archived package)'}</option>`)
       .join('');
+    updateCateringMainDishMaxInput();
 
     setMessage(cateringPageMessage, '');
     await loadCateringMenu();
@@ -3273,7 +3275,40 @@ async function loadCateringMenuPackages() {
 
 cateringPackageSelect.addEventListener('change', async () => {
   cateringMenuActivePackageId = cateringPackageSelect.value || null;
+  updateCateringMainDishMaxInput();
   await loadCateringMenu();
+});
+
+// Reflects the active package's saved cap in the input — kept separate
+// from loadCateringMenu() since it only needs the already-fetched
+// cateringMenuPackages list, not a fresh round trip.
+function updateCateringMainDishMaxInput() {
+  const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+  cateringMainDishMax.value = pkg?.catering_main_dish_max ?? 3;
+}
+
+// Saved on blur (not on every keystroke) so a half-typed number never hits
+// the database — mirrors how other scalar package fields on this page are
+// only written once the admin is done editing.
+cateringMainDishMax.addEventListener('change', async () => {
+  if (!cateringMenuActivePackageId) return;
+  const value = parseInt(cateringMainDishMax.value, 10);
+  if (!Number.isFinite(value) || value < 1) {
+    setMessage(cateringPageMessage, 'Max main dishes must be a whole number of 1 or more.', 'error');
+    updateCateringMainDishMaxInput();
+    return;
+  }
+  try {
+    const { error } = await supabase.from('package').update({ catering_main_dish_max: value }).eq('package_id', cateringMenuActivePackageId);
+    if (error) throw error;
+    const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+    if (pkg) pkg.catering_main_dish_max = value;
+    await logAudit({ action: 'Updated Catering Main Dish Max', category: 'package', details: `Max main dishes set to ${value}`, entityId: cateringMenuActivePackageId });
+    setMessage(cateringPageMessage, 'Max main dishes updated.', 'success');
+  } catch (err) {
+    setMessage(cateringPageMessage, `Failed to save: ${err.message}`, 'error');
+    updateCateringMainDishMaxInput();
+  }
 });
 
 async function loadCateringMenu() {

@@ -327,6 +327,11 @@
           <div class="modal-field" style="max-width:420px;">
             <select id="cateringPackageSelect" class="modal-input modal-select"></select>
           </div>
+          <div class="modal-field" style="max-width:420px;">
+            <label class="modal-label" for="cateringMainDishMax">Max main dishes included</label>
+            <input type="number" id="cateringMainDishMax" class="modal-input" min="1" step="1" placeholder="3">
+            <span class="modal-hint">How many protein dishes (Chicken/Pork/Beef/Fish/Vegetables combined) a customer can pick for this package. The customer builder blocks further picks once this is reached.</span>
+          </div>
         </div>
 
         <div class="card" id="activeCateringSection">
@@ -833,7 +838,7 @@
               <option value="drinks">Drinks</option>
               <option value="addon">Other add-on</option>
             </select>
-            <span class="modal-hint">Checkout requires at least one selection from the main, pasta, and dessert groups.</span>
+            <span class="modal-hint">Checkout requires a selection from any group marked "Required" below (Main dish always needs at least one, up to the package's configured max).</span>
           </div>
           <div class="modal-field">
             <label class="modal-label" for="cateringCatSortOrder">Sort Order</label>
