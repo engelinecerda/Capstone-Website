@@ -72,7 +72,16 @@
     <section class="about-story">
         <div class="about-story-inner">
             <div class="about-story-image">
-                <img src="/images/glorie-gotis.jpg" alt="ELI Coffee Events Cafe interior" />
+                <!-- Matches the current admin-configured Page Content > About
+                     Page > "Who We Are" story image exactly (same Cloudinary
+                     transform js/about_content.js's initAboutSections() would
+                     apply) so the first paint is already correct — no flash of
+                     a placeholder photo before the JS swap runs. If an admin
+                     uploads a different photo later, that JS swap keeps this
+                     current automatically; only the very first paint of a
+                     fresh page load stays pinned to whatever URL is hardcoded
+                     here until this markup is updated to match. -->
+                <img src="https://res.cloudinary.com/dgneg418t/image/upload/w_700,c_limit,q_auto,f_auto/v1788994844/eli_coffee_page_content/FB_IMG_178502581360w7_avehra.webp" alt="ELI Coffee Events Cafe interior" />
             </div>
             <div class="about-story-text">
                 <p class="eyebrow">Who We Are</p>
