@@ -174,17 +174,6 @@
 }
 
 /* ========================
-   Food Tray Builder (Step 4)
-======================== */
-
-.dish-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-/* ========================
    Tray Cart (Step 4)
 ======================== */
 .tray-cart {
@@ -660,6 +649,12 @@
             border-color: #6B3A1F;
             color: #fff;
         }
+        .pt-item.locked { opacity: 0.55; }
+        .pt-item.locked .pt-dot {
+            background: #fff;
+            border-color: #ddd;
+            color: #aaa;
+        }
         .pt-divider {
             flex: 1;
             height: 1px;
@@ -732,7 +727,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 8px;
-            margin-bottom: 0;
+            margin-bottom: 14px;
         }
         .dish-card {
             border: 1px solid #e4d5c9;
@@ -838,6 +833,46 @@
             color: #686868;
             margin-top: 8px;
         }
+        .pax-summary-row {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+        }
+        .pax-summary-text {
+            font-size: 12.5px;
+            color: #5a5148;
+        }
+        .pax-summary-text b { color: #0F6E56; }
+        .pax-custom-badge {
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #6B3A1F;
+            background: #FFF3E4;
+            border: 1px solid #ecd6b8;
+            border-radius: 20px;
+            padding: 1px 8px;
+            margin-left: 4px;
+        }
+        .pax-summary-actions {
+            display: flex;
+            gap: 14px;
+        }
+        .pax-link-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B3A1F;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .pax-link-btn:hover { color: #2A1408; }
         .cat-divider {
             border: none;
             border-top: 1px solid #f0e8e0;
@@ -854,6 +889,9 @@
         }
         .catering-accordion-item.open { border-color: #d9b98c; }
         .catering-accordion-item.done:not(.open) { background: #FBFAF7; }
+        .catering-accordion-item.locked { background: #FBFAF7; opacity: 0.6; }
+        .catering-accordion-item.locked .catering-accordion-header { cursor: not-allowed; }
+        .catering-accordion-item.locked .accordion-chevron { display: none; }
         .catering-accordion-header {
             width: 100%;
             display: flex;
@@ -898,8 +936,13 @@
         .catering-section-hint {
             font-size: 13px;
             color: #888;
-            margin: -6px 0 16px;
+            margin: 0 0 16px;
             line-height: 1.6;
+        }
+        .pills-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         .catering-protein-tabs { margin-bottom: 16px; }
         .pill-check {
@@ -1024,6 +1067,23 @@
             transition: all 0.15s;
         }
         .ci-remove-btn:hover {
+            border-color: #c0392b;
+            color: #c0392b;
+            background: #fdf2f2;
+        }
+        .cart-clear-all-btn {
+            background: none;
+            border: 1px solid #e4d5c9;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #686868;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .cart-clear-all-btn:hover {
             border-color: #c0392b;
             color: #c0392b;
             background: #fdf2f2;
