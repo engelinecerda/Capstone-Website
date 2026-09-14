@@ -84,6 +84,14 @@ const state = {
     activeTab: 'current',
     selectedMethod: '',
     selectedOptionKey: '',
+    // True only once the customer actually clicks a method or payment-type
+    // button — as opposed to selectedMethod/selectedOptionKey merely holding
+    // a value, which happens automatically via syncSelections() on load too.
+    // Lets the draft count an explicit method/type change as real progress
+    // (e.g. picking "Maya" + "Remaining Balance" and then stepping away)
+    // without resurrecting the original bug where the auto-picked defaults
+    // alone made every visit look like progress.
+    selectionTouchedByUser: false,
     isSubmitting: false,
     flashMessage: '',
     flashType: '',
@@ -138,17 +146,11 @@ let paymentSubmissionLocked = false;
 
 function savePaymentDraft() {
     if (!state.reservationId || paymentSubmissionLocked) return;
-    const hasContent = state.selectedMethod || state.selectedOptionKey
-        || state.form.customAmount || state.form.referenceNumber
-        || state.form.paymentDate || state.form.cashPaymentDate || state.form.notes;
-    if (!hasContent) {
-        clearPaymentDraft();
-        return;
-    }
     try {
         localStorage.setItem(getPaymentDraftKey(), JSON.stringify({
             selectedMethod: state.selectedMethod,
             selectedOptionKey: state.selectedOptionKey,
+            selectionTouchedByUser: state.selectionTouchedByUser,
             form: {
                 customAmount: state.form.customAmount,
                 referenceNumber: state.form.referenceNumber,
@@ -166,9 +168,29 @@ function clearPaymentDraft() {
     try { localStorage.removeItem(getPaymentDraftKey()); } catch { /* ignore */ }
 }
 
+// A draft is only worth offering to "resume" if the customer actually did
+// something — otherwise the unconditional pagehide/visibilitychange save
+// above would trigger the resume prompt for someone who just opened the
+// page and left. selectedMethod/selectedOptionKey holding a value isn't
+// enough on its own (mirrors js/reservations.js's draftHasMeaningfulProgress,
+// which excludes the auto-filled name/phone/email for the same reason): the
+// page auto-picks a default payment method and option on load with zero
+// action from the customer. selectionTouchedByUser distinguishes an actual
+// click on a method/type button from that auto-pick, so a customer who
+// explicitly chose e.g. "Maya" + "Remaining Balance" but hasn't typed
+// anything yet still gets offered a resume.
+function paymentDraftHasMeaningfulProgress(saved) {
+    const f = saved?.form || {};
+    return Boolean(
+        saved?.selectionTouchedByUser ||
+        f.customAmount || f.referenceNumber || f.paymentDate || f.cashPaymentDate || f.notes
+    );
+}
+
 // Reads the saved draft without applying it, so the resume-prompt modal can
 // decide whether to appear before anything is mutated. Returns null if
-// there's no draft, it's malformed, or it's past PAYMENT_DRAFT_MAX_AGE_MS.
+// there's no draft, it's malformed, it's past PAYMENT_DRAFT_MAX_AGE_MS, or
+// nothing meaningful was actually filled in.
 function peekPaymentDraft() {
     if (!state.reservationId) return null;
     try {
@@ -177,6 +199,7 @@ function peekPaymentDraft() {
         const parsed = JSON.parse(raw);
         if (!parsed?.form) return null;
         if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > PAYMENT_DRAFT_MAX_AGE_MS) return null;
+        if (!paymentDraftHasMeaningfulProgress(parsed)) return null;
         return parsed;
     } catch { return null; }
 }
@@ -185,6 +208,7 @@ function applyPaymentDraft(draft) {
     if (!draft) return;
     state.selectedMethod = draft.selectedMethod || state.selectedMethod;
     state.selectedOptionKey = draft.selectedOptionKey || '';
+    state.selectionTouchedByUser = Boolean(draft.selectionTouchedByUser);
     state.form.customAmount = draft.form?.customAmount || '';
     state.form.referenceNumber = draft.form?.referenceNumber || '';
     state.form.paymentDate = draft.form?.paymentDate || '';
@@ -1433,9 +1457,10 @@ paymentApp?.addEventListener('click', async (event) => {
         return;
     }
 
-    const methodButton = event.target.closest('[data-payment-method]');
+        const methodButton = event.target.closest('[data-payment-method]');
     if (methodButton) {
         state.selectedMethod = methodButton.dataset.paymentMethod || '';
+        state.selectionTouchedByUser = true;
         renderReservationPaymentPage();
         return;
     }
@@ -1443,6 +1468,7 @@ paymentApp?.addEventListener('click', async (event) => {
     const optionButton = event.target.closest('[data-payment-option-key]');
     if (optionButton) {
         state.selectedOptionKey = optionButton.dataset.paymentOptionKey || '';
+        state.selectionTouchedByUser = true;
         renderReservationPaymentPage();
         return;
     }
