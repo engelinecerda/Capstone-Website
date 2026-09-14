@@ -138,13 +138,6 @@ let paymentSubmissionLocked = false;
 
 function savePaymentDraft() {
     if (!state.reservationId || paymentSubmissionLocked) return;
-    const hasContent = state.selectedMethod || state.selectedOptionKey
-        || state.form.customAmount || state.form.referenceNumber
-        || state.form.paymentDate || state.form.cashPaymentDate || state.form.notes;
-    if (!hasContent) {
-        clearPaymentDraft();
-        return;
-    }
     try {
         localStorage.setItem(getPaymentDraftKey(), JSON.stringify({
             selectedMethod: state.selectedMethod,
@@ -166,9 +159,26 @@ function clearPaymentDraft() {
     try { localStorage.removeItem(getPaymentDraftKey()); } catch { /* ignore */ }
 }
 
+// A draft is only worth offering to "resume" if the customer actually did
+// something. Now that nothing is pre-selected on load (see loadPaymentPage/
+// syncSelections), a truthy selectedMethod can only mean the customer
+// clicked a method button — so it's a reliable signal on its own.
+// selectedOptionKey is deliberately NOT checked here: syncSelections() can
+// silently auto-pick it when there's genuinely only one possible type (the
+// cancellation-fee card never shows a type-picker step at all), and that
+// silent pick shouldn't by itself make the resume prompt appear.
+function paymentDraftHasMeaningfulProgress(saved) {
+    const f = saved?.form || {};
+    return Boolean(
+        saved?.selectedMethod ||
+        f.customAmount || f.referenceNumber || f.paymentDate || f.cashPaymentDate || f.notes
+    );
+}
+
 // Reads the saved draft without applying it, so the resume-prompt modal can
 // decide whether to appear before anything is mutated. Returns null if
-// there's no draft, it's malformed, or it's past PAYMENT_DRAFT_MAX_AGE_MS.
+// there's no draft, it's malformed, it's past PAYMENT_DRAFT_MAX_AGE_MS, or
+// nothing meaningful was actually filled in.
 function peekPaymentDraft() {
     if (!state.reservationId) return null;
     try {
@@ -177,6 +187,7 @@ function peekPaymentDraft() {
         const parsed = JSON.parse(raw);
         if (!parsed?.form) return null;
         if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > PAYMENT_DRAFT_MAX_AGE_MS) return null;
+        if (!paymentDraftHasMeaningfulProgress(parsed)) return null;
         return parsed;
     } catch { return null; }
 }
@@ -332,8 +343,9 @@ function getVisibleOptions(reservation) {
 }
 
 function getSelectedOption(reservation) {
+    if (!state.selectedOptionKey) return null;
     const visibleOptions = getVisibleOptions(reservation);
-    return visibleOptions.find((option) => getPaymentOptionKey(option) === state.selectedOptionKey) || visibleOptions[0] || null;
+    return visibleOptions.find((option) => getPaymentOptionKey(option) === state.selectedOptionKey) || null;
 }
 
 function syncSelections(reservation) {
@@ -370,9 +382,26 @@ function syncSelections(reservation) {
         if (matched) state.selectedOptionKey = getPaymentOptionKey(matched);
     }
 
-    const selectedStillVisible = visibleOptions.some((option) => getPaymentOptionKey(option) === state.selectedOptionKey);
-    if (!selectedStillVisible) {
+    // Some flows (the cancellation-fee card) never show a "choose payment
+    // type" step at all — there's only ever one possible type to pay
+    // there, so there's no real choice being skipped by picking it
+    // automatically. This only fires when there's truly nothing else it
+    // could be; paymentDraftHasMeaningfulProgress() deliberately ignores
+    // selectedOptionKey (only selectedMethod/typed fields count) so this
+    // silent auto-pick can never by itself trigger the resume prompt.
+    if (!state.selectedOptionKey && visibleOptions.length === 1) {
         state.selectedOptionKey = getPaymentOptionKey(visibleOptions[0]);
+    }
+
+    const selectedStillVisible = state.selectedOptionKey
+        && visibleOptions.some((option) => getPaymentOptionKey(option) === state.selectedOptionKey);
+    if (state.selectedOptionKey && !selectedStillVisible) {
+        // The previous selection is no longer valid (e.g. switching to an
+        // onsite method that only allows full payment) — clear it instead of
+        // silently guessing a replacement. No selection at all (the normal
+        // starting state) is left alone rather than defaulted to the first
+        // option.
+        state.selectedOptionKey = '';
     }
 }
 
@@ -573,12 +602,14 @@ function renderPaymentMethodButtons(reservation) {
 
     return state.paymentMethods.map((method) => {
         const isDisabled = method.type === 'onsite' && !cashAllowed;
+        const isActive = state.selectedMethod === method.id;
         return `
             <button
                 type="button"
-                class="payment-select-chip ${state.selectedMethod === method.id ? 'active' : ''}"
+                class="payment-select-chip ${isActive ? 'active' : ''}"
                 data-payment-method="${escapeHtml(method.id)}"
                 ${isDisabled ? 'disabled' : ''}
+                ${isActive ? 'title="Click to unselect"' : ''}
             >
                 ${escapeHtml(method.shortLabel || method.label)}
             </button>
@@ -646,6 +677,22 @@ function renderCustomAmountPanel(reservation, option) {
 
 function renderPaymentTypeButtons(reservation) {
     const visibleOptions = getVisibleOptions(reservation);
+
+    if (!state.selectedMethod) {
+        // Nothing to filter by yet — show every possible type so the
+        // customer can see what's coming, but locked until Step 1 is done.
+        // getVisibleOptions() returns the full unfiltered list here since
+        // getSelectedMethodObject() is null (see its onsite-only filter).
+        const lockedChips = visibleOptions.map((option) => `
+            <button type="button" class="payment-select-chip" disabled>
+                ${option.paymentType === 'partial_payment'
+                    ? escapeHtml(option.displayLabel)
+                    : escapeHtml(`${option.displayLabel} — ${formatCurrency(option.amount)}`)}
+            </button>
+        `).join('');
+        return `${lockedChips}<p class="payment-step-placeholder">Choose a payment method above first.</p>`;
+    }
+
     const chips = visibleOptions.map((option) => `
         <button
             type="button"
@@ -674,7 +721,9 @@ function getArrivalDateBounds(reservation) {
 
 function renderInstructionCard(reservation) {
     const methodMeta = getSelectedMethodObject();
-    if (!methodMeta) return '';
+    if (!methodMeta) {
+        return `<p class="payment-step-placeholder">Choose a payment method above to see how to pay.</p>`;
+    }
 
     if (methodMeta.type === 'online') {
         return `
@@ -735,9 +784,13 @@ function renderInstructionCard(reservation) {
 
 function renderFormSection(reservation) {
     const selectedOption = getSelectedOption(reservation);
-    if (!selectedOption) return '';
-
     const selectedMethodObj = getSelectedMethodObject();
+    // Both must be set — a single-option reservation (e.g. a cancellation
+    // fee, which has no type-picker step) can get selectedOption auto-filled
+    // by syncSelections() before a method is ever chosen; without this guard
+    // Step 4 would render prematurely with no method actually selected.
+    if (!selectedOption || !selectedMethodObj) return '';
+
     const isOnsite = selectedMethodObj?.type === 'onsite';
     const isCustomAmount = selectedOption.paymentType === 'partial_payment';
     const displayAmount = isCustomAmount ? Number(state.form.customAmount || 0) : selectedOption.amount;
@@ -836,8 +889,12 @@ function renderFormSection(reservation) {
 }
 
 function renderActionableCard(reservation) {
-    const selectedOption = getSelectedOption(reservation);
-    if (!selectedOption) {
+    // Whether the card should render at all depends on whether there's
+    // anything payable — not on whether a type is currently selected, which
+    // legitimately starts out unselected now that Step 2 requires an
+    // explicit click (see syncSelections/getSelectedOption above).
+    const availableOptions = getActivePaymentOptions(reservation);
+    if (!availableOptions.length) {
         return `
             <section class="payment-focus-card">
                 <div class="payment-readonly-card">
@@ -848,20 +905,25 @@ function renderActionableCard(reservation) {
         `;
     }
 
+    const selectedOption = getSelectedOption(reservation);
+
     // Unmistakable "what is this payment for", ahead of any payment details
     // — built from selectedOption (getAvailablePaymentOptions, sourced from
     // the loaded reservation/reschedule/extension bundle), never from the
     // URL's target_type/target_id hint directly, so a stale or edited URL
     // can't mislead the customer about what they're about to pay: whatever
     // this line says is exactly what validate_payment_submission() will
-    // re-check server-side on submit.
-    const payingSummary = `${escapeHtml(reservation.event_type || 'Event')} — ${escapeHtml(selectedOption.displayLabel || selectedOption.label)}`;
+    // re-check server-side on submit. Before a type is chosen, this just
+    // names what's being paid toward, without a specific amount/type yet.
+    const payingSummary = selectedOption
+        ? `${escapeHtml(reservation.event_type || 'Event')} — ${escapeHtml(selectedOption.displayLabel || selectedOption.label)}`
+        : `${escapeHtml(reservation.event_type || 'Event')} — choose a payment type below`;
 
     return `
         <section class="payment-focus-card">
             <div class="payment-target-summary">
                 <p class="payment-target-summary-label">Paying: <strong>${payingSummary}</strong></p>
-                ${selectedOption.displayDescription ? `<p class="payment-target-summary-desc">${escapeHtml(selectedOption.displayDescription)}</p>` : ''}
+                ${selectedOption?.displayDescription ? `<p class="payment-target-summary-desc">${escapeHtml(selectedOption.displayDescription)}</p>` : ''}
             </div>
 
             <section class="payment-step-section">
@@ -1296,9 +1358,11 @@ async function loadPaymentPage() {
         state.reservationRules = rules;
         state.paymentRules = paymentRules;
         state.paymentTypes = types;
-        if (!state.selectedMethod && methods.length) {
-            state.selectedMethod = methods[0].id;
-        }
+        // No default method — Step 1 starts with nothing selected so Step 2's
+        // types render locked until the customer actually picks one (see
+        // renderPaymentTypeButtons). syncSelections() below still handles the
+        // "entry-point link" pre-fill and clearing a selection that's become
+        // invalid; it no longer invents a first-option default either.
         state.bundle = await loadCustomerPaymentBundle(supabase, user.id);
         state.cancellationInfo = state.reservationId ? await fetchCancellationInfo(state.reservationId) : null;
         renderReservationPaymentPage();
@@ -1435,7 +1499,17 @@ paymentApp?.addEventListener('click', async (event) => {
 
     const methodButton = event.target.closest('[data-payment-method]');
     if (methodButton) {
-        state.selectedMethod = methodButton.dataset.paymentMethod || '';
+        const clickedId = methodButton.dataset.paymentMethod || '';
+        const isUnselecting = state.selectedMethod === clickedId;
+        // Clicking the already-selected method unselects it — re-locks Step 2
+        // and beyond rather than forcing the customer to pick a different
+        // method just to back out of this one. The chosen type is cleared
+        // too: leaving it set would make the "Paying: ..." summary above
+        // keep showing the old type while Step 2 visually shows nothing
+        // selected (its chips lock/grey out the moment selectedMethod is
+        // empty) — those two would otherwise disagree with each other.
+        state.selectedMethod = isUnselecting ? '' : clickedId;
+        if (isUnselecting) state.selectedOptionKey = '';
         renderReservationPaymentPage();
         return;
     }
