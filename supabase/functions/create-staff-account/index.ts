@@ -10,7 +10,22 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 };
 
-const ALLOWED_ROLES = ['manager', 'staff'];
+const ALLOWED_ROLES = ['admin', 'manager', 'staff'];
+// Send Supabase's real invite email (type=invite) instead of piggybacking
+// on the password-recovery flow. Two reasons this matters:
+//  1. The email itself now reads as a welcome/invite, not "reset your
+//     password" for an account the recipient never had a password on.
+//  2. js/supabase.js's redirect guard tells invite links (type=invite)
+//     apart from genuine reset links (type=recovery) and can route each to
+//     its own page — set-password.html for first-time activation,
+//     reset-password.html for actual resets — rather than overloading one
+//     page (and one set of rules, like the staff shared-password block)
+//     for both cases.
+// Must match an entry on Supabase Auth → URL Configuration → Redirect URLs
+// exactly (protocol + www/non-www + path), or GoTrue silently falls back
+// to the Site URL and this redirectTo is ignored.
+const SITE_URL = 'https://www.elicoffee-events.cafe';
+const INVITE_REDIRECT_TO = `${SITE_URL}/admin/set-password`;
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
@@ -65,41 +80,50 @@ Deno.serve(async (req) => {
     return jsonResponse({ detail: 'Email is required' }, 400);
   }
   if (!ALLOWED_ROLES.includes(role)) {
-    return jsonResponse({ detail: 'Role must be manager or staff' }, 400);
+    return jsonResponse({ detail: 'Role must be admin, manager, or staff' }, 400);
   }
 
-  const tempPassword = crypto.randomUUID();
+  const middleName = body.middle_name ? String(body.middle_name).trim() : null;
 
-  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
+  // inviteUserByEmail both creates the auth user AND sends the invite email
+  // in one call — no more generating a throwaway temp password just to
+  // satisfy createUser(). The `data` object becomes raw_user_meta_data,
+  // which the existing handle_new_user() trigger (20260401_create_profiles.sql)
+  // already reads first_name/middle_name/last_name/role from, so the
+  // profiles row is correct the moment the trigger fires.
+  const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: INVITE_REDIRECT_TO,
+    data: {
+      role,
+      first_name: firstName,
+      middle_name: middleName,
+      last_name: lastName,
+    },
   });
 
-  if (createError || !created?.user) {
-    return jsonResponse({ detail: createError?.message || 'Failed to create account' }, 400);
+  if (inviteError || !invited?.user) {
+    return jsonResponse({ detail: inviteError?.message || 'Failed to invite account' }, 400);
   }
 
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .update({
-      role,
-      staff_role: staffRole,
-      first_name: firstName,
-      last_name: lastName,
-    })
-    .eq('user_id', created.user.id);
+  // staff_role isn't part of handle_new_user()'s insert column list, so it
+  // still needs an explicit follow-up write. protect_privileged_profile_fields()
+  // (20260812_protect_privileged_profile_fields.sql) lets this through since
+  // it runs under the service-role key, not an authenticated admin session.
+  if (staffRole) {
+    const { error: staffRoleError } = await supabaseAdmin
+      .from('profiles')
+      .update({ staff_role: staffRole })
+      .eq('user_id', invited.user.id);
 
-  if (profileError) {
-    return jsonResponse({ detail: `Account created but profile update failed: ${profileError.message}` }, 500);
+    if (staffRoleError) {
+      return jsonResponse({ detail: `Account invited but staff role update failed: ${staffRoleError.message}` }, 500);
+    }
   }
-
-  const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email);
 
   return jsonResponse({
-    user_id: created.user.id,
+    user_id: invited.user.id,
     email,
     role,
-    password_reset_sent: !resetError,
+    invited: true,
   }, 201);
 });

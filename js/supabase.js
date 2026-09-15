@@ -59,6 +59,23 @@ const supabaseOverride = readSupabaseOverride()
 const supabaseUrl = supabaseOverride?.url || DEFAULT_SUPABASE_URL
 const supabaseKey = supabaseOverride?.key || DEFAULT_SUPABASE_KEY
 
+;(function guardAgainstMisroutedRecoveryLink() {
+    if (typeof window === 'undefined') return
+
+    const path = window.location.pathname
+    if (path.startsWith('/admin') || path.startsWith('/board') || path === '/reset-password') {
+        return 
+    }
+
+    const hash = window.location.hash || ''
+    const isInvite = hash.includes('type=invite')
+    const isRecovery = hash.includes('type=recovery')
+    if (!isInvite && !isRecovery) return
+
+    const destination = isInvite ? '/admin/set-password' : '/admin/reset-password'
+    window.location.replace(destination + hash)
+})()
+
 function makeClient(storageKey) {
     if (typeof window === 'undefined' || !window.supabase || typeof window.supabase.createClient !== 'function') {
         throw new Error('Supabase UMD bundle not loaded — add <script src=".../supabase-js@2.../dist/umd/supabase.js" defer> before this page\'s module scripts.')

@@ -444,6 +444,7 @@ tbody tr .actions-cell { opacity: 1; }
 .modal-message.hidden  { display: none; }
 .modal-message.success { background: var(--approved); color: var(--approved-txt); border-color: var(--approved); }
 .modal-message.info    { background: var(--info); color: var(--info-txt); border-color: var(--info); }
+.modal-message.error   { background: var(--declined); color: var(--declined-txt); border-color: var(--declined); }
 
 /* ── FORM ── */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
