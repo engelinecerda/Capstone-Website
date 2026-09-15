@@ -84,6 +84,14 @@ const state = {
     activeTab: 'current',
     selectedMethod: '',
     selectedOptionKey: '',
+    // True only once the customer actually clicks a method or payment-type
+    // button — as opposed to selectedMethod/selectedOptionKey merely holding
+    // a value, which happens automatically via syncSelections() on load too.
+    // Lets the draft count an explicit method/type change as real progress
+    // (e.g. picking "Maya" + "Remaining Balance" and then stepping away)
+    // without resurrecting the original bug where the auto-picked defaults
+    // alone made every visit look like progress.
+    selectionTouchedByUser: false,
     isSubmitting: false,
     flashMessage: '',
     flashType: '',
@@ -142,6 +150,7 @@ function savePaymentDraft() {
         localStorage.setItem(getPaymentDraftKey(), JSON.stringify({
             selectedMethod: state.selectedMethod,
             selectedOptionKey: state.selectedOptionKey,
+            selectionTouchedByUser: state.selectionTouchedByUser,
             form: {
                 customAmount: state.form.customAmount,
                 referenceNumber: state.form.referenceNumber,
@@ -196,6 +205,7 @@ function applyPaymentDraft(draft) {
     if (!draft) return;
     state.selectedMethod = draft.selectedMethod || state.selectedMethod;
     state.selectedOptionKey = draft.selectedOptionKey || '';
+    state.selectionTouchedByUser = Boolean(draft.selectionTouchedByUser);
     state.form.customAmount = draft.form?.customAmount || '';
     state.form.referenceNumber = draft.form?.referenceNumber || '';
     state.form.paymentDate = draft.form?.paymentDate || '';
@@ -1497,7 +1507,7 @@ paymentApp?.addEventListener('click', async (event) => {
         return;
     }
 
-    const methodButton = event.target.closest('[data-payment-method]');
+        const methodButton = event.target.closest('[data-payment-method]');
     if (methodButton) {
         const clickedId = methodButton.dataset.paymentMethod || '';
         const isUnselecting = state.selectedMethod === clickedId;
@@ -1517,6 +1527,7 @@ paymentApp?.addEventListener('click', async (event) => {
     const optionButton = event.target.closest('[data-payment-option-key]');
     if (optionButton) {
         state.selectedOptionKey = optionButton.dataset.paymentOptionKey || '';
+        state.selectionTouchedByUser = true;
         renderReservationPaymentPage();
         return;
     }
