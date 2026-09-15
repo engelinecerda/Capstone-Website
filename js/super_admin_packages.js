@@ -1689,10 +1689,15 @@ function renderActivationChecklist() {
     <div class="checklist-item ${item.met ? 'met' : 'unmet'}">${item.met ? '✓' : '○'} ${escapeHtml(item.label)}</div>
   `).join('');
 
-  if (blockers.length && pkgActiveToggle.checked) {
-    pkgActiveToggle.checked = false;
-  }
-  pkgActiveToggle.disabled = blockers.length > 0;
+  // Bug fix: this used to force pkgActiveToggle.checked = false the instant
+  // any blocker appeared — including transient ones, like a photo you just
+  // added still having blank alt text. That silently archived packages that
+  // were already live, with no warning, the moment an admin edited photos.
+  // We now only prevent turning "Active" ON while blocked (by disabling the
+  // toggle when it's currently off); an already-active package keeps its
+  // checked state as the admin works, and pkgModalSave's validation is what
+  // actually stops a blocked package from being saved as active.
+  pkgActiveToggle.disabled = blockers.length > 0 && !pkgActiveToggle.checked;
 }
 
 [pkgPrice, pkgType, pkgLocationType, pkgMinGuests, pkgMaxGuests].forEach(el => {
@@ -1812,15 +1817,15 @@ function validatePackageForm() {
     return 'A valid duration in hours is required.';
   if (pkgType.value === 'main' && !pkgBookingScope.value)
     return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
-  if (pkgType.value === 'main') {
-    const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
-    // Bug fix: this used to block save unconditionally, even though the
-    // message itself says draft saves are allowed — pkgActiveToggle was
-    // never actually checked. Only require a venue when the package is
-    // being saved active; an inactive/draft package can be saved without
-    // one and have its venue added later.
-    if (isOnsite && pkgVenueIds.size === 0 && pkgActiveToggle.checked) {
-      return 'Onsite packages need at least one venue mapping to activate. Turn off "Active" to save as a draft without one.';
+  // Bug fix: renderActivationChecklist() no longer auto-unchecks "Active"
+  // when a blocker appears (see that function for why), so this is now the
+  // single place that actually enforces the activation checklist at save
+  // time. Covers photos, alt text, inclusions, price, and — for onsite main
+  // packages — venue mapping, all in one pass via getActivationBlockers().
+  if (pkgActiveToggle.checked) {
+    const blockers = getActivationBlockers();
+    if (blockers.length) {
+      return `Before this can go active: ${blockers.join(', ')}. Turn off "Active" to save as a draft instead.`;
     }
   }
   return null;
