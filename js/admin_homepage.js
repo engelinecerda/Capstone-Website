@@ -48,6 +48,30 @@ let demandChart;
 let statusDonutChart;
 let refreshSidebarBadges = () => {};
 
+// Bug fix: browser zoom (Ctrl+scroll, Ctrl+/-, pinch-zoom) changes each
+// canvas's device pixel ratio, and Chart.js sets an explicit inline pixel
+// width on the canvas based on whatever its container measured at render
+// time. If that measurement happened while zoomed out (or otherwise at an
+// unusual container size), the canvas could get "stuck" oversized — see
+// the min-width:0 fix in admin_homepage.css for the CSS Grid half of this;
+// this is the JS half. A ResizeObserver on each chart's own wrapper reacts
+// to the container's actual box size (whatever the cause — zoom, sidebar
+// toggle, grid breakpoint), which is more reliable than only listening for
+// window-level resize events.
+function resizeAllDashboardCharts() {
+    [barChart, pieChart, demandChart, statusDonutChart].forEach((chart) => {
+        if (chart) chart.resize();
+    });
+}
+window.addEventListener('resize', resizeAllDashboardCharts);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeAllDashboardCharts);
+}
+if (typeof ResizeObserver !== 'undefined') {
+    const chartContainerObserver = new ResizeObserver(() => resizeAllDashboardCharts());
+    document.querySelectorAll('.chart-wrap, .donut-wrap').forEach((el) => chartContainerObserver.observe(el));
+}
+
 const statTargets = {
     pending: document.getElementById('pendingReservationsValue'),
     approved: document.getElementById('approvedReservationsValue'),
@@ -67,7 +91,14 @@ const STATUS_SEGMENT_COLORS = {
     cancelled: '#B4B2A9'
 };
 
-const PACKAGE_COLOR_RAMP = ['#4A2C17', '#6B3F23', '#A9805F', '#C9AE9B', '#E2D0BF', '#F0E6D9'];
+// Bug fix: this ramp only had 6 shades, but package_type distribution can
+// (and did, per the dashboard screenshot) have 7+ distinct packages. Since
+// colors are assigned by `i % ramp.length`, the 7th slice silently reused
+// the exact same color as the 1st — "Private Gathering" and "Intimate
+// Wedding" were indistinguishable in both the ring and the legend. The
+// original 6 shades are untouched; these two just extend the same brown
+// family so an 8th category still won't collide with the first two.
+const PACKAGE_COLOR_RAMP = ['#4A2C17', '#6B3F23', '#A9805F', '#C9AE9B', '#E2D0BF', '#F0E6D9', '#8C6239', '#D9C2A0'];
 
 // Warm the backend as early as possible so cold starts on Render's free
 // tier overlap with auth/session checks instead of stacking on top of them.
@@ -121,7 +152,9 @@ function formatStatus(status) {
         declined: 'Declined',
         completed: 'Completed',
         cancelled: 'Cancelled',
-        rescheduled: 'Rescheduled'
+        rescheduled: 'Rescheduled',
+        cancellation_requested: 'Cancellation Requested',
+        cancellation_approved: 'Cancellation Approved'
     };
     return {
         key: normalized,
@@ -269,6 +302,7 @@ function renderMonthlyChart(year) {
 function renderPackageChart(data) {
     const sorted = [...(data || [])].sort((a, b) => (b.count || 0) - (a.count || 0));
     const colors = sorted.map((_, i) => PACKAGE_COLOR_RAMP[i % PACKAGE_COLOR_RAMP.length]);
+    const total = sorted.reduce((sum, d) => sum + (d.count || 0), 0);
 
     const ctx = document.getElementById('pieChart');
     if (ctx) {
@@ -280,15 +314,37 @@ function renderPackageChart(data) {
                 datasets: [{
                     data: sorted.map((d) => d.count),
                     backgroundColor: colors,
-                    borderWidth: 0,
-                    hoverOffset: 4
+                    // A hairline seam is enough to separate two adjacent
+                    // similar-toned slices — border AND spacing together
+                    // (the previous version) doubled up and made the ring
+                    // look broken into disconnected chunks instead of one
+                    // shape, especially on the thin slices.
+                    borderColor: '#FFFFFF',
+                    borderWidth: 1,
+                    hoverOffset: 4,
+                    hoverBorderWidth: 2
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 cutout: '55%',
-                plugins: { legend: { display: false } }
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            // Count alone doesn't help much on a thin slice you can
+                            // barely see — the share of the whole is what actually
+                            // tells packages apart when the wedges are this close
+                            // in size and color.
+                            label: (item) => {
+                                const value = item.raw || 0;
+                                const pct = total ? Math.round((value / total) * 100) : 0;
+                                return ` ${item.label}: ${value} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
             }
         });
     }

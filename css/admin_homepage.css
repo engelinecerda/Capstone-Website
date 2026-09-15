@@ -42,6 +42,8 @@
   --cancelled-txt:#5F5E5A;
   --requested:    #FAEEDA;
   --requested-txt:#854F0B;
+  --info:         #E3EEFB;
+  --info-txt:     #2C5A99;
 
   /* Status distribution segment colors */
   --seg-pending:    #BA7517;
@@ -498,6 +500,11 @@ body {
   height: 8px;
   border-radius: 2px;
   flex-shrink: 0;
+  /* The lightest shades in the brown ramp (e.g. #F0E6D9) are nearly
+     invisible against this white card with no edge to define them —
+     this outline doesn't change any swatch's fill color, just makes
+     the pale ones legible. */
+  box-shadow: 0 0 0 1px rgba(74, 44, 23, 0.18);
 }
 
 .donut-legend .legend-label {
@@ -633,9 +640,23 @@ body {
 }
 
 /* ── CHARTS ──────────────────────────────── */
+.chart-card {
+  /* Bug fix: CSS Grid items default to min-width:auto, which floors
+     their size at their content's intrinsic width. Chart.js sets an
+     explicit pixel width on its <canvas> based on whatever the
+     container measured at render time — if that happened while the
+     page was zoomed out (a wide effective viewport), the canvas's
+     pixel width gets "stuck" high, and without this override the grid
+     item can never shrink back below it even after zoom resets to
+     100%. This is what caused the chart to render clipped/oversized
+     and stay that way. */
+  min-width: 0;
+}
+
 .chart-wrap {
   height: 220px;
   position: relative;
+  min-width: 0;
 }
 
 .demand-card .chart-wrap {
@@ -802,7 +823,8 @@ body {
   white-space: nowrap;
 }
 
-.status-pill.pending {
+.status-pill.pending,
+.status-pill.cancellation_requested {
   background: var(--pending);
   color: var(--pending-txt);
 }
@@ -816,6 +838,15 @@ body {
 .status-pill.declined {
   background: var(--declined);
   color: var(--declined-txt);
+}
+
+/* Matches .status-pill.cancellation_approved in manager-theme.css — kept
+   as its own "info" color rather than folded into cancelled/declined,
+   since it's a distinct in-progress state (approved to cancel, fee still
+   due) and not a final outcome. */
+.status-pill.cancellation_approved {
+  background: var(--info);
+  color: var(--info-txt);
 }
 
 .status-pill.completed {
