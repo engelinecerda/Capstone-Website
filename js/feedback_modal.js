@@ -32,7 +32,7 @@ function ensureStylesheet() {
     if (document.querySelector('link[data-feedback-modal]')) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/css/feedback_modal.css';
+    link.href = '/css/feedback_modal.css?v=25';
     link.setAttribute('data-feedback-modal', '');
     document.head.appendChild(link);
 }
@@ -80,8 +80,10 @@ function ensureDom() {
             <p class="fm-message" id="fm-modal-message"></p>
             <div class="fm-actions">
                 <button type="button" class="fm-btn fm-btn-secondary fm-cancel-btn" hidden></button>
+                <button type="button" class="fm-btn fm-btn-secondary fm-tertiary-btn" hidden></button>
                 <button type="button" class="fm-btn fm-btn-primary fm-confirm-btn"></button>
             </div>
+            <button type="button" class="fm-dismiss-link" hidden></button>
         </div>
     `;
     document.body.appendChild(backdrop);
@@ -94,7 +96,9 @@ function ensureDom() {
         title: backdrop.querySelector('.fm-title'),
         message: backdrop.querySelector('.fm-message'),
         cancelBtn: backdrop.querySelector('.fm-cancel-btn'),
-        confirmBtn: backdrop.querySelector('.fm-confirm-btn')
+        tertiaryBtn: backdrop.querySelector('.fm-tertiary-btn'),
+        confirmBtn: backdrop.querySelector('.fm-confirm-btn'),
+        dismissLink: backdrop.querySelector('.fm-dismiss-link')
     };
 
     backdrop.addEventListener('click', (event) => {
@@ -109,25 +113,36 @@ function ensureDom() {
         if (event.key === 'Tab') trapFocus(event);
     });
     dom.cancelBtn.addEventListener('click', () => resolveAndClose(false));
+    dom.tertiaryBtn.addEventListener('click', () => resolveAndClose('tertiary'));
     dom.confirmBtn.addEventListener('click', () => resolveAndClose(true));
+    dom.dismissLink.addEventListener('click', () => resolveAndClose(false));
 
     return dom;
 }
 
 /**
- * showFeedbackModal({ type, title, message, confirmText, cancelText, destructive })
+ * showFeedbackModal({ type, title, message, confirmText, cancelText, tertiaryText, dismissText, icon, destructive })
  *
  * type: "success" | "error" | "warning" | "info" (default "info")
  * cancelText: omit for a single-button acknowledgement modal; provide it
  *   to get a two-button confirm-style dialog (resolves true on confirm,
  *   false on cancel/dismiss).
+ * tertiaryText: optional third action button (e.g. an alternative to the
+ *   primary action, not just "cancel") — resolves the promise with the
+ *   string "tertiary" when clicked. Rendered alongside cancel/confirm.
+ * dismissText: optional plain-text "no thanks" link shown below the button
+ *   row, for a lighter-weight dismiss than a bordered cancel button.
+ *   Resolves false, same as cancel/Escape/backdrop click.
+ * icon: optional Tabler icon class (e.g. "ti-lock") overriding the
+ *   type-based default icon.
  * destructive: when true (and cancelText is set), the confirm button is
  *   styled as a destructive action and the dialog can ONLY be closed via
  *   an explicit button click — Escape and backdrop click are disabled so
  *   a stray keypress/click can't silently confirm or dismiss it.
  *
- * Returns a Promise<boolean> — true if the user confirmed/acknowledged,
- * false if they cancelled or dismissed the dialog.
+ * Returns a Promise<boolean|"tertiary"> — true if the user confirmed/
+ * acknowledged, false if they cancelled or dismissed the dialog, or the
+ * string "tertiary" if they picked the optional third action.
  */
 export function showFeedbackModal({
     type = 'info',
@@ -135,6 +150,9 @@ export function showFeedbackModal({
     message = '',
     confirmText = 'OK',
     cancelText = null,
+    tertiaryText = null,
+    dismissText = null,
+    icon = null,
     destructive = false
 } = {}) {
     const el = ensureDom();
@@ -147,7 +165,7 @@ export function showFeedbackModal({
     dismissible = !(cancelText && destructive);
 
     el.icon.className = `fm-icon fm-${type}`;
-    el.iconGlyph.className = `ti ${ICON_CLASS[type] || ICON_CLASS.info}`;
+    el.iconGlyph.className = `ti ${icon || ICON_CLASS[type] || ICON_CLASS.info}`;
     el.title.textContent = title;
     el.message.textContent = message;
 
@@ -159,6 +177,20 @@ export function showFeedbackModal({
         el.cancelBtn.textContent = cancelText;
     } else {
         el.cancelBtn.hidden = true;
+    }
+
+    if (tertiaryText) {
+        el.tertiaryBtn.hidden = false;
+        el.tertiaryBtn.textContent = tertiaryText;
+    } else {
+        el.tertiaryBtn.hidden = true;
+    }
+
+    if (dismissText) {
+        el.dismissLink.hidden = false;
+        el.dismissLink.textContent = dismissText;
+    } else {
+        el.dismissLink.hidden = true;
     }
 
     el.backdrop.setAttribute('role', cancelText ? 'alertdialog' : 'dialog');

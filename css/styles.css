@@ -8,6 +8,22 @@
 html {
     overflow-y: scroll;
 }
+/* Guards against page-wide horizontal scroll/shift from anything that
+   technically extends past the viewport edge — most notably the mobile
+   nav drawer (position:fixed, translateX(-110%) when closed; see the
+   "Mobile & Tablet Navigation" block below), which some embedded/webview
+   browser contexts still count toward scrollable width despite the
+   off-canvas transform. Narrowing the viewport (a docked sidebar panel,
+   not just a phone) is exactly when this became visible, since it crosses
+   into the sub-960px mobile-nav breakpoint where that drawer exists.
+   Deliberately on html only, not body — several customer pages
+   (account.css/packages.css/package_details.css/reservations.css) rely on
+   position:sticky, and overflow-x:hidden on body specifically is a known
+   WebKit/Safari trigger for breaking sticky; html alone clips the X axis
+   without establishing that scroll container. */
+html {
+    overflow-x: hidden;
+}
 
 /* ========================
    Config-driven content skeleton

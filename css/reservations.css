@@ -211,13 +211,17 @@
 
 .reservation-container {
     margin: 0 auto;
-    padding: 40px;
+    padding: 44px 56px;
     max-width: 720px;
     background-color: #fff;
     border-radius: 4px;
     box-shadow: 0 2px 24px rgba(30,12,3,0.08);
     border: 1px solid var(--border, rgba(61,26,10,0.10));
     text-align: left;
+}
+
+@media (max-width: 900px) {
+    .reservation-container { padding: 24px; }
 }
 
         /* Progress */
@@ -246,7 +250,57 @@
         }
         .res-input:focus { outline: none; border-color: #6B3A1F; }
         textarea.res-input { height: 100px; resize: vertical; }
-        
+
+        /* ── Step 8 "Your details" — field groups (label + input) ── */
+        .res-field-group { margin-bottom: 4px; }
+        .res-field-label {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--acc-text, #3E2418);
+            margin-bottom: 6px;
+        }
+        .res-field-optional { font-weight: 400; color: var(--acc-text-muted, #756756); }
+
+        /* One consolidated explanation for the whole account-prefill
+           behavior, shown once beneath the step's subtitle — replaces the
+           three near-duplicate per-field captions this step used to carry
+           under Full Name/Phone/Email individually. Specificity/source-
+           order deliberately beats the generic ".res-step > p" rule above
+           (this is also a direct-child <p>, but needs its own smaller
+           size/color/spacing, not the subtitle's). */
+        p.res-contact-note {
+            margin: 4px 0 26px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #8A7965;
+        }
+        /* Rs4's own subtitle only, and only once the consolidated note
+           below it is actually shown (js/reservations.js toggles this
+           alongside revealing the note, for logged-in customers) —
+           shrinks the subtitle's default 20px margin-bottom to match the
+           note's 4px margin-top (adjacent vertical margins collapse to
+           the larger value otherwise, silently erasing that 4px gap). For
+           guests, who never see the note, the subtitle keeps its normal
+           spacing before the first field. */
+        #rs4-subtitle.res-subtitle-tight { margin-bottom: 4px; }
+
+        /* Name is locked to the logged-in account's name (js/reservations.js
+           sets [readonly] only when isLoggedIn) — visually distinct so it
+           reads as "can't edit here", not a bug. */
+        #name[readonly] {
+            background: #F7F2EA;
+            color: var(--acc-text-muted, #756756);
+            cursor: not-allowed;
+            border-color: var(--acc-border-tan, #E5DBCC);
+        }
+        #name[readonly]:focus { outline: none; border-color: var(--acc-border-tan, #E5DBCC); }
+
+        /* Brief loading state while the account's name/phone/email are
+           being fetched, so these fields never sit blank or show a dummy
+           value in the meantime. */
+        .res-field-loading { opacity: 0.55; pointer-events: none; }
+
 
         .availability-panel {
             margin-top: 8px;
@@ -272,17 +326,6 @@
             font-size: 13px;
             color: #756559;
             margin: 0;
-        }
-        .availability-head p.availability-event-type-note {
-            display: flex;
-            align-items: flex-start;
-            gap: 6px;
-            margin-top: 8px;
-            font-size: 12px;
-            color: #8A5A22;
-        }
-        .availability-event-type-note i {
-            margin-top: 1px;
         }
         .availability-nav {
             display: flex;
@@ -1054,14 +1097,27 @@
            is unboxed. */
         .contract-box { width: 100%; display: flex; flex-direction: column; }
         .contract-section { width: 100%; }
-        .rs-contract-divider { border: none; border-top: 0.5px solid var(--acc-border-tan, #E5DBCC); margin: 28px 0; }
-        .contract-section-title { font-size: 14px; font-weight: 600; color: var(--acc-text, #3E2418); margin: 0; }
+        .rs-contract-divider { border: none; border-top: 0.5px solid var(--acc-border-tan, #E5DBCC); margin: 36px 0; }
 
-        .contract-viewer-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
-        .contract-icon { font-size: 16px; color: #8A5A3B; flex-shrink: 0; }
-        .contract-info { flex: 1; }
-        .contract-info h4 { font-size: 14px; font-weight: 600; color: var(--acc-text, #3E2418); margin-bottom: 3px; }
-        .contract-info p  { font-size: 12px; color: #8A7965; margin: 0; }
+        /* Plain numbered section headings (no stepper graphics) — "1. Read
+           the contract" / "2. Sign the contract" / "3. Confirm & submit".
+           The status line directly beneath each reflects that section's
+           current state; collapses to nothing (:empty) when there's
+           nothing to report yet, e.g. Step 1 before it's been read. */
+        /* Was 10px, sized for the row that used to sit right after this
+           (icon + "ELI Coffee Events Reservation Contract" + caption) —
+           that row duplicated this heading and the contract's own title
+           text already visible inside the scroll box, so it's gone.
+           .contract-step-head is now the last thing before the preview
+           box itself, so its own margin needs to carry that full gap. */
+        .contract-step-head { margin-bottom: 16px; }
+        .contract-step-title { font-size: 16px; font-weight: 600; color: var(--acc-text, #3E2418); margin: 0; }
+        .contract-step-status { font-size: 12px; font-weight: 500; margin: 4px 0 0; }
+        .contract-step-status:empty { display: none; margin: 0; }
+        .contract-step-status.is-complete { color: #0F6E56; }
+        .contract-step-status.is-ready    { color: #854F0B; }
+        .contract-step-status.is-locked   { color: #A89880; }
+
         .dl-btn { background: var(--brown-primary, #3D1A0A); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s; display: inline-block; }
         .dl-btn:hover { background: var(--brown-dark, #1E0C03); }
 
@@ -1075,7 +1131,7 @@
            behavior must stay exactly as it is. */
         .contract-viewer-wrap { position: relative; margin-bottom: 10px; }
         .contract-viewer {
-            max-height: 110px;
+            max-height: 190px;
             overflow-y: auto;
             border: 0.5px solid var(--acc-border-tan, #E5DBCC);
             border-radius: 8px;
@@ -1205,7 +1261,7 @@
         .signature-canvas-wrap {
             position: relative;
             width: 100%;
-            height: 110px;
+            height: 130px;
             border: 1px dashed #D8C9AE;
             border-radius: 8px;
             background: #fff;
@@ -1324,10 +1380,11 @@
         .signature-status.error { color: #b42318; }
 
         @media (max-width: 480px) {
-            .signature-canvas-wrap { height: 100px; }
+            .contract-viewer { max-height: 150px; }
+            .signature-canvas-wrap { height: 110px; }
             .signature-guide-placeholder { bottom: 30px; }
             .signature-type-preview { font-size: 26px; }
-            .rs-contract-divider { margin: 20px 0; }
+            .rs-contract-divider { margin: 24px 0; }
         }
 
         /* Each row is its own self-contained flex line: checkbox +
@@ -1351,25 +1408,27 @@
             accent-color: #4A2C17;
             flex-shrink: 0;
         }
+        /* No standalone opacity here — both checkboxes are only ever
+           disabled because Step 3 is locked, and #contract-section-
+           consent.is-locked below already dims the whole section; adding
+           a second, individual opacity on top of that would double-dim
+           just the checkboxes relative to their own labels. */
         .contract-agreement-checkbox:disabled {
             cursor: not-allowed;
-            opacity: 0.55;
         }
         /* Second row gets its own fixed top margin so the ~18px gap between
-           the two checkboxes holds steady whether or not the helper text
-           below the first row is currently shown. */
+           the two checkboxes holds steady. */
         .contract-agreement-row-second {
             margin-top: 18px;
         }
-        /* Indented to the start of the row's text (checkbox width 17px +
-           row gap 10px = 27px) so it reads as attached to the first
-           checkbox row specifically. */
-        .contract-agreement-helper {
-            margin: 6px 0 0 27px;
-            font-size: 12px;
-            line-height: 1.5;
-            color: #A89880;
-            font-style: italic;
+
+        /* Step 3 lock state — the whole section (heading, status line,
+           both checkboxes) reads as "not yet available" until a signature
+           exists (js/reservations.js refreshContractGatingUI). Genuinely
+           disabled, not just dimmed — see .contract-agreement-checkbox
+           :disabled above for the non-interactive half of that. */
+        #contract-section-consent.is-locked {
+            opacity: 0.5;
         }
         .contract-agreement-copy {
             flex: 1;
@@ -1751,7 +1810,7 @@
         @media (max-width: 600px) {
             .page-hero { height: 320px; }
             .page-hero-title { font-size: 36px; }
-            .reservation-container { padding: 24px 16px; }
+            .reservation-container { padding: 18px; }
             .location-options { grid-template-columns: 1fr; }
             .cards-grid       { grid-template-columns: 1fr; }
             .input-row        { grid-template-columns: 1fr; }
@@ -1777,27 +1836,27 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    background: #FEFAF4;
-    border: 1.5px solid #C98A4B;
+    background: #FDF3E4;
+    border: 0.5px solid #F0DFBB;
     border-radius: 10px;
     padding: 14px 18px;
     margin-bottom: 28px;
     font-size: 14px;
     line-height: 1.65;
-    color: var(--text-dark, #2A1408);
+    color: #A34F2E;
 }
 
 .res-guest-notice i {
     font-size: 20px;
-    color: #C98A4B;
+    color: #A34F2E;
     flex-shrink: 0;
     margin-top: 1px;
 }
 
-.res-guest-notice p { margin: 0; }
+.res-guest-notice p { margin: 0; color: #A34F2E; }
 
 .res-guest-notice a {
-    color: var(--brown-primary, #3D1A0A);
+    color: #4A2C17;
     font-weight: 600;
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -1806,9 +1865,9 @@
 .res-guest-notice a:hover { opacity: .75; }
 
 @keyframes res-notice-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(201, 138, 75, .55); }
-    70%  { box-shadow: 0 0 0 8px rgba(201, 138, 75, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(201, 138, 75, 0); }
+    0%   { box-shadow: 0 0 0 0 rgba(163, 79, 46, .45); }
+    70%  { box-shadow: 0 0 0 8px rgba(163, 79, 46, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(163, 79, 46, 0); }
 }
 
 .res-guest-notice--pulse {
@@ -1845,6 +1904,51 @@
 
 .res-guest-notice-btn:hover {
     background: #8A4223;
+}
+
+/* Lightweight guest reminder — a plain inline note (no border/background),
+   for a checkpoint that shouldn't feel as heavy as the persistent banner
+   at the top of the form. */
+.res-guest-inline-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 14px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #8A7965;
+}
+.res-guest-inline-note i {
+    font-size: 13px;
+    color: #A34F2E;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Amber notice-period banner — full-width strip shown right at the
+   calendar so the minimum-notice rule can't be missed/scrolled past
+   before date selection, unlike the old inline caption. */
+.res-notice-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #FDF8EE;
+    border: 0.5px solid #F0DFBB;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 16px 0 0;
+}
+.res-notice-banner i {
+    font-size: 15px;
+    color: #854F0B;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.res-notice-banner p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #854F0B;
 }
 
 /* ── Event-type chips ───────────────────────────────────────────────────────── */

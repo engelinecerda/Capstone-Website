@@ -1,5 +1,6 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
+import { validatePassword } from './password_rules.js';
 
 initPasswordToggles();
 
@@ -53,8 +54,9 @@ form?.addEventListener('submit', async function (e) {
         return;
     }
 
-    if (newPassword.length < 8) {
-        setMessage('error', 'Password must be at least 8 characters.');
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+        setMessage('error', passwordError);
         return;
     }
 

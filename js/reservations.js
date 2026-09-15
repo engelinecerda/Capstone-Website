@@ -33,6 +33,7 @@ const isLoggedIn = !!session;
 
 if (!isLoggedIn) {
     document.getElementById('resGuestNotice').classList.remove('hidden');
+    document.getElementById('guestPkgReminder')?.classList.remove('hidden');
 }
 
 // Booking block — a customer with an overdue balance or unpaid
@@ -297,7 +298,11 @@ const policyModalDismiss      = document.getElementById('policy-modal-dismiss');
 const policyModalAgree        = document.getElementById('policy-modal-agree');
 const policyButtons           = document.querySelectorAll('[data-policy]');
 const contractViewFullBtn     = document.getElementById('contract-view-full-btn');
-const contractAgreementHelper = document.getElementById('contract-agreement-esign-helper');
+const contractStep1Status     = document.getElementById('contract-step1-status');
+const contractStep2Status     = document.getElementById('contract-step2-status');
+const contractStep3Status     = document.getElementById('contract-step3-status');
+const contractSectionConsent  = document.getElementById('contract-section-consent');
+const contactConsolidatedNote = document.getElementById('contact-consolidated-note');
 const agreementModalBackdrop  = document.getElementById('agreement-modal-backdrop');
 const agreementModalTitle     = document.getElementById('agreement-modal-title');
 const agreementModalBody      = document.getElementById('agreement-modal-body');
@@ -305,6 +310,25 @@ const agreementReadingColumn  = document.getElementById('agreement-reading-colum
 const agreementModalCloseBtn        = document.getElementById('agreement-modal-close-btn');
 const agreementModalFooterCloseBtn  = document.getElementById('agreement-modal-footer-close-btn');
 const agreementModalFinishBtn       = document.getElementById('agreement-modal-finish-btn');
+
+// ── Contact fields (Step 8 "Your details") ─────────────────────────────
+// Name is locked to the logged-in account's name — there's no path within
+// this booking flow to change it (that lives on the My Account / Profile
+// page). Guests get none of this: no account to lock the name to, so it
+// stays a plain, freely-editable field exactly as before.
+if (isLoggedIn && nameInput) {
+    nameInput.readOnly = true;
+    nameInput.setAttribute('aria-readonly', 'true');
+    contactConsolidatedNote?.classList.remove('hidden');
+    document.getElementById('rs4-subtitle')?.classList.add('res-subtitle-tight');
+}
+
+// Brief loading state for Name/Phone/Email while the account fetch is in
+// flight, so these never sit blank or show a placeholder value in the
+// meantime.
+function setContactFieldsLoading(isLoading) {
+    [nameInput, phoneInput, emailInput].forEach(el => el?.classList.toggle('res-field-loading', isLoading));
+}
 
 // ── Signature state ────────────────────────────────────────────────────
 const signatureState = {
@@ -370,6 +394,24 @@ function getEffectiveMinAdvanceDays() {
 
 function isOutsideBookingWindow(date, today) {
     return sharedIsOutsideBookingWindow(date, today, advanceNoticeRules, S.eventType);
+}
+
+// Keeps the notice-period banner above the calendar in sync with the
+// currently selected event type — generic until one is chosen, then states
+// the actual applicable minimum so it isn't a vague, one-size-fits-all
+// message. Called whenever the event-type select is (re)built, which
+// covers the initial render, every change of event type, and a restored
+// draft that already had one selected.
+function updateMinNoticeBanner() {
+    const textEl = document.getElementById('minNoticeBannerText');
+    if (!textEl) return;
+    if (!S.eventType) {
+        textEl.textContent = 'Your event type sets its own minimum notice period — select one above to see the exact requirement. Dates shown here can change once you pick one.';
+        return;
+    }
+    const label = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
+    const days = getEffectiveMinAdvanceDays();
+    textEl.textContent = `${label} bookings require at least ${days} day${days === 1 ? '' : 's'}' notice. Dates within that window won't show as available below.`;
 }
 
 // Landing a customer on a calendar page that's entirely grey (every date
@@ -758,7 +800,7 @@ function initSignaturePad() {
         backgroundColor: 'rgba(0,0,0,0)',
         penColor: 'rgb(42,20,8)',
         onBegin: () => setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false),
-        onEnd: () => updateSignatureCapturedBadge()
+        onEnd: () => refreshContractGatingUI()
     });
     resizeSignatureCanvas();
     window.addEventListener('resize', resizeSignatureCanvas);
@@ -768,8 +810,47 @@ function setSignatureGuidePlaceholderVisible(el, visible) {
     el?.classList.toggle('is-hidden', !visible);
 }
 
-function updateSignatureCapturedBadge() {
-    signatureCapturedBadge?.classList.toggle('is-hidden', !isSignaturePresent());
+// Single source of truth for every piece of UI that depends on "has the
+// agreement been read" and/or "does a signature currently exist" — called
+// any time either condition could have changed (scrolled/opened the full
+// agreement, drew/typed/cleared a signature, switched Draw/Type mode).
+// This is the actual fix for the reported "confirmed without signing"
+// failure: both consent checkboxes are only ever enabled here, together,
+// once both conditions hold — never individually, never early.
+function refreshContractGatingUI() {
+    const read = !!signatureState.agreementViewMethod;
+    const signed = isSignaturePresent();
+    const unlocked = read && signed;
+
+    // Step 1 status — nothing shown until it's actually done (see
+    // .contract-step-status:empty in css/reservations.css).
+    if (contractStep1Status) {
+        contractStep1Status.textContent = read ? 'Completed — you scrolled to the end' : '';
+        contractStep1Status.className = 'contract-step-status' + (read ? ' is-complete' : '');
+    }
+
+    // Step 2 — the amber "Ready…" line and the green captured-signature
+    // badge are mutually exclusive: only one is ever visible at a time.
+    signatureCapturedBadge?.classList.toggle('is-hidden', !signed);
+    if (contractStep2Status) {
+        const ready = read && !signed;
+        contractStep2Status.textContent = ready ? 'Ready — sign below to continue' : '';
+        contractStep2Status.className = 'contract-step-status' + (ready ? ' is-ready' : '');
+    }
+
+    // Step 3 — both checkboxes share one gate. Genuinely disabled (not
+    // just dimmed), and re-locked (auto-unchecked) the instant the
+    // signature that unlocked them is no longer present — e.g. Clear.
+    contractSectionConsent?.classList.toggle('is-locked', !unlocked);
+    [contractAgreementTerms, contractAgreementEsign].forEach((cb) => {
+        if (!cb) return;
+        cb.disabled = !unlocked;
+        if (!unlocked) cb.checked = false;
+    });
+    if (contractStep3Status) {
+        contractStep3Status.textContent = unlocked ? '' : 'Sign the contract above to unlock this step';
+        contractStep3Status.className = 'contract-step-status' + (!unlocked ? ' is-locked' : '');
+    }
 }
 
 // Shrinks the live cursive preview in steps until it fits the available
@@ -811,7 +892,7 @@ function setSignatureMode(mode) {
     signatureTypePanel?.classList.toggle('hidden', mode !== 'type');
     if (mode === 'draw') { initSignaturePad(); resizeSignatureCanvas(); }
     setSignatureStatus('');
-    updateSignatureCapturedBadge();
+    refreshContractGatingUI();
 }
 
 function isSignaturePresent() {
@@ -962,25 +1043,22 @@ function renderContractBody(templateBody) {
 }
 
 // ── Agreement read-gating ────────────────────────────────────────────────
-// The e-sign checkbox stays disabled until we have real evidence the
-// customer actually saw the agreement text — either they scrolled the
-// inline preview to its end, or they opened the full-screen reader.
+// Both consent checkboxes stay disabled until we have real evidence the
+// customer actually saw the agreement text (scrolled the inline preview
+// to its end, or opened the full-screen reader) AND a signature currently
+// exists — see refreshContractGatingUI(), the single place that actually
+// applies this to the checkboxes/status lines.
 function resetAgreementGating() {
     signatureState.agreementViewMethod = '';
     signatureState.agreementViewedAt = '';
-    if (contractAgreementEsign) {
-        contractAgreementEsign.checked = false;
-        contractAgreementEsign.disabled = true;
-    }
-    if (contractAgreementHelper) contractAgreementHelper.hidden = false;
+    refreshContractGatingUI();
 }
 
 function markAgreementViewed(method) {
     if (signatureState.agreementViewMethod) return; // already satisfied
     signatureState.agreementViewMethod = method;
     signatureState.agreementViewedAt = new Date().toISOString();
-    if (contractAgreementEsign) contractAgreementEsign.disabled = false;
-    if (contractAgreementHelper) contractAgreementHelper.hidden = true;
+    refreshContractGatingUI();
 }
 
 // Some agreements are short enough to fit the capped preview box with
@@ -1186,8 +1264,15 @@ function handleAgreementModalKeydown(event) {
 function openAgreementModal() {
     if (!agreementModalBackdrop) return;
 
+    // Previously read from #contract-title in the (now-removed) redundant
+    // icon/title/caption row above the preview box — that row duplicated
+    // the "1. Read the contract" heading and the contract's own title
+    // text inside the scroll box, so it's gone, but the modal still needs
+    // a header title. This isn't package-specific data, just the site's
+    // one contract name, so it's hardcoded here instead of read from a
+    // DOM element kept around only to feed this.
     if (agreementModalTitle) {
-        agreementModalTitle.textContent = document.getElementById('contract-title')?.textContent || 'Service Agreement';
+        agreementModalTitle.textContent = 'ELI Coffee Events Reservation Contract';
     }
 
     if (signatureState.agreementText) {
@@ -1513,6 +1598,7 @@ function buildEventTypeSelect() {
     } else {
         otherWrap?.classList.add('hidden');
     }
+    updateMinNoticeBanner();
 }
 
 document.getElementById('event-type-select')?.addEventListener('change', function () {
@@ -1528,6 +1614,7 @@ document.getElementById('event-type-select')?.addEventListener('change', functio
         const otherInput = document.getElementById('event-type-other');
         if (otherInput) otherInput.value = '';
     }
+    updateMinNoticeBanner();
 
     // This event type may carry its own minimum-notice override, so the
     // bookable window (and which dates read as "too soon") can change —
@@ -2425,17 +2512,22 @@ function applyReservationContactPrefill(profile, user) {
     const fullName = getReservationContactName(profile, user);
     const email    = profile?.email || user?.email || '';
     const phone    = profile?.phone_number || user?.user_metadata?.phone_number || '';
-    if (nameInput  && !nameInput.value.trim())  nameInput.value  = fullName;
+    // Name always reflects the account's current name — it's read-only in
+    // this step, so unlike phone/email there's no "customer already typed
+    // something, don't clobber it" case to guard against.
+    if (nameInput) nameInput.value = fullName;
     if (phoneInput && !phoneInput.value.trim()) phoneInput.value = phone;
     if (emailInput && !emailInput.value.trim()) emailInput.value = email;
     S.name  = nameInput?.value.trim()  || S.name;
     S.phone = phoneInput?.value.trim() || S.phone;
     S.email = emailInput?.value.trim() || S.email;
+    setContactFieldsLoading(false);
 }
 
 async function prefillReservationContactDetails() {
     const user = session?.user;
     if (!user) return;
+    setContactFieldsLoading(true);
     const fallback = { first_name: user.user_metadata?.first_name || '', middle_name: user.user_metadata?.middle_name || '', last_name: user.user_metadata?.last_name || '', email: user.email || '', phone_number: user.user_metadata?.phone_number || '' };
     try {
         const { data: profile, error } = await supabase.from('profiles').select('first_name, middle_name, last_name, email, phone_number').eq('user_id', user.id).maybeSingle();
@@ -2691,13 +2783,46 @@ function activate(container, el) {
     el.setAttribute('aria-pressed', 'true');
 }
 
+// Real, enforced gate for guests: intercepts the attempt to leave the
+// Review step (or submit from Contract) with a modal instead of silently
+// refusing or letting them proceed. The actual enforcement is server-side
+// (RLS on public.reservations only allows an authenticated user to insert
+// a row as themselves — see supabase/migrations/20260930_reservations_
+// insert_rls.sql, confirmed live: an unauthenticated insert is rejected);
+// this modal only surfaces that requirement earlier and more clearly than
+// discovering it at submission time. saveDraft() runs immediately (rather
+// than relying only on the pagehide/visibilitychange listeners) so the
+// in-progress booking is guaranteed to be there when Sign In/Create
+// Account bring the customer back.
+async function showGuestSubmitGateModal() {
+    saveDraft();
+    const result = await showFeedbackModal({
+        type: 'info',
+        icon: 'ti-lock',
+        title: 'Sign in to complete your booking',
+        message: "You're almost done — an account is required to submit a reservation. Your progress on this form is saved and won't be lost.",
+        confirmText: 'Sign In',
+        tertiaryText: 'Create Account',
+        dismissText: 'Continue browsing'
+    });
+    if (result === true) {
+        window.location.href = '/login?redirect=' + encodeURIComponent('/reservations');
+    } else if (result === 'tertiary') {
+        window.location.href = '/signup?redirect=' + encodeURIComponent('/reservations');
+    }
+    // false (Escape/backdrop/"Continue browsing") — stay on the form as-is.
+}
+
 // ── Event listeners ────────────────────────────────────────────────────
 document.getElementById('nextBtn').onclick = () => {
-    if (!isLoggedIn) {
-        const notice = document.getElementById('resGuestNotice');
-        notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        notice.classList.add('res-guest-notice--pulse');
-        setTimeout(() => notice.classList.remove('res-guest-notice--pulse'), 800);
+    // Guests may browse and fill out every step, but can't advance past
+    // the Review (rs6) summary — an account is required to actually create
+    // the reservation. Checked here, before validate(), so the same guard
+    // also covers a guest somehow still parked on rs7 (e.g. a session that
+    // expired mid-flow) clicking Submit.
+    if (!isLoggedIn && (sid(cur) === 'rs6' || sid(cur) === 'rs7')) {
+        document.getElementById('guest-warning')?.classList.remove('hidden');
+        showGuestSubmitGateModal();
         return;
     }
     if (!validate(cur)) return;
@@ -2789,14 +2914,14 @@ sigModeTypeBtn?.addEventListener('click', () => switchSignatureMode('type'));
 signatureClearBtn?.addEventListener('click', () => {
     signatureState.pad?.clear();
     setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, true);
-    updateSignatureCapturedBadge();
+    refreshContractGatingUI();
     setSignatureStatus('');
 });
 signatureTypeInput?.addEventListener('input', () => {
     const text = signatureTypeInput.value.trim();
     if (signatureTypePreview) signatureTypePreview.textContent = text;
     fitSignatureTypePreview();
-    updateSignatureCapturedBadge();
+    refreshContractGatingUI();
     setSignatureStatus('');
 });
 policyButtons.forEach(btn => btn.addEventListener('click', () => openPolicyModal(btn.dataset.policy)));
@@ -2845,6 +2970,7 @@ async function submitDone() {
         }
 
         const { data: { session: freshSession } } = await supabase.auth.getSession();
+        if (!freshSession) throw new Error('Please sign in to submit your reservation.');
         const userId = freshSession.user.id;
 
         if (!isSignaturePresent()) throw new Error('Please sign the contract before submitting.');
@@ -3039,7 +3165,16 @@ if (hasUrlPackage) {
     const paramApplied = applyUrlParams();
     cur = 1;
     showStep(cur);
-    if (paramApplied) setTimeout(() => scrollToSection('sub-guests-type'), 120);
+    if (paramApplied) {
+        // applyUrlParams() sets S.miniPackage/S.offsitePackage directly
+        // (no card click happens for a pre-selected package), so the
+        // guest-count native min/max and the "Allowed: X–Y guests" hint —
+        // normally set inside the card's onclick handler via this same
+        // call — never ran. Without this, the hint stayed blank until the
+        // customer manually reselected a package card.
+        clampGuestCountToSelection();
+        setTimeout(() => scrollToSection('sub-guests-type'), 120);
+    }
     finishInit();
 } else {
     const draft = peekDraft();

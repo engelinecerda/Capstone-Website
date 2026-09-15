@@ -12,10 +12,11 @@
   --acc-cream-alt:     #FFFDFA;
   --acc-border-tan:    #E5DBCC;
   --acc-text:          #3E2418;
-  /* Was #8A7965 (~3.5:1 on this page's cream backgrounds, fails AA) — this
-     token isn't just captions here, .terms-body p/li (the actual legal text)
-     use it too. #756756 keeps the same hue, ~4.6:1, matches the darkening
-     applied to this same #8A7965 value elsewhere in the site. */
+  /* Was #8A7965, then #756756 (~4.6:1, technically passing WCAG AA) — still
+     read as too light for a page that's almost entirely body copy, so
+     .terms-body p/li now use --acc-text (full strength) instead of this
+     token. This one is left for genuinely secondary text only (the "Last
+     updated" date, loading/retry states). */
   --acc-text-muted:    #756756;
   --acc-terracotta:    #A34F2E;
 }
@@ -104,7 +105,7 @@
 .terms-body p {
   font-size: 14.5px;
   line-height: 1.7;
-  color: var(--acc-text-muted);
+  color: var(--acc-text);
   margin: 0 0 14px;
 }
 
@@ -116,7 +117,7 @@
 .terms-body li {
   font-size: 14.5px;
   line-height: 1.7;
-  color: var(--acc-text-muted);
+  color: var(--acc-text);
   margin-bottom: 4px;
 }
 

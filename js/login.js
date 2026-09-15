@@ -14,6 +14,19 @@ const LOCK_MS      = 10 * 60 * 1000; // 10 minutes
 const KEY_PREFIX   = 'eli_login_';
 let   countdownId  = null;
 
+// Where to send the customer after a successful login. Pages that gate an
+// in-progress action behind sign-in (e.g. the guest booking flow on
+// /reservations) link here with ?redirect=/reservations so the customer
+// lands back where they left off instead of the homepage. Only a same-site
+// path is ever honored — anything else (a bare protocol, a "//host" value,
+// or an absolute URL) falls back to "/" so this can't be used as an open
+// redirect.
+function getSafeRedirectTarget() {
+    const raw = new URLSearchParams(window.location.search).get('redirect');
+    if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
+    return '/';
+}
+
 /* ─── Storage helpers ─────────────────────────────────────────────────── */
 function storeKey(email) {
     return KEY_PREFIX + email.trim().toLowerCase();
@@ -222,5 +235,5 @@ form.addEventListener('submit', async function (e) {
 
     // Success — clear attempt history and redirect
     clearRecord(email);
-    window.location.href = '/';
+    window.location.href = getSafeRedirectTarget();
 });
