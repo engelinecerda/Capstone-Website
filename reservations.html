@@ -10,15 +10,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=18" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=18"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=24" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=24"></noscript>
     <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"></noscript>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/css/styles.css?v=18" />
-    <link rel="stylesheet" href="/css/reservations.css?v=18" />
-    <link rel="stylesheet" href="/css/home.css?v=18" />
-    <link rel="stylesheet" href="/css/announcement_banner.css?v=18" />
+    <link rel="stylesheet" href="/css/styles.css?v=24" />
+    <link rel="stylesheet" href="/css/reservations.css?v=26" />
+    <link rel="stylesheet" href="/css/home.css?v=24" />
+    <link rel="stylesheet" href="/css/announcement_banner.css?v=24" />
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -71,8 +71,8 @@
 
             <!-- GUEST NOTICE — shown by JS for unauthenticated visitors -->
             <div class="res-guest-notice hidden" id="resGuestNotice" role="status" aria-live="polite">
-                <i class="ti ti-info-circle" aria-hidden="true"></i>
-                <p>You're browsing as a guest. <a href="/login">Sign in</a> or <a href="/login">create an account</a> to complete your booking.</p>
+                <i class="ti ti-user-circle" aria-hidden="true"></i>
+                <p>You're browsing as a guest. <a href="/login?redirect=%2Freservations">Sign in</a> or <a href="/signup?redirect=%2Freservations">create an account</a> to complete your booking. You can keep filling out the form below — we'll save your progress.</p>
             </div>
 
             <!-- BOOKING BLOCK NOTICE — shown by JS when the customer has an
@@ -186,6 +186,9 @@
                             </div>
                         </div>
                     </div>
+                    <p class="res-guest-inline-note hidden" id="guestPkgReminder">
+                        <i class="ti ti-user-circle" aria-hidden="true"></i> Booking as a guest — you'll need to sign in or create an account before this reservation can be submitted.
+                    </p>
                 </div>
 
                 <!-- ── 1C. Guests + Event Type ────────────────── -->
@@ -256,10 +259,6 @@
                             <div>
                                 <h3 id="availabilityTitle">Availability Calendar</h3>
                                 <p>Colors show general availability. Choose your location type and package to select a date.</p>
-                                <p class="availability-event-type-note">
-                                    <i class="ti ti-info-circle" aria-hidden="true"></i>
-                                    Your event type sets its own minimum notice, so dates shown here can change once you pick one.
-                                </p>
                             </div>
                             <div class="availability-nav">
                                 <button type="button" class="availability-nav-btn" id="availabilityPrevMonth" aria-label="Previous month">&lsaquo;</button>
@@ -283,6 +282,11 @@
                             <p class="availability-closure-copy" id="availabilityClosureCopy"></p>
                         </div>
                     </section>
+
+                    <div class="res-notice-banner" id="minNoticeBanner" role="note">
+                        <i class="ti ti-clock-exclamation" aria-hidden="true"></i>
+                        <p id="minNoticeBannerText">Your event type sets its own minimum notice period — select one above to see the exact requirement. Dates shown here can change once you pick one.</p>
+                    </div>
                 </div>
 
                 <!-- ── 1F. Time Slot ──────────────────────────── -->
@@ -301,11 +305,28 @@
                  ═══════════════════════════════════════════════ -->
             <div class="res-step" id="rs4">
                 <h2>Your <em>details</em></h2>
-                <p>Fill in your contact information so we can reach you about your reservation.</p>
-                <input class="res-input" type="text"  id="name"     placeholder="Full Name *">
-                <input class="res-input" type="tel"   id="phone"    placeholder="Phone Number *">
-                <input class="res-input" type="email" id="email"    placeholder="Email Address *">
-                <textarea class="res-input"            id="requests" placeholder="Notes &amp; Special Requests (Optional)"></textarea>
+                <p id="rs4-subtitle">Fill in your contact information so we can reach you about your reservation.</p>
+                <p class="res-contact-note hidden" id="contact-consolidated-note">Your contact details are pre-filled from your account. This reservation is made under your account name — you may update the phone number or email if you'd like a different contact for this booking.</p>
+
+                <div class="res-field-group">
+                    <label class="res-field-label" for="name">Full Name</label>
+                    <input class="res-input" type="text" id="name" placeholder="Full Name *">
+                </div>
+
+                <div class="res-field-group">
+                    <label class="res-field-label" for="phone">Phone Number</label>
+                    <input class="res-input" type="tel" id="phone" placeholder="Phone Number *">
+                </div>
+
+                <div class="res-field-group">
+                    <label class="res-field-label" for="email">Email Address</label>
+                    <input class="res-input" type="email" id="email" placeholder="Email Address *">
+                </div>
+
+                <div class="res-field-group">
+                    <label class="res-field-label" for="requests">Notes &amp; Special Requests <span class="res-field-optional">(Optional)</span></label>
+                    <textarea class="res-input" id="requests" placeholder="Notes &amp; Special Requests"></textarea>
+                </div>
             </div>
 
             <!-- ═══════════════════════════════════════════════
@@ -317,7 +338,7 @@
                 <div id="summary-content"></div>
                 <div id="guest-warning" class="guest-warning hidden">
                     <i class="ti ti-alert-triangle" aria-hidden="true"></i>
-                    <p>You must <a href="/login">sign up or log in</a> to complete your booking.</p>
+                    <p>You must <a href="/login?redirect=%2Freservations">sign in</a> or <a href="/signup?redirect=%2Freservations">create an account</a> to complete your booking.</p>
                 </div>
                 <hr class="rs-summary-footer-divider">
             </div>
@@ -331,12 +352,9 @@
                 <div class="contract-box">
 
                     <div class="contract-section" id="contract-section-contract">
-                        <div class="contract-viewer-head">
-                            <i class="ti ti-file-text contract-icon" aria-hidden="true"></i>
-                            <div class="contract-info">
-                                <h4 id="contract-title">ELI Coffee Events Reservation Contract</h4>
-                                <p id="contract-description">This is a short preview. Open the full agreement to read every section.</p>
-                            </div>
+                        <div class="contract-step-head">
+                            <h3 class="contract-step-title">1. Read the contract</h3>
+                            <p class="contract-step-status" id="contract-step1-status" aria-live="polite"></p>
                         </div>
                         <div class="contract-viewer-wrap">
                             <div
@@ -361,8 +379,11 @@
                     <hr class="rs-contract-divider">
 
                     <div class="contract-section" id="contract-section-signature">
+                        <div class="contract-step-head">
+                            <h3 class="contract-step-title">2. Sign the contract</h3>
+                        </div>
                         <div class="signature-header-row">
-                            <h3 class="contract-section-title">Sign below</h3>
+                            <p class="contract-step-status" id="contract-step2-status" aria-live="polite"></p>
                             <div class="signature-mode-tabs" aria-label="Signature method">
                                 <button type="button" class="signature-mode-btn active" data-mode="draw" id="sig-mode-draw">Draw</button>
                                 <button type="button" class="signature-mode-btn" data-mode="type" id="sig-mode-type">Type instead</button>
@@ -397,8 +418,12 @@
                     <hr class="rs-contract-divider">
 
                     <div class="contract-section" id="contract-section-consent">
+                        <div class="contract-step-head">
+                            <h3 class="contract-step-title">3. Confirm &amp; submit</h3>
+                            <p class="contract-step-status" id="contract-step3-status" aria-live="polite"></p>
+                        </div>
                         <div class="contract-agreement-row">
-                            <input type="checkbox" id="contract-agreement-terms" class="contract-agreement-checkbox">
+                            <input type="checkbox" id="contract-agreement-terms" class="contract-agreement-checkbox" disabled>
                             <div class="contract-agreement-copy">
                                 <label for="contract-agreement-terms">I have read and agree to the</label>
                                 <button type="button" class="contract-policy-link" data-policy="terms">Terms &amp; Conditions</button>
@@ -406,7 +431,6 @@
                                 <button type="button" class="contract-policy-link" data-policy="privacy">Data Privacy Policy</button><span>.</span>
                             </div>
                         </div>
-                        <p class="contract-agreement-helper" id="contract-agreement-esign-helper">Read the agreement to enable this checkbox.</p>
 
                         <div class="contract-agreement-row contract-agreement-row-second">
                             <input type="checkbox" id="contract-agreement-esign" class="contract-agreement-checkbox" disabled>

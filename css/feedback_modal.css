@@ -112,7 +112,30 @@
     outline-offset: 2px;
 }
 
+.fm-dismiss-link {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    padding: 4px;
+    background: none;
+    border: none;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8A7965;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.fm-dismiss-link:hover { color: #3E2418; }
+.fm-dismiss-link:focus-visible {
+    outline: 2px solid #4A2C17;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
 @media (max-width: 480px) {
     .fm-card { padding: 24px 18px 20px; }
     .fm-title { font-size: 19px; }
+    .fm-actions { flex-direction: column; }
 }
