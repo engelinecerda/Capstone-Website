@@ -361,7 +361,6 @@ if (isLoggedIn && nameInput) {
     nameInput.readOnly = true;
     nameInput.setAttribute('aria-readonly', 'true');
     contactConsolidatedNote?.classList.remove('hidden');
-    document.getElementById('rs4-subtitle')?.classList.add('res-subtitle-tight');
 }
 
 // Brief loading state for Name/Phone/Email while the account fetch is in
@@ -845,10 +844,17 @@ function initSignaturePad() {
     if (!signatureCanvas || signatureState.pad || typeof SignaturePad === 'undefined') return;
     signatureState.pad = new SignaturePad(signatureCanvas, {
         backgroundColor: 'rgba(0,0,0,0)',
-        penColor: 'rgb(42,20,8)',
-        onBegin: () => setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false),
-        onEnd: () => refreshContractGatingUI()
+        penColor: 'rgb(42,20,8)'
     });
+    // signature_pad v3+ dropped the onBegin/onEnd constructor options in
+    // favor of real DOM-style events — passing them as options (the old
+    // API) is silently ignored, no error, the callbacks just never fire.
+    // That's exactly why drawing a signature never unlocked Step 3: the
+    // one call to refreshContractGatingUI() that was supposed to run
+    // after a stroke never happened, while Type-instead (a plain <input>
+    // 'input' listener, unrelated to this library) worked fine.
+    signatureState.pad.addEventListener('beginStroke', () => setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false));
+    signatureState.pad.addEventListener('endStroke', () => refreshContractGatingUI());
     resizeSignatureCanvas();
     window.addEventListener('resize', resizeSignatureCanvas);
 }
