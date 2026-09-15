@@ -251,28 +251,21 @@
         }
         .res-field-optional { font-weight: 400; color: var(--acc-text-muted, #756756); }
 
-        /* One consolidated explanation for the whole account-prefill
-           behavior, shown once beneath the step's subtitle — replaces the
-           three near-duplicate per-field captions this step used to carry
-           under Full Name/Phone/Email individually. Specificity/source-
-           order deliberately beats the generic ".res-step > p" rule above
-           (this is also a direct-child <p>, but needs its own smaller
-           size/color/spacing, not the subtitle's). */
+        /* The single intro sentence for this step — sits directly beneath
+           the "Your details" heading now (no separate subtitle line
+           anymore, that and the old per-field captions were merged into
+           this one). Specificity/source-order deliberately beats the
+           generic ".res-step > p" rule above (this is also a direct-child
+           <p>, but needs its own smaller size/color/spacing). Its 8px
+           margin-top collapses against the shared ".res-step h2" 6px
+           margin-bottom to the larger value (8px) — matches the target
+           gap with no extra tightening rule needed. */
         p.res-contact-note {
-            margin: 4px 0 26px;
+            margin: 8px 0 26px;
             font-size: 13px;
             line-height: 1.5;
             color: #8A7965;
         }
-        /* Rs4's own subtitle only, and only once the consolidated note
-           below it is actually shown (js/reservations.js toggles this
-           alongside revealing the note, for logged-in customers) —
-           shrinks the subtitle's default 20px margin-bottom to match the
-           note's 4px margin-top (adjacent vertical margins collapse to
-           the larger value otherwise, silently erasing that 4px gap). For
-           guests, who never see the note, the subtitle keeps its normal
-           spacing before the first field. */
-        #rs4-subtitle.res-subtitle-tight { margin-bottom: 4px; }
 
         /* Name is locked to the logged-in account's name (js/reservations.js
            sets [readonly] only when isLoggedIn) — visually distinct so it
