@@ -184,8 +184,17 @@ function sid(n)  { return STEP_IDS[n - 1]; }
 // ── Draft ──────────────────────────────────────────────────────────────
 // localStorage (not sessionStorage) so a draft survives the customer
 // fully closing the tab/browser, not just an accidental refresh.
-const DRAFT_KEY = 'eli_reservation_draft';
-const DRAFT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days — after this, treat as stale and don't offer to resume
+//
+// Scoped per logged-in user (not a single shared key) so that on a shared
+// or public device, one account's in-progress reservation can never surface
+// as a "resume?" prompt for a different account that later opens this page.
+// Guests get no DRAFT_KEY at all (null) — anonymous browsing has no stable
+// identity to scope a key to, so a guest either would leak someone else's
+// draft or have their own draft picked up by the next guest on the same
+// browser. Every draft read/write below is a no-op when DRAFT_KEY is null,
+// which means: guests never get offered "resume", full stop.
+const DRAFT_KEY = session?.user?.id ? `eli_reservation_draft_${session.user.id}` : null;
+const DRAFT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days 
 
 // Set the instant submission succeeds (see the reservation-submit handler).
 // window.addEventListener('pagehide', saveDraft) below fires unconditionally
@@ -198,11 +207,12 @@ const DRAFT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days — after this, trea
 let submissionLocked = false;
 
 function saveDraft() {
-    if (submissionLocked) return;
+    if (submissionLocked || !DRAFT_KEY) return;
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ state: S, step: cur, savedAt: Date.now() })); } catch { /* ignore */ }
 }
 
 function clearDraft() {
+    if (!DRAFT_KEY) return;
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
@@ -246,6 +256,7 @@ function draftHasMeaningfulProgress(saved, step) {
 // if there's no draft, it's malformed, it's past DRAFT_MAX_AGE_MS, or
 // nothing meaningful was actually filled in.
 function peekDraft() {
+    if (!DRAFT_KEY) return null;
     try {
         const raw = localStorage.getItem(DRAFT_KEY);
         if (!raw) return null;
@@ -258,6 +269,7 @@ function peekDraft() {
 }
 
 function restoreDraft() {
+    if (!DRAFT_KEY) return false;
     try {
         const raw = localStorage.getItem(DRAFT_KEY);
         if (!raw) return false;
