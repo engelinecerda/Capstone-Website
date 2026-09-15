@@ -320,7 +320,6 @@ if (isLoggedIn && nameInput) {
     nameInput.readOnly = true;
     nameInput.setAttribute('aria-readonly', 'true');
     contactConsolidatedNote?.classList.remove('hidden');
-    document.getElementById('rs4-subtitle')?.classList.add('res-subtitle-tight');
 }
 
 // Brief loading state for Name/Phone/Email while the account fetch is in
