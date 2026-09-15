@@ -147,7 +147,7 @@ function roleLabel(a) {
 
 function buildRowMenu(a) {
   const items = [];
-  items.push({ action: 'reset-password', label: 'Resend password setup email' });
+  items.push({ action: 'reset-password', label: a._status === 'invited' ? 'Resend invite email' : 'Send password reset email' });
   if (a.is_board_account) items.push({ action: 'reset-board-password', label: 'Reset board password' });
   items.push({ action: 'lock', label: a._status === 'deactivated' ? 'Reactivate' : 'Deactivate' });
   items.push({ action: 'clear-login-lock', label: 'Clear login lockout' });
@@ -312,6 +312,30 @@ function closeModalReturnFocus(overlay) {
   lastFocusedTrigger = null;
 }
 
+// ── INFO MODAL ──────────────────────────────────────────────────
+// Drop-in replacement for native alert() — same "show a message, one
+// button to dismiss" job, but styled like the rest of the portal instead
+// of a browser-chrome popup stamped with the page's own URL.
+function showInfoModal(message, { title = 'Notice', tone = 'info' } = {}) {
+  const overlay = document.getElementById('infoModal');
+  document.getElementById('infoTitle').textContent = title;
+  const body = document.getElementById('infoBody');
+  body.textContent = message;
+  body.className = `modal-message ${tone}`.trim();
+  lastFocusedTrigger = document.activeElement;
+  openModalWithTrap(overlay);
+}
+
+function closeInfoModal() {
+  closeModalReturnFocus(document.getElementById('infoModal'));
+}
+
+document.getElementById('infoClose').addEventListener('click', closeInfoModal);
+document.getElementById('infoOk').addEventListener('click', closeInfoModal);
+document.getElementById('infoModal').addEventListener('click', (e) => {
+  if (e.target.id === 'infoModal') closeInfoModal();
+});
+
 // ── ADD MODAL ────────────────────────────────────────────────────
 document.getElementById('addAccountBtn').addEventListener('click', () => {
   lastFocusedTrigger = document.getElementById('addAccountBtn');
@@ -447,21 +471,20 @@ async function handleCreateAccount() {
         role,
         staff_role: staffRole || null,
         first_name: firstName,
+        middle_name: middleName || null,
         last_name: lastName
       }
     });
 
     if (fnErr) throw new Error(await extractFnError(fnErr, data));
 
-    const { error: profileErr } = await supabase.from('profiles').update({
-      middle_name: middleName || null
-    }).eq('user_id', data.user_id);
-
-    if (profileErr) throw profileErr;
+    // middle_name now travels in the invite call's metadata and is set by
+    // the handle_new_user() trigger the moment the account is created —
+    // no separate profiles update needed here anymore.
 
     await logAudit({ action: 'Invited User', category: 'accounts', details: `Invited ${firstName} ${lastName} (${email}) as ${role}`, entityId: data.user_id });
 
-    showMsg('Invite sent. A password setup email is on its way.', 'success');
+    showMsg('Invite sent. A welcome email is on its way.', 'success');
     await loadAccounts();
     setTimeout(closeAccountModal, 1400);
 
@@ -593,12 +616,44 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
 }
 
 // ── PASSWORD RESET ───────────────────────────────────────────────
-/*async function sendPasswordReset(a) {
+// Was previously commented out entirely — the "Resend password setup
+// email" menu item called this and did nothing (a silent ReferenceError
+// in the console). Restored, and split by activation status: an account
+// that never set a password needs a real invite resent (type=invite,
+// lands on /admin/set-password), not a recovery email — Supabase will
+// actually reject resetPasswordForEmail's recovery flow as "not
+// confirmed" for an unconfirmed invite anyway. An already-active account
+// gets the genuine reset flow (type=recovery, /admin/reset-password).
+// Both paths now also carry an explicit redirectTo, which the original
+// commented-out version never did — that omission is exactly what let
+// invite/reset links fall back to the customer homepage before.
+async function sendPasswordReset(a) {
   if (!a?.email) return;
-  const { error } = await supabase.auth.resetPasswordForEmail(a.email);
-  if (error) alert('Failed to send: ' + error.message);
-  else alert(`Password reset email sent to ${a.email}.`);
-}*/
+
+  try {
+    if (a._status === 'invited') {
+      const { data, error: fnErr } = await supabase.functions.invoke('resend-account-invite', {
+        body: { email: a.email }
+      });
+      if (fnErr) throw new Error(await extractFnError(fnErr, data));
+      showInfoModal(`Invite email resent to ${a.email}.`, { title: 'Invite Resent', tone: 'success' });
+    } else {
+      const redirectTo = new URL('/admin/reset-password', window.location.href).href;
+      const { error } = await supabase.auth.resetPasswordForEmail(a.email, { redirectTo });
+      if (error) throw error;
+      showInfoModal(`Password reset email sent to ${a.email}.`, { title: 'Email Sent', tone: 'success' });
+    }
+
+    await logAudit({
+      action: 'Resent Password Email',
+      category: 'accounts',
+      details: `${a._status === 'invited' ? 'Invite' : 'Password reset'} email resent to ${displayName(a)} (${a.email})`,
+      entityId: a.user_id
+    });
+  } catch (err) {
+    showInfoModal('Failed to send: ' + (err.message || 'Unknown error'), { title: 'Something Went Wrong', tone: 'error' });
+  }
+}
 
 // ── DEACTIVATE / REACTIVATE ────────────────────────────────────────
 function openLockConfirm(a) {
@@ -607,7 +662,7 @@ function openLockConfirm(a) {
   if (!isLocked && a.role === 'admin') {
     const otherActiveAdmins = allAccounts.filter(x => x.role === 'admin' && x.user_id !== a.user_id && !x.is_locked).length;
     if (otherActiveAdmins === 0) {
-      alert('At least one admin is required. Promote another account to Admin before deactivating this one.');
+      showInfoModal('At least one admin is required. Promote another account to Admin before deactivating this one.', { title: 'Action Blocked', tone: 'error' });
       return;
     }
   }
@@ -664,10 +719,10 @@ function openLockConfirm(a) {
 async function clearLoginLock(a) {
   const { error } = await supabase.rpc('admin_clear_login_lock', { p_user_id: a.user_id });
   if (error) {
-    alert('Failed to clear login lockout: ' + error.message);
+    showInfoModal('Failed to clear login lockout: ' + error.message, { title: 'Something Went Wrong', tone: 'error' });
     return;
   }
-  alert(`Login lockout cleared for ${displayName(a)}. They can sign in again immediately.`);
+  showInfoModal(`Login lockout cleared for ${displayName(a)}. They can sign in again immediately.`, { title: 'Lockout Cleared', tone: 'success' });
 }
 
 // ── RESET BOARD PASSWORD ─────────────────────────────────────────
