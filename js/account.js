@@ -1,5 +1,6 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { showFeedbackModal } from './feedback_modal.js';
+import { validatePassword } from './password_rules.js';
 import {
     buildCustomerPaymentUrl,
     fetchPayments as fetchSharedPayments,
@@ -1461,7 +1462,7 @@ function renderReservations() {
     if (!state.reservations.length) {
         reservationsList.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">No reservations yet</div>
+                <div class="empty-icon"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i></div>
                 <h3>No reservations yet</h3>
                 <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
                 <a href="/reservations" class="res-book-btn">Book an Event</a>
@@ -1654,7 +1655,7 @@ function renderPaymentsModule() {
     if (!paymentReservations.length) {
         paymentsList.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">Payments</div>
+                <div class="empty-icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></div>
                 <h3>No payments yet</h3>
                 <p>Approved reservations that need payment will appear here.</p>
             </div>
@@ -3005,8 +3006,9 @@ function wirePasswordForm() {
         const newPassword = document.getElementById('new-password')?.value || '';
         const confirmPassword = document.getElementById('confirm-new-password')?.value || '';
 
-        if (newPassword.length < 8) {
-            setFormMessage(passwordMessage, 'New password must be at least 8 characters long.', 'error');
+        const passwordError = validatePassword(newPassword);
+        if (passwordError) {
+            setFormMessage(passwordMessage, passwordError, 'error');
             return;
         }
 

@@ -215,6 +215,15 @@
     margin-bottom: 8px;
 }
 
+/* "(Optional)" annotation on a label — quiet, not shouting like the rest
+   of the uppercase/tracked label text above. */
+.label-optional {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: rgba(61,26,10,0.45);
+}
+
 .form-group input {
     width: 100%;
     padding: 12px 16px;

@@ -1,5 +1,6 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
+import { validatePassword } from './password_rules.js';
 
 initPasswordToggles();
 
@@ -18,16 +19,29 @@ function setLoading(loading) {
     btn.textContent = loading ? 'Creating account…' : 'Create Account';
 }
 
+// Carries a same-site ?redirect=... target (e.g. from the guest booking
+// gate on /reservations) forward to /login, so it survives the "confirm
+// your email, then log in" detour and the customer still lands back where
+// they started once they actually sign in.
+function getLoginRedirectSuffix() {
+    const raw = new URLSearchParams(window.location.search).get('redirect');
+    if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
+        return '?redirect=' + encodeURIComponent(raw);
+    }
+    return '';
+}
+
 form.addEventListener('submit', async function (e) {
     e.preventDefault();
     setMessage('');
 
-    const firstName = document.getElementById('first-name').value.trim();
-    const lastName  = document.getElementById('last-name').value.trim();
-    const email     = document.getElementById('signup-email').value.trim();
-    const password  = document.getElementById('signup-password').value;
-    const confirm   = document.getElementById('confirm-password').value;
-    const terms     = document.getElementById('terms').checked;
+    const firstName  = document.getElementById('first-name').value.trim();
+    const middleName = document.getElementById('middle-name').value.trim();
+    const lastName   = document.getElementById('last-name').value.trim();
+    const email      = document.getElementById('signup-email').value.trim();
+    const password   = document.getElementById('signup-password').value;
+    const confirm    = document.getElementById('confirm-password').value;
+    const terms      = document.getElementById('terms').checked;
 
     // Client-side validation
     if (!firstName || !lastName) {
@@ -40,8 +54,9 @@ form.addEventListener('submit', async function (e) {
         return;
     }
 
-    if (password.length < 8) {
-        setMessage('Password must be at least 8 characters long.', 'error');
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+        setMessage(passwordError, 'error');
         return;
     }
 
@@ -65,9 +80,10 @@ form.addEventListener('submit', async function (e) {
         options: {
             emailRedirectTo,
             data: {
-                first_name: firstName,
-                last_name:  lastName,
-                role:       'customer'
+                first_name:  firstName,
+                middle_name: middleName || null,
+                last_name:   lastName,
+                role:        'customer'
             }
         }
     });
@@ -105,6 +121,6 @@ form.addEventListener('submit', async function (e) {
     form.reset();
 
     setTimeout(() => {
-        window.location.href = '/login';
+        window.location.href = '/login' + getLoginRedirectSuffix();
     }, 3000);
 });
