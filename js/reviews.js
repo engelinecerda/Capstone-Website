@@ -2,6 +2,11 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { shouldHideReview } from './reviews_filter.js';
 import { getEffectiveReservationStatus, getReservationPackageName } from './reservation_shared.js';
+import {
+    fetchPayments as fetchSharedPayments,
+    getReservationBalanceDetails as getSharedReservationBalanceDetails
+} from './customer_payments.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 /* ============================================================
    STATE
@@ -274,6 +279,7 @@ async function fetchMyReviewableReservations(userId) {
             event_date,
             event_time,
             status,
+            total_price,
             package:package_id ( package_name )
         `)
         .eq('user_id', userId)
@@ -281,9 +287,28 @@ async function fetchMyReviewableReservations(userId) {
 
     if (error) throw error;
 
-    const completed = (reservations || []).filter(
-        (reservation) => getEffectiveReservationStatus(reservation) === 'completed'
+    const reservationList = reservations || [];
+
+    // getEffectiveReservationStatus() only infers 'completed' for a
+    // past-event reservation when it's told the outstanding balance — pass
+    // nothing and it just echoes back whatever status is already persisted
+    // on the row (see reservation_shared.js). The account page fetches
+    // payments and passes that balance in, so it shows "Completed" (and the
+    // "Leave a Review" button) the moment the event has passed and the
+    // reservation is paid off. Without doing the same here, this page
+    // instead waited for a separate background job to actually write
+    // status: 'completed' to the DB before it would let the customer submit
+    // a review — visible as a delay between the account page offering
+    // "Leave a Review" and the review form actually working.
+    const paymentsByReservationId = await fetchSharedPayments(
+        supabase,
+        reservationList.map((reservation) => reservation.reservation_id)
     );
+
+    const completed = reservationList.filter((reservation) => {
+        const { remainingBalance } = getSharedReservationBalanceDetails(reservation, paymentsByReservationId);
+        return getEffectiveReservationStatus(reservation, remainingBalance) === 'completed';
+    });
 
     if (!completed.length) return [];
 
@@ -626,6 +651,31 @@ async function init() {
         if (loadingEl) loadingEl.remove();
         showError('We couldn\'t load reviews right now. Please try again shortly.');
     }
+
+    // Without this, a reservation that becomes reviewable (event passes,
+    // gets marked completed) while this tab is already open/backgrounded
+    // never shows the "Write a Review" bar until the customer manually
+    // reloads the page — the eligibility check above only ever ran once,
+    // on the very first load. initAutoRefresh (js/auto_refresh.js, already
+    // used by notifications.js and admin_homepage.js for the same reason)
+    // re-runs on tab focus, tab becoming visible again, and bfcache restore
+    // (the browser back/forward button, which doesn't re-execute module
+    // scripts on its own), plus a 60s fallback poll — deliberately a plain
+    // interval rather than a realtime subscription, which is what drove
+    // this project's Disk IO usage sky-high before (see notifications.js).
+    // Re-checks both the write-review eligibility and the public reviews
+    // list, so a review someone else just posted also shows up without a
+    // manual refresh.
+    initAutoRefresh(() => {
+        initWriteReview();
+        fetchReviews()
+            .then((raw) => {
+                allReviews = raw.filter((r) => !shouldHideReview(r.comment).hide);
+                renderSummary();
+                renderReviews();
+            })
+            .catch((err) => console.error('[reviews] auto-refresh failed:', err));
+    });
 }
 
 document.addEventListener('DOMContentLoaded', init);
