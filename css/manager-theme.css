@@ -316,13 +316,26 @@ body {
   width: calc(100% - var(--sidebar-w));
   flex: 0 0 calc(100% - var(--sidebar-w));
   min-width: 0;
-  padding: 32px 32px 48px;
+  padding: 32px clamp(32px, 3vw, 56px) 48px;
   min-height: 100vh;
 }
 
+/* Grows with the viewport instead of sitting at a fixed 1200px on every
+   screen — the clamp() lower bound keeps today's layout on laptops (it
+   only takes effect once the viewport actually has more than 1200px to
+   offer past the sidebar/padding), the preferred value lets it fill
+   extra width on large monitors, and the upper bound stops it sprawling
+   edge-to-edge on ultra-wide displays. .page-shell--wide raises that
+   ceiling further for table/list-heavy pages, which read fine wider than
+   a form or profile page would. */
 .page-shell {
-  max-width: 1200px;
+  max-width: clamp(1200px, 92vw, 1440px);
+  width: 100%;
   margin: 0 auto;
+}
+
+.page-shell--wide {
+  max-width: clamp(1200px, 96vw, 1760px);
 }
 
 .page-header {
@@ -445,6 +458,7 @@ body {
   color: var(--muted);
   margin-top: 2px;
   margin-bottom: 16px;
+  max-width: 70ch;
 }
 
 .stat-grid,
@@ -664,7 +678,7 @@ table td {
 }
 
 .truncate {
-  max-width: 180px;
+  max-width: clamp(180px, 16vw, 320px);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
