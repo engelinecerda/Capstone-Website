@@ -70,23 +70,16 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
 body.sidebar-open .sidebar-overlay { display: block; }
 
 /* ── LARGE DESKTOP (≥ 1600px) ──────────────────────────────────
-   Every other breakpoint in this file only scales the layout DOWN
-   for smaller screens. Nothing scaled UP for large monitors, so on
-   a big display .page-shell's 1200px cap just sits in a sea of
-   unused space while every page's hardcoded px text/spacing stays
-   the same physical size — reported as "looks small, harder to see"
-   on bigger screens. `zoom` scales .main's content (text, cards,
-   spacing) proportionally without having to touch every page's
-   individual px values. Modal overlays are siblings of .main (direct
-   children of <body>, see admin/**/*.html), not descendants, so they
-   render at normal scale and are unaffected. */
-@media (min-width: 1600px) {
-  .main { zoom: 1.12; }
-}
-
-@media (min-width: 2000px) {
-  .main { zoom: 1.25; }
-}
+   This used to blow up .main with a blunt `zoom` (1.12, then 1.25) so
+   text wasn't tiny in a sea of unused space at the old fixed 1200px
+   .page-shell cap. That masked the real problem instead of fixing it:
+   it enlarged content in place rather than using the extra width, and
+   scaled borders/hit targets/images right along with text. Now that
+   .page-shell itself grows with the viewport (manager-theme.css) up to
+   1440px (1760px for .page-shell--wide), the extra room is used for
+   actual layout — wider cards/tables, more breathing room — instead of
+   a uniform zoom, so this block is intentionally gone rather than
+   stacking both. */
 
 /* ── TABLET (≤ 1024px) ───────────────────────────────────────── */
 @media (max-width: 1024px) {
