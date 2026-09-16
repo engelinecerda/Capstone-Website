@@ -1,4 +1,3 @@
-
 //session_validation.js
 //
 // ─── ROLE VALUES ─────────────────────────────────────────────────────────────
@@ -107,11 +106,24 @@ export async function validateAdminSession({
 
 // ─── Auth state watcher ───────────────────────────────────────────────────────
 // Call once per page. Redirects to login if session is signed out.
+//
+// Some flows (e.g. inactivity timeout) need a different destination than
+// this page's default without racing this listener's own navigation —
+// e.g. supabase.auth.signOut() fires the SIGNED_OUT event almost
+// immediately, so if the caller also runs its own window.location right
+// after signOut() resolves, the browser gets two competing redirects
+// back-to-back (one to redirectTo, one to the caller's own target),
+// which shows up as a slow/janky "double redirect". Setting
+// window.__nextSignOutRedirect right before calling signOut() lets a
+// caller override the destination for that one sign-out, so only this
+// single navigation call ever fires.
 export function watchAuthState(redirectTo = '/admin') {
   supabase.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') {
     localStorage.removeItem('profile'); //  clear cache
-    window.location.replace(redirectTo);
+    const override = window.__nextSignOutRedirect;
+    window.__nextSignOutRedirect = null;
+    window.location.replace(override || redirectTo);
   }
 });
 }

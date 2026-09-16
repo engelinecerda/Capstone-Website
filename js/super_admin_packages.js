@@ -264,6 +264,7 @@ const addCateringCategoryBtn              = document.getElementById('addCatering
 const cateringPageMessage                 = document.getElementById('cateringPageMessage');
 const cateringPackagePickerCard           = document.getElementById('cateringPackagePickerCard');
 const cateringPackageSelect               = document.getElementById('cateringPackageSelect');
+const cateringMainDishMax                 = document.getElementById('cateringMainDishMax');
 const activeCateringSection               = document.getElementById('activeCateringSection');
 const archivedCateringSection             = document.getElementById('archivedCateringSection');
 const activeCateringBody                  = document.getElementById('activeCateringBody');
@@ -1688,10 +1689,15 @@ function renderActivationChecklist() {
     <div class="checklist-item ${item.met ? 'met' : 'unmet'}">${item.met ? '✓' : '○'} ${escapeHtml(item.label)}</div>
   `).join('');
 
-  if (blockers.length && pkgActiveToggle.checked) {
-    pkgActiveToggle.checked = false;
-  }
-  pkgActiveToggle.disabled = blockers.length > 0;
+  // Bug fix: this used to force pkgActiveToggle.checked = false the instant
+  // any blocker appeared — including transient ones, like a photo you just
+  // added still having blank alt text. That silently archived packages that
+  // were already live, with no warning, the moment an admin edited photos.
+  // We now only prevent turning "Active" ON while blocked (by disabling the
+  // toggle when it's currently off); an already-active package keeps its
+  // checked state as the admin works, and pkgModalSave's validation is what
+  // actually stops a blocked package from being saved as active.
+  pkgActiveToggle.disabled = blockers.length > 0 && !pkgActiveToggle.checked;
 }
 
 [pkgPrice, pkgType, pkgLocationType, pkgMinGuests, pkgMaxGuests].forEach(el => {
@@ -1811,15 +1817,15 @@ function validatePackageForm() {
     return 'A valid duration in hours is required.';
   if (pkgType.value === 'main' && !pkgBookingScope.value)
     return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
-  if (pkgType.value === 'main') {
-    const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
-    // Bug fix: this used to block save unconditionally, even though the
-    // message itself says draft saves are allowed — pkgActiveToggle was
-    // never actually checked. Only require a venue when the package is
-    // being saved active; an inactive/draft package can be saved without
-    // one and have its venue added later.
-    if (isOnsite && pkgVenueIds.size === 0 && pkgActiveToggle.checked) {
-      return 'Onsite packages need at least one venue mapping to activate. Turn off "Active" to save as a draft without one.';
+  // Bug fix: renderActivationChecklist() no longer auto-unchecks "Active"
+  // when a blocker appears (see that function for why), so this is now the
+  // single place that actually enforces the activation checklist at save
+  // time. Covers photos, alt text, inclusions, price, and — for onsite main
+  // packages — venue mapping, all in one pass via getActivationBlockers().
+  if (pkgActiveToggle.checked) {
+    const blockers = getActivationBlockers();
+    if (blockers.length) {
+      return `Before this can go active: ${blockers.join(', ')}. Turn off "Active" to save as a draft instead.`;
     }
   }
   return null;
@@ -3231,7 +3237,7 @@ async function loadCateringMenuPackages() {
   try {
     const { data, error } = await supabase
       .from('package')
-      .select('package_id, package_name, is_active')
+      .select('package_id, package_name, is_active, catering_main_dish_max')
       .eq('uses_catering_menu', true)
       .order('sort_order', { ascending: true });
     if (error) throw error;
@@ -3263,6 +3269,7 @@ async function loadCateringMenuPackages() {
     cateringPackageSelect.innerHTML = cateringMenuPackages
       .map(p => `<option value="${p.package_id}" ${p.package_id === cateringMenuActivePackageId ? 'selected' : ''}>${escapeHtml(p.package_name)}${p.is_active ? '' : ' (Archived package)'}</option>`)
       .join('');
+    updateCateringMainDishMaxInput();
 
     setMessage(cateringPageMessage, '');
     await loadCateringMenu();
@@ -3273,7 +3280,40 @@ async function loadCateringMenuPackages() {
 
 cateringPackageSelect.addEventListener('change', async () => {
   cateringMenuActivePackageId = cateringPackageSelect.value || null;
+  updateCateringMainDishMaxInput();
   await loadCateringMenu();
+});
+
+// Reflects the active package's saved cap in the input — kept separate
+// from loadCateringMenu() since it only needs the already-fetched
+// cateringMenuPackages list, not a fresh round trip.
+function updateCateringMainDishMaxInput() {
+  const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+  cateringMainDishMax.value = pkg?.catering_main_dish_max ?? 3;
+}
+
+// Saved on blur (not on every keystroke) so a half-typed number never hits
+// the database — mirrors how other scalar package fields on this page are
+// only written once the admin is done editing.
+cateringMainDishMax.addEventListener('change', async () => {
+  if (!cateringMenuActivePackageId) return;
+  const value = parseInt(cateringMainDishMax.value, 10);
+  if (!Number.isFinite(value) || value < 1) {
+    setMessage(cateringPageMessage, 'Max main dishes must be a whole number of 1 or more.', 'error');
+    updateCateringMainDishMaxInput();
+    return;
+  }
+  try {
+    const { error } = await supabase.from('package').update({ catering_main_dish_max: value }).eq('package_id', cateringMenuActivePackageId);
+    if (error) throw error;
+    const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+    if (pkg) pkg.catering_main_dish_max = value;
+    await logAudit({ action: 'Updated Catering Main Dish Max', category: 'package', details: `Max main dishes set to ${value}`, entityId: cateringMenuActivePackageId });
+    setMessage(cateringPageMessage, 'Max main dishes updated.', 'success');
+  } catch (err) {
+    setMessage(cateringPageMessage, `Failed to save: ${err.message}`, 'error');
+    updateCateringMainDishMaxInput();
+  }
 });
 
 async function loadCateringMenu() {

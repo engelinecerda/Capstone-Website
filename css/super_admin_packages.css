@@ -161,14 +161,29 @@
 }
 
 /* ── PAGE MESSAGE ── */
+/* The reserved min-height/margin exist so a status message (loading,
+   success, error) doesn't shift the card below it when it appears —
+   but most of the time this sits empty (message cleared after load),
+   so reserving that space permanently left a large dead gap under the
+   page subtitle. Collapsing to 0 while empty keeps the anti-jank
+   reservation for the moments a message is actually shown. */
 .page-message {
   font-size: 12.5px;
   color: var(--muted);
   margin-bottom: 12px;
   min-height: 18px;
 }
+.page-message:empty {
+  margin-bottom: 0;
+  min-height: 0;
+}
 .page-message.error { color: #A32D2D; }
 .page-message.success { color: #3B6D11; }
+
+/* Sibling .card sections (e.g. "Managing menu for" + "Active Categories")
+   otherwise sit flush against each other — .card itself carries no
+   spacing, matching the convention used on the other admin pages. */
+.card + .card { margin-top: 20px; }
 
 /* ── CARD extras (base .card is shared) ── */
 .stat-top { margin-bottom: 8px; }
@@ -192,6 +207,14 @@
   font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
+}
+
+/* The "Managing menu for" card stacks two .modal-field rows directly (no
+   .modal-body wrapper, which is what normally supplies the 16px gap between
+   stacked fields inside a modal) — without this they sit flush against each
+   other while every other gap on the page is 16px. */
+#cateringPackagePickerCard .modal-field + .modal-field {
+  margin-top: 16px;
 }
 
 /* ── TABLE (pkg-table sits on top of the shared bare-table rules) ── */

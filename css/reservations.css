@@ -174,17 +174,6 @@
 }
 
 /* ========================
-   Food Tray Builder (Step 4)
-======================== */
-
-.dish-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-/* ========================
    Tray Cart (Step 4)
 ======================== */
 .tray-cart {
@@ -654,16 +643,28 @@
             margin: 20px 0 28px;
             flex-wrap: wrap;
             gap: 10px;
+            position: sticky;
+            top: 70px;
+            z-index: 20;
+            box-shadow: 0 6px 16px rgba(61,26,10,0.08);
         }
         .pt-item {
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 13px;
+            color: #aaa;
+            cursor: pointer;
+            transition: transform 0.15s ease;
             color: #686868;
         }
+        .pt-item:hover { transform: translateY(-1px); }
         .pt-item.done { color: #0F6E56; }
         .pt-item.pending { color: #2A1408; font-weight: 600; }
+        .pt-item.active .pt-dot {
+            box-shadow: 0 0 0 3px rgba(107,58,31,0.22);
+        }
+        .pt-item.active span { text-decoration: underline; text-underline-offset: 3px; }
         .pt-dot {
             width: 20px; height: 20px;
             border-radius: 50%;
@@ -683,6 +684,12 @@
             background: #6B3A1F;
             border-color: #6B3A1F;
             color: #fff;
+        }
+        .pt-item.locked { opacity: 0.55; }
+        .pt-item.locked .pt-dot {
+            background: #fff;
+            border-color: #ddd;
+            color: #aaa;
         }
         .pt-divider {
             flex: 1;
@@ -756,7 +763,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 8px;
-            margin-bottom: 0;
+            margin-bottom: 14px;
         }
         .dish-card {
             border: 1px solid #e4d5c9;
@@ -778,6 +785,14 @@
         }
         .dish-card.selected:hover {
             background: #c5eedd;
+        }
+        .dish-card.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .dish-card.disabled:hover {
+            border-color: #e4d5c9;
+            background: #fff;
         }
         .dish-name {
             font-size: 13px;
@@ -854,11 +869,140 @@
             color: #686868;
             margin-top: 8px;
         }
+        .pax-summary-row {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+        }
+        .pax-summary-text {
+            font-size: 12.5px;
+            color: #5a5148;
+        }
+        .pax-summary-text b { color: #0F6E56; }
+        .pax-custom-badge {
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #6B3A1F;
+            background: #FFF3E4;
+            border: 1px solid #ecd6b8;
+            border-radius: 20px;
+            padding: 1px 8px;
+            margin-left: 4px;
+        }
+        .pax-summary-actions {
+            display: flex;
+            gap: 14px;
+        }
+        .pax-link-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B3A1F;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .pax-link-btn:hover { color: #2A1408; }
         .cat-divider {
             border: none;
             border-top: 1px solid #f0e8e0;
             margin: 16px 0 20px;
         }
+
+        .catering-accordion-item {
+            border: 1px solid #ead9ca;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            background: #fff;
+            transition: border-color 0.15s ease;
+        }
+        .catering-accordion-item.open { border-color: #d9b98c; }
+        .catering-accordion-item.done:not(.open) { background: #FBFAF7; }
+        .catering-accordion-item.locked { background: #FBFAF7; opacity: 0.6; }
+        .catering-accordion-item.locked .catering-accordion-header { cursor: not-allowed; }
+        .catering-accordion-item.locked .accordion-chevron { display: none; }
+        .catering-accordion-header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 18px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+        }
+        .accordion-status-dot {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            border: 1.5px solid #ddd;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            background: #fff;
+            color: #bbb;
+        }
+        .accordion-status-dot.visible {
+            background: #E1F5EE;
+            border-color: #1D9E75;
+            color: #0F6E56;
+        }
+        .catering-accordion-title {
+            flex: 1;
+            font-size: 15px;
+            font-weight: 700;
+            color: #2A1408;
+        }
+        .accordion-chevron {
+            color: #b8a494;
+            transition: transform 0.2s ease;
+        }
+        .catering-accordion-item.open .accordion-chevron { transform: rotate(180deg); }
+        .catering-accordion-body {
+            padding: 0 18px 20px;
+        }
+        .catering-section-hint {
+            font-size: 13px;
+            color: #888;
+            margin: 0 0 16px;
+            line-height: 1.6;
+        }
+        .pills-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .catering-protein-tabs { margin-bottom: 16px; }
+        .pill-check {
+            color: #0F6E56;
+            font-weight: 700;
+            margin-left: 2px;
+        }
+        .pill.active .pill-check { color: #085041; }
+
+        .catering-accordion-recap {
+            padding: 0 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .catering-recap-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .catering-recap-dish { color: #2A1408; font-weight: 600; }
+        .catering-recap-meta { color: #8a7a6d; white-space: nowrap; }
 
         .cart-section { margin-top: 28px; }
         .cart-box {
@@ -959,6 +1103,23 @@
             transition: all 0.15s;
         }
         .ci-remove-btn:hover {
+            border-color: #c0392b;
+            color: #c0392b;
+            background: #fdf2f2;
+        }
+        .cart-clear-all-btn {
+            background: none;
+            border: 1px solid #e4d5c9;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #686868;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .cart-clear-all-btn:hover {
             border-color: #c0392b;
             color: #c0392b;
             background: #fdf2f2;
@@ -1799,6 +1960,10 @@
         }
 
         .hidden { display: none !important; }
+
+        @media (max-width: 960px) {
+            .progress-tracker { top: 64px; }
+        }
 
         @media (max-width: 600px) {
             .page-hero { height: 320px; }

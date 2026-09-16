@@ -283,6 +283,7 @@
             <div class="form-group">
               <label class="form-label">Role</label>
               <select class="form-select" id="addFieldRole">
+                <option value="admin">Admin</option>
                 <option value="manager">Manager</option>
                 <option value="staff">Staff</option>
               </select>
@@ -333,6 +334,30 @@
       <div class="modal-footer">
         <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
         <button type="button" class="btn-danger"  id="confirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INFO MODAL ══ -->
+  <!-- Replaces native alert() popups (the ugly "127.0.0.1 says..." browser
+       dialog) for one-button confirmations like "Invite email resent." —
+       reuses the same modal-overlay/modal/modal-sm shell as confirmModal,
+       just with a single OK button and no destructive action wired up. -->
+  <div class="modal-overlay hidden" id="infoModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="infoTitle">Notice</h2>
+        </div>
+        <button type="button" class="modal-close" id="infoClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-message" id="infoBody"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="infoOk">OK</button>
       </div>
     </div>
   </div>

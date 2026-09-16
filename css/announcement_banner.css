@@ -34,6 +34,19 @@
   line-height: 1.5;
 }
 
+/* Sticks to the very top of the viewport, with the navbar (css/styles.css)
+   docking directly under it via --ann-banner-h, so the banner stays
+   visible while scrolling instead of disappearing above the fold. Scoped
+   to a direct child of <body> so this never affects the admin editor's
+   live preview, which renders the identical .ann-banner markup nested
+   inside its own preview box (js/admin_announcements.js), not at the
+   page root. */
+body > .ann-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
 .ann-banner--info {
   background: var(--ann-info-bg);
   color: var(--ann-info-text);

@@ -17,6 +17,16 @@ let dom = null;
 let activeResolve = null;
 let lastFocusedEl = null;
 let dismissible = true;
+// Resolves once /css/feedback_modal.css has actually loaded (or failed to,
+// so a broken/slow network doesn't hang the modal forever). Every caller
+// awaits this before the modal opens/focuses — otherwise, on a page's very
+// first showFeedbackModal()/showConfirmModal() call, the backdrop/card can
+// briefly render unstyled (still in normal document flow, not yet the
+// fixed-position overlay the stylesheet gives it) at the moment
+// requestAnimationFrame focuses a button inside it, and focusing an
+// off-screen element scrolls the page to it. Later calls on the same page
+// resolve this immediately since the stylesheet is already loaded.
+let stylesheetReady = null;
 
 function ensureIconFont() {
     const hasTabler = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -29,12 +39,21 @@ function ensureIconFont() {
 }
 
 function ensureStylesheet() {
-    if (document.querySelector('link[data-feedback-modal]')) return;
+    if (stylesheetReady) return stylesheetReady;
+    if (document.querySelector('link[data-feedback-modal]')) {
+        stylesheetReady = Promise.resolve();
+        return stylesheetReady;
+    }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = '/css/feedback_modal.css?v=25';
     link.setAttribute('data-feedback-modal', '');
+    stylesheetReady = new Promise((resolve) => {
+        link.addEventListener('load', resolve, { once: true });
+        link.addEventListener('error', resolve, { once: true });
+    });
     document.head.appendChild(link);
+    return stylesheetReady;
 }
 
 function trapFocus(event) {
@@ -144,7 +163,7 @@ function ensureDom() {
  * acknowledged, false if they cancelled or dismissed the dialog, or the
  * string "tertiary" if they picked the optional third action.
  */
-export function showFeedbackModal({
+export async function showFeedbackModal({
     type = 'info',
     title = '',
     message = '',
@@ -156,6 +175,7 @@ export function showFeedbackModal({
     destructive = false
 } = {}) {
     const el = ensureDom();
+    await ensureStylesheet();
 
     // A modal is already open — resolve it as dismissed before opening the
     // new one so no caller is left awaiting forever.

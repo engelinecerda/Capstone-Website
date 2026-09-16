@@ -1063,6 +1063,11 @@ table td {
   color: var(--muted-2);
 }
 
+body .fm-title {
+  font-family: var(--font);
+  font-weight: 700;
+}
+
 @media (max-width: 480px) {
   .pagination-bar {
     flex-direction: column;
@@ -1089,3 +1094,4 @@ table td {
 @media (max-width: 480px) {
   .stat-grid, .stat-row { grid-template-columns: 1fr 1fr; }
 }
+
