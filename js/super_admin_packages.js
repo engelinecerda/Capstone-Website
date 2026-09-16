@@ -606,7 +606,16 @@ function renderCategoryRail() {
       <span class="rail-count">${activeCount}</span>
     </button>`;
 
-  const catItems = allCategories.map(cat => {
+  const catItems = [...allCategories]
+    // Bug fix: this rendered allCategories in raw array order. Adding a
+    // category (unshift, wrong position) or using Move up/down (which
+    // only swaps sort_order values on the objects, not their position in
+    // this array) both left the rail showing stale order until the next
+    // full reload — Move up/down looked like it silently did nothing.
+    // Sorting here, the same way the initial query does, makes render
+    // correct regardless of how the array got mutated beforehand.
+    .sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)))
+    .map(cat => {
     const count = allPackages.filter(p => p.package_category_id === cat.package_category_id && p.is_active).length;
     const isArchived = !cat.is_active;
     const kebabItems = isArchived
@@ -977,7 +986,16 @@ function getFilteredInventory() {
       if (!hay.includes(term)) return false;
     }
     return true;
-  });
+  })
+    // Bug fix: this used to return in raw allPackages array order. Adding
+    // a package (unshift, wrong position) or using Move up/down in the
+    // Inventory list (which only swaps sort_order values on the package
+    // objects via getCategorySiblings, not their position in allPackages)
+    // both left the grid/list showing stale order until the next full
+    // reload — Move up/down looked like it silently did nothing. Sorting
+    // here, the same way the initial query does, makes render correct
+    // regardless of how the array got mutated beforehand.
+    .sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
 }
 
 function renderInventory() {
@@ -1609,6 +1627,20 @@ pkgCategorySelect.addEventListener('blur', () => {
   setFieldError(pkgCategorySelect, pkgCategoryError, (needsCategory && !pkgCategorySelect.value) ? 'Packages must have a category.' : '');
 });
 
+// "Catering" as a category (an organizational tag) and "uses the
+// customizable catering menu" (a separate feature flag) look related but
+// aren't — that's what caused a Catering-tagged test package to not show
+// up in the Catering Menu page. Auto-sync the checkbox to the category
+// choice so picking "Catering" turns it on, and picking anything else
+// turns it back off. Only fires on an actual user change of the dropdown
+// (not when a modal is opened and the field is set programmatically), so
+// opening Edit on an existing package never silently flips its saved
+// catering-menu setting — only a deliberate category change does.
+pkgCategorySelect.addEventListener('change', () => {
+  const selected = allCategories.find(c => String(c.package_category_id) === String(pkgCategorySelect.value));
+  pkgUsesCateringMenuToggle.checked = !!selected && selected.category_name.trim().toLowerCase() === 'catering';
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE: UNSAVED-CHANGES GUARD
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1792,7 +1824,12 @@ function clearPackageForm() {
   pkgLocationType.value = '';
   pkgBookingScope.value = '';
   pkgMaxQuantity.value  = '1';
-  pkgActiveToggle.checked = false;
+  // New packages default to Active — you'd otherwise have to remember to
+  // manually check this on every single new package, and forgetting means
+  // it silently sits invisible to customers until someone notices. Still
+  // fully overridable (uncheck to start as a draft), and validatePackageForm()
+  // still blocks saving as active if required fields/photos aren't filled in.
+  pkgActiveToggle.checked = true;
   pkgUsesCateringMenuToggle.checked = false;
   pkgPhotos      = [];
   pkgInclusions  = [];
@@ -2032,7 +2069,18 @@ async function openConfirmDeletePackage(packageId) {
 deleteModalOk.addEventListener('click', async () => {
   if (!pendingDeleteAction) return;
   const { scope, id, mode } = pendingDeleteAction;
+
+  // Nothing here told the admin a delete was actually running — the button
+  // was disabled (so double-clicks couldn't fire twice), but with no label
+  // change or spinner that's invisible, and package deletes in particular
+  // can take a moment (each photo is removed from Cloudinary one at a time
+  // before the row itself is deleted). Also lock Cancel/the X so the modal
+  // can't be dismissed mid-delete, leaving things in a half-finished state.
+  const originalLabel = deleteModalOk.textContent;
   deleteModalOk.disabled = true;
+  deleteModalOk.textContent = mode === 'archive' ? 'Archiving…' : 'Deleting…';
+  deleteModalCancel.disabled = true;
+  deleteModalClose.disabled = true;
 
   try {
     if (scope === 'category') {
@@ -2117,7 +2165,13 @@ deleteModalOk.addEventListener('click', async () => {
   } catch (err) {
     setModalMsg(deleteModalMessage, `Failed: ${err.message}`);
   } finally {
+    // Restore to what it was before this click, since on failure the modal
+    // stays open — without this it'd be stuck reading "Deleting…" forever
+    // with no way to tell the admin they can retry.
     deleteModalOk.disabled = false;
+    deleteModalOk.textContent = originalLabel;
+    deleteModalCancel.disabled = false;
+    deleteModalClose.disabled = false;
     pendingDeleteAction = null;
   }
 });
@@ -2772,6 +2826,17 @@ function handlePkgTableAction(e) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // VENUES
 // ═══════════════════════════════════════════════════════════════════════════════
+function sortVenuesInPlace() {
+  // Same order the initial loadVenues() query uses — sort_order ascending,
+  // then created_at descending as a tiebreaker — so any in-place add/edit
+  // of allVenues lands rows in the same order a fresh page load would.
+  allVenues.sort((a, b) => {
+    const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    if (orderDiff !== 0) return orderDiff;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+}
+
 async function loadVenues() {
   setMessage(venuePageMessage, 'Loading venues…');
   try {
@@ -2802,12 +2867,12 @@ function buildVenueRow(venue) {
     ? `<div class="action-cell">
         <button class="action-btn edit" data-venue-action="edit" data-id="${venue.venue_id}">Edit</button>
         <button class="action-btn restore" data-venue-action="restore" data-id="${venue.venue_id}">Restore</button>
-        <button class="action-btn archive" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
+        <button class="action-btn danger" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
       </div>`
     : `<div class="action-cell">
         <button class="action-btn edit" data-venue-action="edit" data-id="${venue.venue_id}">Edit</button>
         <button class="action-btn archive" data-venue-action="archive" data-id="${venue.venue_id}">Archive</button>
-        <button class="action-btn archive" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
+        <button class="action-btn danger" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
       </div>`;
 
   return `<tr>
@@ -2916,6 +2981,10 @@ venueModalSave.addEventListener('click', async () => {
       if (error) throw error;
       const idx = allVenues.findIndex(v => v.venue_id === editingVenueId);
       if (idx !== -1) allVenues[idx] = { ...allVenues[idx], ...data };
+      // Same reasoning as the add-venue branch below: changing a venue's
+      // Order needs a re-sort too, or it stays at its old array position
+      // until the next full reload.
+      sortVenuesInPlace();
       await logAudit({ action: 'Updated Venue', category: 'package', details: `Venue updated: ${name}`, entityId: editingVenueId });
       setMessage(venuePageMessage, 'Venue updated successfully.', 'success');
     } else {
@@ -2924,6 +2993,14 @@ venueModalSave.addEventListener('click', async () => {
       if (error) throw error;
       data._mappedCount = 0;
       allVenues.unshift(data);
+      // Bug fix: unshift always put the new venue at the very top of the
+      // list regardless of the Order value just entered, so a venue saved
+      // with e.g. order 3 would render above venues with order 1 and 2
+      // until the page was reloaded (loadVenues() re-fetches pre-sorted
+      // from the DB, which is why the mistake only showed up right after
+      // adding one). Re-sort so the freshly-added row lands in its
+      // correct position immediately.
+      sortVenuesInPlace();
       await logAudit({ action: 'Added Venue', category: 'package', details: `New venue created: ${name}`, entityId: data.venue_id });
       setMessage(venuePageMessage, 'Venue added successfully.', 'success');
     }
@@ -3046,12 +3123,12 @@ function buildBadgeTypeRow(badge) {
     ? `<div class="action-cell">
         <button class="action-btn edit" data-badgetype-action="edit" data-id="${badge.badge_id}">Edit</button>
         <button class="action-btn restore" data-badgetype-action="restore" data-id="${badge.badge_id}">Restore</button>
-        <button class="action-btn archive" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
+        <button class="action-btn danger" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
       </div>`
     : `<div class="action-cell">
         <button class="action-btn edit" data-badgetype-action="edit" data-id="${badge.badge_id}">Edit</button>
         <button class="action-btn archive" data-badgetype-action="archive" data-id="${badge.badge_id}">Archive</button>
-        <button class="action-btn archive" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
+        <button class="action-btn danger" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
       </div>`;
 
   return `<tr>
@@ -3066,8 +3143,13 @@ function buildBadgeTypeRow(badge) {
 
 function renderBadgeTypesTables() {
   const manageable = manageableBadgeTypes();
-  const active = manageable.filter(b => b.is_active);
-  const archived = manageable.filter(b => !b.is_active);
+  // Bug fix: same class of bug as Categories/Packages above — adding a
+  // badge type (push, wrong position) or editing one's Order left the
+  // table showing stale order until reload, since this rendered raw
+  // array order instead of sorting by sort_order.
+  const sorted = [...manageable].sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
+  const active = sorted.filter(b => b.is_active);
+  const archived = sorted.filter(b => !b.is_active);
 
   activeBadgeTypesBody.innerHTML = active.length
     ? active.map(buildBadgeTypeRow).join('')
@@ -3336,7 +3418,15 @@ async function loadCateringMenu() {
 }
 
 function dishesForCategory(categoryId) {
-  return allCateringDishes.filter(d => d.category_id === categoryId);
+  return allCateringDishes
+    .filter(d => d.category_id === categoryId)
+    // Bug fix: the ↑/↓ reorder buttons below swap sort_order values
+    // between two dish objects but never touch their position in
+    // allCateringDishes, so rendering raw array order made a reorder
+    // look like it silently did nothing until the drawer was reopened.
+    // Sorting here — the same way the initial query does — fixes both
+    // that and the equivalent "new dish added in the wrong spot" case.
+    .sort((a, b) => a.sort_order - b.sort_order);
 }
 
 function cateringPriceSummary(cat) {
@@ -3351,13 +3441,13 @@ function buildCateringCategoryRow(cat) {
     ? `<div class="action-cell">
         <button class="action-btn edit" data-catering-action="edit" data-id="${cat.category_id}">Edit</button>
         <button class="action-btn restore" data-catering-action="restore" data-id="${cat.category_id}">Restore</button>
-        <button class="action-btn archive" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
+        <button class="action-btn danger" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
       </div>`
     : `<div class="action-cell">
         <button class="action-btn tiers" data-catering-action="dishes" data-id="${cat.category_id}">Dishes</button>
         <button class="action-btn edit" data-catering-action="edit" data-id="${cat.category_id}">Edit</button>
         <button class="action-btn archive" data-catering-action="archive" data-id="${cat.category_id}">Archive</button>
-        <button class="action-btn archive" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
+        <button class="action-btn danger" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
       </div>`;
 
   return `<tr>
