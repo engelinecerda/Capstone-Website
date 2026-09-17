@@ -1,7 +1,8 @@
 // manager_notification_bell.js
 // Shared header notification bell + dropdown for every Manager-side admin page.
-// Reuses the existing `notifications` table/RLS/realtime setup — only the
+// Reuses the existing `notifications` table/RLS setup — only the
 // presentation (header bell + dropdown instead of a sidebar badge) is new.
+import { initAutoRefresh } from './auto_refresh.js';
 
 function escHtml(value) {
     return String(value ?? '')
@@ -195,12 +196,16 @@ export function initManagerNotificationBell(supabase, userId) {
 
     fetchAndRender();
 
-    supabase
-        .channel(`notif_bell_manager_${userId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => {
-            fetchAndRender();
-        })
-        .subscribe();
+    // Was a standing realtime postgres_changes channel, opened fresh on every
+    // admin page load (this bell mounts on nearly every Manager/Admin page).
+    // js/notifications.js's identical customer-side bell had the same
+    // pattern and turned out to be the single largest contributor to this
+    // project's Disk IO budget usage (2.1M+ realtime.list_changes calls,
+    // ~58% of all tracked query time) before it was switched to a plain
+    // interval — this bell was simply missed in that pass. initAutoRefresh
+    // still fires immediately on tab focus/visibility/bfcache-restore, so
+    // returning to a tab still feels current, not just the poll cadence.
+    initAutoRefresh(fetchAndRender);
 
     return fetchAndRender;
 }

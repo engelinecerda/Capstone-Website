@@ -7,6 +7,7 @@
 // one fetched batch, mirroring js/account.js's renderReservations() pattern
 // (RESERVATIONS_PAGE_SIZE + Array.slice) rather than server-side .range().
 import { customerSupabase as supabase } from './supabase.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -179,17 +180,15 @@ paginationEl.addEventListener('click', (e) => {
 });
 
 // Keeps this page's list/counts live if the dropdown (or another tab) marks
-// notifications read/unread while this page is open — same channel pattern
-// js/notifications.js's dropdown already uses.
-supabase
-  .channel(`notif_customer_page_${userId}`)
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'notifications',
-    filter: `user_id=eq.${userId}`,
-  }, () => loadNotifs())
-  .subscribe();
+// notifications read/unread while this page is open. Was a standing
+// realtime postgres_changes channel — js/notifications.js's dropdown had
+// the identical pattern and turned out to be the single largest
+// contributor to this project's Disk IO budget usage (2.1M+
+// realtime.list_changes calls, ~58% of all tracked query time) before it
+// was switched to a plain interval; this page was simply missed in that
+// pass. initAutoRefresh still fires immediately on tab focus/visibility/
+// bfcache-restore, so returning to this page still feels current.
+initAutoRefresh(() => loadNotifs());
 
 // ── Init ─────────────────────────────────────────────────────────────────
 await loadNotifs();

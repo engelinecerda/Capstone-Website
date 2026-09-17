@@ -148,17 +148,17 @@ function renderRosterRows() {
 
     return `
       <tr>
-        <td class="roster-name-cell">${escapeHtml(getEmployeeName(employee))}</td>
-        <td>${employee.email ? escapeHtml(employee.email) : '<span class="roster-muted">No email</span>'}</td>
-        <td>${employee.staff_role ? escapeHtml(toTitleCase(employee.staff_role)) : '<span class="roster-muted">—</span>'}</td>
-        <td>${count} reservation${count === 1 ? '' : 's'}</td>
-        <td>
+        <td class="roster-name-cell" data-label="Name">${escapeHtml(getEmployeeName(employee))}</td>
+        <td data-label="Email">${employee.email ? escapeHtml(employee.email) : '<span class="roster-muted">No email</span>'}</td>
+        <td data-label="Position">${employee.staff_role ? escapeHtml(toTitleCase(employee.staff_role)) : '<span class="roster-muted">—</span>'}</td>
+        <td data-label="Assignments">${count} reservation${count === 1 ? '' : 's'}</td>
+        <td data-label="Active">
           <label class="pm2-toggle">
             <input type="checkbox" class="roster-active-toggle" data-id="${escapeHtml(employee.staff_id)}" ${employee.is_active ? 'checked' : ''} ${isManager ? '' : 'disabled'}>
             <span class="pm2-toggle-track"></span>
           </label>
         </td>
-        <td class="roster-actions-cell"><div class="roster-actions-inner">${actionsCell}</div></td>
+        <td class="roster-actions-cell" data-label="Actions"><div class="roster-actions-inner">${actionsCell}</div></td>
       </tr>
     `;
   }).join('');

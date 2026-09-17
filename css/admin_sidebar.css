@@ -123,6 +123,32 @@ body.sidebar-open .sidebar-overlay { display: block; }
   }
 
   .page-title { font-size: 22px !important; }
+
+  /* ── TOUCH TARGETS ──────────────────────────────────────────
+     Buttons/nav items/pagination are sized for a mouse everywhere
+     else (30-40px, tuned for desktop density) — raise the floor to
+     ~44px at phone widths without touching that desktop sizing.
+     Covers the shared button classes (manager-theme.css), the row-
+     action button shared by most tables (admin_reservations.css's
+     .action-btn, imported by several other pages), and the sidebar's
+     own icon buttons, now that the drawer above gives them room. */
+  .nav-item,
+  .btn-primary, .primary-btn, .header-btn-primary,
+  .btn-secondary, .secondary-btn, .header-btn, .filter-range-clear,
+  .action-btn, .roster-delete-btn, .closed-date-reopen-btn,
+  .sidebar-logout-btn,
+  .sidebar-collapse-btn {
+    min-height: 44px !important;
+  }
+
+  .page-btn, .page-ellipsis {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .pagination-controls {
+    gap: 8px !important;
+  }
 }
 
 /* ── SMALL PHONE (≤ 480px) ───────────────────────────────────── */

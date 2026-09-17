@@ -1,7 +1,51 @@
 export const BLOCKING_RESERVATION_STATUSES = new Set(['pending', 'approved', 'confirmed', 'rescheduled']);
 
+// calendar_blackouts was hand-rolled in the Supabase SQL Editor (see
+// supabase_setup.md Step 7 and the note at the top of
+// 20260802_fix_calendar_blackouts_rls.sql) rather than shipped in a
+// migration, so its actual column names aren't guaranteed to match the
+// docs — 'closed_date'/'reason' is what's actually live today, ahead of
+// the originally-documented 'date'/'note'. Both lists still carry the
+// legacy name as a fallback in case an environment was set up from the
+// docs verbatim.
 export const BLACKOUT_DATE_COLUMNS = ['closed_date', 'date'];
-export const BLACKOUT_REASON_COLUMNS = ['note', 'reason'];
+export const BLACKOUT_REASON_COLUMNS = ['reason', 'note'];
+
+// Every candidate past the first in the lists above costs a failed (400)
+// request against a column that doesn't exist — harmless (caught below)
+// but noisy in the network tab, and it repeats on every page that calls
+// resolveBlackout*Column with its own fresh in-memory cache. Once a
+// column is confirmed for this browser tab, remember it in sessionStorage
+// so later calls — even from a different page/module with no in-memory
+// cache of their own — try the right column first instead of re-probing
+// from scratch. Session-scoped (not localStorage) so a schema change
+// self-heals on the next tab/visit rather than sticking forever.
+const BLACKOUT_COLUMN_STORAGE_KEYS = {
+    date: 'eli_blackout_date_column',
+    reason: 'eli_blackout_reason_column'
+};
+
+function readStoredBlackoutColumn(kind) {
+    try {
+        return sessionStorage.getItem(BLACKOUT_COLUMN_STORAGE_KEYS[kind]) || null;
+    } catch {
+        return null;
+    }
+}
+
+function writeStoredBlackoutColumn(kind, value) {
+    try {
+        sessionStorage.setItem(BLACKOUT_COLUMN_STORAGE_KEYS[kind], value);
+    } catch {
+        // sessionStorage unavailable (privacy mode, etc.) — in-memory cache still works
+    }
+}
+
+function orderedBlackoutColumnCandidates(kind, candidates) {
+    const remembered = readStoredBlackoutColumn(kind);
+    if (!remembered) return candidates;
+    return [remembered, ...candidates.filter((column) => column !== remembered)];
+}
 
 export function formatDateKey(value) {
     return String(value || '').split('T')[0];
@@ -137,7 +181,7 @@ export async function fetchCalendarAvailability(supabase, { fromDate, toDate } =
 export async function resolveBlackoutDateColumn(supabase, cache = {}) {
     if (cache.blackoutDateColumn) return cache.blackoutDateColumn;
 
-    for (const column of BLACKOUT_DATE_COLUMNS) {
+    for (const column of orderedBlackoutColumnCandidates('date', BLACKOUT_DATE_COLUMNS)) {
         const { error } = await supabase
             .from('calendar_blackouts')
             .select(column)
@@ -145,6 +189,7 @@ export async function resolveBlackoutDateColumn(supabase, cache = {}) {
 
         if (!error) {
             cache.blackoutDateColumn = column;
+            writeStoredBlackoutColumn('date', column);
             return column;
         }
     }
@@ -155,7 +200,7 @@ export async function resolveBlackoutDateColumn(supabase, cache = {}) {
 export async function resolveBlackoutReasonColumn(supabase, cache = {}) {
     if (cache.blackoutReasonColumn) return cache.blackoutReasonColumn;
 
-    for (const column of BLACKOUT_REASON_COLUMNS) {
+    for (const column of orderedBlackoutColumnCandidates('reason', BLACKOUT_REASON_COLUMNS)) {
         const { error } = await supabase
             .from('calendar_blackouts')
             .select(column)
@@ -163,6 +208,7 @@ export async function resolveBlackoutReasonColumn(supabase, cache = {}) {
 
         if (!error) {
             cache.blackoutReasonColumn = column;
+            writeStoredBlackoutColumn('reason', column);
             return column;
         }
     }
