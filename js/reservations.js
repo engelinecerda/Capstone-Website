@@ -648,7 +648,9 @@ function toDateKey(date) {
     return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-');
 }
 
-function fmtPeso(v) { return '₱' + Number(v || 0).toLocaleString(); }
+function fmtPeso(v) {
+    return '₱' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 function formatDisplayDate(dateKey) {
     if (!dateKey) return '';
@@ -2853,71 +2855,86 @@ function buildSummary() {
     if (S.locationType === 'onsite') {
         if (S.miniPackage) {
             total += S.miniPackage.price;
-            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; &#8369;' + S.miniPackage.price.toLocaleString());
+            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price), 'package');
         }
         if (S.snackAddon) {
             total += S.snackAddon.price;
-            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
+            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; ' + fmtPeso(S.snackAddon.price), 'plus');
         }
     } else if (S.offsiteCategory === 'catering') {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
         const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
-        pkgRows += sr('Service', catObj ? catObj.name : 'Catering');
+        pkgRows += sr('Service', catObj ? catObj.name : 'Catering', 'tools-kitchen-2');
         const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
         const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
         const cateringPlainItems = cateringItems.filter(i => i !== cateringOffer);
-        if (cateringPlainItems.length) pkgRows += sr('Inclusions', cateringPlainItems.join(', '));
-        else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc);
-        if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''));
+        if (cateringPlainItems.length) pkgRows += sr('Inclusions', cateringPlainItems.join(', '), 'list-check');
+        else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc, 'list-check');
+        if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''), 'gift');
         S.cateringCart.filter(i => i && i.pax).forEach(i => {
             total += i.price;
-            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; &#8369;' + i.price.toLocaleString());
+            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; ' + fmtPeso(i.price), 'users');
         });
-        if (total === 0) pkgRows += sr('Price', 'Contact for quote');
+        if (total === 0) pkgRows += sr('Price', 'Contact for quote', 'tag');
     } else if (S.offsitePackage) {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
         total = S.offsitePackage.price;
-        pkgRows += sr('Service', catObj ? catObj.name : '');
-        pkgRows += sr('Package', S.offsitePackage.label);
-        if (S.offsitePackage.price > 0) pkgRows += sr('Price', '&#8369;' + S.offsitePackage.price.toLocaleString());
+        pkgRows += sr('Service', catObj ? catObj.name : '', 'tools-kitchen-2');
+        pkgRows += sr('Package', S.offsitePackage.label, 'package');
+        if (S.offsitePackage.price > 0) pkgRows += sr('Price', fmtPeso(S.offsitePackage.price), 'tag');
     }
 
     // Itemised, never folded into the package price — customer sees
     // Subtotal, then the service charge as its own line, then Total.
+    // Subtotal/Service charge/Total are the receipt-style lines of the
+    // Total card — deliberately icon-less (unlike every Event/Contact row)
+    // so that card reads as a plain receipt, not another field list.
     const charge = resolveServiceCharge(total, S.locationType, S.categoryId);
-    const totalRowsHtml = total > 0
-        ? sr('Subtotal', '&#8369;' + total.toLocaleString()) +
-          sr('Service charge (' + charge.pct + '%)', '&#8369;' + charge.amount.toLocaleString()) +
-          '<div class="summary-total"><span>Total</span><span>&#8369;' + charge.total.toLocaleString() + '</span></div>'
-        : '<div class="summary-total"><span>Total</span><span>Contact for quote</span></div>';
+    const pricingRowsHtml = total > 0
+        ? sr('Subtotal', fmtPeso(total)) +
+          sr('Service charge (' + charge.pct + '%)', fmtPeso(charge.amount)) +
+          totalRow('Total', fmtPeso(charge.total))
+        : totalRow('Total', 'Contact for quote');
 
-    const locStr   = S.locationType === 'onsite'
-        ? '&#127968; Onsite &mdash; ELI Coffee'
-        : '&#128663; Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
+    const locStr   = S.locationType === 'onsite' ? 'Onsite &mdash; ELI Coffee' : 'Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
     const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
-    box.innerHTML =
-        '<div class="summary-section-title">Event</div>' +
-        sr('Location',   locStr) +
+    const eventRows =
+        sr('Location',   locStr, 'building-store') +
         pkgRows +
-        sr('Guests',     S.guestCount) +
-        sr('Event Type', displayEventType) +
-        sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate) +
-        sr('Time',       S.time) +
-        '<hr class="summary-divider">' +
-        '<div class="summary-section-title">Contact</div>' +
-        sr('Name',  S.name) +
-        sr('Email', S.email) +
-        sr('Phone', S.phone) +
-        (S.requests ? sr('Requests', S.requests) : '') +
-        '<hr class="summary-divider">' +
-        totalRowsHtml;
+        sr('Guests',     S.guestCount, 'users') +
+        sr('Event Type', displayEventType, 'confetti') +
+        sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate, 'calendar') +
+        sr('Time',       S.time, 'clock');
+
+    const contactRows =
+        sr('Name',  S.name, 'user') +
+        sr('Email', S.email, 'mail') +
+        sr('Phone', S.phone, 'phone') +
+        (S.requests ? sr('Requests', S.requests, 'message') : '');
+
+    box.innerHTML =
+        '<div class="rs-summary-cards">' +
+        summaryCard('Event',    eventRows) +
+        summaryCard('Contact',  contactRows) +
+        summaryCard('Total',    pricingRowsHtml) +
+        '</div>';
 
     document.getElementById('guest-warning').classList.toggle('hidden', isLoggedIn);
 }
 
-function sr(label, value) {
-    return '<div class="summary-row"><span class="s-label">' + label + '</span><span class="s-value">' + value + '</span></div>';
+function summaryCard(title, rowsHtml) {
+    if (!rowsHtml) return '';
+    return '<div class="rs-summary-card"><p class="rs-summary-card-title">' + title + '</p>' + rowsHtml + '</div>';
+}
+
+function sr(label, value, icon) {
+    const iconHtml = icon ? '<i class="ti ti-' + icon + '" aria-hidden="true"></i>' : '';
+    return '<div class="rs-summary-row"><span class="rs-row-label">' + iconHtml + label + '</span><span class="rs-row-value">' + value + '</span></div>';
+}
+
+function totalRow(label, value) {
+    return '<div class="rs-summary-total-row"><span class="rs-row-label">' + label + '</span><span class="rs-row-value">' + value + '</span></div>';
 }
 
 // ── Contract download ──────────────────────────────────────────────────
