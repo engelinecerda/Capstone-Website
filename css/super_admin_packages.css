@@ -318,6 +318,14 @@
   color: var(--neutral-txt);
 }
 
+/* Discount status pill — computed live from is_active + the time window,
+   never a stored flag (see computeDiscountStatus() in
+   js/package_discount_helpers.js). */
+.status-pill.disc-active    { background: var(--approved); color: var(--approved-txt); }
+.status-pill.disc-scheduled { background: var(--pending);  color: var(--pending-txt); }
+.status-pill.disc-expired   { background: var(--neutral);  color: var(--neutral-txt); }
+.status-pill.disc-off       { background: var(--declined); color: var(--declined-txt); }
+
 /* Action buttons in table */
 .action-cell {
   display: flex;
@@ -963,6 +971,18 @@
 .badge-toggle-chip.active.variant-info     { background: var(--info);     color: var(--info-txt); }
 .badge-toggle-chip.active.variant-neutral  { background: var(--neutral); color: var(--neutral-txt); }
 
+.discount-status-row { margin-bottom: 14px; }
+
+.discount-preview {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--neutral);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
 .badge-readonly-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;
@@ -1035,6 +1055,16 @@
   margin-bottom: 10px;
 }
 .pkg-spec-price { font-size: 16px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.pkg-spec-price--discounted { display: inline-flex; align-items: baseline; gap: 6px; }
+.pkg-price-original { font-size: 12px; font-weight: 500; color: var(--muted); }
+.pkg-price-off {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--approved-txt);
+  background: var(--approved);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
 .spec-leader { flex: 1 1 auto; border-bottom: 1px dotted var(--border); height: 1px; align-self: center; }
 .spec-figures {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;

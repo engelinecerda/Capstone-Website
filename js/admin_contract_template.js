@@ -1,19 +1,28 @@
 // admin_contract_template.js
 // Powers the "Contract Template" tab on admin/config/form.html.
 //
-// Extends the existing per-package contract_templates system (unchanged,
-// still edited/versioned via admin/contracts.html) with structure:
+// Extends the existing per-package contract_templates system with
+// structure — this IS the only editor for the pieces below; the
+// contract_templates row itself (template_body, one per package) is only
+// ever created here too, the first time a package gets clauses saved
+// (admin/contracts.html is a different page entirely — the signed-
+// contract review/verification queue — it has no contract_templates code):
 //   - contract_field   — Layer 1 (Reservation Summary row visibility/label/order), global
 //   - contract_template_clause — Layer 2 (editable clauses), scoped to one package's template
 //   - contract_locked_clause   — Layer 3 (legal boilerplate), global, locked by default
 //
-// The merge-token engine (regex, vocabulary) lives in js/merge_tokens.js,
-// shared with the Notifications Configuration message editor and mirroring
+// The template/clause fetch (js/contract_render.js) is shared with
+// js/reservations.js's Review & Sign step, so this editor's preview and
+// the customer's actual preview can't independently drift on which row
+// counts as "the current template" (BUG-03). The merge-token engine
+// (regex, vocabulary) lives in js/merge_tokens.js, shared with the
+// Notifications Configuration message editor and mirroring
 // supabase/functions/generate-signed-contract/index.ts's mergeTemplate() —
 // keep all in sync if the token vocabulary changes.
 import { portalSupabase as supabase } from './supabase.js';
 import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
+import { fetchContractTemplateData } from './contract_render.js';
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -99,28 +108,14 @@ async function loadGlobalData() {
   };
 }
 
+// Shares its query with js/reservations.js's Review & Sign step
+// (js/contract_render.js) — same table/filter/order on both sides, so this
+// editor and the customer's actual preview can never independently drift
+// on which template/clause rows count as "the current one" (BUG-03).
 async function loadTemplateForPackage(packageId) {
-  const { data: template } = await supabase
-    .from('contract_templates')
-    .select('template_id, version_no, contract_type')
-    .eq('package_id', packageId)
-    .eq('is_active', true)
-    .order('version_no', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  const { template, clauses } = await fetchContractTemplateData(supabase, packageId);
   currentTemplate = template || null;
-
-  if (currentTemplate) {
-    const { data: clauseRows } = await supabase
-      .from('contract_template_clause')
-      .select('clause_id, heading, body, sort_order')
-      .eq('template_id', currentTemplate.template_id)
-      .order('sort_order', { ascending: true });
-    templateClauses = (clauseRows || []).map((c) => ({ ...c }));
-  } else {
-    templateClauses = [];
-  }
+  templateClauses = clauses.map((c) => ({ ...c }));
 }
 
 // ── Rendering: Layer 1 fields ────────────────────────────────────────────

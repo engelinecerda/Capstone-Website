@@ -14,6 +14,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
+import { computeDiscountStatus, pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -25,6 +26,7 @@ const PACKAGE_VENUE_TABLE = 'package_venue';
 const PACKAGE_PHOTO_TABLE = 'package_photo';
 const BADGE_TABLE = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
+const PACKAGE_DISCOUNT_TABLE = 'package_discount';
 const CATERING_CATEGORY_TABLE = 'catering_dish_category';
 const CATERING_DISH_TABLE = 'catering_dish';
 
@@ -62,8 +64,11 @@ const archivedRefCountCache = new Map(); // package_id -> reservation reference 
 let allBadgeDefs          = [];          // full badge table (admin sees all, incl. inactive)
 let packageBadgeMap       = new Map();   // package_id -> Set(badge_id)  [admin-assigned]
 let bestSellerByCategory  = new Map();   // package_category_id -> package_id  [derived]
+let discountsByPackage    = new Map();   // package_id -> package_discount[]  (all rows, incl. inactive history)
 let badgeModalPackageId   = null;
 let editingBadgeTypeId    = null;        // badge_id being edited in the Badge Types view, null = add mode
+let discountModalPackageId = null;
+let editingDiscountId      = null;       // package_discount row being edited; null = the Save button inserts a new row
 
 // Catering menu
 let allCateringCategories   = [];        // catering_dish_category rows (for the currently selected package)
@@ -174,6 +179,24 @@ const badgeModalDone      = document.getElementById('badgeModalDone');
 const badgeModalMessage   = document.getElementById('badgeModalMessage');
 const badgeBestSellerRow  = document.getElementById('badgeBestSellerRow');
 const badgeChipList       = document.getElementById('badgeChipList');
+
+// ─── DOM: Discount Modal ────────────────────────────────────────────────────
+const discountModal          = document.getElementById('discountModal');
+const discountModalSub       = document.getElementById('discountModalSub');
+const discountModalClose     = document.getElementById('discountModalClose');
+const discountModalMessage   = document.getElementById('discountModalMessage');
+const discountStatusPill     = document.getElementById('discountStatusPill');
+const discPercentOffInput    = document.getElementById('discPercentOff');
+const discPercentOffError    = document.getElementById('discPercentOffError');
+const discLabelInput         = document.getElementById('discLabel');
+const discStartsAtInput      = document.getElementById('discStartsAt');
+const discEndsAtInput        = document.getElementById('discEndsAt');
+const discWindowError        = document.getElementById('discWindowError');
+const discActiveInput        = document.getElementById('discActive');
+const discountPreview        = document.getElementById('discountPreview');
+const discountEndBtn         = document.getElementById('discountEndBtn');
+const discountNewBtn         = document.getElementById('discountNewBtn');
+const discountSaveBtn        = document.getElementById('discountSaveBtn');
 
 // ─── DOM: Delete/Reassign Modal ───────────────────────────────────────────────
 const deleteModal          = document.getElementById('deleteModal');
@@ -473,7 +496,8 @@ async function loadInventory() {
       { data: venues, error: venueErr },
       { data: badgeDefs, error: badgeErr },
       { data: packageBadgeRows, error: pkgBadgeErr },
-      { data: bestSellerRows, error: bestSellerErr }
+      { data: bestSellerRows, error: bestSellerErr },
+      { data: discountRows, error: discountErr }
     ] = await Promise.all([
       supabase.from(CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from('package').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
@@ -493,6 +517,11 @@ async function loadInventory() {
       // No p_category_id — the admin view loads every category up front, so
       // resolve every category's derived Best Seller in one call.
       supabase.rpc('get_best_seller_package_ids'),
+      // Full history (not just is_active) — the Discount modal needs to
+      // show a package's most recent row even once it's expired/off, and
+      // computeDiscountStatus() derives the live status from the window,
+      // not from what's fetched here.
+      supabase.from(PACKAGE_DISCOUNT_TABLE).select('*').order('created_at', { ascending: false }),
     ]);
     if (catErr) throw catErr;
     if (pkgErr) throw pkgErr;
@@ -502,6 +531,7 @@ async function loadInventory() {
     if (badgeErr) throw badgeErr;
     if (pkgBadgeErr) throw pkgBadgeErr;
     if (bestSellerErr) throw bestSellerErr;
+    if (discountErr) throw discountErr;
 
     allCategories = cats || [];
     allPackages   = pkgs || [];
@@ -527,6 +557,12 @@ async function loadInventory() {
 
     bestSellerByCategory = new Map();
     (bestSellerRows || []).forEach(r => bestSellerByCategory.set(r.package_category_id, r.package_id));
+
+    discountsByPackage = new Map();
+    (discountRows || []).forEach(d => {
+      if (!discountsByPackage.has(d.package_id)) discountsByPackage.set(d.package_id, []);
+      discountsByPackage.get(d.package_id).push(d);
+    });
 
     await loadCoverPhotosForAllPackages();
 
@@ -748,7 +784,7 @@ function buildCardMenu(pkg) {
       ]
     : [
         { action: 'duplicate', label: 'Duplicate' },
-        ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }, { action: 'badges', label: 'Badges' }]),
+        ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }, { action: 'badges', label: 'Badges' }, { action: 'discount', label: 'Discount' }]),
         { divider: true },
         { action: 'move-up', label: 'Move up' },
         { action: 'move-down', label: 'Move down' },
@@ -851,6 +887,32 @@ function buildBadgeChipsHtml(pkg) {
   ).join('')}</div>`;
 }
 
+// Most recent package_discount row for a package (active, scheduled,
+// expired, or off) — the one the Discount modal edits. Rows are already
+// sorted newest-first from loadInventory()'s query.
+function getPkgLatestDiscount(pkg) {
+  return (discountsByPackage.get(pkg.package_id) || [])[0] || null;
+}
+
+function getPkgActiveDiscount(pkg) {
+  return pickActiveDiscount(discountsByPackage.get(pkg.package_id));
+}
+
+// Struck-through original + discounted price when a discount is currently
+// active; the plain price otherwise — so the admin sees the same effect on
+// the inventory grid/table that a customer would see, not just inside the
+// Discount modal.
+function buildPkgPriceHtml(pkg) {
+  const discount = getPkgActiveDiscount(pkg);
+  if (!discount) return `<span class="pkg-spec-price">${formatCurrency(pkg.price)}</span>`;
+  const applied = applyDiscount(pkg.price, discount);
+  return `<span class="pkg-spec-price pkg-spec-price--discounted">
+      <s class="pkg-price-original">${formatCurrency(applied.listPrice)}</s>
+      ${formatCurrency(applied.discountedPrice)}
+      <span class="pkg-price-off">−${applied.percentOff}%</span>
+    </span>`;
+}
+
 function archivedReasonLine(pkg) {
   const count = archivedRefCountCache.get(pkg.package_id);
   if (count === undefined) return `<p class="tier-ladder">Archived</p>`;
@@ -901,7 +963,7 @@ function buildPkgCard(pkg) {
         ${buildBadgeChipsHtml(pkg)}
         <p class="pkg-card-meta">${escapeHtml(catLabel)} · ${escapeHtml(modeLabel)}</p>
         <div class="pkg-spec-line">
-          <span class="pkg-spec-price">${formatCurrency(pkg.price)}</span>
+          ${buildPkgPriceHtml(pkg)}
           <span class="spec-leader"></span>
           <span class="spec-figures">${escapeHtml(guestRangeLabel(pkg))} · ${escapeHtml(formatDuration(pkg.duration_hours))}</span>
         </div>
@@ -936,7 +998,7 @@ function buildPkgListRow(pkg) {
       </div>
     </td>
     <td>${escapeHtml(catLabel)}</td>
-    <td>${escapeHtml(formatCurrency(pkg.price))}</td>
+    <td>${buildPkgPriceHtml(pkg)}</td>
     <td>${escapeHtml(guestRangeLabel(pkg))}</td>
     <td>${buildTierLadder(pkg)}</td>
     <td>
@@ -2471,6 +2533,201 @@ badgeModalDone.addEventListener('click',  () => closeModal(badgeModal));
 badgeModal.addEventListener('click', e => { if (e.target === badgeModal) closeModal(badgeModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PACKAGE DISCOUNT
+// ═══════════════════════════════════════════════════════════════════════════════
+// The modal always edits exactly one package_discount row at a time:
+//  - If the package's most recent row is still active/scheduled, that row
+//    is loaded for editing (Save = update; End Discount ends it).
+//  - Otherwise the form starts blank (Save = insert a fresh row), and the
+//    old row (if any) stays untouched in the table as history — expired
+//    discounts are deactivated, never deleted, so a promo can be re-run
+//    later and past bookings that snapshotted it still resolve correctly.
+// "+ New Discount" only appears while a row is active/scheduled — clicking
+// it explains the one-active-discount-per-package rule (enforced for real
+// by the partial unique index) instead of letting the admin hit a raw
+// Postgres constraint error.
+function discIsoToLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function discLocalInputToIso(value) {
+  if (!value) return null;
+  return new Date(value).toISOString();
+}
+
+function openDiscountModal(packageId) {
+  const pkg = allPackages.find(p => p.package_id === packageId);
+  if (!pkg) return;
+  discountModalPackageId = packageId;
+  discountModalSub.textContent = `Set a percentage discount for ${pkg.package_name}`;
+  setModalMsg(discountModalMessage, '');
+
+  const latest = getPkgLatestDiscount(pkg);
+  const latestStatus = latest ? computeDiscountStatus(latest) : 'off';
+  const editable = latest && (latestStatus === 'active' || latestStatus === 'scheduled');
+
+  editingDiscountId = editable ? latest.discount_id : null;
+  discPercentOffInput.value = editable ? latest.percent_off : '';
+  discLabelInput.value = editable ? (latest.label || '') : '';
+  discStartsAtInput.value = editable ? discIsoToLocalInput(latest.starts_at) : '';
+  discEndsAtInput.value = editable ? discIsoToLocalInput(latest.ends_at) : '';
+  discActiveInput.checked = editable ? !!latest.is_active : true;
+  discPercentOffError.classList.add('hidden');
+  discWindowError.classList.add('hidden');
+
+  discountEndBtn.classList.toggle('hidden', !editable);
+  discountNewBtn.classList.toggle('hidden', !editable);
+
+  renderDiscountPreviewAndStatus();
+  openModal(discountModal);
+  discPercentOffInput.focus();
+}
+
+function renderDiscountPreviewAndStatus() {
+  const pkg = allPackages.find(p => p.package_id === discountModalPackageId);
+  if (!pkg) return;
+  const draft = {
+    percent_off: Number(discPercentOffInput.value || 0),
+    label: discLabelInput.value.trim(),
+    starts_at: discLocalInputToIso(discStartsAtInput.value),
+    ends_at: discLocalInputToIso(discEndsAtInput.value),
+    is_active: discActiveInput.checked
+  };
+  const status = computeDiscountStatus(draft);
+  discountStatusPill.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+  discountStatusPill.className = `status-pill disc-${status}`;
+
+  if (!draft.percent_off || draft.percent_off <= 0) {
+    discountPreview.textContent = '';
+    return;
+  }
+  const applied = applyDiscount(pkg.price, { ...draft, is_active: true }); // preview the effect regardless of the Active toggle
+  discountPreview.textContent = `${formatCurrency(applied.listPrice)} → ${formatCurrency(applied.discountedPrice)} at ${applied.percentOff}% off`;
+}
+
+[discPercentOffInput, discLabelInput, discStartsAtInput, discEndsAtInput, discActiveInput].forEach(el => {
+  el.addEventListener('input', renderDiscountPreviewAndStatus);
+  el.addEventListener('change', renderDiscountPreviewAndStatus);
+});
+
+function validateDiscountForm() {
+  discPercentOffError.classList.add('hidden');
+  discWindowError.classList.add('hidden');
+  const percentOff = Number(discPercentOffInput.value);
+  if (!Number.isFinite(percentOff) || percentOff <= 0 || percentOff > 100) {
+    discPercentOffError.textContent = 'Enter a percent off between 0 and 100.';
+    discPercentOffError.classList.remove('hidden');
+    return false;
+  }
+  const starts = discLocalInputToIso(discStartsAtInput.value);
+  const ends = discLocalInputToIso(discEndsAtInput.value);
+  if (starts && ends && new Date(starts) >= new Date(ends)) {
+    discWindowError.textContent = 'End must be after start.';
+    discWindowError.classList.remove('hidden');
+    return false;
+  }
+  return true;
+}
+
+async function saveDiscount() {
+  if (!validateDiscountForm()) return;
+  const pkg = allPackages.find(p => p.package_id === discountModalPackageId);
+  if (!pkg) return;
+
+  const payload = {
+    package_id: discountModalPackageId,
+    percent_off: Number(discPercentOffInput.value),
+    label: discLabelInput.value.trim() || null,
+    starts_at: discLocalInputToIso(discStartsAtInput.value),
+    ends_at: discLocalInputToIso(discEndsAtInput.value),
+    is_active: discActiveInput.checked
+  };
+
+  try {
+    let saved;
+    if (editingDiscountId) {
+      const { data, error } = await supabase
+        .from(PACKAGE_DISCOUNT_TABLE)
+        .update(payload)
+        .eq('discount_id', editingDiscountId)
+        .select()
+        .single();
+      if (error) throw error;
+      saved = data;
+      const list = discountsByPackage.get(discountModalPackageId) || [];
+      const idx = list.findIndex(d => d.discount_id === editingDiscountId);
+      if (idx !== -1) list[idx] = saved; else list.unshift(saved);
+      discountsByPackage.set(discountModalPackageId, list);
+    } else {
+      const { data, error } = await supabase
+        .from(PACKAGE_DISCOUNT_TABLE)
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        // Partial unique index one_active_discount_per_package — surfaces
+        // if payload.is_active is true and another row is somehow already
+        // active (shouldn't happen via this UI, but a second admin session
+        // could race). Explain it rather than showing the raw DB error.
+        if (error.code === '23505') throw new Error('This package already has an active or scheduled discount. End it first, then start a new one.');
+        throw error;
+      }
+      saved = data;
+      const list = discountsByPackage.get(discountModalPackageId) || [];
+      list.unshift(saved);
+      discountsByPackage.set(discountModalPackageId, list);
+    }
+
+    await logAudit({
+      action: editingDiscountId ? 'Updated Package Discount' : 'Created Package Discount',
+      category: 'package',
+      details: `${pkg.package_name}: ${payload.percent_off}% off${payload.label ? ' ("' + payload.label + '")' : ''}`,
+      entityId: discountModalPackageId
+    });
+
+    closeModal(discountModal);
+    renderInventory();
+  } catch (err) {
+    setModalMsg(discountModalMessage, err.message || 'Failed to save discount.');
+  }
+}
+
+async function endDiscount() {
+  if (!editingDiscountId) return;
+  const pkg = allPackages.find(p => p.package_id === discountModalPackageId);
+  try {
+    const { data, error } = await supabase
+      .from(PACKAGE_DISCOUNT_TABLE)
+      .update({ is_active: false })
+      .eq('discount_id', editingDiscountId)
+      .select()
+      .single();
+    if (error) throw error;
+    const list = discountsByPackage.get(discountModalPackageId) || [];
+    const idx = list.findIndex(d => d.discount_id === editingDiscountId);
+    if (idx !== -1) list[idx] = data;
+    discountsByPackage.set(discountModalPackageId, list);
+
+    await logAudit({ action: 'Ended Package Discount', category: 'package', details: pkg?.package_name || '', entityId: discountModalPackageId });
+
+    closeModal(discountModal);
+    renderInventory();
+  } catch (err) {
+    setModalMsg(discountModalMessage, err.message || 'Failed to end discount.');
+  }
+}
+
+discountModalClose.addEventListener('click', () => closeModal(discountModal));
+discountModal.addEventListener('click', e => { if (e.target === discountModal) closeModal(discountModal); });
+discountSaveBtn.addEventListener('click', saveDiscount);
+discountEndBtn.addEventListener('click', endDiscount);
+discountNewBtn.addEventListener('click', () => {
+  setModalMsg(discountModalMessage, 'End the current discount before starting a new one.');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE TIER — right-anchored drawer (replaces the old below-table panel)
 // ═══════════════════════════════════════════════════════════════════════════════
 function trapFocus(container) {
@@ -2763,6 +3020,7 @@ function handlePkgTableAction(e) {
   if (pkgAction === 'restore')   openConfirmRestorePackage(id);
   if (pkgAction === 'tiers')     openTierDrawer(id, name, btn);
   if (pkgAction === 'badges')    openBadgeModal(id);
+  if (pkgAction === 'discount')  openDiscountModal(id);
   if (pkgAction === 'delete')    openConfirmDeletePackage(id);
   if (pkgAction === 'duplicate') duplicatePackage(id);
   if (pkgAction === 'move-up')   movePackage(id, -1);
@@ -3700,6 +3958,7 @@ document.addEventListener('keydown', e => {
   if (!venueModal.classList.contains('hidden'))    closeModal(venueModal);
   if (!badgeModal.classList.contains('hidden'))    closeModal(badgeModal);
   if (!badgeTypeModal.classList.contains('hidden')) closeModal(badgeTypeModal);
+  if (!discountModal.classList.contains('hidden')) closeModal(discountModal);
   if (!deleteModal.classList.contains('hidden'))   closeModal(deleteModal);
   if (!cateringCategoryModal.classList.contains('hidden')) closeModal(cateringCategoryModal);
   if (!cateringDishDrawer.classList.contains('hidden')) closeCateringDishDrawer();
