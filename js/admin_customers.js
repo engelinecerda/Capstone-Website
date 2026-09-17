@@ -149,7 +149,7 @@ function renderCustomers(customers) {
 
     return `
       <tr>
-        <td>
+        <td data-label="Customer">
           <div class="customer-cell">
             <div class="customer-head">
               <span class="avatar">${escapeHtml(getCustomerInitials(customer))}</span>
@@ -160,15 +160,15 @@ function renderCustomers(customers) {
             </div>
           </div>
         </td>
-        <td>
+        <td data-label="Contact">
           <span class="table-main">${escapeHtml(customer.email || 'No email on file')}</span>
           <span class="table-sub">${escapeHtml(phoneLabel)}</span>
         </td>
-        <td>
+        <td data-label="Registered">
           <span class="table-main">${escapeHtml(formatDate(customer.date_registered))}</span>
           <span class="table-sub">${escapeHtml(customer.date_registered ? 'Account created' : 'Missing registration date')}</span>
         </td>
-        <td>
+        <td data-label="Reservation Activity">
           <div class="customer-tags">
             ${reservationBadge}
             ${approvedBadge}

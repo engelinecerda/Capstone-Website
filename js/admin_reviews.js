@@ -136,7 +136,7 @@ function renderReviews(reviews) {
 
     return `
       <tr>
-        <td>
+        <td data-label="Customer">
           <div class="customer-cell">
             <div class="customer-head">
               <span class="avatar">${escapeHtml(getCustomerInitials(customer, reservation))}</span>
@@ -147,18 +147,18 @@ function renderReviews(reviews) {
             </div>
           </div>
         </td>
-        <td>
+        <td data-label="Reservation">
           <span class="table-main">${escapeHtml(reservationLabel)}</span>
           <span class="table-sub">${escapeHtml(packageLabel)}</span>
           <span class="table-sub">${escapeHtml(formatDate(reservation.event_date))}</span>
         </td>
-        <td>
+        <td data-label="Rating">
           <span class="review-rating-pill">${escapeHtml(`${Number(review.rating || 0)}/5`)}</span>
         </td>
-        <td>
+        <td data-label="Comment">
           <span class="table-main review-comment" title="${escapeHtml(review.comment || 'No comment provided.')}">${escapeHtml(comment)}</span>
         </td>
-        <td>
+        <td data-label="Submitted">
           <span class="table-main">${escapeHtml(formatDateTime(review.created_at))}</span>
           <span class="table-sub">Review submitted</span>
         </td>

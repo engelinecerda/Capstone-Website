@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=28">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=28">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=28">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=28">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=32">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=32">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=32">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=32">
 </head>
 <body>
 
@@ -636,6 +636,66 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-primary" id="badgeModalDone">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DISCOUNT MODAL ── -->
+  <div class="modal-overlay hidden" id="discountModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="discountModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="discountModalTitle">Discount</h2>
+          <p class="modal-sub" id="discountModalSub">Set a percentage discount for this package</p>
+        </div>
+        <button type="button" class="modal-close" id="discountModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="discount-status-row">
+          <span class="status-pill" id="discountStatusPill">Off</span>
+        </div>
+
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="discPercentOff">Percent off *</label>
+            <input type="number" id="discPercentOff" class="modal-input" placeholder="20" min="0.01" max="100" step="0.01">
+            <span class="field-error hidden" id="discPercentOffError"></span>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="discLabel">Label (optional)</label>
+            <input type="text" id="discLabel" class="modal-input" placeholder="e.g. Holiday Promo" maxlength="60">
+          </div>
+        </div>
+
+        <div class="modal-row">
+          <div class="modal-field">
+            <label class="modal-label" for="discStartsAt">Starts (optional)</label>
+            <input type="datetime-local" id="discStartsAt" class="modal-input">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="discEndsAt">Ends (optional)</label>
+            <input type="datetime-local" id="discEndsAt" class="modal-input">
+          </div>
+        </div>
+        <span class="field-error hidden" id="discWindowError"></span>
+
+        <div class="modal-field">
+          <label class="pm2-toggle">
+            <input type="checkbox" id="discActive" checked>
+            <span class="pm2-toggle-track"></span>
+          </label>
+          <label class="modal-label" for="discActive" style="display:inline;margin-left:8px;">Active</label>
+        </div>
+
+        <p class="discount-preview" id="discountPreview"></p>
+        <p class="modal-message hidden" id="discountModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary hidden" id="discountEndBtn">End Discount</button>
+        <button type="button" class="btn-secondary hidden" id="discountNewBtn">+ New Discount</button>
+        <button type="button" class="btn-primary" id="discountSaveBtn">Save</button>
       </div>
     </div>
   </div>

@@ -1080,6 +1080,94 @@ body .fm-title {
 }
 
 /* ============================================================
+   RESPONSIVE TABLE → STACKED CARDS (opt-in utility)
+   Add class="table-responsive-cards" to a <table>, and
+   data-label="Column Name" to each <td> in its JS-rendered rows, and
+   it reflows into labelled stacked cards below this breakpoint
+   instead of forcing horizontal scroll — for the lists where reading
+   each row as a card matters more than scanning columns (reservations,
+   customers, reviews, staff roster). Dense reference tables can skip
+   this and keep the plain .table-wrap { overflow-x: auto } scroll —
+   both are legitimate per-table choices, not every table needs cards.
+   Mirrors the bespoke .reservation-table/.payments-table treatment
+   already shipped in admin_reservations.css/admin_payments.css,
+   pulled out here so new tables don't have to duplicate it.
+   ============================================================ */
+@media (max-width: 1450px) {
+  .table-wrap:has(.table-responsive-cards) {
+    overflow: visible;
+  }
+
+  .table-responsive-cards {
+    display: block;
+    width: 100%;
+    border-spacing: 0;
+  }
+
+  .table-responsive-cards thead {
+    display: none;
+  }
+
+  .table-responsive-cards tbody {
+    display: grid;
+    gap: 14px;
+  }
+
+  .table-responsive-cards tbody tr {
+    display: grid;
+    gap: 0;
+  }
+
+  .table-responsive-cards tbody td {
+    display: grid;
+    grid-template-columns: minmax(110px, 148px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    width: 100%;
+    padding: 14px 16px;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-top: none;
+    border-bottom: 0.5px solid #EFE8DD;
+    border-radius: 0;
+    background: var(--card-bg);
+    /* A long unbroken value (email, token) in the value column has no
+       spaces to wrap at otherwise, and would push the card wider than
+       the viewport — the one thing this whole pass isn't allowed to do. */
+    overflow-wrap: anywhere;
+  }
+
+  /* A td without a data-label (an empty-state message, a lone full-width
+     action button) skips the label column instead of leaving a blank
+     one beside it. */
+  .table-responsive-cards tbody td:not([data-label]) {
+    grid-template-columns: 1fr;
+  }
+
+  .table-responsive-cards tbody tr td:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .table-responsive-cards tbody tr td:last-child {
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+  }
+
+  .table-responsive-cards tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.45;
+    padding-top: 2px;
+  }
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 1050px) {
