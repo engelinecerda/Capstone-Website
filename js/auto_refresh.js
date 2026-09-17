@@ -21,7 +21,15 @@ export function initAutoRefresh(refreshFn, options = {}) {
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) triggerAutoRefresh();
   });
-  setInterval(triggerAutoRefresh, pollMs);
+  // Skip the tick entirely while the tab is hidden/backgrounded — a tab an
+  // admin or customer left open in another window was still firing a full
+  // refresh query every pollMs indefinitely, with nobody there to see it.
+  // The visibilitychange listener above already catches the tab back up
+  // the moment it's actually looked at again, so nothing is missed.
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    triggerAutoRefresh();
+  }, pollMs);
 
   return triggerAutoRefresh;
 }

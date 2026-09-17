@@ -11,6 +11,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { initAutoRefresh } from './auto_refresh.js';
 
 const PAGE_SIZE = 15;
 const FETCH_CAP = 300;
@@ -177,17 +178,16 @@ paginationEl.addEventListener('click', (e) => {
 });
 
 // Keeps this page's list/counts/badge live if the sidebar bell or another
-// tab mutates data while this page is open.
-function subscribeRealtime() {
-  supabase
-    .channel(`notif_admin_page_${userId}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'notifications',
-      filter: `user_id=eq.${userId}`,
-    }, () => loadNotifs())
-    .subscribe();
+// tab mutates data while this page is open. Was a standing realtime
+// postgres_changes channel — js/notifications.js's identical customer-side
+// bell had the same pattern and turned out to be the single largest
+// contributor to this project's Disk IO budget usage (2.1M+
+// realtime.list_changes calls, ~58% of all tracked query time) before it
+// was switched to a plain interval; this page was simply missed in that
+// pass. initAutoRefresh still fires immediately on tab focus/visibility/
+// bfcache-restore, so returning to this page still feels current.
+function startPolling() {
+  initAutoRefresh(() => loadNotifs());
 }
 
 // ── Session / init ───────────────────────────────────────────────────────
@@ -208,7 +208,7 @@ async function init() {
   initAdminSidebarBadges(supabase);
   initAdminNav({ role: result.profile.role });
 
-  subscribeRealtime();
+  startPolling();
   await loadNotifs();
 }
 
