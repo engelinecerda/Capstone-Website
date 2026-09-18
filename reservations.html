@@ -13,12 +13,14 @@
     <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=39"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
-    <link rel="preload" as="style" href="/css/styles.css?v=39" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/styles.css?v=39"></noscript>
-    <link rel="preload" as="style" href="/css/reservations.css?v=39" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/reservations.css?v=39"></noscript>
-    <link rel="preload" as="style" href="/css/home.css?v=39" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/home.css?v=39"></noscript>
+    <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
+         blocking, not async — deferring these caused a flash of unstyled
+         content on first paint. Only genuinely non-critical assets above
+         (webfonts, icon font, Leaflet map CSS) and the JS-injected
+         announcement banner below stay async. -->
+    <link rel="stylesheet" href="/css/styles.css?v=39">
+    <link rel="stylesheet" href="/css/reservations.css?v=39">
+    <link rel="stylesheet" href="/css/home.css?v=39">
     <link rel="preload" as="style" href="/css/announcement_banner.css?v=39" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=39"></noscript>
     <style>.hidden { display: none !important; }</style>
