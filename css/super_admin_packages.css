@@ -1051,11 +1051,13 @@
 .pkg-spec-line {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 4px;
   margin-bottom: 10px;
 }
 .pkg-spec-price { font-size: 16px; font-weight: 700; color: var(--text); white-space: nowrap; }
-.pkg-spec-price--discounted { display: inline-flex; align-items: baseline; gap: 6px; }
+.pkg-spec-price--discounted { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
 .pkg-price-original { font-size: 12px; font-weight: 500; color: var(--muted); }
 .pkg-price-off {
   font-size: 10.5px;
@@ -1065,7 +1067,14 @@
   border-radius: 999px;
   padding: 1px 7px;
 }
-.spec-leader { flex: 1 1 auto; border-bottom: 1px dotted var(--border); height: 1px; align-self: center; }
+/* The original+discounted+%-off group is wide enough on its own that the
+   leader dots and pax/hr figures no longer fit on the same row without
+   crowding the card's right edge (the figures are white-space:nowrap, so
+   they can't shrink to make room) — drop the purely decorative leader so
+   the figures get that space back, and let the whole line wrap if it's
+   still tight, rather than letting it run past the card's padding. */
+.pkg-spec-line:has(.pkg-spec-price--discounted) .spec-leader { display: none; }
+.spec-leader { flex: 1 1 auto; border-bottom: 1px dotted var(--border); height: 1px; align-self: center; min-width: 0; }
 .spec-figures {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11.5px;
@@ -1079,18 +1088,6 @@
 .tier-ladder-bar:nth-child(1) { height: 6px; }
 .tier-ladder-bar:nth-child(2) { height: 9px; }
 .tier-ladder-bar:nth-child(3) { height: 12px; }
-.tier-ladder-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--btn-primary-bg);
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
 /* ── Kebab menu (used in both card and list-view rows) ── */
 .card-menu { position: relative; }
 .icon-btn {

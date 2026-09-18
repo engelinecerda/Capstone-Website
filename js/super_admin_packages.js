@@ -328,7 +328,10 @@ function escapeHtml(str) {
     ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 }
 
-function formatCurrency(v)  { return `₱${Number(v || 0).toLocaleString()}`; }
+// Fixed to always 2 decimals — a discounted price is rarely a round peso
+// amount (e.g. 20% off ₱2,999 is ₱2,399.20), and toLocaleString() alone
+// drops a trailing zero, showing "₱2,399.2" instead.
+function formatCurrency(v)  { return `₱${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
 function formatCapacity(v)  { return v ? `${v} pax` : '—'; }
 function formatDuration(v)  { return v ? `${v} hr${v !== 1 ? 's' : ''}` : '—'; }
 
@@ -845,16 +848,21 @@ function buildPkgThumb(pkg) {
   </div>`;
 }
 
+// Plain, non-interactive text only — tiers are still fully manageable via
+// the card's "Tiers" menu action (buildCardMenu(), same openTierDrawer()
+// this used to open inline), so this isn't a dead end. Removed as its own
+// clickable link/button per package: it read as an unwanted nag on every
+// package that doesn't use tiers, not a genuine call to action.
 function buildTierLadder(pkg) {
   if (pkg.package_type === 'add on') {
     return `<p class="tier-ladder">Add-ons don't use tiers</p>`;
   }
   const tiers = allTiersByPackage.get(pkg.package_id) || [];
   if (!tiers.length) {
-    return `<p class="tier-ladder"><button type="button" class="tier-ladder-link" data-pkg-action="tiers" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">No tiers set — Add tiers</button></p>`;
+    return `<p class="tier-ladder">No tiers set</p>`;
   }
   const bars = tiers.slice(0, 3).map(() => '<span class="tier-ladder-bar"></span>').join('');
-  return `<p class="tier-ladder"><span class="tier-ladder-bars">${bars}</span>&nbsp;${tiers.length} tier${tiers.length === 1 ? '' : 's'} · <button type="button" class="tier-ladder-link" data-pkg-action="tiers" data-id="${pkg.package_id}" data-name="${escapeHtml(pkg.package_name)}">Manage</button></p>`;
+  return `<p class="tier-ladder"><span class="tier-ladder-bars">${bars}</span>&nbsp;${tiers.length} tier${tiers.length === 1 ? '' : 's'}</p>`;
 }
 
 // Assigned badges (package_badge) + Best Seller for this category — add-ons
