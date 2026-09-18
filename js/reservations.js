@@ -27,6 +27,8 @@ import {
 import { loadReservationFormConfig } from '/js/reservation_form_config.js';
 import { buildCustomerPaymentUrl } from '/js/customer_payments.js';
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
+import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
+import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
@@ -146,6 +148,14 @@ function resolveServiceCharge(basePrice, locationType, categoryId) {
         : (CATEGORY_SERVICE_CHARGE_PCT[categoryId] ?? GLOBAL_SERVICE_CHARGE_PCT);
     const amount = Math.round(basePrice * pct) / 100;
     return { pct, amount, total: basePrice + amount };
+}
+
+// Re-evaluated against the current clock every time it's called (not
+// cached from page-load) — a promo's window could open or close mid-session
+// between Step 1 selection and final submit. Only ever applies to a real
+// package/tier price, never add-ons, travel fee, or the catering cart.
+function getPkgDiscount(pkg) {
+    return applyDiscount(pkg?.price, pickActiveDiscount(pkg?.discountRows));
 }
 
 // Category name → icon (mirrors js/packages.js's getCategoryIcon so the
@@ -648,7 +658,9 @@ function toDateKey(date) {
     return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-');
 }
 
-function fmtPeso(v) { return '₱' + Number(v || 0).toLocaleString(); }
+function fmtPeso(v) {
+    return '₱' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 function formatDisplayDate(dateKey) {
     if (!dateKey) return '';
@@ -1027,19 +1039,32 @@ function getSelectedContractPackageLabel() {
     return S.offsitePackage?.label || null;
 }
 
+// Same package-only rule as buildSummary(): catering has no single
+// package.price to discount, add-ons are never discounted.
+function computeContractPreviewDiscount() {
+    if (S.locationType === 'onsite') return getPkgDiscount(S.miniPackage);
+    if (S.offsiteCategory === 'catering') return getPkgDiscount(null);
+    return getPkgDiscount(S.offsitePackage);
+}
+
 function computeContractPreviewBase() {
+    let base;
     if (S.locationType === 'onsite') {
-        return (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
+        base = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
+    } else if (S.offsiteCategory === 'catering') {
+        base = S.cateringCart.filter(i => i && i.pax).reduce((sum, i) => sum + i.price, 0);
+    } else {
+        base = S.offsitePackage ? S.offsitePackage.price : 0;
     }
-    if (S.offsiteCategory === 'catering') {
-        return S.cateringCart.filter(i => i && i.pax).reduce((sum, i) => sum + i.price, 0);
-    }
-    return S.offsitePackage ? S.offsitePackage.price : 0;
+    // Discount reduces the base before the service charge, same ordering
+    // as buildSummary() — so the pre-submit contract preview matches the
+    // final breakdown the customer sees on the Review step.
+    return base - computeContractPreviewDiscount().discountAmount;
 }
 
 // Same order of operations as buildSummary()/the submit handler: the
-// service charge is added to the base to reach the total the customer
-// actually signs for — never the pre-charge figure.
+// service charge is added to the (already discounted) base to reach the
+// total the customer actually signs for — never the pre-charge figure.
 function computeContractPreviewCharge() {
     return resolveServiceCharge(computeContractPreviewBase(), S.locationType, S.categoryId);
 }
@@ -1048,9 +1073,66 @@ function mergeTemplateTokens(template, data) {
     return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key) => (data[key] ?? ''));
 }
 
-function renderContractBody(templateBody) {
+// template_body has no explicit structural markup — every real row is
+// plain text: a title, an intro paragraph, a "Label: Value" reservation
+// summary block, then numbered clauses ("1. Heading. Body..."). Splits at
+// the first numbered-clause line, so callers can keep the authored
+// title/intro/summary prose as-is while replacing everything from the
+// clauses onward with the live, admin-editable clause set (BUG-03 fix) —
+// or, when no contract_template_clause rows exist yet for this package,
+// fall back to whatever numbered clauses the template_body already has
+// (same legacy-fallback behavior as the signed-PDF edge function).
+function splitTemplateIntroAndLegacyClauses(templateBody) {
+    const lines = String(templateBody || '').split('\n');
+    const isClauseLine = l => /^\s*\d+\.\s+\S/.test(l);
+    // "Label: Value" — same pattern the full-screen modal's own
+    // parseAgreementSections() uses to recognize a reservation-summary
+    // block. The intro must stop here too, not just at the first numbered
+    // clause — every real template_body hardcodes its own "Reservation
+    // Number: ... / Package: ..." block right after the opening paragraph,
+    // and buildSummaryLinesText() below rebuilds that same block from the
+    // live contract_field rows; without this second cutoff the two would
+    // stack into a visibly duplicated summary.
+    const isDetailLine = l => /^([A-Za-z][A-Za-z\s]{1,40}):\s*(.+)$/.test(l.trim());
+    const introCutIdx = lines.findIndex(l => isClauseLine(l) || isDetailLine(l));
+    const firstClauseIdx = lines.findIndex(isClauseLine);
+    return {
+        introText: introCutIdx === -1 ? (templateBody || '') : lines.slice(0, introCutIdx).join('\n').replace(/\n+$/, ''),
+        legacyClausesText: firstClauseIdx === -1 ? '' : lines.slice(firstClauseIdx).join('\n')
+    };
+}
+
+// Reservation Summary — Layer 1, built from the same contract_field rows
+// (visibility/label/order) the admin's own preview uses, instead of the
+// fixed set of lines a template_body happens to have hardcoded. "Label:
+// Value" lines are what both the inline preview and the full-screen
+// modal's parseAgreementSections() already recognize as a definition-list
+// block, so no changes are needed there.
+function buildSummaryLinesText(fields, data) {
+    return fields
+        .filter(f => f.is_visible !== false)
+        .map(f => `${f.label}: ${data[f.token] ?? ''}`)
+        .join('\n');
+}
+
+// Numbered clauses — Layer 2, built from contract_template_clause when the
+// admin has saved any for this package; heading and body both go through
+// the same token merge as everything else, so a clause referencing
+// {{cancellation_fee}} etc. resolves correctly instead of rendering blank.
+function buildClausesText(clauses, data, startNumber) {
+    return clauses.map((c, i) => {
+        const heading = mergeTemplateTokens(c.heading || '', data);
+        const body = mergeTemplateTokens(c.body || '', data);
+        return `${startNumber + i}. ${heading}.\n${body}`;
+    }).join('\n\n');
+}
+
+function renderContractBody(templateBody, contractData = {}) {
     if (!contractViewer) return '';
+    const { clauses = [], lockedClauses = {}, fields = [], feeTerms = {} } = contractData;
     const charge = computeContractPreviewCharge();
+    const discount = computeContractPreviewDiscount();
+    const isOffsite = S.locationType === 'offsite';
     const data = {
         customer_name: S.name || 'Customer',
         package_name: getSelectedContractPackageLabel() || 'Selected Package',
@@ -1062,17 +1144,62 @@ function renderContractBody(templateBody) {
         total_price: fmtPeso(charge.total),
         service_charge_percent: String(charge.pct),
         service_charge_amount: fmtPeso(charge.amount),
-        guest_count: S.guestCount || ''
+        discount_percent: discount.active ? String(discount.percentOff) : '',
+        discount_amount: discount.active ? fmtPeso(discount.discountAmount) : '',
+        discount_label: discount.active ? (discount.label || '') : '',
+        guest_count: S.guestCount || '',
+        // Same live system_settings/payment_type sources the admin's own
+        // preview and the final signed PDF use — previously missing here
+        // entirely, so any clause referencing one of these five tokens
+        // silently rendered blank instead of matching what's shown
+        // everywhere else (the second half of BUG-03).
+        reschedule_fee: fmtPeso(feeTerms.rescheduleFee ?? 3000),
+        cancellation_fee: fmtPeso(isOffsite ? (feeTerms.cancellationFeeOffsite ?? 2000) : (feeTerms.cancellationFeeOnsite ?? 500)),
+        deposit_percent: String(feeTerms.depositPercent ?? 50),
+        terms_and_conditions: feeTerms.termsAndConditions || '(See the Terms & Conditions page.)',
+        data_privacy_policy: feeTerms.dataPrivacyPolicy || '(See the Data Privacy Policy page.)'
     };
-    const merged = mergeTemplateTokens(templateBody, data);
-    // Templates have no explicit structural markup — real contract_templates
-    // rows are plain text with the title (and often a brand line before it)
-    // as consecutive ALL-CAPS lines at the very top, then ALL-CAPS section
-    // headers (EVENT DETAILS, PAYMENT TERMS, etc.) scattered through
-    // otherwise-regular paragraphs. Confirmed against live template rows,
-    // not assumed. inTitleBlock tracks "still in that opening run of
-    // consecutive caps lines" — the first blank line ends it, so any caps
-    // line after that point is a section header, not more title.
+
+    const { introText, legacyClausesText } = splitTemplateIntroAndLegacyClauses(templateBody);
+    const summaryText = buildSummaryLinesText(fields, data);
+
+    // Layer 3 (Electronic Signature / acknowledgement) is only appended
+    // when real admin-saved clauses (Layer 2) are in use. The legacy
+    // template_body fallback below is old, self-contained plain text — it
+    // already ends with its own Electronic Signature clause and closing
+    // "By signing below..." sentence (see DEFAULT_CONTRACT_TEMPLATE_BODY),
+    // so appending Layer 3 on top of it would duplicate that content
+    // rather than replace it. Matches the signed-PDF edge function's own
+    // "templateClauses.length ? real clauses + Layer 3 : legacy text as-is"
+    // branch exactly.
+    const usingRealClauses = clauses.length > 0;
+    const clausesText = usingRealClauses
+        ? buildClausesText(clauses, data, 1)
+        : mergeTemplateTokens(legacyClausesText, data);
+
+    const esClause = lockedClauses.electronic_signature;
+    const esText = (usingRealClauses && esClause)
+        ? buildClausesText([esClause], data, clauses.length + 1)
+        : '';
+
+    const ackClause = lockedClauses.acknowledgement;
+    const ackText = (usingRealClauses && ackClause) ? mergeTemplateTokens(ackClause.body || '', data) : '';
+
+    const sections = [
+        mergeTemplateTokens(introText, data),
+        summaryText,
+        clausesText,
+        esText,
+        ackText
+    ].filter(s => s && s.trim());
+    const merged = sections.join('\n\n');
+
+    // Numbered clause headings ("1. Title.") get the same heading styling
+    // as an ALL-CAPS section header — matches the full-screen modal's own
+    // heading detection (parseAgreementSections()) so both surfaces agree
+    // on what's a heading, not just this compact box's own ALL-CAPS-only
+    // heuristic from before.
+    const numberedHeadingPattern = /^\d+\.\s+.+\.$/;
     let inTitleBlock = true;
     contractViewer.innerHTML = merged.split('\n').map(line => {
         const trimmed = line.trim();
@@ -1085,7 +1212,7 @@ function renderContractBody(templateBody) {
             return `<p class="contract-viewer-title">${escapeHtml(trimmed)}</p>`;
         }
         inTitleBlock = false;
-        if (isAllCaps) {
+        if (isAllCaps || numberedHeadingPattern.test(trimmed)) {
             return `<p class="contract-viewer-heading">${escapeHtml(trimmed)}</p>`;
         }
         return `<p>${escapeHtml(trimmed)}</p>`;
@@ -1160,25 +1287,29 @@ async function buildContractStep() {
 
     contractViewer.innerHTML = '<p class="contract-viewer-loading">Loading your contract...</p>';
 
-    let tmpl = null;
+    // BUG-03 fix: fetch the exact same Layer 1/2/3 data + fee/terms tokens
+    // the admin's own preview and the final signed PDF use (js/contract_
+    // render.js), not just the flat template_body — see that module's doc
+    // comment for the full story on why this step never used to show an
+    // admin's saved clause/field edit.
+    let tmpl = null, clauses = [], lockedClauses = {}, fields = [], feeTerms = {};
     try {
-        const { data, error } = await supabase
-            .from('contract_templates')
-            .select('template_body, contract_type')
-            .eq('package_id', pkgId)
-            .eq('is_active', true)
-            .order('version_no', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-        if (error) throw error;
-        tmpl = data;
+        const [templateData, feeTermsData] = await Promise.all([
+            fetchContractTemplateData(supabase, pkgId),
+            fetchContractFeeTermsTokens(supabase)
+        ]);
+        ({ template: tmpl, clauses, lockedClauses, fields } = templateData);
+        feeTerms = feeTermsData;
     } catch (err) {
         showContractLoadError();
         return;
     }
 
     signatureState.activeTemplateContractType = tmpl?.contract_type || 'package_contract';
-    signatureState.agreementText = renderContractBody(tmpl?.template_body || DEFAULT_CONTRACT_TEMPLATE_BODY);
+    signatureState.agreementText = renderContractBody(
+        tmpl?.template_body || DEFAULT_CONTRACT_TEMPLATE_BODY,
+        { clauses, lockedClauses, fields, feeTerms }
+    );
     signatureState.contractLoaded = true;
     checkInlinePreviewFits();
 }
@@ -1386,12 +1517,15 @@ function updateDateDisplayPlaceholder() {
         : 'Choose your location and package first, then select a date *';
 }
 
+// Always an array (or null) — see getBookingScope()'s own doc comment in
+// reservation_availability.js for why (a combo "Plus" package occupies
+// more than one scope at once).
 function getSelectedBookingScope() {
     if (!S.locationType) return null;
     if (S.locationType === 'offsite') {
         if (!S.offsiteCategory) return null;
         if (S.offsiteCategory !== 'catering' && !S.offsitePackage) return null;
-        return 'offsite';
+        return ['offsite'];
     }
     return getSharedBookingScope(S.locationType, S.miniPackage?.label || '', S.miniPackage?.bookingScope || null);
 }
@@ -1707,16 +1841,28 @@ async function loadPackages() {
     // "both") package needs at least one mapped venue; every package
     // needs at least one photo. Two batch queries, not one per package.
     const packageIds = pkgs.map(p => p.package_id);
-    const [{ data: venueMaps }, { data: photoRows }] = packageIds.length
+    const [{ data: venueMaps }, { data: photoRows }, { data: discountRows }] = packageIds.length
         ? await Promise.all([
             supabase.from('package_venue').select('package_id').in('package_id', packageIds),
-            supabase.from('package_photo').select('package_id, image_url, is_cover, sort_order').in('package_id', packageIds).order('sort_order', { ascending: true })
+            supabase.from('package_photo').select('package_id, image_url, is_cover, sort_order').in('package_id', packageIds).order('sort_order', { ascending: true }),
+            supabase.from('package_discount').select('*').in('package_id', packageIds)
         ])
-        : [{ data: [] }, { data: [] }];
+        : [{ data: [] }, { data: [] }, { data: [] }];
 
     const venueCounts = new Map();
     (venueMaps || []).forEach(row => venueCounts.set(row.package_id, (venueCounts.get(row.package_id) || 0) + 1));
     const hasGalleryPhoto = new Set((photoRows || []).map(row => row.package_id));
+
+    // Grouped by package, resolved to "the one active row (if any)" at the
+    // point each base package object is built below — not cached as a
+    // flat map, since applyDiscount()/pickActiveDiscount() must be
+    // re-evaluated against `now` again later (buildSummary(), submit) in
+    // case the window opens/closes mid-session.
+    const discountsByPkg = new Map();
+    (discountRows || []).forEach(row => {
+        if (!discountsByPkg.has(row.package_id)) discountsByPkg.set(row.package_id, []);
+        discountsByPkg.get(row.package_id).push(row);
+    });
 
     // Cover photo per package — the gallery photo marked is_cover, else
     // the first uploaded photo (mirrors js/packages.js's _coverPhoto logic).
@@ -1792,7 +1938,11 @@ async function loadPackages() {
             categoryId,
             categoryName,
             coverPhotoUrl: cover?.image_url || p.package_image || null,
-            mainDishMax: p.catering_main_dish_max ?? null
+            mainDishMax: p.catering_main_dish_max ?? null,
+            // Raw rows (not a pre-resolved snapshot) so buildSummary() and
+            // the submit handler can each re-evaluate against the current
+            // clock — a promo could start or end mid-session.
+            discountRows: discountsByPkg.get(p.package_id) || null
         };
         const isAddon = p.package_type === 'add on' || p.package_type === 'add_on';
 
@@ -1973,9 +2123,19 @@ function buildPkgCardInner(p) {
     const photoHtml = p.coverPhotoUrl
         ? '<img class="rpkg-photo" src="' + escapeHtml(p.coverPhotoUrl) + '" alt="' + escapeHtml(p.label) + '" loading="lazy">'
         : '<div class="rpkg-photo-placeholder" aria-hidden="true"><i class="ti ti-photo"></i></div>';
-    const priceHtml = p.price > 0
-        ? '<div class="rpkg-price">' + fmtPeso(p.price) + '</div>'
-        : '<div class="rpkg-price rpkg-price--contact">Contact for quote</div>';
+    const discount = getPkgDiscount(p);
+    let priceHtml;
+    if (!(p.price > 0)) {
+        priceHtml = '<div class="rpkg-price rpkg-price--contact">Contact for quote</div>';
+    } else if (discount.active) {
+        priceHtml = '<div class="rpkg-price rpkg-price--discounted">' +
+            '<s class="rpkg-price-original">' + fmtPeso(discount.listPrice) + '</s> ' +
+            fmtPeso(discount.discountedPrice) +
+            ' <span class="rpkg-price-off">&minus;' + discount.percentOff + '%</span>' +
+            '</div>';
+    } else {
+        priceHtml = '<div class="rpkg-price">' + fmtPeso(p.price) + '</div>';
+    }
     const chips = buildGuestDurationChips(p);
     return (
         '<div class="rpkg-media">' + photoHtml +
@@ -2849,75 +3009,106 @@ function buildSummary() {
 
     let pkgRows = '';
     let total   = 0;
+    // Only a real onsite/offsite package can carry a discount — catering
+    // is cart-priced with no single package.price to discount (the same
+    // exemption the price-floor DB trigger already gives it), and add-ons
+    // are never discounted (the discount applies to the package/tier price
+    // only), so discountAmount below only ever comes off S.miniPackage /
+    // S.offsitePackage, never S.snackAddon or the catering cart.
+    let discount = { active: false, discountAmount: 0, label: '' };
 
     if (S.locationType === 'onsite') {
         if (S.miniPackage) {
             total += S.miniPackage.price;
-            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; &#8369;' + S.miniPackage.price.toLocaleString());
+            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price), 'package');
+            discount = getPkgDiscount(S.miniPackage);
         }
         if (S.snackAddon) {
             total += S.snackAddon.price;
-            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; &#8369;' + S.snackAddon.price.toLocaleString());
+            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; ' + fmtPeso(S.snackAddon.price), 'plus');
         }
     } else if (S.offsiteCategory === 'catering') {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
         const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
-        pkgRows += sr('Service', catObj ? catObj.name : 'Catering');
+        pkgRows += sr('Service', catObj ? catObj.name : 'Catering', 'tools-kitchen-2');
         const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
         const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
         const cateringPlainItems = cateringItems.filter(i => i !== cateringOffer);
-        if (cateringPlainItems.length) pkgRows += sr('Inclusions', cateringPlainItems.join(', '));
-        else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc);
-        if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''));
+        if (cateringPlainItems.length) pkgRows += sr('Inclusions', cateringPlainItems.join(', '), 'list-check');
+        else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc, 'list-check');
+        if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''), 'gift');
         S.cateringCart.filter(i => i && i.pax).forEach(i => {
             total += i.price;
-            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; &#8369;' + i.price.toLocaleString());
+            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; ' + fmtPeso(i.price), 'users');
         });
-        if (total === 0) pkgRows += sr('Price', 'Contact for quote');
+        if (total === 0) pkgRows += sr('Price', 'Contact for quote', 'tag');
     } else if (S.offsitePackage) {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
         total = S.offsitePackage.price;
-        pkgRows += sr('Service', catObj ? catObj.name : '');
-        pkgRows += sr('Package', S.offsitePackage.label);
-        if (S.offsitePackage.price > 0) pkgRows += sr('Price', '&#8369;' + S.offsitePackage.price.toLocaleString());
+        pkgRows += sr('Service', catObj ? catObj.name : '', 'tools-kitchen-2');
+        pkgRows += sr('Package', S.offsitePackage.label, 'package');
+        if (S.offsitePackage.price > 0) pkgRows += sr('Price', fmtPeso(S.offsitePackage.price), 'tag');
+        discount = getPkgDiscount(S.offsitePackage);
     }
 
-    // Itemised, never folded into the package price — customer sees
-    // Subtotal, then the service charge as its own line, then Total.
-    const charge = resolveServiceCharge(total, S.locationType, S.categoryId);
-    const totalRowsHtml = total > 0
-        ? sr('Subtotal', '&#8369;' + total.toLocaleString()) +
-          sr('Service charge (' + charge.pct + '%)', '&#8369;' + charge.amount.toLocaleString()) +
-          '<div class="summary-total"><span>Total</span><span>&#8369;' + charge.total.toLocaleString() + '</span></div>'
-        : '<div class="summary-total"><span>Total</span><span>Contact for quote</span></div>';
+    // Discount reduces the base BEFORE the service charge — the critical
+    // ordering the whole feature depends on. Itemised as its own line
+    // (Package -> Discount -> Subtotal -> Service charge -> Total), never
+    // folded silently into a lower package price.
+    const discountedTotal = total - discount.discountAmount;
+    const charge = resolveServiceCharge(discountedTotal, S.locationType, S.categoryId);
+    // Subtotal/Service charge/Discount/Total are the receipt-style lines of
+    // the Total card — deliberately icon-less (unlike every Event/Contact
+    // row) so that card reads as a plain receipt, not another field list.
+    const discountRowHtml = discount.active
+        ? sr('Discount' + (discount.label ? ' (' + discount.label + ')' : ''), '&minus;' + fmtPeso(discount.discountAmount))
+        : '';
+    const pricingRowsHtml = total > 0
+        ? discountRowHtml +
+          sr('Subtotal', fmtPeso(discountedTotal)) +
+          sr('Service charge (' + charge.pct + '%)', fmtPeso(charge.amount)) +
+          totalRow('Total', fmtPeso(charge.total))
+        : totalRow('Total', 'Contact for quote');
 
-    const locStr   = S.locationType === 'onsite'
-        ? '&#127968; Onsite &mdash; ELI Coffee'
-        : '&#128663; Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
+    const locStr   = S.locationType === 'onsite' ? 'Onsite &mdash; ELI Coffee' : 'Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
     const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
-    box.innerHTML =
-        '<div class="summary-section-title">Event</div>' +
-        sr('Location',   locStr) +
+    const eventRows =
+        sr('Location',   locStr, 'building-store') +
         pkgRows +
-        sr('Guests',     S.guestCount) +
-        sr('Event Type', displayEventType) +
-        sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate) +
-        sr('Time',       S.time) +
-        '<hr class="summary-divider">' +
-        '<div class="summary-section-title">Contact</div>' +
-        sr('Name',  S.name) +
-        sr('Email', S.email) +
-        sr('Phone', S.phone) +
-        (S.requests ? sr('Requests', S.requests) : '') +
-        '<hr class="summary-divider">' +
-        totalRowsHtml;
+        sr('Guests',     S.guestCount, 'users') +
+        sr('Event Type', displayEventType, 'confetti') +
+        sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate, 'calendar') +
+        sr('Time',       S.time, 'clock');
+
+    const contactRows =
+        sr('Name',  S.name, 'user') +
+        sr('Email', S.email, 'mail') +
+        sr('Phone', S.phone, 'phone') +
+        (S.requests ? sr('Requests', S.requests, 'message') : '');
+
+    box.innerHTML =
+        '<div class="rs-summary-cards">' +
+        summaryCard('Event',    eventRows) +
+        summaryCard('Contact',  contactRows) +
+        summaryCard('Total',    pricingRowsHtml) +
+        '</div>';
 
     document.getElementById('guest-warning').classList.toggle('hidden', isLoggedIn);
 }
 
-function sr(label, value) {
-    return '<div class="summary-row"><span class="s-label">' + label + '</span><span class="s-value">' + value + '</span></div>';
+function summaryCard(title, rowsHtml) {
+    if (!rowsHtml) return '';
+    return '<div class="rs-summary-card"><p class="rs-summary-card-title">' + title + '</p>' + rowsHtml + '</div>';
+}
+
+function sr(label, value, icon) {
+    const iconHtml = icon ? '<i class="ti ti-' + icon + '" aria-hidden="true"></i>' : '';
+    return '<div class="rs-summary-row"><span class="rs-row-label">' + iconHtml + label + '</span><span class="rs-row-value">' + value + '</span></div>';
+}
+
+function totalRow(label, value) {
+    return '<div class="rs-summary-total-row"><span class="rs-row-label">' + label + '</span><span class="rs-row-value">' + value + '</span></div>';
 }
 
 // ── Contract download ──────────────────────────────────────────────────
@@ -3416,11 +3607,18 @@ async function submitDone() {
         let packageId  = null;
         let addOnId    = null;
         let totalPrice = 0;
+        // Only a real onsite/offsite package can carry a discount — same
+        // package-only, catering-exempt rule as buildSummary()/
+        // computeContractPreviewDiscount(). Re-evaluated against the
+        // current clock right here (not reused from Step 1) in case the
+        // promo's window opened or closed since the customer picked it.
+        let discount = { active: false, discountAmount: 0, percentOff: 0, label: '' };
 
         if (S.locationType === 'onsite') {
             packageId  = S.miniPackage ? S.miniPackage.id : null;
             addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
             totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
+            discount = getPkgDiscount(S.miniPackage);
         } else if (S.offsiteCategory === 'catering') {
             const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
             packageId  = cateringPkg ? cateringPkg.id : null;
@@ -3428,14 +3626,21 @@ async function submitDone() {
         } else {
             packageId  = S.offsitePackage ? S.offsitePackage.id    : null;
             totalPrice = S.offsitePackage ? S.offsitePackage.price : 0;
+            discount = getPkgDiscount(S.offsitePackage);
         }
 
-        // Service charge is added to the base to reach the total that
-        // gets stored — everything downstream (deposit %, custom-amount
-        // minimum) reads this same total_price column, so they
-        // automatically compute off the post-charge figure. Snapshotted
-        // alongside total_price so later default/override edits never
-        // change an existing booking.
+        // Discount reduces the base BEFORE the service charge — same
+        // ordering as buildSummary(). Snapshotted below alongside
+        // total_price/service_charge_* so a later promo change or expiry
+        // never reprices this booking or its signed contract.
+        totalPrice -= discount.discountAmount;
+
+        // Service charge is added to the (already discounted) base to
+        // reach the total that gets stored — everything downstream
+        // (deposit %, custom-amount minimum) reads this same total_price
+        // column, so they automatically compute off the post-charge,
+        // post-discount figure. Snapshotted alongside total_price so later
+        // default/override edits never change an existing booking.
         const serviceCharge = resolveServiceCharge(totalPrice, S.locationType, S.categoryId);
         totalPrice = serviceCharge.total;
 
@@ -3456,6 +3661,9 @@ async function submitDone() {
                 total_price:      totalPrice,
                 service_charge_percent: serviceCharge.pct,
                 service_charge_amount:  serviceCharge.amount,
+                discount_percent: discount.active ? discount.percentOff : null,
+                discount_amount:  discount.active ? discount.discountAmount : null,
+                discount_label:   discount.active ? (discount.label || null) : null,
                 contact_name:     S.name,
                 contact_email:    S.email,
                 contact_phone:    S.phone,
@@ -3493,7 +3701,7 @@ async function submitDone() {
         document.querySelector('.progress-container').style.display  = 'none';
 
         const msg = document.createElement('div');
-        msg.className = 'summary-box';
+        msg.className = 'rs-summary-card';
         msg.style.cssText = 'text-align:center;padding:48px 20px;';
         msg.innerHTML =
             '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +

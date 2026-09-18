@@ -760,6 +760,7 @@ Deno.serve(async (req: Request) => {
         reservation_id, reservation_number, event_type, event_date, event_time, guest_count, location_type,
         venue_location, contact_name, contact_email, contact_phone, total_price,
         service_charge_percent, service_charge_amount,
+        discount_percent, discount_amount, discount_label,
         package_id, package:package_id ( package_name )
       `)
       .eq('reservation_id', reservation_id)
@@ -847,6 +848,11 @@ Deno.serve(async (req: Request) => {
       // must freeze at the moment of booking, not reflect today's settings.
       service_charge_percent: String(reservation.service_charge_percent ?? 0),
       service_charge_amount: formatCurrency(reservation.service_charge_amount || 0),
+      // Same frozen-at-booking treatment — blank (never a live-recomputed
+      // value) when this booking had no discount applied.
+      discount_percent: reservation.discount_percent != null ? String(reservation.discount_percent) : '',
+      discount_amount: reservation.discount_amount != null ? formatCurrency(reservation.discount_amount) : '',
+      discount_label: reservation.discount_label || '',
       guest_count: String(reservation.guest_count || ''),
       contact_email: reservation.contact_email || '',
       contact_phone: reservation.contact_phone || '',

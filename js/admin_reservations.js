@@ -31,6 +31,7 @@ const rescheduleAlert = document.getElementById('rescheduleAlert');
 const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
 const rescheduleAlertText = document.getElementById('rescheduleAlertText');
 const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
+const rescheduleAlertDismiss = document.getElementById('rescheduleAlertDismiss');
 const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
 
 let reservationsCache = [];
@@ -329,10 +330,6 @@ function hasPendingRescheduleRequest(reservation) {
   return reviewFilterIds.has(reservation.reservation_id);
 }
 
-function getPendingRescheduleRequestCount() {
-  return unseenChangeIds.size;
-}
-
 function renderPendingRescheduleAlert() {
   if (!rescheduleAlert || !rescheduleAlertCount || !rescheduleAlertText) return;
 
@@ -500,7 +497,14 @@ function filterAndRender({ resetPage = true } = {}) {
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
   const status = dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
-  if (!getPendingRescheduleRequestCount()) {
+  // BUG-04 fix: this used to check unseenChangeIds (the badge count), which
+  // both "Review" flows clear as their very first step (marking the rows
+  // seen) before calling filterAndRender() — so the "only show these rows"
+  // filter this same function was told to turn on a moment earlier
+  // immediately turned itself back off. reviewFilterIds is the snapshot
+  // meant to survive that clear (see its declaration comment); only reset
+  // the filter once there's nothing left in that snapshot to show.
+  if (!reviewFilterIds.size) {
     showPendingRescheduleOnly = false;
   }
   const filtered = sortReservationsForView(
@@ -556,7 +560,23 @@ function wireFilters() {
 
     const idsToMark = Array.from(unseenChangeIds);
     unseenChangeIds = new Set();
+    renderPendingRescheduleAlert();
     filterAndRender();
+
+    try {
+      await markReservationChangesSeen(supabase, idsToMark);
+    } catch (error) {
+      // Non-fatal — worst case the banner re-shows these on the next load.
+    }
+  });
+
+  // BUG-04: acknowledge and hide without navigating/filtering — same
+  // mark-as-seen call "Review" makes, minus the table filter, for an admin
+  // who's already aware and just wants the banner gone.
+  rescheduleAlertDismiss?.addEventListener('click', async () => {
+    const idsToMark = Array.from(unseenChangeIds);
+    unseenChangeIds = new Set();
+    renderPendingRescheduleAlert();
 
     try {
       await markReservationChangesSeen(supabase, idsToMark);

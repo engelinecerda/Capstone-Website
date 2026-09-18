@@ -32,6 +32,9 @@ export const TOKEN_INFO = {
   rejection_reason: 'Why a payment was rejected — Payment Rejected notice only',
   service_charge_percent: 'Service charge percentage applied to this booking, frozen at booking time — Payment Settings → Service Charge',
   service_charge_amount: 'Service charge amount (₱) applied to this booking, frozen at booking time — Payment Settings → Service Charge',
+  discount_percent: 'Discount percentage applied to this booking, frozen at booking time — blank if no discount applied',
+  discount_amount: 'Discount amount (₱) applied to this booking, frozen at booking time — blank if no discount applied',
+  discount_label: "The discount's customer-facing label (e.g. \"Holiday Promo\"), frozen at booking time — blank if no discount applied or none was set",
 };
 
 export const SAMPLE_RESERVATION = {
@@ -53,6 +56,9 @@ export const SAMPLE_RESERVATION = {
   rejection_reason: 'Receipt image was unreadable',
   service_charge_percent: '10',
   service_charge_amount: '₱2,800.00',
+  discount_percent: '20',
+  discount_amount: '₱5,600.00',
+  discount_label: 'Holiday Promo',
 };
 
 export const TOKEN_REGEX = /\{\{\s*(\w+)\s*\}\}/g;

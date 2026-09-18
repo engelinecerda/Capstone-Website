@@ -1,4 +1,9 @@
-export const BLOCKING_RESERVATION_STATUSES = new Set(['pending', 'approved', 'confirmed', 'rescheduled']);
+// BUG-01 fix: a merely-pending (not yet staff-reviewed) reservation is
+// provisional, not a hold — it must not read as capacity-blocking here,
+// matching the same fix in enforce_reservation_capacity() and
+// is_capacity_blocking_reservation_status() (supabase/migrations/
+// 20261005_fix_pending_blocks_capacity.sql).
+export const BLOCKING_RESERVATION_STATUSES = new Set(['approved', 'confirmed', 'rescheduled']);
 
 // calendar_blackouts was hand-rolled in the Supabase SQL Editor (see
 // supabase_setup.md Step 7 and the note at the top of
@@ -60,6 +65,12 @@ export function buildDateKey(date) {
     ].join('-');
 }
 
+// Always returns an array (or null when no scope could be resolved at
+// all) — a "Plus" package that occupies both VIP and Main Hall needs both
+// scopes checked/blocked together, not just one. Every caller downstream
+// (fetchDateAvailability, fetchAvailableStartTimes, getScopeLabel) is
+// array-aware, so a normal single-scope package (the overwhelming
+// majority) just flows through as a one-element array.
 export function getBookingScope(locationTypeOrReservation, packageName = '', explicitScope = null) {
     if (locationTypeOrReservation && typeof locationTypeOrReservation === 'object') {
         const obj = locationTypeOrReservation;
@@ -71,9 +82,13 @@ export function getBookingScope(locationTypeOrReservation, packageName = '', exp
     }
 
     // package.booking_scope (admin-set, explicit) always wins — see
-    // supabase/migrations/20260706_package_explicit_booking_scope.sql. Name
+    // supabase/migrations/20260706_package_explicit_booking_scope.sql and
+    // 20261010_multi_scope_packages.sql (the array-ification). Name
     // matching below only runs for packages an admin hasn't configured yet.
-    if (explicitScope) return explicitScope;
+    if (explicitScope) {
+        const scopes = (Array.isArray(explicitScope) ? explicitScope : [explicitScope]).filter(Boolean);
+        return scopes.length ? scopes : null;
+    }
 
     const location = String(locationTypeOrReservation || '').toLowerCase();
     const name = String(packageName || '').toLowerCase();
@@ -88,19 +103,30 @@ export function getBookingScope(locationTypeOrReservation, packageName = '', exp
         name.includes('all occasion') ||
         name.includes('birthday / baptism all in package')
     ) {
-        return 'offsite';
+        return ['offsite'];
     }
-    if (location === 'onsite' && name.includes('main hall')) return 'onsite_main_hall';
-    if (location === 'onsite' && name.includes('vip')) return 'onsite_vip';
+    if (location === 'onsite' && name.includes('main hall')) return ['onsite_main_hall'];
+    if (location === 'onsite' && name.includes('vip')) return ['onsite_vip'];
     return null;
 }
 
+const SCOPE_LABELS = {
+    onsite_vip: 'VIP',
+    onsite_main_hall: 'Main Hall',
+    offsite: 'Off-site'
+};
+
+// Accepts a single scope or the array getBookingScope() now always returns
+// — a combo package reads as "VIP + Main Hall" instead of just one half of
+// what it actually occupies.
 export function getScopeLabel(scope) {
-    return {
-        onsite_vip: 'VIP',
-        onsite_main_hall: 'Main Hall',
-        offsite: 'Off-site'
-    }[scope] || 'Selected package';
+    const scopes = (Array.isArray(scope) ? scope : [scope]).filter(Boolean);
+    if (!scopes.length) return 'Selected package';
+    return scopes.map((s) => SCOPE_LABELS[s] || 'Selected package').join(' + ');
+}
+
+function asScopeArray(scope) {
+    return (Array.isArray(scope) ? scope : [scope]).filter(Boolean);
 }
 
 export function isBlockingReservationStatus(status) {
@@ -119,20 +145,49 @@ function normalizeAvailabilityPayload(payload, fallbackDate = '') {
     };
 }
 
+// get_booking_availability() itself still only ever answers for one scope
+// at a time (that didn't need to change — see the migration's comment on
+// why get_available_start_times() kept a single p_scope too) — a combo
+// package's real answer is "taken" the moment ANY one of its scopes is
+// taken, so this calls it once per scope and ORs scope_taken/is_fully_
+// booked together, unioning occupied_scopes/blocked_times for display.
 export async function fetchDateAvailability(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null } = {}) {
     if (!eventDate) {
         return normalizeAvailabilityPayload({}, '');
     }
 
-    const { data, error } = await supabase.rpc('get_booking_availability', {
-        p_event_date: eventDate,
-        p_scope: scope || null,
-        p_duration_hours: Number.isFinite(Number(durationHours)) ? Number(durationHours) : null,
-        p_exclude_reservation_id: excludeReservationId || null
-    });
+    const scopes = asScopeArray(scope);
+    const durationParam = Number.isFinite(Number(durationHours)) ? Number(durationHours) : null;
 
-    if (error) throw error;
-    return normalizeAvailabilityPayload(data, eventDate);
+    if (!scopes.length) {
+        const { data, error } = await supabase.rpc('get_booking_availability', {
+            p_event_date: eventDate,
+            p_scope: null,
+            p_duration_hours: durationParam,
+            p_exclude_reservation_id: excludeReservationId || null
+        });
+        if (error) throw error;
+        return normalizeAvailabilityPayload(data, eventDate);
+    }
+
+    const results = await Promise.all(scopes.map(async (singleScope) => {
+        const { data, error } = await supabase.rpc('get_booking_availability', {
+            p_event_date: eventDate,
+            p_scope: singleScope,
+            p_duration_hours: durationParam,
+            p_exclude_reservation_id: excludeReservationId || null
+        });
+        if (error) throw error;
+        return normalizeAvailabilityPayload(data, eventDate);
+    }));
+
+    return results.reduce((merged, r) => ({
+        eventDate: merged.eventDate || r.eventDate,
+        occupiedScopes: [...new Set([...merged.occupiedScopes, ...r.occupiedScopes])],
+        isFullyBooked: merged.isFullyBooked || r.isFullyBooked,
+        scopeTaken: merged.scopeTaken || r.scopeTaken,
+        blockedTimes: [...new Set([...merged.blockedTimes, ...r.blockedTimes])]
+    }), { eventDate: '', occupiedScopes: [], isFullyBooked: false, scopeTaken: false, blockedTimes: [] });
 }
 
 function normalizeStartTimeRow(row) {
@@ -145,18 +200,51 @@ function normalizeStartTimeRow(row) {
     };
 }
 
+// get_available_start_times() still only ever answers for one scope at a
+// time (see the migration's comment on why that signature stayed as-is) —
+// a combo package's slot is only really bookable where EVERY one of its
+// scopes reports available, so this calls it once per scope and ANDs
+// is_available together per matching time_label, rather than teaching the
+// RPC a second, array-typed signature.
 export async function fetchAvailableStartTimes(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null } = {}) {
     if (!eventDate) return [];
 
-    const { data, error } = await supabase.rpc('get_available_start_times', {
-        p_event_date: eventDate,
-        p_scope: scope || null,
-        p_duration_hours: Number.isFinite(Number(durationHours)) ? Number(durationHours) : null,
-        p_exclude_reservation_id: excludeReservationId || null
-    });
+    const scopes = asScopeArray(scope);
+    const durationParam = Number.isFinite(Number(durationHours)) ? Number(durationHours) : null;
 
-    if (error) throw error;
-    return (Array.isArray(data) ? data : []).map(normalizeStartTimeRow);
+    if (!scopes.length) {
+        const { data, error } = await supabase.rpc('get_available_start_times', {
+            p_event_date: eventDate,
+            p_scope: null,
+            p_duration_hours: durationParam,
+            p_exclude_reservation_id: excludeReservationId || null
+        });
+        if (error) throw error;
+        return (Array.isArray(data) ? data : []).map(normalizeStartTimeRow);
+    }
+
+    const perScopeRows = await Promise.all(scopes.map(async (singleScope) => {
+        const { data, error } = await supabase.rpc('get_available_start_times', {
+            p_event_date: eventDate,
+            p_scope: singleScope,
+            p_duration_hours: durationParam,
+            p_exclude_reservation_id: excludeReservationId || null
+        });
+        if (error) throw error;
+        return (Array.isArray(data) ? data : []).map(normalizeStartTimeRow);
+    }));
+
+    if (perScopeRows.length === 1) return perScopeRows[0];
+
+    const [firstRows, ...restRows] = perScopeRows;
+    return firstRows.map((row, i) => {
+        const sameSlotAcrossScopes = restRows.map((rows) => rows[i]);
+        const allAvailable = row.isAvailable && sameSlotAcrossScopes.every((r) => r?.isAvailable);
+        const blockingReason = !allAvailable
+            ? (row.reason || sameSlotAcrossScopes.find((r) => r && !r.isAvailable)?.reason || 'Unavailable due to another reservation.')
+            : null;
+        return { ...row, isAvailable: allAvailable, reason: blockingReason };
+    });
 }
 
 export async function fetchCalendarAvailability(supabase, { fromDate, toDate } = {}) {

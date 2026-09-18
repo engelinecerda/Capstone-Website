@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=32">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=32">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=32">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=32">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=36">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=36">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=36">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=36">
 </head>
 <body>
 
@@ -540,14 +540,22 @@
         </div>
 
         <div class="modal-field" id="pkgBookingScopeField">
-          <label class="modal-label" for="pkgBookingScope">Booking Scope (Main packages only) *</label>
-          <select id="pkgBookingScope" class="modal-input modal-select">
-            <option value="">Select the team/resource this package occupies</option>
-            <option value="onsite_vip">VIP</option>
-            <option value="onsite_main_hall">Main Hall</option>
-            <option value="offsite">Offsite / Catering Team</option>
-          </select>
-          <span class="modal-hint">Determines which reservations block each other on the calendar. Required for Main packages — add-ons don't need this.</span>
+          <label class="modal-label">Booking Scope (Main packages only) *</label>
+          <div class="pkg-scope-checks" id="pkgBookingScopeChecks">
+            <label class="pkg-scope-check-option">
+              <input type="checkbox" class="pkg-scope-check" value="onsite_vip">
+              <span>VIP</span>
+            </label>
+            <label class="pkg-scope-check-option">
+              <input type="checkbox" class="pkg-scope-check" value="onsite_main_hall">
+              <span>Main Hall</span>
+            </label>
+            <label class="pkg-scope-check-option">
+              <input type="checkbox" class="pkg-scope-check" value="offsite">
+              <span>Offsite / Catering Team</span>
+            </label>
+          </div>
+          <span class="modal-hint">Determines which reservations block each other on the calendar. Check both VIP and Main Hall for a combo package that uses both rooms at once (e.g. a "Plus" package). Required for Main packages — add-ons don't need this.</span>
         </div>
 
         <!-- Photos (multi, drag/keyboard reorder, cover select, alt text) -->

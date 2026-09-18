@@ -16,12 +16,14 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPageHeader } from './page_content.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
+import { pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
 
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
 const PHOTO_TABLE    = 'package_photo';
 const BADGE_TABLE    = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
+const DISCOUNT_TABLE = 'package_discount';
 
 // Fixed bucket BOUNDARIES only — every count shown next to a bucket is
 // computed from real package data in computeFacets(), never hardcoded.
@@ -151,6 +153,23 @@ async function loadCatalog() {
         });
       } catch { /* badges optional — never block the catalogue */ }
 
+      // Active discounts — public RLS already scopes this to is_active
+      // rows only, but a package can still carry a not-yet-started
+      // "scheduled" row (is_active=true, starts_at in the future), so the
+      // active/scheduled/expired resolution still happens client-side via
+      // applyDiscount(), same as everywhere else this is used.
+      let discountMap = {};
+      try {
+        const { data: discountRows } = await supabase
+          .from(DISCOUNT_TABLE)
+          .select('*')
+          .in('package_id', packageIds);
+        (discountRows || []).forEach(row => {
+          if (!discountMap[row.package_id]) discountMap[row.package_id] = [];
+          discountMap[row.package_id].push(row);
+        });
+      } catch { /* discounts optional — never block the catalogue */ }
+
       allPackages.forEach(p => {
         p._categoryName = categoryNameById[p.package_category_id] || '';
         p._coverPhoto = coverByPackageId[p.package_id] || null;
@@ -159,6 +178,7 @@ async function loadCatalog() {
           .slice()
           .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
           .slice(0, 2);
+        p._discount = applyDiscount(p.price, pickActiveDiscount(discountMap[p.package_id]));
       });
 
       // Most Booked is a single, unambiguous winner across the WHOLE active
@@ -511,9 +531,20 @@ function buildResultCard(pkg) {
   if (locLabel) chips.push(`<span class="pkg-chip pkg-chip--location">${esc(locLabel)}</span>`);
 
   const price = Number(pkg.price || 0);
-  const priceHtml = price > 0
-    ? `<p class="pkg-result-price-note">Starting price</p><p class="pkg-result-price">${formatPeso(price)}</p>`
-    : `<p class="pkg-result-price-note">Custom pricing</p><p class="pkg-result-price pkg-result-price--contact">Contact for Quote</p>`;
+  const discount = pkg._discount;
+  let priceHtml;
+  if (price <= 0) {
+    priceHtml = `<p class="pkg-result-price-note">Custom pricing</p><p class="pkg-result-price pkg-result-price--contact">Contact for Quote</p>`;
+  } else if (discount?.active) {
+    priceHtml = `<p class="pkg-result-price-note">Starting price${discount.label ? ' &middot; ' + esc(discount.label) : ''}</p>
+      <p class="pkg-result-price pkg-result-price--discounted">
+        <s class="pkg-result-price-original">${formatPeso(discount.listPrice)}</s>
+        ${formatPeso(discount.discountedPrice)}
+        <span class="pkg-result-price-off">&minus;${discount.percentOff}%</span>
+      </p>`;
+  } else {
+    priceHtml = `<p class="pkg-result-price-note">Starting price</p><p class="pkg-result-price">${formatPeso(price)}</p>`;
+  }
 
   const imgHtml = pkg._coverPhoto?.image_url
     ? `<img class="pkg-result-img" src="${esc(optimizedImageUrl(pkg._coverPhoto.image_url, 700))}" alt="${esc(pkg._coverPhoto.alt_text || name)}" loading="lazy">`

@@ -325,6 +325,14 @@
   color: var(--neutral-txt);
 }
 
+/* Discount status pill — computed live from is_active + the time window,
+   never a stored flag (see computeDiscountStatus() in
+   js/package_discount_helpers.js). */
+.status-pill.disc-active    { background: var(--approved); color: var(--approved-txt); }
+.status-pill.disc-scheduled { background: var(--pending);  color: var(--pending-txt); }
+.status-pill.disc-expired   { background: var(--neutral);  color: var(--neutral-txt); }
+.status-pill.disc-off       { background: var(--declined); color: var(--declined-txt); }
+
 /* Action buttons in table */
 .action-cell {
   display: flex;
@@ -742,6 +750,27 @@
   cursor: pointer;
 }
 
+/* Booking Scope — same checkbox-row treatment as .venue-option-row above;
+   a package can check both VIP and Main Hall for a combo "Plus" package
+   that occupies both rooms at once. */
+.pkg-scope-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.pkg-scope-check-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
 /* ============================================================
    INVENTORY REBUILD — health strip, segmented controls, category
    rail, card grid, kebab menu, tier drawer, medal chips, inline
@@ -1001,6 +1030,18 @@
 .badge-toggle-chip.active.variant-info     { background: var(--info);     color: var(--info-txt); }
 .badge-toggle-chip.active.variant-neutral  { background: var(--neutral); color: var(--neutral-txt); }
 
+.discount-status-row { margin-bottom: 14px; }
+
+.discount-preview {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--neutral);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
 .badge-readonly-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;
@@ -1069,11 +1110,30 @@
 .pkg-spec-line {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 4px;
   margin-bottom: 10px;
 }
 .pkg-spec-price { font-size: 16px; font-weight: 700; color: var(--text); white-space: nowrap; }
-.spec-leader { flex: 1 1 auto; border-bottom: 1px dotted var(--border); height: 1px; align-self: center; }
+.pkg-spec-price--discounted { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.pkg-price-original { font-size: 12px; font-weight: 500; color: var(--muted); }
+.pkg-price-off {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--approved-txt);
+  background: var(--approved);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+/* The original+discounted+%-off group is wide enough on its own that the
+   leader dots and pax/hr figures no longer fit on the same row without
+   crowding the card's right edge (the figures are white-space:nowrap, so
+   they can't shrink to make room) — drop the purely decorative leader so
+   the figures get that space back, and let the whole line wrap if it's
+   still tight, rather than letting it run past the card's padding. */
+.pkg-spec-line:has(.pkg-spec-price--discounted) .spec-leader { display: none; }
+.spec-leader { flex: 1 1 auto; border-bottom: 1px dotted var(--border); height: 1px; align-self: center; min-width: 0; }
 .spec-figures {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11.5px;
@@ -1087,18 +1147,6 @@
 .tier-ladder-bar:nth-child(1) { height: 6px; }
 .tier-ladder-bar:nth-child(2) { height: 9px; }
 .tier-ladder-bar:nth-child(3) { height: 12px; }
-.tier-ladder-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--btn-primary-bg);
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
 /* ── Kebab menu (used in both card and list-view rows) ── */
 .card-menu { position: relative; }
 .icon-btn {
