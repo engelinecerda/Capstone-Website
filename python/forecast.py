@@ -15,19 +15,27 @@ if not SUPABASE_SERVICE_ROLE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 def run_forecast(generated_by=None):
-    # 1. Fetch reservation data (ACTUAL)
-    response = supabase.table("reservations").select("event_date").eq("status", "completed").execute()
+    # 1. Fetch reservation data (ACTUAL), already aggregated by month.
+    #
+    # Previously this pulled EVERY completed reservation's event_date row
+    # off disk (.select("event_date").eq("status", "completed"), no
+    # limit) and then collapsed it to one row per month with a pandas
+    # groupby. The database can do that GROUP BY itself, backed by the
+    # reservations_completed_event_date_idx partial index (see
+    # supabase/migrations/20261001_forecast_query_perf.sql), so the amount
+    # of data actually read off disk and sent back over the wire is
+    # bounded by the number of DISTINCT MONTHS with completed reservations
+    # rather than the total number of completed reservations — the two
+    # only match while the business is brand new.
+    response = supabase.rpc("get_monthly_completed_reservation_counts").execute()
     data = response.data
 
     if not data:
         print("No completed reservations yet — skipping forecast run.")
         return
 
-    df = pd.DataFrame(data)
-
-    df['ds'] = pd.to_datetime(df['event_date'])
-    df = df.groupby(df['ds'].dt.to_period('M')).size().reset_index(name='y')
-    df['ds'] = df['ds'].dt.to_timestamp()
+    df = pd.DataFrame(data).rename(columns={"month": "ds", "reservation_count": "y"})
+    df['ds'] = pd.to_datetime(df['ds'])
 
     # Prophet needs at least 2 data points to fit a model
     if len(df) < 2:
@@ -77,14 +85,16 @@ def run_forecast(generated_by=None):
     # so a failed run never leaves the table empty.
     try:
         new_id = insert_res.data[0]["forecast_id"]
-        old_rows = supabase.table("reservation_forecast") \
-            .select("forecast_id") \
+        # Single bulk DELETE instead of SELECT-then-delete-one-by-one: the
+        # old version ran 1 select + N individual deletes (N+1 round trips
+        # and N separate write operations) every time this job ran, purely
+        # to remove rows that a single statement already deletes at once.
+        deleted = supabase.table("reservation_forecast") \
+            .delete() \
             .neq("forecast_id", new_id) \
             .execute()
-        for row in old_rows.data:
-            supabase.table("reservation_forecast").delete().eq("forecast_id", row["forecast_id"]).execute()
-        if old_rows.data:
-            print(f"Cleaned up {len(old_rows.data)} old forecast row(s).")
+        if deleted.data:
+            print(f"Cleaned up {len(deleted.data)} old forecast row(s).")
     except Exception as e:
         # Non-fatal: the new forecast is already saved, cleanup failing isn't critical
         print(f"WARNING: cleanup of old forecast rows failed: {e}", file=sys.stderr)

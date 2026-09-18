@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import pandas as pd
 import logging
 import asyncio
 import sys
@@ -77,7 +76,16 @@ async def get_forecast():
         )
 
     def fetch_actuals():
-        return supabase.table("reservations").select("event_date").eq("status", "completed").execute()  
+        # Was: .select("event_date").eq("status", "completed") over the
+        # WHOLE reservations table, on every /forecast request (i.e. every
+        # dashboard load) — the same unbounded query forecast.py used to
+        # run once a day, just hit far more often. Now reuses the
+        # monthly-aggregate RPC from forecast.py (backed by
+        # reservations_active_event_date_idx, see
+        # supabase/migrations/20261001_forecast_query_perf.sql and
+        # 20261002_main_endpoints_query_perf.sql), so this returns one row
+        # per month instead of one row per completed reservation.
+        return supabase.rpc("get_monthly_completed_reservation_counts").execute()
 
     loop = asyncio.get_event_loop()
     try:
@@ -101,11 +109,15 @@ async def get_forecast():
     years = set()
 
     for r in res.data:
-        key = r["event_date"][:7]
-        year = r["event_date"][:4]
+        # r["month"] comes back as "YYYY-MM-DD" from the RPC's
+        # date_trunc('month', ...); r["reservation_count"] is already the
+        # per-month total, so this is a direct assignment now instead of
+        # a += 1 accumulation.
+        key = r["month"][:7]
+        year = r["month"][:4]
 
         years.add(year)
-        actual_map[key] = actual_map.get(key, 0) + 1
+        actual_map[key] = r["reservation_count"]
 
     # ADD FUTURE YEARS (next 2 years)
     current_year = datetime.now().year
@@ -191,29 +203,33 @@ async def get_forecast_status():
 # =========================
 @app.get("/analytics/monthly-reservations")
 def monthly_reservations():
-    res = supabase.table("reservations") \
-        .select("event_date") \
-        .in_("status", ["approved", "confirmed", "completed"]) \
-        .execute()
+    # Was: .select("event_date").in_("status", [...]) over the WHOLE
+    # reservations table (no limit), then a pandas groupby purely to
+    # collapse it to one row per month — every time this chart loads.
+    # get_monthly_reservation_counts() does that GROUP BY in Postgres
+    # (backed by reservations_active_event_date_idx) and returns one row
+    # per month instead of one row per reservation. See
+    # supabase/migrations/20261002_main_endpoints_query_perf.sql.
+    res = supabase.rpc(
+        "get_monthly_reservation_counts",
+        {"p_statuses": ["approved", "confirmed", "completed"]},
+    ).execute()
 
-    df = pd.DataFrame(res.data)
-
-    if df.empty:
+    if not res.data:
         return []
 
-    df['event_date'] = pd.to_datetime(df['event_date'])
-    df['year'] = df['event_date'].dt.year.astype(str)
-    df['month_num'] = df['event_date'].dt.month
-    df['month'] = df['event_date'].dt.strftime('%b')
+    result = [
+        {
+            "year": row["month"][:4],
+            "month_num": int(row["month"][5:7]),
+            "month": datetime.strptime(row["month"][:7], "%Y-%m").strftime("%b"),
+            "count": row["reservation_count"],
+        }
+        for row in res.data
+    ]
 
-    grouped = (
-        df.groupby(['year', 'month_num', 'month'])
-        .size()
-        .reset_index(name='count')
-        .sort_values(['year', 'month_num'])
-    )
-
-    return grouped[['year', 'month_num', 'month', 'count']].to_dict(orient='records')
+    result.sort(key=lambda r: (r["year"], r["month_num"]))
+    return result
 # =========================
 # PACKAGE DISTRIBUTION
 # =========================
