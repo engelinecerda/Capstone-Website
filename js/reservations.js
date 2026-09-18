@@ -481,12 +481,20 @@ function updateMinNoticeBanner() {
 // either past or inside the minimum-advance-notice window — e.g. today
 // is the 26th with a 14-day minimum, so the rest of this month can never
 // have a bookable date) reads as broken, even though it's working as
-// designed. Called once on initial load only — not on manual Prev/Next,
-// so a customer who deliberately pages back can still see why a month is
-// empty. Bounded to 24 months so a misconfigured max_advance_days (e.g.
-// 0) can't spin this forever.
+// designed. Called on initial load AND every time the notice window can
+// change (event type / location / package) — not on manual Prev/Next, so
+// a customer who deliberately pages back can still see why a month is
+// empty. Always restarts the scan from today's month rather than wherever
+// the calendar currently sits: this function only ever pages FORWARD, so
+// re-running it without resetting first would leave the calendar stuck on
+// a later month forever once some earlier selection (e.g. an event type
+// with a longer notice requirement) had paged it forward — even after the
+// customer picks a shorter-notice event type that would make an earlier
+// month bookable again. Bounded to 24 months so a misconfigured
+// max_advance_days (e.g. 0) can't spin this forever.
 function advanceToFirstBookableMonth() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    availabilityState.month = new Date(today.getFullYear(), today.getMonth(), 1);
     for (let guard = 0; guard < 24; guard++) {
         const monthStart = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth(), 1);
         const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
