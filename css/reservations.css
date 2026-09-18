@@ -173,6 +173,50 @@
     margin-top: 1px;
 }
 
+/* venue-pinned-label is an <input>, not a <span> — style it to blend into
+   the pinned-row "chip" rather than look like a normal form field, while
+   still reading clearly as editable. */
+.venue-pinned-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    line-height: inherit;
+    resize: none;
+    overflow-y: auto;
+}
+.venue-pinned-input:focus { outline: none; }
+.venue-pinned-input::placeholder { color: inherit; opacity: 0.65; }
+.venue-pinned-row:focus-within {
+    border-color: #6B3A1F;
+    box-shadow: 0 0 0 2px rgba(107, 58, 31, 0.12);
+}
+
+.venue-details-row {
+    margin-top: 12px;
+}
+
+.venue-details-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #3D1A0A;
+    margin-bottom: 6px;
+}
+
+.venue-details-label small {
+    font-weight: 400;
+    color: #999;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.venue-details-row .res-input { margin-bottom: 0; }
+
 /* ========================
    Tray Cart (Step 4)
 ======================== */
@@ -2190,6 +2234,23 @@
     line-height: 1.55;
 }
 
+.venue-details-row { margin-top: 14px; }
+
+.venue-details-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brown-mid, #6B3820);
+    margin-bottom: 6px;
+}
+
+.venue-details-label small {
+    font-weight: 400;
+    color: #929292;
+}
+
+.venue-details-row .res-input { margin-bottom: 0; }
+
 .pkg-empty-state {
     grid-column: 1 / -1;
     padding: 20px 16px;
@@ -2522,16 +2583,6 @@
     font-weight: 500;
     font-style: italic;
     color: var(--acc-text-muted);
-}
-.rpkg-price--discounted { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-.rpkg-price-original { font-size: 13px; font-weight: 500; color: var(--acc-text-muted); }
-.rpkg-price-off {
-    font-size: 11px;
-    font-weight: 700;
-    color: #fff;
-    background: var(--acc-terracotta);
-    border-radius: 999px;
-    padding: 1px 8px;
 }
 .rpkg-desc {
     font-size: 12px;

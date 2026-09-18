@@ -160,6 +160,22 @@
   border-bottom: 0.5px solid var(--border);
 }
 
+/* .status-stack is a CSS grid — grid items stretch to fill their track by
+   default, so the status pill spans the full cell width and centers its
+   text there, same pattern used on the dashboard/contracts/reservations
+   tables (see css/admin_homepage.css). Only one pill column on this page,
+   so this just makes every row's pill the same width regardless of its
+   own label length, instead of each shrinking to fit its own text. */
+.reports-table .status-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.reports-table .table-status-cell {
+  min-width: 0;
+  width: 190px;
+}
+
 /* Row typography now comes from the shared .table-main/.table-sub/
    .date-cell classes (manager-theme.css, loaded on this page) — the same
    ones the Reviews module uses — instead of a local <strong>/<span>-based
