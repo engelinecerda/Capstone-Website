@@ -1110,8 +1110,12 @@ body {
    reservations-page rules.
    ============================================================ */
 .reschedule-alert {
+  position: relative;
   margin-bottom: 20px;
-  padding: 18px 20px;
+  /* Right padding reserves room for .reschedule-alert-dismiss, which is
+     pinned to this corner out of normal flow (see its own comment below) —
+     this keeps .reschedule-alert-copy/-actions from ever extending under it. */
+  padding: 18px 56px 18px 20px;
   border-radius: 16px;
   border: 0.5px solid #EAD9BC;
   background: #FBF3E6;
@@ -1183,10 +1187,19 @@ body {
   transform: translateY(-1px);
 }
 
-/* BUG-04: dismiss (X) — acknowledges the banner without acting on it,
-   same circular icon-button treatment as the customer-side announcement
-   banner's own dismiss (css/announcement_banner.css). */
+/* BUG-04 / follow-up: dismiss (X) — acknowledges the banner without acting
+   on it, same circular icon-button treatment as the customer-side
+   announcement banner's own dismiss (css/announcement_banner.css). Pinned
+   to the card's top-right corner, taken out of flex flow — .reschedule-
+   alert's own right padding (above) reserves this corner so it can never
+   overlap .reschedule-alert-copy/-actions, and taking it out of flow leaves
+   exactly two flex children (copy, actions) so justify-content: space-
+   between correctly anchors the Review button to the right edge instead of
+   the middle. */
 .reschedule-alert-dismiss {
+  position: absolute;
+  top: 14px;
+  right: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
