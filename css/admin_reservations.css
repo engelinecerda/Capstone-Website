@@ -153,6 +153,46 @@ body {
   transform: translateY(-1px);
 }
 
+/* BUG-04: dismiss (X) — acknowledges the banner without acting on it,
+   same circular icon-button treatment as the customer-side announcement
+   banner's own dismiss (css/announcement_banner.css). A normal flex
+   sibling of .reschedule-alert-copy/-actions (not absolutely positioned)
+   so the row's own layout always reserves its space — .reschedule-alert's
+   height is driven by the copy text, and an absolutely-positioned circle
+   pinned to the corner would risk drifting over the Review button once
+   that height varies instead of guaranteed clearance. */
+.reschedule-alert-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(42, 18, 8, 0.06);
+  color: #7b6a5d;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* .reschedule-alert switches to flex-direction: column at 1450px (below)
+   — keep the dismiss button anchored top-right there instead of falling
+   to its own row beneath the full-width Review button. position:relative
+   is scoped to the same breakpoint since that's the only place this is
+   taken out of flow. */
+@media (max-width: 1450px) {
+  .reschedule-alert { position: relative; }
+  .reschedule-alert-dismiss { position: absolute; top: 14px; right: 16px; }
+}
+
+.reschedule-alert-dismiss:hover,
+.reschedule-alert-dismiss:focus-visible {
+  background: rgba(42, 18, 8, 0.12);
+  color: #2A1208;
+  outline: none;
+}
+
 .toolbar-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
