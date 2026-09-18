@@ -12,6 +12,7 @@ import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -918,11 +919,13 @@ function openReceiptViewer(url) {
   }
   receiptViewerModal?.classList.remove('hidden');
   receiptViewerModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 function closeReceiptViewer() {
   receiptViewerModal?.classList.add('hidden');
   receiptViewerModal?.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
 }
 
 function wireReceiptViewer() {
@@ -1116,11 +1119,13 @@ async function openRecordPaymentModal() {
 
   recordPaymentModal?.classList.remove('hidden');
   recordPaymentModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 function closeRecordPaymentModal() {
   recordPaymentModal?.classList.add('hidden');
   recordPaymentModal?.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
   recordPaymentSaveBtn?.removeAttribute('disabled');
   recordPaymentTargetPayment = null;
 }
@@ -1549,6 +1554,7 @@ function closeAssignmentModal() {
   if (assignmentSearchInput) assignmentSearchInput.value = '';
   assignmentSaveBtn?.removeAttribute('disabled');
   setAssignmentModalMessage('');
+  unlockBodyScroll();
 }
 
 function openAssignmentModal() {
@@ -1566,6 +1572,7 @@ function openAssignmentModal() {
 
   assignmentModal.classList.remove('hidden');
   assignmentModal.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
   renderAssignmentStaffList();
   setAssignmentModalMessage(staffDirectory.length ? '' : 'No staff profiles are available yet.', !staffDirectory.length);
   assignmentSearchInput?.focus();
@@ -1654,6 +1661,7 @@ function wireAssignmentModal() {
 function closeApprovalPrompt() {
   approvalPromptModal?.classList.add('hidden');
   approvalPromptModal?.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
 }
 
 function openApprovalPrompt() {
@@ -1666,6 +1674,7 @@ function openApprovalPrompt() {
   approvalPromptMeta.textContent = metaParts.join(' · ');
   approvalPromptModal.classList.remove('hidden');
   approvalPromptModal.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 // Approval is already committed by the time this runs, so any failure here

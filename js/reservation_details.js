@@ -41,6 +41,7 @@ import {
 import { fetchMaxExtensionHours, requestExtension } from './reservation_extensions.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -888,6 +889,7 @@ function closeCancelModal() {
     cancelReservationBackdrop?.setAttribute('aria-hidden', 'true');
     if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
     setCancelModalMessage('');
+    unlockBodyScroll();
 }
 
 // Swaps the hardcoded fallback copy inside the policy block for the
@@ -909,6 +911,7 @@ function openCancelModal() {
     setCancelModalMessage('');
     cancelReservationBackdrop?.classList.remove('hidden');
     cancelReservationBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function openSubmissionFeedbackModal({
@@ -921,11 +924,13 @@ function openSubmissionFeedbackModal({
     if (submissionFeedbackCopy) submissionFeedbackCopy.textContent = copy;
     submissionFeedbackBackdrop?.classList.remove('hidden');
     submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeSubmissionFeedbackModal() {
     submissionFeedbackBackdrop?.classList.add('hidden');
     submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 async function submitCancellationRequest() {
@@ -1150,6 +1155,7 @@ async function openExtensionModal() {
     renderExtensionModalBody();
     extensionRequestBackdrop?.classList.remove('hidden');
     extensionRequestBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 
     try {
         extensionAvailability = await fetchMaxExtensionHours(supabase, reservationId);
@@ -1165,6 +1171,7 @@ function closeExtensionModal() {
     extensionRequestBackdrop?.setAttribute('aria-hidden', 'true');
     extensionModalConfirm?.removeAttribute('disabled');
     setExtensionModalMessage('');
+    unlockBodyScroll();
 }
 
 async function submitExtensionRequest() {

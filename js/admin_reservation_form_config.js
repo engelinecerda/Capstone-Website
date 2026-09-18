@@ -8,6 +8,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { logAudit } from './audit_logger.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -168,6 +169,7 @@ function openPreview() {
     : '<p><em>Nothing saved yet — customers currently see the built-in fallback copy.</em></p>';
 
   document.getElementById('rf-preview-backdrop').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 // ── Event Types tab ────────────────────────────────────────────────────────
@@ -221,10 +223,12 @@ function openEventTypeModal(id = null) {
   document.getElementById('et-active-input').checked = et ? et.status === 'Active' : true;
   document.getElementById('et-modal-message').textContent = '';
   document.getElementById('et-modal-backdrop').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 function closeEventTypeModal() {
   document.getElementById('et-modal-backdrop').classList.add('hidden');
+  unlockBodyScroll();
 }
 
 async function saveEventType() {
@@ -294,9 +298,13 @@ export function initReservationFormConfig() {
   document.getElementById('rf-legal-preview')?.addEventListener('click', openPreview);
   document.getElementById('rf-preview-close')?.addEventListener('click', () => {
     document.getElementById('rf-preview-backdrop').classList.add('hidden');
+    unlockBodyScroll();
   });
   document.getElementById('rf-preview-backdrop')?.addEventListener('click', (e) => {
-    if (e.target.id === 'rf-preview-backdrop') e.currentTarget.classList.add('hidden');
+    if (e.target.id === 'rf-preview-backdrop') {
+      e.currentTarget.classList.add('hidden');
+      unlockBodyScroll();
+    }
   });
 
   document.getElementById('et-add-btn')?.addEventListener('click', () => openEventTypeModal(null));

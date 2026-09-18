@@ -26,6 +26,7 @@ import {
     submitCustomerPayment,
     validateReferenceNumber
 } from './customer_payments.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // Small display-only map for historical payment records whose stored
 // payment_method free-text happens to match a legacy brand key — used only
@@ -1335,11 +1336,13 @@ function openReceiptModal(paymentId) {
 
     receiptModalBackdrop?.classList.remove('hidden');
     receiptModalBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeReceiptModal() {
     receiptModalBackdrop?.classList.add('hidden');
     receiptModalBackdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 async function fetchCancellationInfo(reservationId) {
@@ -1651,6 +1654,7 @@ function wasPaymentDraftAlreadySubmitted(draft, reservationId) {
 function hidePaymentDraftModal() {
     paymentDraftModalBackdrop?.classList.add('hidden');
     paymentDraftModalBackdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 // Only offer to resume when the actionable form (the one with fields worth
@@ -1667,6 +1671,7 @@ if (draft && wasPaymentDraftAlreadySubmitted(draft, state.reservationId)) {
 if (draft) {
     paymentDraftModalBackdrop?.classList.remove('hidden');
     paymentDraftModalBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 
     paymentDraftContinueBtn?.addEventListener('click', () => {
         applyPaymentDraft(draft);

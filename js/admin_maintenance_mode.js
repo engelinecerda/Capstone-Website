@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { buildMaintenancePageHtml } from './maintenance_template.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let mode = null;
@@ -42,8 +43,8 @@ function setFormMsg(msg, type = 'error') {
   formMessage.textContent = msg;
   formMessage.className = `modal-message ${type}`;
 }
-function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
-function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); lockBodyScroll(); }
+function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); unlockBodyScroll(); }
 function fmtDateTime(iso) {
   return iso ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
 }

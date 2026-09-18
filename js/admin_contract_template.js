@@ -23,6 +23,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
 import { fetchContractTemplateData } from './contract_render.js';
+import { lockBodyScroll } from './modal_scroll_lock.js';
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -448,6 +449,7 @@ function openContractPreview() {
     ${ackHtml}
   `;
   document.getElementById('rf-preview-backdrop').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 // ── Package switch + init ────────────────────────────────────────────────

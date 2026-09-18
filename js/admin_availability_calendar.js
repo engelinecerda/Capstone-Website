@@ -13,6 +13,7 @@ import {
   resolveBlackoutReasonColumn,
 } from './reservation_availability.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const calendarMonthLabel = document.getElementById('calendarMonthLabel');
 const prevMonthBtn = document.getElementById('prevMonth');
@@ -406,6 +407,7 @@ function closeBlackoutModal() {
   blackoutModal?.setAttribute('aria-hidden', 'true');
   blackoutConfirmBtn?.removeAttribute('disabled');
   setModalMessage('');
+  unlockBodyScroll();
 }
 
 function openBlackoutModal(dateIso) {
@@ -428,6 +430,7 @@ function openBlackoutModal(dateIso) {
   if (blackoutReasonInput) blackoutReasonInput.value = closedDateReasons.get(dateIso) || '';
   blackoutModal?.classList.remove('hidden');
   blackoutModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 async function confirmCloseDate() {

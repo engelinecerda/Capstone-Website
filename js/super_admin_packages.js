@@ -15,6 +15,7 @@ import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { computeDiscountStatus, pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -378,13 +379,13 @@ function setModalMsg(el, msg, type = 'error') {
 function openModal(modal) {
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
+  lockBodyScroll();
 }
 
 function closeModal(modal) {
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
+  unlockBodyScroll();
 }
 // one-per-line or comma-separated → stored as newline-separated ──
 function normalizeTierInclusions(raw) {
@@ -2795,6 +2796,7 @@ function openTierDrawer(packageId, packageName, triggerEl) {
   tierDrawer.classList.add('open');
   tierDrawer.setAttribute('aria-hidden', 'false');
   document.body.classList.add('tier-drawer-open');
+  lockBodyScroll();
 
   loadTiers(packageId);
 
@@ -2812,6 +2814,7 @@ function closeTierDrawer() {
   tierDrawer.classList.remove('open');
   tierDrawer.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('tier-drawer-open');
+  unlockBodyScroll();
   if (tierDrawer._cleanup) { tierDrawer._cleanup(); tierDrawer._cleanup = null; }
   tierForPackageId   = null;
   tierForPackageName = '';

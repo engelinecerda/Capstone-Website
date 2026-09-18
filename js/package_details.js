@@ -10,6 +10,7 @@ import { customerSupabase as supabase } from './supabase.js';
 import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 import { pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
@@ -325,11 +326,13 @@ function openLightbox(photos, index, name) {
   renderLightboxFrame(name);
   show(pkgLightboxBackdrop);
   pkgLightboxBackdrop.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
   pkgLightboxClose.focus();
 }
 function closeLightbox() {
   hide(pkgLightboxBackdrop);
   pkgLightboxBackdrop.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
   if (lightboxLastFocused?.focus) lightboxLastFocused.focus();
 }
 function renderLightboxFrame(name) {

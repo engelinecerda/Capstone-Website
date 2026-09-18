@@ -7,6 +7,7 @@ import {
     getReservationBalanceDetails as getSharedReservationBalanceDetails
 } from './customer_payments.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 /* ============================================================
    STATE
@@ -390,12 +391,14 @@ function openReviewPickerModal() {
     const backdrop = document.getElementById('review-picker-backdrop');
     backdrop?.classList.remove('hidden');
     backdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeReviewPickerModal() {
     const backdrop = document.getElementById('review-picker-backdrop');
     backdrop?.classList.add('hidden');
     backdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 function setReviewPromptRating(rating) {
@@ -453,6 +456,7 @@ function openReviewPromptModal(reservation) {
     const backdrop = document.getElementById('review-prompt-backdrop');
     backdrop?.classList.remove('hidden');
     backdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeReviewPromptModal() {
@@ -462,6 +466,7 @@ function closeReviewPromptModal() {
     const backdrop = document.getElementById('review-prompt-backdrop');
     backdrop?.classList.add('hidden');
     backdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 function openSubmissionFeedbackModal() {
@@ -471,12 +476,14 @@ function openSubmissionFeedbackModal() {
     document.getElementById('submission-feedback-copy').textContent = 'Your review has been saved to your completed reservation.';
     backdrop?.classList.remove('hidden');
     backdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeSubmissionFeedbackModal() {
     const backdrop = document.getElementById('submission-feedback-backdrop');
     backdrop?.classList.add('hidden');
     backdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 async function submitReservationReview() {

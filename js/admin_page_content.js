@@ -2,6 +2,7 @@
 // Manages page_header, gallery_image, about_section, faq — presentation
 // config only, read by the customer pages via js/page_content.js.
 import { portalSupabase as supabase } from './supabase.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
@@ -175,8 +176,8 @@ function setModalMsg(el, msg, type = 'error') {
   el.textContent = msg;
   el.className = `modal-message ${type}`;
 }
-function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
-function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); lockBodyScroll(); }
+function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); unlockBodyScroll(); }
 
 // ── LOAD ─────────────────────────────────────────────────────────
 async function loadAll() {

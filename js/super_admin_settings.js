@@ -18,6 +18,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // ── Confirm modal (Operating Hours) ───────────────────────────────────────
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
@@ -29,10 +30,15 @@ function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
 
   document.getElementById('settingsConfirmOk').onclick = () => {
     modal.classList.add('hidden');
+    unlockBodyScroll();
     onConfirm();
   };
-  document.getElementById('settingsConfirmCancel').onclick = () => modal.classList.add('hidden');
+  document.getElementById('settingsConfirmCancel').onclick = () => {
+    modal.classList.add('hidden');
+    unlockBodyScroll();
+  };
   modal.classList.remove('hidden');
+  lockBodyScroll();
 }
 
 // ── Vision API usage widget ─────────────────────────────────────────────────

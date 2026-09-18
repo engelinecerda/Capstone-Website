@@ -12,6 +12,7 @@
 // window.initVenueMap, window.venueMap) — nothing here relies on shared
 // module scope with that script, so extraction doesn't change behavior.
 import { customerSupabase as supabase } from '/js/supabase.js';
+import { lockBodyScroll, unlockBodyScroll } from '/js/modal_scroll_lock.js';
 import {
     fetchAvailableStartTimes,
     fetchBlackoutDates,
@@ -819,11 +820,13 @@ function openPolicyModal(key) {
     renderPolicyContent(key);
     policyModalBackdrop.classList.remove('hidden');
     policyModalBackdrop.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closePolicyModal() {
     policyModalBackdrop.classList.add('hidden');
     policyModalBackdrop.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 // ── Warning modal ──────────────────────────────────────────────────────
@@ -1467,7 +1470,7 @@ function openAgreementModal() {
     signatureState.agreementModalLastFocus = document.activeElement;
     agreementModalBackdrop.classList.remove('hidden');
     agreementModalBackdrop.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
+    lockBodyScroll();
     document.addEventListener('keydown', handleAgreementModalKeydown);
 
     const focusable = getAgreementModalFocusable();
@@ -1478,7 +1481,7 @@ function closeAgreementModal() {
     if (!agreementModalBackdrop) return;
     agreementModalBackdrop.classList.add('hidden');
     agreementModalBackdrop.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
+    unlockBodyScroll();
     document.removeEventListener('keydown', handleAgreementModalKeydown);
     (signatureState.agreementModalLastFocus || contractViewFullBtn)?.focus();
 }
