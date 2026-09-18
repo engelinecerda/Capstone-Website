@@ -208,6 +208,7 @@ const PRESENTATION_BY_TRIGGER_CODE: Record<string, Presentation> = {
   reschedule_confirmed:   { eyebrow: 'Reschedule',   ctaLabel: 'Continue payment' },
   cancellation_approved:  { eyebrow: 'Cancellation', ctaLabel: 'Continue payment' },
   cancellation_confirmed: { eyebrow: 'Cancellation', ctaLabel: 'View reservation' },
+  reservation_completed:  { eyebrow: 'Reservation',  ctaLabel: 'View reservation' },
   payment_due:            { eyebrow: 'Reminder',     ctaLabel: 'Continue payment' },
   balance_due:            { eyebrow: 'Reminder',     ctaLabel: 'Continue payment' },
   event_reminder:         { eyebrow: 'Reminder',     ctaLabel: 'View reservation' },

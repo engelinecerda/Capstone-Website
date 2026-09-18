@@ -11,6 +11,7 @@ import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
+import { showToast } from './admin_toast.js';
 
 const PAGE_LABELS = { home: 'Home', packages: 'Packages', about: 'About', faqs: 'FAQs', menu: 'Menu', reviews: 'Reviews' };
 
@@ -347,6 +348,7 @@ headerModalSave.addEventListener('click', async () => {
 
     renderPageHeaders();
     closeModal(headerModal);
+    showToast(`${PAGE_LABELS[editingHeaderKey] || editingHeaderKey} header saved.`, 'success');
   } catch (err) {
     setModalMsg(headerModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -456,6 +458,7 @@ document.getElementById('galleryEditSave').addEventListener('click', async () =>
     await logAudit({ action: 'Updated Gallery Image', category: 'page_content', details: `Updated caption/alt text for a gallery image`, entityId: editingGalleryId });
     renderGallery();
     closeModal(galleryEditModal);
+    showToast('Gallery image saved.', 'success');
   } catch (err) {
     setModalMsg(galleryEditMessage, `Failed to save: ${err.message}`);
   }
@@ -613,6 +616,7 @@ aboutSectionsEl.addEventListener('click', async e => {
 
       await logAudit({ action: 'Updated About Section', category: 'page_content', details: `Updated "${section?.title || key}"`, entityId: key });
       setMsg(aboutMsg, 'Saved successfully.', 'success');
+      showToast('About section saved.', 'success');
     } catch (err) {
       setMsg(aboutMsg, `Failed to save: ${err.message}`, 'error');
     } finally {
@@ -758,6 +762,7 @@ faqModalSave.addEventListener('click', async () => {
     }
     renderFaqs();
     closeModal(faqModal);
+    showToast(editingFaqId ? 'FAQ updated.' : 'FAQ added.', 'success');
   } catch (err) {
     setModalMsg(faqModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -947,6 +952,7 @@ serviceModalSave.addEventListener('click', async () => {
     }
     renderServices();
     closeModal(serviceModal);
+    showToast(editingServiceId ? 'Service updated.' : 'Service added.', 'success');
   } catch (err) {
     setModalMsg(serviceModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -1130,6 +1136,7 @@ menuSectionModalSave.addEventListener('click', async () => {
     }
     renderMenuSections();
     closeModal(menuSectionModal);
+    showToast(editingMenuSectionId ? 'Menu image updated.' : 'Menu image added.', 'success');
   } catch (err) {
     setModalMsg(menuSectionModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -1279,6 +1286,7 @@ saveMenuBannerBtn.addEventListener('click', async () => {
     menuBannerPendingFile = null;
     await logAudit({ action: 'Updated Elite Card Banner', category: 'page_content', details: `is_active=${isActive}` });
     setMsg(menuBannerMsg, 'Banner saved successfully.', 'success');
+    showToast('Elite Card banner saved.', 'success');
   } catch (err) {
     setMsg(menuBannerMsg, `Failed to save: ${err.message}`, 'error');
   } finally {
@@ -1387,6 +1395,7 @@ valueModalSave.addEventListener('click', async () => {
     }
     renderValues();
     closeModal(valueModal);
+    showToast(editingValueId ? 'Value updated.' : 'Value added.', 'success');
   } catch (err) {
     setModalMsg(valueModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -1446,8 +1455,17 @@ function openConfirmRemoveValue(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED CONFIRM MODAL
 // ═══════════════════════════════════════════════════════════════════════════
+const REMOVE_ACTION_LABEL = {
+  'remove-gallery': 'Gallery image removed.',
+  'remove-faq': 'FAQ removed.',
+  'remove-service': 'Service removed.',
+  'remove-menu-section': 'Menu image removed.',
+  'remove-value': 'Value removed.',
+};
+
 confirmOk.addEventListener('click', async () => {
   if (!pendingConfirmAction) return;
+  const actionType = pendingConfirmAction.type;
   confirmOk.disabled = true;
   try {
     if (pendingConfirmAction.type === 'remove-gallery') {
@@ -1490,6 +1508,7 @@ confirmOk.addEventListener('click', async () => {
       renderValues();
     }
     closeModal(confirmModal);
+    showToast(REMOVE_ACTION_LABEL[actionType] || 'Removed.', 'success');
   } catch (err) {
     setModalMsg(confirmMessage, `Failed: ${err.message}`);
   } finally {

@@ -30,6 +30,7 @@ import { buildCustomerPaymentUrl } from '/js/customer_payments.js';
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
+import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
@@ -1948,7 +1949,11 @@ async function loadPackages() {
             guestCapacity: p.guest_capacity ?? null,
             categoryId,
             categoryName,
-            coverPhotoUrl: cover?.image_url || p.package_image || null,
+            // Package cards render at ~300-370px (`.cards-grid`, `.reservation-
+            // container` max-width 720px) — 600 covers that at a safe ~1.6-2x
+            // for retina screens instead of shipping the full Cloudinary
+            // upload resolution into a small grid thumbnail.
+            coverPhotoUrl: optimizedImageUrl(cover?.image_url || p.package_image, 600) || null,
             mainDishMax: p.catering_main_dish_max ?? null,
             // Raw rows (not a pre-resolved snapshot) so buildSummary() and
             // the submit handler can each re-evaluate against the current
@@ -3439,6 +3444,42 @@ async function showGuestSubmitGateModal() {
     // false (Escape/backdrop/"Continue browsing") — stay on the form as-is.
 }
 
+// Gate for guests at the Step 1 → Step 2 transition specifically (not
+// within Step 1 itself — every field there, including the public
+// availability calendar, stays fully browsable for guests). Fires only
+// after validate(cur) has already passed, so a guest still gets normal
+// per-field validation feedback while filling out Step 1 instead of being
+// blocked before they've even finished it. The rs6/rs7 gate above stays in
+// place independently as defense-in-depth (e.g. a session that expires
+// mid-flow after this point).
+async function showGuestStep1GateModal() {
+    // Save the draft one step ahead (as rs4/Step 2), matching where a
+    // logged-in customer would land from this same click, so that once
+    // auth completes and the existing draft-resume prompt reappears on
+    // /reservations, "Continue" resumes directly on Step 2 instead of
+    // back on Step 1 — the customer never has to reselect anything.
+    const stepBeforeGate = cur;
+    cur = Math.min(cur + 1, total());
+    saveDraft();
+    cur = stepBeforeGate;
+
+    const result = await showFeedbackModal({
+        type: 'warning',
+        icon: 'ti-lock',
+        title: 'Sign in to continue your booking',
+        message: "Create an account or sign in to continue — your selections so far will be saved.",
+        confirmText: 'Sign In',
+        tertiaryText: 'Create Account',
+        dismissText: 'Continue Browsing'
+    });
+    if (result === true) {
+        window.location.href = '/login?redirect=' + encodeURIComponent('/reservations');
+    } else if (result === 'tertiary') {
+        window.location.href = '/signup?redirect=' + encodeURIComponent('/reservations');
+    }
+    // false (Escape/backdrop/"Continue Browsing") — stay on Step 1 as-is.
+}
+
 // ── Event listeners ────────────────────────────────────────────────────
 document.getElementById('nextBtn').onclick = () => {
     // Guests may browse and fill out every step, but can't advance past
@@ -3452,6 +3493,14 @@ document.getElementById('nextBtn').onclick = () => {
         return;
     }
     if (!validate(cur)) return;
+    // Guests may fully complete Step 1, but can't advance into Step 2
+    // (account details/notes) without signing in — checked AFTER
+    // validate() succeeds, unlike the rs6/rs7 gate above, so guests still
+    // get normal per-field validation feedback while working through Step 1.
+    if (!isLoggedIn && sid(cur) === 'rs1') {
+        showGuestStep1GateModal();
+        return;
+    }
     if (cur < total()) { cur++; showStep(cur); }
     else { submitDone(); }
 };

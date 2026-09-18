@@ -39,6 +39,19 @@ async function initHero() {
     if (!data) return; // keep the existing hardcoded fallback
 
     if (imgEl && data.image_url) {
+      // data.image_url is already w_1920-capped (fetchPageHeader's own
+      // targetWidth above) — a full-bleed hero needs that ceiling for large
+      // desktops, but shipping it to every mobile viewport too was exactly
+      // what Lighthouse mobile flagged (~100KB wasted on a 375-430px
+      // screen). optimizedImageUrl() replaces an existing w_ transform
+      // rather than stacking a second one, so re-deriving smaller variants
+      // from this same URL is safe. sizes="100vw" matches .hero-bg's
+      // full-bleed CSS (object-fit:cover across the whole hero section).
+      const srcset = [480, 768, 1080, 1600, 1920]
+        .map(w => `${optimizedImageUrl(data.image_url, w)} ${w}w`)
+        .join(', ');
+      imgEl.srcset = srcset;
+      imgEl.sizes = '100vw';
       imgEl.src = data.image_url;
       if (data.alt_text) imgEl.alt = data.alt_text;
     }

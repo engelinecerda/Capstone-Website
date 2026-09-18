@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=38');
+@import url('./admin_reservations.css?v=39');
 
 /* ============================================================
    Hidden-state overrides.
@@ -437,6 +437,20 @@
 }
 
 .dl-grid-2col .dl-row:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+
+/* #bookingDetailsGrid carries 7 rows now (Event date/Start time/End time
+   were added alongside the original 4) — an odd count in this 2-column
+   grid, so its trailing item (Contact number) sits alone in the final
+   row instead of paired with a second one. The shared rule above assumes
+   an even count and would incorrectly strip the divider from the row
+   before it (Location type) too; this restores that one's divider and
+   keeps it removed only on the item that's actually last. */
+#bookingDetailsGrid.dl-grid-2col .dl-row:nth-last-child(-n+2) {
+  border-bottom: 0.5px solid var(--border);
+}
+#bookingDetailsGrid.dl-grid-2col .dl-row:last-child {
   border-bottom: none;
 }
 

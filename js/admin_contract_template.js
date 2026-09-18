@@ -3,10 +3,13 @@
 //
 // Extends the existing per-package contract_templates system with
 // structure — this IS the only editor for the pieces below; the
-// contract_templates row itself (template_body, one per package) is only
-// ever created here too, the first time a package gets clauses saved
-// (admin/contracts.html is a different page entirely — the signed-
+// contract_templates row itself (one per package) is only ever created
+// here too, the first time a package gets its title/intro or clauses
+// saved (admin/contracts.html is a different page entirely — the signed-
 // contract review/verification queue — it has no contract_templates code):
+//   - contract_templates.template_body — Title & Introduction (the part of
+//     the document not covered by any of the three layers below; see
+//     saveTitleIntro()/loadTitleIntroFromBody())
 //   - contract_field   — Layer 1 (Reservation Summary row visibility/label/order), global
 //   - contract_template_clause — Layer 2 (editable clauses), scoped to one package's template
 //   - contract_locked_clause   — Layer 3 (legal boilerplate), global, locked by default
@@ -42,6 +45,7 @@ function setMsg(msg, isError = false) {
 let packagesCache = [];
 let selectedPackageId = null;
 let currentTemplate = null;       // { template_id, version_no, contract_type } | null
+let currentTemplateBody = '';     // raw contract_templates.template_body — source of Title & Introduction only, see loadTitleIntroFromBody()
 let templateClauses = [];         // [{ clause_id?, heading, body, sort_order }]
 let summaryFields = [];           // [{ field_id, token, label, is_visible, sort_order }]
 let lockedClauses = {};           // { acknowledgement: {clause_id,heading,body}, electronic_signature: {...} }
@@ -116,7 +120,92 @@ async function loadGlobalData() {
 async function loadTemplateForPackage(packageId) {
   const { template, clauses } = await fetchContractTemplateData(supabase, packageId);
   currentTemplate = template || null;
+  currentTemplateBody = template?.template_body || '';
   templateClauses = clauses.map((c) => ({ ...c }));
+}
+
+// ── Title & Introduction ─────────────────────────────────────────────────
+// The only piece of a contract that ISN'T covered by fields/clauses/locked
+// clauses — the document's opening title + intro paragraph. Stored as the
+// first lines of contract_templates.template_body, same convention
+// js/reservations.js's Review & Sign step and the signed-PDF edge function
+// both already read it with: everything up to the first "Label: Value"
+// line or numbered clause is title+intro, the rest (if any) is legacy
+// clause text from before this editor existed for a given package.
+const DEFAULT_CONTRACT_TITLE = 'RESERVATION SERVICE AGREEMENT';
+const DEFAULT_CONTRACT_INTRO = 'This Reservation Service Agreement ("Agreement") is entered into between ELI Coffee Events Cafe Binangonan ("the Venue") and {{customer_name}} ("the Client") for the event and package described below.';
+
+function parseTitleAndIntro(templateBody) {
+  const lines = String(templateBody || '').split('\n');
+  const isClauseLine = (l) => /^\s*\d+\.\s+\S/.test(l);
+  const isDetailLine = (l) => /^([A-Za-z][A-Za-z\s]{1,40}):\s*(.+)$/.test(l.trim());
+  const cutIdx = lines.findIndex((l) => isClauseLine(l) || isDetailLine(l));
+  const introLines = cutIdx === -1 ? lines : lines.slice(0, cutIdx);
+  if (!introLines.some((l) => l.trim())) return { title: DEFAULT_CONTRACT_TITLE, intro: DEFAULT_CONTRACT_INTRO };
+  const title = (introLines[0] || '').trim();
+  const intro = introLines.slice(1).join('\n').trim();
+  return { title: title || DEFAULT_CONTRACT_TITLE, intro };
+}
+
+function populateTitleIntroInputs() {
+  const { title, intro } = parseTitleAndIntro(currentTemplateBody);
+  const titleInput = document.getElementById('ct-title-input');
+  const introInput = document.getElementById('ct-intro-input');
+  if (titleInput) titleInput.value = title;
+  if (introInput) introInput.value = intro;
+}
+
+async function saveTitleIntro() {
+  if (!selectedPackageId) return;
+  const btn = document.getElementById('ct-intro-save');
+  const titleInput = document.getElementById('ct-title-input');
+  const introInput = document.getElementById('ct-intro-input');
+  const title = (titleInput?.value || '').trim() || DEFAULT_CONTRACT_TITLE;
+  const intro = (introInput?.value || '').trim();
+
+  btn.disabled = true;
+  setMsg('Saving title & introduction…');
+  try {
+    const newBody = intro ? `${title}\n\n${intro}` : title;
+    let templateId = currentTemplate?.template_id;
+
+    if (!templateId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: newTemplate, error: createError } = await supabase
+        .from('contract_templates')
+        .insert({
+          package_id: selectedPackageId,
+          version_no: 1,
+          contract_type: 'package_contract',
+          description: 'Created from the Contract Template tab',
+          is_active: true,
+          created_by: user?.id ?? null,
+          template_body: newBody,
+        })
+        .select('template_id, version_no, contract_type')
+        .single();
+      if (createError) throw createError;
+      currentTemplate = newTemplate;
+      templateId = newTemplate.template_id;
+    } else {
+      const { error } = await supabase.from('contract_templates').update({ template_body: newBody }).eq('template_id', templateId);
+      if (error) throw error;
+    }
+
+    currentTemplateBody = newBody;
+
+    await logAudit({
+      action: 'Updated Contract Title & Introduction',
+      category: 'reservation_form_config',
+      details: `Package ${selectedPackageId}`,
+      entityId: templateId,
+    });
+    setMsg('Title & introduction saved. Future contracts for this package will use them.');
+  } catch (err) {
+    setMsg('Failed to save: ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Rendering: Layer 1 fields ────────────────────────────────────────────
@@ -418,6 +507,10 @@ async function saveClauses() {
 function openContractPreview() {
   const values = { ...tokenValues };
 
+  const { title, intro } = parseTitleAndIntro(currentTemplateBody);
+  const titleHtml = `<h3 style="margin:0 0 8px;">${escHtml(title)}</h3>`;
+  const introHtml = intro ? `<p>${escHtml(mergeTokens(intro, values))}</p>` : '';
+
   const fieldsHtml = summaryFields
     .filter((f) => f.is_visible !== false)
     .map((f) => `<p><strong>${escHtml(f.label)}:</strong> ${escHtml(values[f.token] ?? '')}</p>`)
@@ -442,6 +535,8 @@ function openContractPreview() {
   document.getElementById('rf-preview-title').textContent = 'Contract Preview';
   document.getElementById('rf-preview-body').innerHTML = `
     <p style="font-size:11.5px;color:var(--muted);margin-bottom:14px;"><em>Preview uses sample booking data. Real contracts fill from the customer's reservation.</em></p>
+    ${titleHtml}
+    ${introHtml}
     <h4>Reservation Summary</h4>
     ${fieldsHtml || '<p><em>No visible fields.</em></p>'}
     ${clausesHtml}
@@ -460,6 +555,7 @@ async function refreshForSelectedPackage() {
   setMsg('Loading template…');
   await loadTemplateForPackage(selectedPackageId);
   editor.classList.remove('hidden');
+  populateTitleIntroInputs();
   renderFieldsList();
   renderClausesList();
   setMsg(currentTemplate ? '' : 'No template saved yet for this package — add clauses below and Save to create one.');
@@ -477,6 +573,7 @@ export async function initContractTemplateTab() {
     await refreshForSelectedPackage();
   });
 
+  document.getElementById('ct-intro-save')?.addEventListener('click', saveTitleIntro);
   document.getElementById('ct-fields-save')?.addEventListener('click', saveFields);
   document.getElementById('ct-clauses-save')?.addEventListener('click', saveClauses);
   document.getElementById('ct-preview-btn')?.addEventListener('click', openContractPreview);

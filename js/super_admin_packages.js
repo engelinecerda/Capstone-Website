@@ -1,8 +1,8 @@
 // super_admin_packages.js
 // Bookable inventory: a single filterable Inventory view (category rail +
 // card grid / list) replacing the old category-drilldown + package-table
-// pages, plus Venues (its own page) and a tier side-drawer.
-// Tables: public.package_category, public.package, public.package_tier,
+// pages, plus Venues (its own page).
+// Tables: public.package_category, public.package,
 // public.venue, public.package_venue, public.package_photo.
 // Image host: Cloudinary (cloud dgneg418t, preset eli_coffee_packages).
 
@@ -21,7 +21,6 @@ const MAX_PHOTOS_PER_PACKAGE = 8;
 
 // ─── Supabase tables ────────────────────────────────────────────────────────
 const CATEGORY_TABLE = 'package_category';
-const TIER_TABLE = 'package_tier';
 const VENUE_TABLE = 'venue';
 const PACKAGE_VENUE_TABLE = 'package_venue';
 const PACKAGE_PHOTO_TABLE = 'package_photo';
@@ -37,10 +36,6 @@ let allPackages           = [];
 let editingCategoryId     = null;
 let editingPackageId      = null;
 let pendingAction         = null;
-let allTiers              = [];
-let editingTierId         = null;
-let tierForPackageId      = null;
-let tierForPackageName    = '';
 
 // Bookable-inventory additions
 let allVenues             = [];
@@ -58,7 +53,6 @@ let viewMode                = 'grid';   // 'grid' | 'list'
 let healthFilterActive      = false;
 let openCardMenuEl          = null;  // currently-open kebab popover element
 let allPackageVenueCounts   = new Map(); // package_id -> mapped venue count
-let allTiersByPackage       = new Map(); // package_id -> active tier[]
 const archivedRefCountCache = new Map(); // package_id -> reservation reference count (lazy)
 
 // Badges
@@ -84,7 +78,6 @@ let cateringDishDrawerTriggerEl = null;
 // Package-modal dirty-tracking
 let pkgFormSnapshot   = null;
 let catFormSnapshot   = null;    // same idea as pkgFormSnapshot, for the category modal
-let tierDrawerTriggerEl = null;
 
 // ─── DOM: Views ───────────────────────────────────────────────────────────────
 const inventoryView    = document.getElementById('inventoryView');
@@ -238,29 +231,6 @@ const deleteModalMessage   = document.getElementById('deleteModalMessage');
 const deleteReassignField  = document.getElementById('deleteReassignField');
 const deleteReassignSelect = document.getElementById('deleteReassignSelect');
 
-// ─── DOM: Package tier (Add/Edit form modal) ──────────────────────────────────
-const tierModal          = document.getElementById('tierModal');
-const tierModalTitle     = document.getElementById('tierModalTitle');
-const tierModalSub       = document.getElementById('tierModalSub');
-const tierModalClose     = document.getElementById('tierModalClose');
-const tierModalCancel    = document.getElementById('tierModalCancel');
-const tierModalSave      = document.getElementById('tierModalSave');
-const tierModalSaveLabel = document.getElementById('tierModalSaveLabel');
-const tierModalMessage   = document.getElementById('tierModalMessage');
-const tierNameInput      = document.getElementById('tierName');
-const tierSubtitle       = document.getElementById('tierSubtitle');
-const tierFullInclusions = document.getElementById('tierFullInclusions');
-const tierSortOrder      = document.getElementById('tierSortOrder');
-
-// ─── DOM: Tier drawer (right-anchored, replaces the old below-table panel) ────
-const tierDrawerScrim = document.getElementById('tierDrawerScrim');
-const tierDrawer      = document.getElementById('tierDrawer');
-const tierDrawerTitle = document.getElementById('tierDrawerTitle');
-const tierDrawerList  = document.getElementById('tierDrawerList');
-const tierDrawerClose = document.getElementById('tierDrawerClose');
-const tierDrawerDone  = document.getElementById('tierDrawerDone');
-const addTierBtn      = document.getElementById('addTierBtn');
-
 // ─── DOM: Venue View + Modal ──────────────────────────────────────────────────
 const addVenueBtn           = document.getElementById('addVenueBtn');
 const venuePageMessage      = document.getElementById('venuePageMessage');
@@ -387,15 +357,6 @@ function closeModal(modal) {
   modal.setAttribute('aria-hidden', 'true');
   unlockBodyScroll();
 }
-// one-per-line or comma-separated → stored as newline-separated ──
-function normalizeTierInclusions(raw) {
-  if (!raw || !raw.trim()) return null;
-  return raw
-    .split(/[\n,]+/)          // split by newline or comma
-    .map(item => item.trim()) // trim each item
-    .filter(Boolean)          // remove empty strings
-    .join('\n');               // store as newline-separated
-}
 
 // ─── Reference counting (delete-vs-archive, mirrors the payment-methods pattern) ─
 async function countPackageReservationRefs(packageId) {
@@ -497,7 +458,7 @@ openCateringMenuBtn.addEventListener('click', showCateringMenuView);
 backToCategoriesFromCateringBtn.addEventListener('click', showInventoryView);
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INVENTORY: LOAD (all categories + all packages, batched venue/tier counts)
+// INVENTORY: LOAD (all categories + all packages, batched venue counts)
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadCoverPhotosForAllPackages() {
   const ids = allPackages.map(p => p.package_id);
@@ -524,7 +485,6 @@ async function loadInventory() {
       { data: cats, error: catErr },
       { data: pkgs, error: pkgErr },
       { data: venueMaps, error: vmErr },
-      { data: tiers, error: tierErr },
       { data: venues, error: venueErr },
       { data: badgeDefs, error: badgeErr },
       { data: packageBadgeRows, error: pkgBadgeErr },
@@ -534,7 +494,6 @@ async function loadInventory() {
       supabase.from(CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from('package').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from(PACKAGE_VENUE_TABLE).select('package_id'),
-      supabase.from(TIER_TABLE).select('*').eq('is_active', true).order('sort_order', { ascending: true }),
       // Bug fix: allVenues used to be populated only by loadVenues(), which
       // only runs when the admin opens the separate Venues screen. Editing
       // a package's venue mappings never triggered that fetch, so
@@ -558,7 +517,6 @@ async function loadInventory() {
     if (catErr) throw catErr;
     if (pkgErr) throw pkgErr;
     if (vmErr) throw vmErr;
-    if (tierErr) throw tierErr;
     if (venueErr) throw venueErr;
     if (badgeErr) throw badgeErr;
     if (pkgBadgeErr) throw pkgBadgeErr;
@@ -573,12 +531,6 @@ async function loadInventory() {
     allPackageVenueCounts = new Map();
     (venueMaps || []).forEach(row => {
       allPackageVenueCounts.set(row.package_id, (allPackageVenueCounts.get(row.package_id) || 0) + 1);
-    });
-
-    allTiersByPackage = new Map();
-    (tiers || []).forEach(t => {
-      if (!allTiersByPackage.has(t.package_id)) allTiersByPackage.set(t.package_id, []);
-      allTiersByPackage.get(t.package_id).push(t);
     });
 
     packageBadgeMap = new Map();
@@ -816,7 +768,7 @@ function buildCardMenu(pkg) {
       ]
     : [
         { action: 'duplicate', label: 'Duplicate' },
-        ...(isAddon ? [] : [{ action: 'tiers', label: 'Tiers' }, { action: 'badges', label: 'Badges' }, { action: 'discount', label: 'Discount' }]),
+        ...(isAddon ? [] : [{ action: 'badges', label: 'Badges' }, { action: 'discount', label: 'Discount' }]),
         { divider: true },
         { action: 'move-up', label: 'Move up' },
         { action: 'move-down', label: 'Move down' },
@@ -875,23 +827,6 @@ function buildPkgThumb(pkg) {
       <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
     </svg>
   </div>`;
-}
-
-// Plain, non-interactive text only — tiers are still fully manageable via
-// the card's "Tiers" menu action (buildCardMenu(), same openTierDrawer()
-// this used to open inline), so this isn't a dead end. Removed as its own
-// clickable link/button per package: it read as an unwanted nag on every
-// package that doesn't use tiers, not a genuine call to action.
-function buildTierLadder(pkg) {
-  if (pkg.package_type === 'add on') {
-    return `<p class="tier-ladder">Add-ons don't use tiers</p>`;
-  }
-  const tiers = allTiersByPackage.get(pkg.package_id) || [];
-  if (!tiers.length) {
-    return `<p class="tier-ladder">No tiers set</p>`;
-  }
-  const bars = tiers.slice(0, 3).map(() => '<span class="tier-ladder-bar"></span>').join('');
-  return `<p class="tier-ladder"><span class="tier-ladder-bars">${bars}</span>&nbsp;${tiers.length} tier${tiers.length === 1 ? '' : 's'}</p>`;
 }
 
 // Assigned badges (package_badge) + Best Seller for this category — add-ons
@@ -1004,7 +939,7 @@ function buildPkgCard(pkg) {
           <span class="spec-leader"></span>
           <span class="spec-figures">${escapeHtml(guestRangeLabel(pkg))} · ${escapeHtml(formatDuration(pkg.duration_hours))}</span>
         </div>
-        ${isArchived ? archivedReasonLine(pkg) : buildTierLadder(pkg)}
+        ${isArchived ? archivedReasonLine(pkg) : ''}
       </div>
     </div>`;
 }
@@ -1037,7 +972,6 @@ function buildPkgListRow(pkg) {
     <td>${escapeHtml(catLabel)}</td>
     <td>${buildPkgPriceHtml(pkg)}</td>
     <td>${escapeHtml(guestRangeLabel(pkg))}</td>
-    <td>${buildTierLadder(pkg)}</td>
     <td>
       <div class="list-actions">
         ${inlineAction}
@@ -2226,7 +2160,7 @@ deleteModalCancel.addEventListener('click', () => closeModal(deleteModal));
 deleteModal.addEventListener('click', e => { if (e.target === deleteModal) closeModal(deleteModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CONFIRM MODAL: Shared handler (archive/restore for category, package, tier, venue)
+// CONFIRM MODAL: Shared handler (archive/restore for category, package, venue)
 // ═══════════════════════════════════════════════════════════════════════════════
 confirmOk.addEventListener('click', async () => {
   if (!pendingAction) return;
@@ -2289,27 +2223,6 @@ confirmOk.addEventListener('click', async () => {
       renderCategoryRail();
       renderInventory();
       setMessage(inventoryPageMessage, type === 'archive' ? 'Package archived.' : 'Package restored.', 'success');
-    }
-
-    if (scope === 'tier') {
-      const tier = allTiers.find(t => t.tier_id === id);
-      const { error, count } = await supabase
-        .from(TIER_TABLE)
-        .update({ is_active: isActive }, { count: 'exact' })
-        .eq('tier_id', id);
-      if (error) throw error;
-      if (count === 0) throw new Error('No rows updated — check database permissions.');
-      const idx = allTiers.findIndex(t => t.tier_id === id);
-      if (idx !== -1) allTiers[idx] = { ...allTiers[idx], is_active: isActive };
-      await logAudit({
-        action:   type === 'archive' ? 'Archived Tier' : 'Restored Tier',
-        category: 'package',
-        details:  `Tier ${type === 'archive' ? 'archived' : 'restored'}: ${tier?.tier_name} (Package: ${tierForPackageName})`,
-        entityId: id
-      });
-      renderTierTable();
-      allTiersByPackage.set(tierForPackageId, allTiers.filter(t => t.is_active));
-      renderInventory();
     }
 
     if (scope === 'venue') {
@@ -2765,7 +2678,7 @@ discountNewBtn.addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE TIER — right-anchored drawer (replaces the old below-table panel)
+// SHARED: focus-trap utility (used by the Catering Dish Drawer)
 // ═══════════════════════════════════════════════════════════════════════════════
 function trapFocus(container) {
   const focusables = container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -2784,227 +2697,6 @@ function trapFocus(container) {
   first.focus();
   return handler;
 }
-
-function openTierDrawer(packageId, packageName, triggerEl) {
-  tierForPackageId    = packageId;
-  tierForPackageName  = packageName;
-  tierDrawerTriggerEl = triggerEl || document.activeElement;
-
-  tierDrawerTitle.textContent = packageName;
-
-  tierDrawerScrim.classList.remove('hidden');
-  tierDrawer.classList.add('open');
-  tierDrawer.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('tier-drawer-open');
-  lockBodyScroll();
-
-  loadTiers(packageId);
-
-  const trapHandler = trapFocus(tierDrawer);
-  function escHandler(e) { if (e.key === 'Escape') closeTierDrawer(); }
-  document.addEventListener('keydown', escHandler);
-  tierDrawer._cleanup = () => {
-    if (trapHandler) tierDrawer.removeEventListener('keydown', trapHandler);
-    document.removeEventListener('keydown', escHandler);
-  };
-}
-
-function closeTierDrawer() {
-  tierDrawerScrim.classList.add('hidden');
-  tierDrawer.classList.remove('open');
-  tierDrawer.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('tier-drawer-open');
-  unlockBodyScroll();
-  if (tierDrawer._cleanup) { tierDrawer._cleanup(); tierDrawer._cleanup = null; }
-  tierForPackageId   = null;
-  tierForPackageName = '';
-  if (tierDrawerTriggerEl && document.body.contains(tierDrawerTriggerEl)) tierDrawerTriggerEl.focus();
-  tierDrawerTriggerEl = null;
-}
-
-tierDrawerClose.addEventListener('click', closeTierDrawer);
-tierDrawerDone.addEventListener('click', closeTierDrawer);
-tierDrawerScrim.addEventListener('click', closeTierDrawer);
-
-async function loadTiers(packageId) {
-  tierDrawerList.innerHTML = '<p class="modal-hint">Loading tiers...</p>';
-  try {
-    const { data, error } = await supabase
-      .from(TIER_TABLE)
-      .select('*')
-      .eq('package_id', packageId)
-      .order('sort_order', { ascending: true });
-    if (error) throw error;
-    allTiers = data || [];
-    renderTierTable();
-  } catch (err) {
-    tierDrawerList.innerHTML = `<p class="modal-hint">Failed to load tiers: ${escapeHtml(err.message)}</p>`;
-  }
-}
-
-function medalClassForIndex(i) { return i === 0 ? 'bronze' : i === 1 ? 'silver' : i === 2 ? 'gold' : 'bronze'; }
-function medalLabelForIndex(i) { return i === 0 ? 'B' : i === 1 ? 'S' : i === 2 ? 'G' : '•'; }
-
-function renderTierTable() {
-  if (allTiers.length === 0) {
-    tierDrawerList.innerHTML = `<p class="modal-hint">Tiers let one package sell at several price points — Bronze, Silver, Gold. Add one to get started.</p>`;
-    return;
-  }
-
-  tierDrawerList.innerHTML = allTiers.map((tier, i) => {
-    const isArchived = !tier.is_active;
-    const actions = isArchived
-      ? `<button type="button" class="action-btn edit" data-tier-action="edit" data-id="${tier.tier_id}">Edit</button>
-         <button type="button" class="action-btn restore" data-tier-action="restore" data-id="${tier.tier_id}" data-name="${escapeHtml(tier.tier_name)}">Restore</button>`
-      : `<button type="button" class="action-btn edit" data-tier-action="edit" data-id="${tier.tier_id}">Edit</button>
-         <button type="button" class="action-btn archive" data-tier-action="archive" data-id="${tier.tier_id}" data-name="${escapeHtml(tier.tier_name)}">Archive</button>`;
-    return `
-      <div class="tier-row" style="${isArchived ? 'opacity:.55' : ''}">
-        <span class="medal-chip ${medalClassForIndex(i)}">${medalLabelForIndex(i)}</span>
-        <div>
-          <div class="tier-row-name">${escapeHtml(tier.tier_name)}${isArchived ? ' (archived)' : ''}</div>
-          <div class="tier-row-sub">${escapeHtml(tier.tier_subtitle || '—')}</div>
-        </div>
-        <div class="tier-row-actions">${actions}</div>
-      </div>`;
-  }).join('');
-}
-
-function handleTierTableAction(e) {
-  const btn = e.target.closest('[data-tier-action]');
-  if (!btn) return;
-  const { tierAction, id, name } = btn.dataset;
-  if (tierAction === 'edit')    openEditTierModal(id);
-  if (tierAction === 'archive') openConfirmTierArchive(id, name);
-  if (tierAction === 'restore') openConfirmTierRestore(id, name);
-}
-
-tierDrawerList.addEventListener('click', handleTierTableAction);
-
-// ─── Tier Modal: Add / Edit ───────────────────────────────────────────────────
-function clearTierForm() {
-  tierNameInput.value      = '';
-  tierSubtitle.value       = '';
-  tierFullInclusions.value = '';
-  tierSortOrder.value      = '0';
-}
-
-function openAddTierModal() {
-  editingTierId = null;
-  tierModalTitle.textContent     = 'Add Tier';
-  tierModalSub.textContent       = `Add a tier to "${tierForPackageName}"`;
-  tierModalSaveLabel.textContent = 'Add Tier';
-  clearTierForm();
-  setModalMsg(tierModalMessage, '');
-  openModal(tierModal);
-}
-
-function openEditTierModal(tierId) {
-  const tier = allTiers.find(t => t.tier_id === tierId);
-  if (!tier) return;
-
-  editingTierId = tierId;
-  tierModalTitle.textContent     = 'Edit Tier';
-  tierModalSub.textContent       = `Edit "${tier.tier_name}" tier`;
-  tierModalSaveLabel.textContent = 'Save Changes';
-
-  tierNameInput.value      = tier.tier_name || '';
-  tierSubtitle.value       = tier.tier_subtitle || '';
-  tierFullInclusions.value = tier.tier_full_inclusions || '';
-  tierSortOrder.value      = tier.sort_order ?? 0;
-
-  setModalMsg(tierModalMessage, '');
-  openModal(tierModal);
-}
-
-tierModalSave.addEventListener('click', async () => {
-  const name = tierNameInput.value.trim();
-  if (!name) { setModalMsg(tierModalMessage, 'Tier name is required.'); return; }
-
-  tierModalSave.disabled = true;
-  tierModalSaveLabel.textContent = 'Saving…';
-  setModalMsg(tierModalMessage, '');
-
-  try {
-    const payload = {
-      tier_name:           name,
-      tier_subtitle:       tierSubtitle.value.trim() || null,
-      tier_full_inclusions: normalizeTierInclusions(tierFullInclusions.value) || null,
-      sort_order:          parseInt(tierSortOrder.value, 10) || 0,
-      package_id:          tierForPackageId,
-    };
-
-    if (editingTierId) {
-      const { data, error } = await supabase
-        .from(TIER_TABLE)
-        .update(payload)
-        .eq('tier_id', editingTierId)
-        .select()
-        .single();
-      if (error) throw error;
-      const idx = allTiers.findIndex(t => t.tier_id === editingTierId);
-      if (idx !== -1) allTiers[idx] = data;
-      await logAudit({
-        action:   'Updated Tier',
-        category: 'package',
-        details:  `Tier updated: ${name} (Package: ${tierForPackageName})`,
-        entityId: editingTierId
-      });
-    } else {
-      payload.is_active = true;
-      const { data, error } = await supabase
-        .from(TIER_TABLE)
-        .insert(payload)
-        .select()
-        .single();
-      if (error) throw error;
-      allTiers.push(data);
-      await logAudit({
-        action:   'Added Tier',
-        category: 'package',
-        details:  `New tier created: ${name} (Package: ${tierForPackageName})`,
-        entityId: data.tier_id
-      });
-    }
-
-    allTiers.sort((a, b) => a.sort_order - b.sort_order);
-    renderTierTable();
-    allTiersByPackage.set(tierForPackageId, allTiers.filter(t => t.is_active));
-    renderInventory();
-    closeModal(tierModal);
-  } catch (err) {
-    setModalMsg(tierModalMessage, `Failed to save: ${err.message}`);
-  } finally {
-    tierModalSave.disabled = false;
-    tierModalSaveLabel.textContent = editingTierId ? 'Save Changes' : 'Add Tier';
-  }
-});
-
-// ─── Tier Archive / Restore ───────────────────────────────────────────────────
-function openConfirmTierArchive(tierId, tierNameText) {
-  pendingAction = { scope: 'tier', type: 'archive', id: tierId };
-  confirmTitle.textContent = 'Archive Tier';
-  confirmCopy.textContent  = `Are you sure you want to archive the "${tierNameText}" tier?`;
-  confirmOk.textContent    = 'Archive';
-  confirmOk.className      = 'btn-danger';
-  setModalMsg(confirmMessage, '');
-  openModal(confirmModal);
-}
-
-function openConfirmTierRestore(tierId, tierNameText) {
-  pendingAction = { scope: 'tier', type: 'restore', id: tierId };
-  confirmTitle.textContent = 'Restore Tier';
-  confirmCopy.textContent  = `Restore the "${tierNameText}" tier?`;
-  confirmOk.textContent    = 'Restore';
-  confirmOk.className      = 'btn-primary';
-  setModalMsg(confirmMessage, '');
-  openModal(confirmModal);
-}
-
-// ─── Tier Modal close handlers ────────────────────────────────────────────────
-tierModalClose.addEventListener('click',  () => closeModal(tierModal));
-tierModalCancel.addEventListener('click', () => closeModal(tierModal));
-tierModal.addEventListener('click', e => { if (e.target === tierModal) closeModal(tierModal); });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE: REORDER (move up/down among active siblings in the same category —
@@ -3048,7 +2740,7 @@ async function movePackage(packageId, direction) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE ACTION DISPATCH (shared by card kebab, list-row kebab, tier-ladder link)
+// PACKAGE ACTION DISPATCH (shared by card kebab, list-row kebab)
 // ═══════════════════════════════════════════════════════════════════════════════
 function handlePkgTableAction(e) {
   const btn = e.target.closest('[data-pkg-action]');
@@ -3057,7 +2749,6 @@ function handlePkgTableAction(e) {
   if (pkgAction === 'edit')      openEditPackageModal(id);
   if (pkgAction === 'archive')   openConfirmArchivePackage(id);
   if (pkgAction === 'restore')   openConfirmRestorePackage(id);
-  if (pkgAction === 'tiers')     openTierDrawer(id, name, btn);
   if (pkgAction === 'badges')    openBadgeModal(id);
   if (pkgAction === 'discount')  openDiscountModal(id);
   if (pkgAction === 'delete')    openConfirmDeletePackage(id);
@@ -3651,7 +3342,7 @@ function buildCateringCategoryRow(cat) {
         <button class="action-btn archive" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
       </div>`
     : `<div class="action-cell">
-        <button class="action-btn tiers" data-catering-action="dishes" data-id="${cat.category_id}">Dishes</button>
+        <button class="action-btn dishes" data-catering-action="dishes" data-id="${cat.category_id}">Dishes</button>
         <button class="action-btn edit" data-catering-action="edit" data-id="${cat.category_id}">Edit</button>
         <button class="action-btn archive" data-catering-action="archive" data-id="${cat.category_id}">Archive</button>
         <button class="action-btn archive" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
@@ -3992,7 +3683,6 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!categoryModal.classList.contains('hidden')) attemptCloseCategoryModal();
   if (!packageModal.classList.contains('hidden'))  attemptClosePackageModal();
-  if (!tierModal.classList.contains('hidden'))     closeModal(tierModal);
   if (!confirmModal.classList.contains('hidden'))  closeModal(confirmModal);
   if (!venueModal.classList.contains('hidden'))    closeModal(venueModal);
   if (!badgeModal.classList.contains('hidden'))    closeModal(badgeModal);

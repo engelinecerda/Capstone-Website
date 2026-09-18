@@ -46,8 +46,13 @@ const blackoutModalWarning = document.getElementById('blackoutModalWarning');
 const blackoutModalMessage = document.getElementById('blackoutModalMessage');
 const blackoutReasonInput = document.getElementById('blackoutReasonInput');
 
+// BUG-01 fix: 'pending' removed — a merely-submitted, not-yet-reviewed
+// reservation must not count toward this calendar's per-day reservation
+// count/capacity display. Mirrors the DB-level fix in
+// enforce_reservation_capacity()/is_capacity_blocking_reservation_status()
+// (supabase/migrations/20261005_fix_pending_blocks_capacity.sql).
 const CAPACITY_BLOCKING_STATUSES = new Set([
-  'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
+  'pending_review', 'for_finalization', 'for_contract_signing',
   'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
 ]);
 const DEFAULT_CLOSE_REASON = 'Closed by manager';

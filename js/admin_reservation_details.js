@@ -121,8 +121,15 @@ const PAYMENT_TYPE_LABELS = {
   reschedule_fee: 'Reschedule Fee',
   cancellation_fee: 'Cancellation Fee'
 };
+// BUG-01 fix: 'pending' removed — a merely-submitted, not-yet-reviewed
+// reservation must not count toward "this date is already fully booked"
+// when checking whether ANOTHER reservation can be approved (it was
+// blocking admins from approving one of several competing pending
+// requests). Mirrors the DB-level fix in enforce_reservation_capacity()/
+// is_capacity_blocking_reservation_status() (supabase/migrations/
+// 20261005_fix_pending_blocks_capacity.sql).
 const CAPACITY_BLOCKING_STATUSES = new Set([
-  'pending', 'pending_review', 'for_finalization', 'for_contract_signing',
+  'pending_review', 'for_finalization', 'for_contract_signing',
   'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
 ]);
 
@@ -161,6 +168,20 @@ function formatReservationDate(dateIso) {
   return new Date(`${formatDateKey(dateIso)}T00:00:00`).toLocaleDateString('en-PH', {
     year: 'numeric', month: 'short', day: 'numeric'
   });
+}
+
+// reservation.event_end_time comes back from Postgres as a raw "HH:MM:SS"
+// value (same shape js/reservation_details.js and
+// js/admin_availability_calendar.js already handle this way) — reformats
+// it to the same 12-hour "h:mm AM/PM" style event_time is entered in.
+function formatTimeOfDay(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${meridiem}`;
 }
 
 function formatCurrency(value) {
@@ -787,6 +808,14 @@ function renderBookingDetails() {
   const reservation = currentReservation;
   bookingDetailsGrid.innerHTML = [
     dlRow('Package', reservation.package?.package_name || 'No package selected'),
+    dlRow('Event date', reservation.event_date ? formatReservationDate(reservation.event_date) : 'No date selected'),
+    dlRow('Start time', reservation.event_time || 'No time selected'),
+    // event_end_time is maintained server-side (set at booking from the
+    // package's duration_hours, then advanced whenever an extension is
+    // approved — see supabase/migrations/20260920_package_extension_hours.sql)
+    // so this always reflects the reservation's current true end time
+    // without this page needing to separately track approved extensions.
+    dlRow('End time', reservation.event_end_time ? formatTimeOfDay(reservation.event_end_time) : 'Not available'),
     dlRow('Guests', reservation.guest_count ? `${reservation.guest_count} pax` : 'Not specified'),
     dlRow('Location type', capitalize(reservation.location_type) || 'Not specified'),
     dlRow('Contact number', reservation.contact_phone || 'No phone on file')

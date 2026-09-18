@@ -8,6 +8,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
+import { showToast } from './admin_toast.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let locations = [];
@@ -186,6 +187,7 @@ locationModalSave.addEventListener('click', async () => {
     }
     renderLocations();
     closeModal(locationModal);
+    showToast(editingLocationId ? 'Location updated.' : 'Location added.', 'success');
   } catch (err) {
     setModalMsg(locationModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -255,6 +257,7 @@ confirmOk.addEventListener('click', async () => {
       renderLocations();
     }
     closeModal(confirmModal);
+    showToast('Location removed.', 'success');
   } catch (err) {
     setModalMsg(confirmMessage, `Failed: ${err.message}`);
   } finally {
@@ -369,6 +372,7 @@ saveMapScopeBtn.addEventListener('click', async () => {
     if (error) throw error;
     await logAudit({ action: 'Updated Venue Map Scope', category: 'business_profile', details: JSON.stringify(config) });
     setMsg(mapScopeMsg, 'Saved. Customers booking an offsite venue will see the updated map area.', 'success');
+    showToast('Venue map scope saved.', 'success');
   } catch (err) {
     setMsg(mapScopeMsg, `Failed to save: ${err.message}`, 'error');
   } finally {
@@ -440,6 +444,7 @@ saveBrandBtn.addEventListener('click', async () => {
     logoPendingFile = null;
     await logAudit({ action: 'Updated Brand', category: 'business_profile', details: 'Updated brand name/logo' });
     setMsg(brandMsg, 'Saved successfully.', 'success');
+    showToast('Brand settings saved.', 'success');
   } catch (err) {
     setMsg(brandMsg, `Failed to save: ${err.message}`, 'error');
   } finally {
@@ -469,6 +474,7 @@ document.getElementById('saveContactBtn').addEventListener('click', async () => 
     contact = { ...contact, ...payload };
     await logAudit({ action: 'Updated Business Contact', category: 'business_profile', details: 'Updated contact & social info' });
     setMsg(contactMsg, 'Saved successfully.', 'success');
+    showToast('Contact & social links saved.', 'success');
   } catch (err) {
     setMsg(contactMsg, `Failed to save: ${err.message}`, 'error');
   }
