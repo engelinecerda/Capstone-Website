@@ -8,6 +8,7 @@ import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { getPasswordChecks, validatePassword } from './password_rules.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // supabase-js's functions.invoke() sets `data` to null on any non-2xx
 // response — the actual JSON body the function returned (our friendly
@@ -300,6 +301,7 @@ function openModalWithTrap(overlay) {
   overlay.setAttribute('aria-hidden', 'false');
   const card = overlay.querySelector('[role="dialog"]');
   overlay._trapHandler = trapFocus(card);
+  lockBodyScroll();
 }
 
 function closeModalReturnFocus(overlay) {
@@ -311,6 +313,7 @@ function closeModalReturnFocus(overlay) {
   }
   if (lastFocusedTrigger && document.body.contains(lastFocusedTrigger)) lastFocusedTrigger.focus();
   lastFocusedTrigger = null;
+  unlockBodyScroll();
 }
 
 // ── INFO MODAL ──────────────────────────────────────────────────

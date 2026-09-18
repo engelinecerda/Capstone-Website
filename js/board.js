@@ -1,5 +1,6 @@
 import { boardSupabase as supabase } from './supabase.js';
 import { verifyPortalSession } from './admin_auth.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const boardClock = document.getElementById('boardClock');
 const boardDate = document.getElementById('boardDate');
@@ -444,10 +445,12 @@ async function handleLogout() {
 
 function showLogoutConfirmDialog() {
   boardLogoutConfirmOverlay?.classList.remove('hidden');
+  lockBodyScroll();
 }
 
 function hideLogoutConfirmDialog() {
   boardLogoutConfirmOverlay?.classList.add('hidden');
+  unlockBodyScroll();
 }
 
 function requestLogout() {

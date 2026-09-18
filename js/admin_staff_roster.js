@@ -13,6 +13,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
@@ -181,12 +182,14 @@ function resetRosterModal() {
 function openRosterModal() {
   rosterModal?.classList.remove('hidden');
   rosterModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 function closeRosterModal() {
   rosterModal?.classList.add('hidden');
   rosterModal?.setAttribute('aria-hidden', 'true');
   rosterModalSave?.removeAttribute('disabled');
+  unlockBodyScroll();
 }
 
 function openAddEmployeeModal() {
@@ -273,6 +276,7 @@ async function saveRosterEmployee() {
 function openRosterConfirmModal() {
   rosterConfirmModal?.classList.remove('hidden');
   rosterConfirmModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 function closeRosterConfirmModal() {
@@ -280,6 +284,7 @@ function closeRosterConfirmModal() {
   rosterConfirmModal?.classList.add('hidden');
   rosterConfirmModal?.setAttribute('aria-hidden', 'true');
   rosterConfirmOk?.removeAttribute('disabled');
+  unlockBodyScroll();
 }
 
 async function handleDeleteClick(id) {

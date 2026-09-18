@@ -6,6 +6,8 @@
 // use (same pattern as the admin hamburger menu in
 // js/admin_sidebar_counts.js), so no HTML file needs to carry modal markup.
 
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+
 const ICON_CLASS = {
     success: 'ti-circle-check',
     error: 'ti-circle-x',
@@ -80,7 +82,9 @@ function resolveAndClose(result) {
         lastFocusedEl.focus();
     }
     const resolve = activeResolve;
+    const wasOpen = activeResolve !== null;
     activeResolve = null;
+    if (wasOpen) unlockBodyScroll();
     if (resolve) resolve(result);
 }
 
@@ -219,6 +223,7 @@ export async function showFeedbackModal({
     el.backdrop.setAttribute('aria-describedby', 'fm-modal-message');
     el.backdrop.setAttribute('aria-hidden', 'false');
     el.backdrop.classList.add('is-open');
+    lockBodyScroll();
 
     // For a destructive confirm, focus the safe "Cancel" action by default
     // so a stray Enter keypress can't trigger the destructive one.

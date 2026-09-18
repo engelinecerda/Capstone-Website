@@ -8,6 +8,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID  = '419921262357-ci1j9bi3i9v3hebp11m3077fa0b805pv.apps.googleusercontent.com';
@@ -108,13 +109,13 @@ function setModalMsg(el, msg, type = 'error') {
 function openModal(modal) {
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
+  lockBodyScroll();
 }
 
 function closeModal(modal) {
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
+  unlockBodyScroll();
 }
 
 function formatBytes(bytes) {

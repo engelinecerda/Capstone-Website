@@ -12,6 +12,7 @@ import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fet
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -908,11 +909,13 @@ function closeDetailsModal() {
   paymentDetailsModal?.classList.add('hidden');
   paymentDetailsModal?.setAttribute('aria-hidden', 'true');
   setPaymentReviewMessage('');
+  unlockBodyScroll();
 }
 
 function closeReceiptModal() {
   receiptModal?.classList.add('hidden');
   receiptModal?.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
 }
 
 // "Expected this payment" has a well-defined value for all three flat-fee
@@ -1114,6 +1117,7 @@ function openDetailsModal(paymentId) {
   renderPaymentReviewModal(paymentId);
   paymentDetailsModal?.classList.remove('hidden');
   paymentDetailsModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 function openReceiptModalForPayment(paymentId) {
@@ -1135,6 +1139,7 @@ function openReceiptModalForPayment(paymentId) {
 
   receiptModal?.classList.remove('hidden');
   receiptModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 /* ---------------------------------------------------------------- */
@@ -1284,12 +1289,14 @@ async function openRecordPaymentModalForPayment(paymentId) {
 
   recordPaymentModal?.classList.remove('hidden');
   recordPaymentModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 function closeRecordPaymentModal() {
   recordPaymentTargetPayment = null;
   recordPaymentModal?.classList.add('hidden');
   recordPaymentModal?.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
   recordPaymentSaveBtn?.removeAttribute('disabled');
 }
 

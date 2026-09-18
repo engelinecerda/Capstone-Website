@@ -9,6 +9,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -626,6 +627,7 @@ function closeContractDetailsModal() {
   contractDetailsModal?.classList.add('hidden');
   contractDetailsModal?.setAttribute('aria-hidden', 'true');
   setContractDetailsMessage('');
+  unlockBodyScroll();
 }
 
 function renderContractDetailsModal(reservationId = activeContractReservationId) {
@@ -751,6 +753,7 @@ function openContractDetailsModal(reservationId) {
   renderContractDetailsModal(reservationId);
   contractDetailsModal?.classList.remove('hidden');
   contractDetailsModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
 }
 
 async function performContractAction(action, button) {

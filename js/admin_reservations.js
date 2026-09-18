@@ -347,10 +347,23 @@ function renderPendingRescheduleAlert() {
   rescheduleAlert.classList.remove('hidden');
   rescheduleAlert.setAttribute('aria-hidden', 'false');
   rescheduleAlertCount.textContent = String(count);
-  rescheduleAlertText.textContent = 'Customers can cancel or reschedule without approval — this is just for visibility.';
   if (rescheduleAlertAction) {
     rescheduleAlertAction.textContent = 'Review';
   }
+
+  // Name the specific booking(s) instead of a bare count, so an admin can
+  // tell at a glance which reservation(s) triggered this without clicking
+  // through — reservationsCache holds the full unpaginated list, so every
+  // id in unseenChangeIds is guaranteed to resolve to a row here.
+  const MAX_NAMED = 3;
+  const changed = reservationsCache.filter((r) => unseenChangeIds.has(r.reservation_id));
+  const names = changed.map((r) => r.reservation_number || r.contact_name || 'Unknown booking');
+  const namedList = names.length > MAX_NAMED
+    ? `${names.slice(0, MAX_NAMED).join(', ')}, and ${names.length - MAX_NAMED} more`
+    : names.join(', ');
+  rescheduleAlertText.textContent = names.length
+    ? `${namedList} — customers can cancel or reschedule without approval, this is just for visibility.`
+    : 'Customers can cancel or reschedule without approval — this is just for visibility.';
 }
 
 // Sourced from reservation_payment_summary (the one server-side computed-

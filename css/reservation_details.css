@@ -1,10 +1,15 @@
 /* ========================
    Reservation details page
    Shares design tokens, navbar, .account-content and .res-status with
-   account.css (imported below) — this file only adds the components that
-   are unique to the single-reservation view.
+   account.css — this file only adds the components that are unique to the
+   single-reservation view. account.css is loaded via its own <link> in
+   reservation-details.html (immediately before this file), not @import —
+   the only page that loads this stylesheet already loads account.css
+   directly, so an internal @import here was a pure duplicate fetch/parse
+   and an avoidable critical-request chain (this file couldn't finish
+   loading until the @import resolved, even though the browser was already
+   fetching the exact same file in parallel via the sibling <link>).
 ======================== */
-@import url("account.css?v=28");
 
 .rd-page {
     padding-top: 28px;

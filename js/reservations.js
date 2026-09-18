@@ -12,6 +12,7 @@
 // window.initVenueMap, window.venueMap) — nothing here relies on shared
 // module scope with that script, so extraction doesn't change behavior.
 import { customerSupabase as supabase } from '/js/supabase.js';
+import { lockBodyScroll, unlockBodyScroll } from '/js/modal_scroll_lock.js';
 import {
     fetchAvailableStartTimes,
     fetchBlackoutDates,
@@ -29,6 +30,7 @@ import { buildCustomerPaymentUrl } from '/js/customer_payments.js';
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
+import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
@@ -480,12 +482,20 @@ function updateMinNoticeBanner() {
 // either past or inside the minimum-advance-notice window — e.g. today
 // is the 26th with a 14-day minimum, so the rest of this month can never
 // have a bookable date) reads as broken, even though it's working as
-// designed. Called once on initial load only — not on manual Prev/Next,
-// so a customer who deliberately pages back can still see why a month is
-// empty. Bounded to 24 months so a misconfigured max_advance_days (e.g.
-// 0) can't spin this forever.
+// designed. Called on initial load AND every time the notice window can
+// change (event type / location / package) — not on manual Prev/Next, so
+// a customer who deliberately pages back can still see why a month is
+// empty. Always restarts the scan from today's month rather than wherever
+// the calendar currently sits: this function only ever pages FORWARD, so
+// re-running it without resetting first would leave the calendar stuck on
+// a later month forever once some earlier selection (e.g. an event type
+// with a longer notice requirement) had paged it forward — even after the
+// customer picks a shorter-notice event type that would make an earlier
+// month bookable again. Bounded to 24 months so a misconfigured
+// max_advance_days (e.g. 0) can't spin this forever.
 function advanceToFirstBookableMonth() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    availabilityState.month = new Date(today.getFullYear(), today.getMonth(), 1);
     for (let guard = 0; guard < 24; guard++) {
         const monthStart = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth(), 1);
         const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
@@ -819,11 +829,13 @@ function openPolicyModal(key) {
     renderPolicyContent(key);
     policyModalBackdrop.classList.remove('hidden');
     policyModalBackdrop.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closePolicyModal() {
     policyModalBackdrop.classList.add('hidden');
     policyModalBackdrop.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 // ── Warning modal ──────────────────────────────────────────────────────
@@ -1467,7 +1479,7 @@ function openAgreementModal() {
     signatureState.agreementModalLastFocus = document.activeElement;
     agreementModalBackdrop.classList.remove('hidden');
     agreementModalBackdrop.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
+    lockBodyScroll();
     document.addEventListener('keydown', handleAgreementModalKeydown);
 
     const focusable = getAgreementModalFocusable();
@@ -1478,7 +1490,7 @@ function closeAgreementModal() {
     if (!agreementModalBackdrop) return;
     agreementModalBackdrop.classList.add('hidden');
     agreementModalBackdrop.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
+    unlockBodyScroll();
     document.removeEventListener('keydown', handleAgreementModalKeydown);
     (signatureState.agreementModalLastFocus || contractViewFullBtn)?.focus();
 }
@@ -1937,7 +1949,11 @@ async function loadPackages() {
             guestCapacity: p.guest_capacity ?? null,
             categoryId,
             categoryName,
-            coverPhotoUrl: cover?.image_url || p.package_image || null,
+            // Package cards render at ~300-370px (`.cards-grid`, `.reservation-
+            // container` max-width 720px) — 600 covers that at a safe ~1.6-2x
+            // for retina screens instead of shipping the full Cloudinary
+            // upload resolution into a small grid thumbnail.
+            coverPhotoUrl: optimizedImageUrl(cover?.image_url || p.package_image, 600) || null,
             mainDishMax: p.catering_main_dish_max ?? null,
             // Raw rows (not a pre-resolved snapshot) so buildSummary() and
             // the submit handler can each re-evaluate against the current
@@ -3428,6 +3444,42 @@ async function showGuestSubmitGateModal() {
     // false (Escape/backdrop/"Continue browsing") — stay on the form as-is.
 }
 
+// Gate for guests at the Step 1 → Step 2 transition specifically (not
+// within Step 1 itself — every field there, including the public
+// availability calendar, stays fully browsable for guests). Fires only
+// after validate(cur) has already passed, so a guest still gets normal
+// per-field validation feedback while filling out Step 1 instead of being
+// blocked before they've even finished it. The rs6/rs7 gate above stays in
+// place independently as defense-in-depth (e.g. a session that expires
+// mid-flow after this point).
+async function showGuestStep1GateModal() {
+    // Save the draft one step ahead (as rs4/Step 2), matching where a
+    // logged-in customer would land from this same click, so that once
+    // auth completes and the existing draft-resume prompt reappears on
+    // /reservations, "Continue" resumes directly on Step 2 instead of
+    // back on Step 1 — the customer never has to reselect anything.
+    const stepBeforeGate = cur;
+    cur = Math.min(cur + 1, total());
+    saveDraft();
+    cur = stepBeforeGate;
+
+    const result = await showFeedbackModal({
+        type: 'warning',
+        icon: 'ti-lock',
+        title: 'Sign in to continue your booking',
+        message: "Create an account or sign in to continue — your selections so far will be saved.",
+        confirmText: 'Sign In',
+        tertiaryText: 'Create Account',
+        dismissText: 'Continue Browsing'
+    });
+    if (result === true) {
+        window.location.href = '/login?redirect=' + encodeURIComponent('/reservations');
+    } else if (result === 'tertiary') {
+        window.location.href = '/signup?redirect=' + encodeURIComponent('/reservations');
+    }
+    // false (Escape/backdrop/"Continue Browsing") — stay on Step 1 as-is.
+}
+
 // ── Event listeners ────────────────────────────────────────────────────
 document.getElementById('nextBtn').onclick = () => {
     // Guests may browse and fill out every step, but can't advance past
@@ -3441,6 +3493,14 @@ document.getElementById('nextBtn').onclick = () => {
         return;
     }
     if (!validate(cur)) return;
+    // Guests may fully complete Step 1, but can't advance into Step 2
+    // (account details/notes) without signing in — checked AFTER
+    // validate() succeeds, unlike the rs6/rs7 gate above, so guests still
+    // get normal per-field validation feedback while working through Step 1.
+    if (!isLoggedIn && sid(cur) === 'rs1') {
+        showGuestStep1GateModal();
+        return;
+    }
     if (cur < total()) { cur++; showStep(cur); }
     else { submitDone(); }
 };

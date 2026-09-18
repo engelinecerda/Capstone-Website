@@ -10,10 +10,10 @@ import { customerSupabase as supabase } from './supabase.js';
 import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
 import { pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
-const TIER_TABLE     = 'package_tier';
 const PHOTO_TABLE    = 'package_photo';
 const BADGE_TABLE    = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
@@ -121,17 +121,10 @@ async function init() {
       categoryName = cat?.category_name || '';
     }
 
-    const [{ data: photos }, { data: tiers }] = await Promise.all([
-      supabase.from(PHOTO_TABLE)
-        .select('package_id, image_url, alt_text, is_cover, sort_order')
-        .eq('package_id', packageId)
-        .order('sort_order', { ascending: true }),
-      supabase.from(TIER_TABLE)
-        .select('*')
-        .eq('package_id', packageId)
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-    ]);
+    const { data: photos } = await supabase.from(PHOTO_TABLE)
+      .select('package_id, image_url, alt_text, is_cover, sort_order')
+      .eq('package_id', packageId)
+      .order('sort_order', { ascending: true });
 
     pkg._categoryName = categoryName;
     // Left un-optimized here on purpose — this same array backs both the
@@ -140,7 +133,6 @@ async function init() {
     // tile <img>, renderLightboxFrame) calls optimizedImageUrl() itself with
     // its own width instead.
     pkg._photos = photos || [];
-    pkg._tiers = tiers || [];
     pkg._badges = await fetchBadgesForPackage(packageId);
     pkg._discount = await fetchDiscountForPackage(packageId, pkg.price);
 
@@ -325,11 +317,13 @@ function openLightbox(photos, index, name) {
   renderLightboxFrame(name);
   show(pkgLightboxBackdrop);
   pkgLightboxBackdrop.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
   pkgLightboxClose.focus();
 }
 function closeLightbox() {
   hide(pkgLightboxBackdrop);
   pkgLightboxBackdrop.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
   if (lightboxLastFocused?.focus) lightboxLastFocused.focus();
 }
 function renderLightboxFrame(name) {
@@ -409,21 +403,6 @@ pkgGlanceReadMore?.addEventListener('click', () => {
 
 // ─── What's Included card ─────────────────────────────────────────────────────
 function renderInclusionsCard(pkg) {
-  if (pkg._tiers && pkg._tiers.length > 0) {
-    pkgInclusionsGrid.innerHTML = pkg._tiers.map(tier => {
-      const items = parseItemList(tier.tier_full_inclusions || '');
-      return `
-        <div class="pkg-tier-block">
-          <div class="pkg-tier-head">
-            <p class="pkg-tier-name">${esc(tier.tier_name)}</p>
-            ${tier.tier_subtitle ? `<p class="pkg-tier-sub">${esc(tier.tier_subtitle)}</p>` : ''}
-          </div>
-          ${items.length ? buildChecklist(items) : '<p class="pkg-section-empty">No inclusions listed for this tier.</p>'}
-        </div>`;
-    }).join('');
-    return;
-  }
-
   const items = Array.isArray(pkg.inclusions) && pkg.inclusions.length
     ? pkg.inclusions
     : parseItemList(pkg.description || '');

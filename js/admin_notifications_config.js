@@ -8,6 +8,7 @@ import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
 import { renderPagination } from './pagination.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // Own page size, not the shared pagination.js default (10) — that constant
 // is also used by other pages' client-side-sliced lists; this log pages at
@@ -62,8 +63,8 @@ function setModalMsg(el, msg, type = 'error') {
   el.textContent = msg;
   el.className = `modal-message ${type}`;
 }
-function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
-function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+function openModal(modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); lockBodyScroll(); }
+function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); unlockBodyScroll(); }
 function fmtDate(iso) {
   return iso ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
 }

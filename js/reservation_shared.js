@@ -494,7 +494,7 @@ export async function fetchUnseenReservationChanges(supabase) {
     const [{ data: cancellations, error: cancellationError }, { data: rescheduleRows, error: rescheduleError }] = await Promise.all([
         supabase
             .from('reservations')
-            .select('reservation_id, change_seen_at, updated_at')
+            .select('reservation_id, change_seen_at, updated_at, reservation_number, contact_name')
             .in('status', ['cancellation_requested', 'cancellation_approved', 'cancelled']),
         supabase
             .from('reschedule_requests')
@@ -512,7 +512,7 @@ export async function fetchUnseenReservationChanges(supabase) {
     if (missingIds.length) {
         const { data: rescheduleReservations, error: fetchError } = await supabase
             .from('reservations')
-            .select('reservation_id, change_seen_at, updated_at')
+            .select('reservation_id, change_seen_at, updated_at, reservation_number, contact_name')
             .in('reservation_id', missingIds);
         if (fetchError) throw fetchError;
         (rescheduleReservations || []).forEach((row) => seenById.set(row.reservation_id, row));
@@ -526,7 +526,18 @@ export async function fetchUnseenReservationChanges(supabase) {
         return new Date(row.change_seen_at).getTime() < new Date(row.updated_at).getTime();
     });
 
-    return { count: unseenIds.length, reservationIds: unseenIds };
+    // Carried alongside reservationIds so a banner can name the specific
+    // booking(s) that triggered it instead of just a bare count.
+    const reservations = unseenIds.map((id) => {
+        const row = seenById.get(id);
+        return {
+            reservation_id: id,
+            reservation_number: row?.reservation_number || null,
+            contact_name: row?.contact_name || null
+        };
+    });
+
+    return { count: unseenIds.length, reservationIds: unseenIds, reservations };
 }
 
 export async function markReservationChangesSeen(supabase, reservationIds) {

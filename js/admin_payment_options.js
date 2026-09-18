@@ -8,6 +8,7 @@ import { uploadToCloudinary } from './cloudinary_payment_methods.js';
 import { logAudit } from './audit_logger.js';
 import { initAdminNav } from './admin_nav.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // ── Confirm modal (Payment Rules) ────────────────────────────────────────────
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
@@ -19,10 +20,15 @@ function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
 
   document.getElementById('settingsConfirmOk').onclick = () => {
     modal.classList.add('hidden');
+    unlockBodyScroll();
     onConfirm();
   };
-  document.getElementById('settingsConfirmCancel').onclick = () => modal.classList.add('hidden');
+  document.getElementById('settingsConfirmCancel').onclick = () => {
+    modal.classList.add('hidden');
+    unlockBodyScroll();
+  };
   modal.classList.remove('hidden');
+  lockBodyScroll();
 }
 
 // ── Payment methods ───────────────────────────────────────────────────────
@@ -167,8 +173,8 @@ function pm2ResetModal() {
   pm2UpdatePreview();
 }
 
-function pm2OpenModal() { document.getElementById('pm2Modal')?.classList.remove('hidden'); }
-function pm2CloseModal() { document.getElementById('pm2Modal')?.classList.add('hidden'); }
+function pm2OpenModal() { document.getElementById('pm2Modal')?.classList.remove('hidden'); lockBodyScroll(); }
+function pm2CloseModal() { document.getElementById('pm2Modal')?.classList.add('hidden'); unlockBodyScroll(); }
 
 function openAddMethodModal() {
   pm2ResetModal();
@@ -336,6 +342,7 @@ function pm2HandleBodyChange(e) {
     : `Deactivate "${method.label}"? Customers will no longer see it at checkout.`;
   document.getElementById('pm2ConfirmOk').textContent = 'Confirm';
   document.getElementById('pm2ConfirmModal').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 function pm2HandleBodyClick(e) {
@@ -382,6 +389,7 @@ async function pm2HandleDeleteClick(id) {
     document.getElementById('pm2ConfirmOk').textContent = 'Delete';
   }
   document.getElementById('pm2ConfirmModal').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 async function pm2ConfirmAction() {
@@ -436,6 +444,7 @@ async function pm2ConfirmAction() {
     okBtn.disabled = false;
     pm2PendingAction = null;
     document.getElementById('pm2ConfirmModal').classList.add('hidden');
+    unlockBodyScroll();
   }
 }
 
@@ -977,6 +986,7 @@ async function init() {
   document.getElementById('pm2ConfirmCancel')?.addEventListener('click', () => {
     pm2PendingAction = null;
     document.getElementById('pm2ConfirmModal').classList.add('hidden');
+    unlockBodyScroll();
   });
   document.getElementById('pm2ConfirmOk')?.addEventListener('click', pm2ConfirmAction);
 

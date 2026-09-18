@@ -384,14 +384,14 @@
 
 .action-btn.edit,
 .action-btn.view,
-.action-btn.tiers {
+.action-btn.dishes {
   color: var(--active-bg, #4A2C17);
   border-color: var(--btn-secondary-border);
   background: var(--input-bg);
 }
 .action-btn.edit:hover,
 .action-btn.view:hover,
-.action-btn.tiers:hover { background: var(--btn-secondary-hover); }
+.action-btn.dishes:hover { background: var(--btn-secondary-hover); }
 
 /* ── MODAL ── */
 .modal-overlay {
@@ -496,6 +496,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Grid/flex items default to min-width:auto, so a field holding
+     something with a wide intrinsic minimum (e.g. a datetime-local input's
+     native month/day/year/time segments) won't shrink to its 1fr track
+     inside .modal-row — it overflows the modal's right edge instead. This
+     lets it actually shrink to fit; .modal-input's own width:100% still
+     fills whatever space that leaves. */
+  min-width: 0;
 }
 .modal-field.hidden { display: none; }
 
@@ -773,9 +780,9 @@
 
 /* ============================================================
    INVENTORY REBUILD — health strip, segmented controls, category
-   rail, card grid, kebab menu, tier drawer, medal chips, inline
-   field errors. All colors come from manager-theme.css tokens
-   already loaded on this page — no new fonts, no new palette.
+   rail, card grid, kebab menu, inline field errors. All colors
+   come from manager-theme.css tokens already loaded on this
+   page — no new fonts, no new palette.
    ============================================================ */
 
 /* ── Health strip (amber warning banner, same idiom as a dirty-changes
@@ -1142,11 +1149,6 @@
 }
 
 .tier-ladder { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
-.tier-ladder-bars { display: flex; align-items: flex-end; gap: 2px; }
-.tier-ladder-bar { width: 4px; background: var(--btn-primary-bg); border-radius: 1px; }
-.tier-ladder-bar:nth-child(1) { height: 6px; }
-.tier-ladder-bar:nth-child(2) { height: 9px; }
-.tier-ladder-bar:nth-child(3) { height: 12px; }
 /* ── Kebab menu (used in both card and list-view rows) ── */
 .card-menu { position: relative; }
 .icon-btn {
@@ -1198,91 +1200,6 @@
 /* ── List view row actions (Edit + kebab only) ── */
 .list-actions { display: flex; align-items: center; gap: 6px; }
 
-/* ── Tier drawer (right-anchored slide-in) ── */
-.tier-drawer-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(42, 18, 8, .45);
-  z-index: 150;
-}
-.tier-drawer-scrim.hidden { display: none; }
-
-.tier-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  height: 100vh;
-  width: 410px;
-  max-width: 100%;
-  background: var(--card-bg);
-  box-shadow: -20px 0 60px rgba(42, 18, 8, .18);
-  transform: translateX(100%);
-  transition: transform .25s ease;
-  z-index: 151;
-  display: flex;
-  flex-direction: column;
-}
-.tier-drawer.open { transform: translateX(0); }
-
-.tier-drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 20px 22px 16px;
-  border-bottom: 0.5px solid var(--border);
-}
-.tier-drawer-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--muted);
-  margin-bottom: 2px;
-}
-.tier-drawer-title { font-size: 16px; font-weight: 600; color: var(--text); }
-
-.tier-drawer-body { padding: 18px 22px; overflow-y: auto; flex: 1 1 auto; }
-
-.tier-drawer-footer {
-  padding: 14px 22px 18px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  border-top: 0.5px solid var(--border);
-}
-
-.tier-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 0.5px solid #EFE8DD;
-}
-.tier-row:last-child { border-bottom: none; }
-.tier-row-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
-.tier-row-sub { font-size: 11.5px; color: var(--muted); }
-.tier-row-actions { margin-left: auto; display: flex; gap: 6px; }
-
-.medal-chip {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #fff;
-}
-.medal-chip.bronze { background: #B08D57; }
-.medal-chip.silver { background: #9AA0A6; }
-.medal-chip.gold   { background: #C9A227; }
-
-@media (max-width: 480px) {
-  .tier-drawer { width: 100%; }
-}
-
 /* ── Inline field-level validation (blur) ── */
 .field-error {
   font-size: 11.5px;
@@ -1307,7 +1224,7 @@
 .unsaved-banner.hidden { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tier-drawer, .pkg-card, .pkg-card-actions, .seg-btn { transition: none; }
+  .pkg-card, .pkg-card-actions, .seg-btn { transition: none; }
 }
 
 /* ── RESPONSIVE ── */

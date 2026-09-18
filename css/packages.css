@@ -927,22 +927,6 @@ body { background: var(--cream); }
 }
 .pkg-checklist-item i { color: #0F6E56; font-size: 15px; margin-top: 1px; flex-shrink: 0; }
 
-.pkg-tier-block { margin-bottom: 22px; }
-.pkg-tier-block:last-child { margin-bottom: 0; }
-.pkg-tier-head {
-  padding: 14px 0 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-.pkg-tier-name {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--text-dark);
-  margin-bottom: 2px;
-}
-.pkg-tier-sub { font-size: 13px; color: var(--text-light); }
-
 /* Area coverage */
 .pkg-area-note {
   display: flex;
@@ -1075,6 +1059,13 @@ body { background: var(--cream); }
   .pkg-sidebar-backdrop:not(.hidden) { display: block; }
 
   body.pkg-no-scroll { overflow: hidden; }
+
+  /* The sidebar is now a full-screen touch drawer, not a compact desktop
+     panel — each filter row needs a real tap target, not just enough room
+     for a mouse pointer. */
+  .pkg-filter-row { min-height: 40px; padding: 10px 4px; gap: 12px; }
+  .pkg-filter-checkbox,
+  .pkg-filter-radio { width: 20px; height: 20px; }
 }
 
 @media (max-width: 640px) {
@@ -1092,6 +1083,22 @@ body { background: var(--cream); }
   .pkg-policy-row { align-items: flex-start; }
   .pkg-policy-footer { flex-direction: column; align-items: flex-start; }
   .pkg-policy-terms-btn { align-self: stretch; justify-content: center; }
+
+  /* Book button becomes a fixed bottom bar so it's always thumb-reachable
+     without scrolling back up past the gallery/glance/policy cards —
+     #pkgdContent-only padding (not .pkg-wrap, shared with the catalogue
+     page) keeps this scoped to package-details.html. */
+  #pkgdContent { padding-bottom: 84px; }
+  .pkg-detail-book-btn {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    border-radius: 0;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  }
 
   .pkg-lightbox-nav { width: 36px; height: 36px; font-size: 16px; }
   .pkg-lightbox-close { top: 12px; right: 12px; }

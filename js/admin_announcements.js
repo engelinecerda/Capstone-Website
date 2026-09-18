@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { computeAnnouncementStatus, renderAnnouncementBannerHtml, KIND_LABELS } from './announcement_helpers.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let announcements = [];
@@ -43,8 +44,8 @@ function setModalMsg(msg, type = 'error') {
   modalMessage.textContent = msg;
   modalMessage.className = `modal-message ${type}`;
 }
-function openModal() { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
-function closeModal() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+function openModal() { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); lockBodyScroll(); }
+function closeModal() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); unlockBodyScroll(); }
 
 function isoToLocalInput(iso) {
   if (!iso) return '';

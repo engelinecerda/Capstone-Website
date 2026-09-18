@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+<<<<<<< HEAD
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
@@ -18,6 +19,24 @@
     <link rel="stylesheet" href="/css/reservations.css?v=32">
     <link rel="stylesheet" href="/css/home.css?v=32">
     <link rel="stylesheet" href="/css/announcement_banner.css?v=32">
+=======
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=39" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=39"></noscript>
+    <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
+    <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
+         blocking, not async — deferring these caused a flash of unstyled
+         content on first paint. Only genuinely non-critical assets above
+         (webfonts, icon font, Leaflet map CSS) and the JS-injected
+         announcement banner below stay async. -->
+    <link rel="stylesheet" href="/css/styles.css?v=39">
+    <link rel="stylesheet" href="/css/reservations.css?v=39">
+    <link rel="stylesheet" href="/css/home.css?v=39">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=39" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=39"></noscript>
+>>>>>>> master
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -104,20 +123,20 @@
                     <p>Choose whether to host at ELI Coffee Events Caf&eacute; or have our team come to you.</p>
                     <div class="location-options">
                         <div class="location-card" data-val="onsite" role="button" tabindex="0" aria-pressed="false">
-                            <span class="loc-icon" aria-hidden="true"><i class="fa-solid fa-store"></i></span>
+                            <span class="loc-icon" aria-hidden="true"><i class="ti ti-building-store"></i></span>
                             <span class="loc-copy">
                                 <span class="loc-name">Onsite</span>
                                 <span class="loc-sub">At ELI Coffee Binangonan</span>
                             </span>
-                            <span class="loc-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+                            <span class="loc-check" aria-hidden="true"><i class="ti ti-check"></i></span>
                         </div>
                         <div class="location-card" data-val="offsite" role="button" tabindex="0" aria-pressed="false">
-                            <span class="loc-icon" aria-hidden="true"><i class="fa-solid fa-truck-fast"></i></span>
+                            <span class="loc-icon" aria-hidden="true"><i class="ti ti-truck-delivery"></i></span>
                             <span class="loc-copy">
                                 <span class="loc-name">Offsite</span>
                                 <span class="loc-sub">We come to your venue</span>
                             </span>
-                            <span class="loc-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+                            <span class="loc-check" aria-hidden="true"><i class="ti ti-check"></i></span>
                         </div>
                     </div>
                 </div>
@@ -392,7 +411,7 @@
                             </div>
                         </div>
                         <span class="signature-captured-badge is-hidden" id="signature-captured-badge" aria-hidden="true">
-                            <i class="fa-solid fa-check" aria-hidden="true"></i> Signature captured
+                            <i class="ti ti-check" aria-hidden="true"></i> Signature captured
                         </span>
 
                         <div class="signature-draw-panel" id="signature-draw-panel">
@@ -491,7 +510,7 @@
             <header class="agreement-modal-header">
                 <h2 class="agreement-modal-title" id="agreement-modal-title">Service Agreement</h2>
                 <button type="button" class="agreement-modal-close-btn" id="agreement-modal-close-btn" aria-label="Close agreement">
-                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    <i class="ti ti-x" aria-hidden="true"></i>
                 </button>
             </header>
             <div class="agreement-modal-body" id="agreement-modal-body">
