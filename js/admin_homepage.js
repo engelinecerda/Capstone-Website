@@ -24,6 +24,7 @@ const pageDate = document.getElementById('pageDate');
 const rescheduleAlert = document.getElementById('rescheduleAlert');
 const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
 const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
+const rescheduleAlertDismiss = document.getElementById('rescheduleAlertDismiss');
 const qaPendingCount = document.getElementById('qaPendingCount');
 const API = "https://capstone-website-papg.onrender.com";
 
@@ -894,6 +895,13 @@ async function refreshChangesAlert() {
     }
 }
 
+function hideChangesAlert() {
+    dashboardUnseenChangeIds = [];
+    rescheduleAlert.hidden = true;
+    rescheduleAlert.classList.add('hidden');
+    rescheduleAlert.setAttribute('aria-hidden', 'true');
+}
+
 rescheduleAlertAction?.addEventListener('click', async () => {
     try {
         await markReservationChangesSeen(supabase, dashboardUnseenChangeIds);
@@ -901,6 +909,19 @@ rescheduleAlertAction?.addEventListener('click', async () => {
         // Non-fatal — worst case the banner re-shows these on next load.
     }
     window.location.href = '/admin/reservations?filter=changed';
+});
+
+// BUG-04: acknowledge and hide without navigating to Reservations — same
+// mark-as-seen call "Review" makes, for an admin who's already aware and
+// just wants the banner gone.
+rescheduleAlertDismiss?.addEventListener('click', async () => {
+    const idsToMark = dashboardUnseenChangeIds;
+    hideChangesAlert();
+    try {
+        await markReservationChangesSeen(supabase, idsToMark);
+    } catch (error) {
+        // Non-fatal — worst case the banner re-shows these on next load.
+    }
 });
 
 refreshChangesAlert();

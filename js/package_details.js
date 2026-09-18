@@ -9,6 +9,7 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
+import { pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
 
 const CATEGORY_TABLE = 'package_category';
 const PACKAGE_TABLE  = 'package';
@@ -16,6 +17,7 @@ const TIER_TABLE     = 'package_tier';
 const PHOTO_TABLE    = 'package_photo';
 const BADGE_TABLE    = 'badge';
 const PACKAGE_BADGE_TABLE = 'package_badge';
+const DISCOUNT_TABLE = 'package_discount';
 
 let paymentRules = null;
 let paymentTypes = null;
@@ -140,6 +142,7 @@ async function init() {
     pkg._photos = photos || [];
     pkg._tiers = tiers || [];
     pkg._badges = await fetchBadgesForPackage(packageId);
+    pkg._discount = await fetchDiscountForPackage(packageId, pkg.price);
 
     await resolveMostBooked(packageId);
     renderPackageDetail(pkg);
@@ -198,6 +201,18 @@ async function fetchBadgesForPackage(packageId) {
   }
 }
 
+async function fetchDiscountForPackage(packageId, listPrice) {
+  try {
+    const { data: discountRows } = await supabase
+      .from(DISCOUNT_TABLE)
+      .select('*')
+      .eq('package_id', packageId);
+    return applyDiscount(listPrice, pickActiveDiscount(discountRows));
+  } catch {
+    return applyDiscount(listPrice, null);
+  }
+}
+
 function showNotFound() {
   hide(pkgdLoading);
   hide(pkgdContent);
@@ -226,11 +241,21 @@ function renderPackageDetail(pkg) {
   renderGlanceCard(pkg, loc);
 
   const price = Number(pkg.price || 0);
-  pkgDetailPricing.innerHTML = price > 0
-    ? `<p class="pkg-detail-price">₱${price.toLocaleString()}</p>
-       <p class="pkg-detail-price-note">Inclusive of setup</p>`
-    : `<p class="pkg-detail-price pkg-detail-price--contact">Contact for Quote</p>
+  const discount = pkg._discount;
+  if (price <= 0) {
+    pkgDetailPricing.innerHTML = `<p class="pkg-detail-price pkg-detail-price--contact">Contact for Quote</p>
        <p class="pkg-detail-price-note">Customized pricing available</p>`;
+  } else if (discount?.active) {
+    pkgDetailPricing.innerHTML = `<p class="pkg-detail-price pkg-detail-price--discounted">
+         <s class="pkg-detail-price-original">₱${discount.listPrice.toLocaleString()}</s>
+         ₱${discount.discountedPrice.toLocaleString()}
+         <span class="pkg-detail-price-off">&minus;${discount.percentOff}%</span>
+       </p>
+       <p class="pkg-detail-price-note">${discount.label ? esc(discount.label) + ' &middot; ' : ''}Inclusive of setup</p>`;
+  } else {
+    pkgDetailPricing.innerHTML = `<p class="pkg-detail-price">₱${price.toLocaleString()}</p>
+       <p class="pkg-detail-price-note">Inclusive of setup</p>`;
+  }
 
   if (pkgDetailBookBtn) {
     pkgDetailBookBtn.href = pkg.package_id
@@ -444,7 +469,10 @@ function renderPolicyCard(pkg, loc) {
   // and can still hold a stale pre-migration value in existing DB rows.
   const depositPct = paymentTypes?.down_payment?.percent_of_total;
   if (depositPct != null) {
-    const amount = Math.round(Number(pkg.price || 0) * (depositPct / 100));
+    // Off the discounted price when a discount is active — otherwise this
+    // estimate would overstate the deposit a customer actually owes.
+    const depositBase = pkg._discount?.active ? pkg._discount.discountedPrice : Number(pkg.price || 0);
+    const amount = Math.round(depositBase * (depositPct / 100));
     rows.push({
       icon: 'ti-file-text',
       label: 'Downpayment required',
