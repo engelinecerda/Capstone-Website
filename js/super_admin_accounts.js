@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { getPasswordChecks, validatePassword } from './password_rules.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // supabase-js's functions.invoke() sets `data` to null on any non-2xx
@@ -200,8 +201,8 @@ function renderTable() {
             </div>
           </div>
         </td>
-        <td><span class="badge badge-${a.role}">${roleLabel(a)}${(!a.is_board_account && a.staff_role) ? ` · ${a.staff_role}` : ''}</span></td>
-        <td><span class="status-pill ${a._status}">${a._status.charAt(0).toUpperCase() + a._status.slice(1)}</span></td>
+        <td class="table-status-cell"><div class="status-stack"><span class="badge badge-${a.role}">${roleLabel(a)}${(!a.is_board_account && a.staff_role) ? ` · ${a.staff_role}` : ''}</span></div></td>
+        <td class="table-status-cell"><div class="status-stack"><span class="status-pill ${a._status}">${a._status.charAt(0).toUpperCase() + a._status.slice(1)}</span></div></td>
         <td class="mono muted-cell">${fmtRelative(a.last_sign_in_at)}</td>
         <td>
           <div class="actions-cell">
@@ -423,14 +424,7 @@ function openEditModal(a) {
   document.getElementById('viewStaffRole').textContent      = a.staff_role || '—';
 
   // Reset security tab fields
-  document.getElementById('securityNewPassword').value = '';
-  document.getElementById('securityConfirmPassword').value = '';
-  validatePasswordRequirements();
-  document.querySelectorAll('.password-toggle-btn').forEach(btn => {
-    const input = document.getElementById(btn.dataset.target);
-    if (input) input.type = 'password';
-    btn.classList.remove('showing');
-  });
+  resetSecurityFields();
 
   hideMsg();
   document.getElementById('accountModalSave').onclick = () => handleUpdateAccount(a);
@@ -527,8 +521,9 @@ async function handleUpdateAccount(a) {
   }
 
   if (newPassword || confirmPassword) {
-    if (newPassword.length < 8) {
-      showMsg('New password must be at least 8 characters.', 'error');
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      showMsg(passwordError, 'error');
       switchTab('security');
       return;
     }
@@ -604,9 +599,7 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
         throw new Error('Profile saved but password update failed: ' + (rpcData.error || 'Unknown error'));
       }
 
-      document.getElementById('securityNewPassword').value = '';
-      document.getElementById('securityConfirmPassword').value = '';
-      validatePasswordRequirements();
+      resetSecurityFields();
     }
 
     if (role !== a.role) {
@@ -815,7 +808,28 @@ function openRemoveConfirm(a) {
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────
-const closeAccountModal = () => closeModalReturnFocus(document.getElementById('accountModal'));
+// Clearing the Security tab's password inputs before the modal is hidden
+// (Cancel, the X button, backdrop click, or Escape all funnel through here)
+// matters for more than tidiness: Chrome's password manager watches for a
+// filled password field that goes invisible and offers to save/update a
+// credential for it, even with no <form> and no submit. If the fields
+// still held a value once `overlay.classList.add('hidden')` ran, typing a
+// valid password and cancelling was enough to trigger that "Update your
+// password?" prompt. Clearing them first means there's nothing left for
+// Chrome to notice.
+function resetSecurityFields() {
+  clearFields(['securityNewPassword', 'securityConfirmPassword']);
+  validatePasswordRequirements();
+  document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+    const input = document.getElementById(btn.dataset.target);
+    if (input) input.type = 'password';
+    btn.classList.remove('showing');
+  });
+}
+const closeAccountModal = () => {
+  resetSecurityFields();
+  closeModalReturnFocus(document.getElementById('accountModal'));
+};
 const closeConfirmModal  = () => closeModalReturnFocus(document.getElementById('confirmModal'));
 
 function showMsg(text, type = '') {
@@ -855,6 +869,17 @@ document.addEventListener('keydown', e => {
 });
 
 // ── PASSWORD TOGGLE ──────────────────────────────────────────────
+// Registered with useCapture=true (the trailing `true`) so this runs
+// during the capture phase, before the click reaches the modal card.
+// The card has its own bubble-phase listener (`card.addEventListener(
+// 'click', e => e.stopPropagation())`, above) that stops clicks inside
+// the dialog from bubbling out to the overlay and closing the modal.
+// Since the toggle button lives inside that same card, a bubble-phase
+// listener here would get stopped before it ever ran — this button
+// simply never fired. Capture-phase listeners run top-down (document
+// -> overlay -> card -> button) BEFORE any bubble-phase listener
+// anywhere fires, so this now sees the click first, unaffected by
+// stopPropagation() further down the tree.
 document.addEventListener('click', e => {
   const toggleBtn = e.target.closest('.password-toggle-btn');
   if (!toggleBtn) return;
@@ -867,25 +892,29 @@ document.addEventListener('click', e => {
     input.type = 'password';
     toggleBtn.classList.remove('showing');
   }
-});
+}, true);
 
 // ── PASSWORD REQUIREMENTS VALIDATION ─────────────────────────────
 function validatePasswordRequirements() {
   const pw = document.getElementById('securityNewPassword')?.value || '';
   const confirm = document.getElementById('securityConfirmPassword')?.value || '';
-  const reqLength = document.getElementById('reqLength');
-  const reqMatch = document.getElementById('reqMatch');
 
-  const lengthMet = pw.length >= 8;
+  const checks = getPasswordChecks(pw);
   const matchMet = pw.length > 0 && pw === confirm;
 
-  if (reqLength) {
-    reqLength.classList.toggle('met', lengthMet);
-    reqLength.querySelector('.req-icon').textContent = lengthMet ? '✓' : '○';
-  }
-  if (reqMatch) {
-    reqMatch.classList.toggle('met', matchMet);
-    reqMatch.querySelector('.req-icon').textContent = matchMet ? '✓' : '○';
+  const rows = {
+    reqLength: checks.length,
+    reqLower: checks.lowercase,
+    reqUpper: checks.uppercase,
+    reqSpecial: checks.special,
+    reqMatch: matchMet,
+  };
+
+  for (const [id, met] of Object.entries(rows)) {
+    const row = document.getElementById(id);
+    if (!row) continue;
+    row.classList.toggle('met', met);
+    row.querySelector('.req-icon').textContent = met ? '✓' : '○';
   }
 }
 document.getElementById('securityNewPassword').addEventListener('input', validatePasswordRequirements);

@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=42">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=42">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=42">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=42">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=43">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=43">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=43">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=43">
 </head>
 <body>
 
@@ -320,7 +320,6 @@
           <div class="section-head">
             <div>
               <h2 class="section-title">Managing menu for</h2>
-              <p class="section-sub">Each catering-type package has its own set of categories, dishes, and pricing. Flag a package as catering-enabled from its Edit modal in Inventory.</p>
             </div>
           </div>
           <div class="modal-field" style="max-width:420px;">
@@ -329,7 +328,6 @@
           <div class="modal-field" style="max-width:420px;">
             <label class="modal-label" for="cateringMainDishMax">Max main dishes included</label>
             <input type="number" id="cateringMainDishMax" class="modal-input" min="1" step="1" placeholder="3">
-            <span class="modal-hint">How many protein dishes (Chicken/Pork/Beef/Fish/Vegetables combined) a customer must pick for this package. The customer builder blocks further picks once this is reached, and won't let the customer move on to the next dish category until it's reached.</span>
           </div>
         </div>
 
@@ -588,15 +586,16 @@
             <span>Active (visible to customers)</span>
           </label>
         </div>
-
-        <p class="modal-message hidden" id="pkgModalMessage"></p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn-cancel" id="pkgModalCancel">Cancel</button>
-        <button type="button" class="btn-primary" id="pkgModalSave">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span id="pkgModalSaveLabel">Add Package</span>
-        </button>
+        <p class="modal-message hidden" id="pkgModalMessage"></p>
+        <div class="modal-footer-actions">
+          <button type="button" class="btn-cancel" id="pkgModalCancel">Cancel</button>
+          <button type="button" class="btn-primary" id="pkgModalSave">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span id="pkgModalSaveLabel">Add Package</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

@@ -34,6 +34,7 @@
   transition: background .15s ease;
 }
 .btn-cancel:hover { background: var(--btn-secondary-hover); }
+.btn-cancel:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-danger {
   display: inline-flex;
@@ -52,6 +53,12 @@
   transition: background .15s ease;
 }
 .btn-danger:hover { background: #8a2424; }
+/* Without this, disabling the button while a delete is in-flight (to stop
+   double-clicks) looked identical to normal — same solid red, same cursor
+   — so there was no visual sign anything was happening beyond the label
+   text change itself. */
+.btn-danger:disabled { opacity: 0.65; cursor: not-allowed; }
+.btn-danger:disabled:hover { background: #A32D2D; }
 
 /* ── FILTER BAR ── */
 .filter-bar {
@@ -355,6 +362,19 @@
 
 .action-btn.archive { color: var(--muted); }
 
+/* Delete previously shared the plain "archive" class/style, making a
+   destructive, irreversible action look identical to a reversible one
+   (Archive) — across the catering menu, venues, and badge types alike.
+   One shared class here fixes it everywhere at once, and matches how
+   destructive actions are already flagged elsewhere in the admin (e.g.
+   Declined status pills, btn-danger). */
+.action-btn.danger {
+  color: var(--declined-txt, #A32D2D);
+  border-color: var(--declined, #FCEBEB);
+  background: var(--declined, #FCEBEB);
+}
+.action-btn.danger:hover { filter: brightness(0.97); }
+
 .action-btn.restore {
   color: var(--approved-txt);
   border-color: var(--approved);
@@ -443,6 +463,8 @@
   transition: color .15s, background .15s;
 }
 .modal-close:hover { color: var(--text); background: var(--bg); }
+.modal-close:disabled { opacity: 0.5; cursor: not-allowed; }
+.modal-close:disabled:hover { background: none; }
 
 .modal-body {
   padding: 18px 22px;
@@ -454,12 +476,20 @@
 .modal-footer {
   padding: 14px 22px 18px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: flex-end;   
   gap: 10px;
   border-top: 0.5px solid var(--border);
   position: sticky;
   bottom: 0;
   background: var(--card-bg);
+}
+
+.modal-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;                   
 }
 
 .modal-field {
@@ -531,14 +561,22 @@
 }
 
 .modal-message {
+  display: flex;
+  align-items: center;
+  height: 36px;
   font-size: 12.5px;
   border-radius: 8px;
-  padding: 9px 12px;
+  padding: 0 12px;
   background: var(--declined, #FCEBEB);
   color: #A32D2D;
   border: 1px solid #F3C9C9;
+  box-sizing: border-box;
+  margin: 0 auto 0 0;   /* margin-right: auto — pushes actions to the right, only when this element exists in flow */
+  flex: 0 1 auto;
 }
-.modal-message.hidden { display: none; }
+.modal-message.hidden {
+  display: none;   /* already true in your JS-toggled class — confirming it stays display:none, not just visibility */
+}
 .modal-message.success {
   background: var(--approved);
   color: var(--approved-txt);

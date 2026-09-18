@@ -259,7 +259,7 @@ function renderTable(reservations) {
                     <span class="table-main">${escapeHtml(getPackageName(reservation))}</span>
                     <span class="table-sub">${escapeHtml(packageTypeLabel)}</span>
                 </td>
-                <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+                <td class="table-status-cell"><div class="status-stack"><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></div></td>
                 <td><span class="table-main">${escapeHtml(formatCurrency(reservation?.total_price || 0))}</span></td>
             </tr>
         `;

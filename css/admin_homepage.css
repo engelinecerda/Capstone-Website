@@ -823,19 +823,52 @@ body {
   white-space: nowrap;
 }
 
+/* Wrapper the "Contract" / "Status" cells render their pill inside of
+   (see js/admin_homepage.js), matching .status-stack in
+   css/admin_reservations.css — the contracts tab's reference. It's a CSS
+   grid, and grid items stretch to fill their track by default, so the
+   pill spans the full cell width and its centered text reads the same
+   way it does on the contracts tab, instead of shrinking to fit its
+   own text. */
+.status-stack {
+  display: grid;
+  gap: 8px;
+}
+
+/* Both status columns get the same explicit width so the "Contract" pill
+   (longest label "Verified contract"/"Contract missing") and the "Status"
+   pill (longest label "Cancellation Approved", which needs more room)
+   render at the same size instead of each column auto-sizing to its own
+   widest label. 190px comfortably fits "Cancellation Approved" at this
+   font size, so both columns settle at that width. */
+.table-status-cell {
+  min-width: 0;
+  width: 190px;
+}
+
+/* Selector groups below mirror .status-pill in css/manager-theme.css (the
+   contracts tab's shared stylesheet) key-for-key, so any status value that
+   can appear on this page — not just the handful the dashboard currently
+   renders — gets the same pill color it would get on the contracts tab. */
 .status-pill.pending,
-.status-pill.cancellation_requested {
+.status-pill.pending_review,
+.status-pill.requested,
+.status-pill.cancellation_requested,
+.status-pill.reschedule_requested {
   background: var(--pending);
   color: var(--pending-txt);
 }
 
 .status-pill.confirmed,
-.status-pill.approved {
+.status-pill.approved,
+.status-pill.verified {
   background: var(--approved);
   color: var(--approved-txt);
 }
 
-.status-pill.declined {
+.status-pill.declined,
+.status-pill.rejected,
+.status-pill.overpaid {
   background: var(--declined);
   color: var(--declined-txt);
 }
@@ -855,7 +888,10 @@ body {
 }
 
 .status-pill.cancelled,
-.status-pill.rescheduled {
+.status-pill.rescheduled,
+.status-pill.default,
+.status-pill.unpaid,
+.status-pill.missing {
   background: var(--cancelled);
   color: var(--cancelled-txt);
 }

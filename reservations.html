@@ -7,10 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=42" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=42"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=43" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=43"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
     <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
@@ -18,11 +19,11 @@
          content on first paint. Only genuinely non-critical assets above
          (webfonts, icon font, Leaflet map CSS) and the JS-injected
          announcement banner below stay async. -->
-    <link rel="stylesheet" href="/css/styles.css?v=42">
-    <link rel="stylesheet" href="/css/reservations.css?v=42">
-    <link rel="stylesheet" href="/css/home.css?v=42">
-    <link rel="preload" as="style" href="/css/announcement_banner.css?v=42" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=42"></noscript>
+    <link rel="stylesheet" href="/css/styles.css?v=43">
+    <link rel="stylesheet" href="/css/reservations.css?v=43">
+    <link rel="stylesheet" href="/css/home.css?v=43">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=43" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=43"></noscript>
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -237,7 +238,7 @@
 
                         <!-- Offsite: venue details -->
                         <div id="venue-section" class="hidden">
-                            <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically.</p>
+                            <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically &mdash; you can edit it below if it's not quite right.</p>
                             <div class="venue-search-row">
                                 <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)">
                                 <button type="button" id="venue-search-btn" class="venue-search-btn">Search</button>
@@ -245,7 +246,11 @@
                             <div id="venue-map" class="venue-map-container"></div>
                             <div class="venue-pinned-row">
                                 <span class="venue-pin-icon"><i class="ti ti-map-pin" aria-hidden="true"></i></span>
-                                <span id="venue-pinned-label">Click the map or search an address to pin your venue.</span>
+                                <textarea id="venue-pinned-label" class="venue-pinned-input" rows="2" placeholder="Click the map or search an address to pin your venue." aria-label="Pinned venue address (editable)"></textarea>
+                            </div>
+                            <div class="venue-details-row">
+                                <label for="venue-address-details" class="venue-details-label">Additional address details <small>(house/unit no., lot/block no., building name, landmark &mdash; optional but recommended)</small></label>
+                                <input type="text" id="venue-address-details" class="res-input" placeholder="e.g., Unit 4B, Lot 7 Blk 2, near the yellow gate">
                             </div>
                             <input type="hidden" id="venue-location" value="">
                         </div>
@@ -617,11 +622,27 @@
             if (doReverseGeocode) reverseGeocode(lat, lng);
         }
 
+        // venue-pinned-label is an editable <textarea> (not read-only text) so the
+        // customer can correct Nominatim's wording; venue-address-details is a
+        // separate free-text field for house/unit/lot number and landmarks that
+        // reverse geocoding can't infer from a lat/lng. The hidden #venue-location
+        // field — read by the rest of reservations.js for validation and submit —
+        // is always the two combined, kept in sync on every edit to either one.
+        function combineVenueLocation() {
+            var labelInput   = document.getElementById('venue-pinned-label');
+            var detailsInput = document.getElementById('venue-address-details');
+            var hidden       = document.getElementById('venue-location');
+            if (!hidden) return;
+            var details = detailsInput ? detailsInput.value.trim() : '';
+            var address = labelInput ? labelInput.value.trim() : '';
+            hidden.value = details ? (address ? details + ', ' + address : details) : address;
+        }
+        window.combineVenueLocation = combineVenueLocation;
+
         function setVenueAddress(address) {
-            var label  = document.getElementById('venue-pinned-label');
-            var hidden = document.getElementById('venue-location');
-            if (label)  label.textContent = address;
-            if (hidden) hidden.value       = address;
+            var label = document.getElementById('venue-pinned-label');
+            if (label) label.value = address;
+            combineVenueLocation();
         }
 
         function reverseGeocode(lat, lng) {
@@ -653,8 +674,16 @@
         }
 
         // Wire up search controls once DOM is ready (script is at bottom of body)
-        var searchBtn   = document.getElementById('venue-search-btn');
-        var searchInput = document.getElementById('venue-search-input');
+        var searchBtn     = document.getElementById('venue-search-btn');
+        var searchInput   = document.getElementById('venue-search-input');
+        var pinnedInput   = document.getElementById('venue-pinned-label');
+        var detailsInput  = document.getElementById('venue-address-details');
+
+        // Manual edits to either field re-sync the hidden combined value —
+        // this is what makes the geocoded address editable and the extra
+        // details (house/lot no., landmark) actually reach venue_location.
+        if (pinnedInput)  pinnedInput.addEventListener('input', combineVenueLocation);
+        if (detailsInput) detailsInput.addEventListener('input', combineVenueLocation);
 
         if (searchBtn) searchBtn.addEventListener('click', function () { if (searchInput) searchAddress(searchInput.value); });
         if (searchInput) searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); searchAddress(searchInput.value); } });

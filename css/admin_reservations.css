@@ -597,6 +597,17 @@ body {
   min-width: 0;
 }
 
+/* Scoped to #reservationsBody (the reservations tab's own tbody id) rather
+   than added to the base .table-status-cell rule above, since this file is
+   @import'd into css/admin_contracts.css and the contracts tab reuses the
+   same .table-status-cell class for its own two pill columns — this keeps
+   the width change from leaking into that page. Gives the "Payment" and
+   "Status" columns the same width so their pills line up (mirrors the
+   Contract/Status column fix on the dashboard, css/admin_homepage.css). */
+#reservationsBody .table-status-cell {
+  width: 190px;
+}
+
 .actions {
   min-width: 0;
 }
