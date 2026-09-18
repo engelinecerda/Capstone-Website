@@ -712,6 +712,27 @@
   cursor: pointer;
 }
 
+/* Booking Scope — same checkbox-row treatment as .venue-option-row above;
+   a package can check both VIP and Main Hall for a combo "Plus" package
+   that occupies both rooms at once. */
+.pkg-scope-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.pkg-scope-check-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
 /* ============================================================
    INVENTORY REBUILD — health strip, segmented controls, category
    rail, card grid, kebab menu, tier drawer, medal chips, inline

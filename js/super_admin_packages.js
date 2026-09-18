@@ -154,7 +154,35 @@ const pkgVenuesField     = document.getElementById('pkgVenuesField');
 const pkgVenuesList      = document.getElementById('pkgVenuesList');
 const pkgVenueCapacityHint = document.getElementById('pkgVenueCapacityHint');
 const pkgBookingScopeField = document.getElementById('pkgBookingScopeField');
-const pkgBookingScope    = document.getElementById('pkgBookingScope');
+const pkgBookingScopeChecks = document.getElementById('pkgBookingScopeChecks');
+const pkgBookingScopeInputs = () => Array.from(pkgBookingScopeChecks.querySelectorAll('.pkg-scope-check'));
+
+// Multi-scope: a combo "Plus" package can check both VIP and Main Hall
+// (occupies both rooms at once), but Offsite never combines with an
+// onsite scope — mirrors the package_booking_scope_check constraint in
+// 20261010_multi_scope_packages.sql. Checking Offsite clears the two
+// onsite boxes and vice versa, so the UI can't even construct the
+// combination the database would reject anyway.
+pkgBookingScopeChecks.addEventListener('change', (e) => {
+  const target = e.target;
+  if (!target.classList.contains('pkg-scope-check')) return;
+  if (!target.checked) return;
+  const isOffsite = target.value === 'offsite';
+  pkgBookingScopeInputs().forEach((input) => {
+    if (input === target) return;
+    const otherIsOffsite = input.value === 'offsite';
+    if (isOffsite || otherIsOffsite) input.checked = false;
+  });
+});
+
+function getPkgBookingScopeValue() {
+  return pkgBookingScopeInputs().filter((input) => input.checked).map((input) => input.value);
+}
+
+function setPkgBookingScopeValue(scopes) {
+  const scopeSet = new Set(Array.isArray(scopes) ? scopes : (scopes ? [scopes] : []));
+  pkgBookingScopeInputs().forEach((input) => { input.checked = scopeSet.has(input.value); });
+}
 const pkgPhotosGrid      = document.getElementById('pkgPhotosGrid');
 const pkgPhotoInput      = document.getElementById('pkgPhotoInput');
 const pkgInclusionsListEl = document.getElementById('pkgInclusionsList');
@@ -1687,7 +1715,7 @@ function getPkgFormState() {
     name: pkgName.value, type: pkgType.value, category: pkgCategorySelect.value,
     description: pkgDescription.value, price: pkgPrice.value, duration: pkgDuration.value,
     maxQty: pkgMaxQuantity.value, minGuests: pkgMinGuests.value, maxGuests: pkgMaxGuests.value,
-    extPrice: pkgExtensionPrice.value, location: pkgLocationType.value, bookingScope: pkgBookingScope.value,
+    extPrice: pkgExtensionPrice.value, location: pkgLocationType.value, bookingScope: getPkgBookingScopeValue().sort().join(','),
     active: pkgActiveToggle.checked,
     usesCateringMenu: pkgUsesCateringMenuToggle.checked,
     inclusions: pkgInclusions,
@@ -1824,7 +1852,7 @@ async function openEditPackageModal(packageId) {
   pkgExtensionPrice.value = pkg.extension_price ?? '';
   pkgLocationType.value   = pkg.location_type || '';
   pkgLocationPrevValue    = pkg.location_type || '';
-  pkgBookingScope.value   = pkg.booking_scope || '';
+  setPkgBookingScopeValue(pkg.booking_scope);
   pkgActiveToggle.checked = !!pkg.is_active;
   pkgUsesCateringMenuToggle.checked = !!pkg.uses_catering_menu;
 
@@ -1860,7 +1888,7 @@ function clearPackageForm() {
   [pkgName, pkgDescription, pkgPrice, pkgDuration, pkgExtensionPrice, pkgMinGuests, pkgMaxGuests].forEach(el => el.value = '');
   pkgType.value         = '';
   pkgLocationType.value = '';
-  pkgBookingScope.value = '';
+  setPkgBookingScopeValue([]);
   pkgMaxQuantity.value  = '1';
   pkgActiveToggle.checked = false;
   pkgUsesCateringMenuToggle.checked = false;
@@ -1885,7 +1913,7 @@ function validatePackageForm() {
     return 'Min guests must be less than or equal to max guests.';
   if (!pkgDuration.value || isNaN(parseInt(pkgDuration.value)) || parseInt(pkgDuration.value) < 1)
     return 'A valid duration in hours is required.';
-  if (pkgType.value === 'main' && !pkgBookingScope.value)
+  if (pkgType.value === 'main' && !getPkgBookingScopeValue().length)
     return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
   // Bug fix: renderActivationChecklist() no longer auto-unchecks "Active"
   // when a blocker appears (see that function for why), so this is now the
@@ -1927,7 +1955,7 @@ pkgModalSave.addEventListener('click', async () => {
       duration_hours:     parseInt(pkgDuration.value, 10),
       extension_price:    pkgExtensionPrice.value !== '' ? Number(pkgExtensionPrice.value) : null,
       location_type:      pkgLocationType.value || null,
-      booking_scope:      pkgBookingScope.value || null,
+      booking_scope:      getPkgBookingScopeValue().length ? getPkgBookingScopeValue() : null,
       package_category_id: pkgCategorySelect.value || null,
       is_active:          !!pkgActiveToggle.checked,
       uses_catering_menu: !!pkgUsesCateringMenuToggle.checked,

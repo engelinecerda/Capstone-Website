@@ -1517,12 +1517,15 @@ function updateDateDisplayPlaceholder() {
         : 'Choose your location and package first, then select a date *';
 }
 
+// Always an array (or null) — see getBookingScope()'s own doc comment in
+// reservation_availability.js for why (a combo "Plus" package occupies
+// more than one scope at once).
 function getSelectedBookingScope() {
     if (!S.locationType) return null;
     if (S.locationType === 'offsite') {
         if (!S.offsiteCategory) return null;
         if (S.offsiteCategory !== 'catering' && !S.offsitePackage) return null;
-        return 'offsite';
+        return ['offsite'];
     }
     return getSharedBookingScope(S.locationType, S.miniPackage?.label || '', S.miniPackage?.bookingScope || null);
 }
