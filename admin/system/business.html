@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <title>Business Profile - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=39">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=39">
-  <link rel="stylesheet" href="/css/admin_business_profile.css?v=39">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=39">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=42">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=42">
+  <link rel="stylesheet" href="/css/admin_business_profile.css?v=43">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=42">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
@@ -151,6 +151,24 @@
         </div>
       </div>
 
+      <!-- ── ADDITIONAL CONTACTS & SOCIAL LINKS ── -->
+      <div class="card">
+        <div class="card-title-row">
+          <div>
+            <p class="card-title">Additional Contacts &amp; Social Links</p>
+            <p class="card-sub">Beyond the fixed Facebook/Instagram fields above — add any other platform (TikTok, WhatsApp, LinkedIn, a booking line, etc.). Shown alongside the social icons in every page's footer.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addSocialLinkBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Link
+          </button>
+        </div>
+        <p class="form-message" id="socialLinkMsg"></p>
+        <div id="socialLinkList" class="location-admin-list">
+          <p class="pc-loading">Loading…</p>
+        </div>
+      </div>
+
     </section>
   </main>
 
@@ -189,6 +207,36 @@
         <button type="button" class="btn-primary" id="locationModalSave">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
           <span id="locationModalSaveLabel">Add Location</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SOCIAL LINK EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="socialLinkModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="socialLinkModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="socialLinkModalTitle">Add Link</h2>
+        <button type="button" class="modal-close" id="socialLinkModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="socialLinkLabelInput">Label *</label>
+          <input type="text" id="socialLinkLabelInput" class="modal-input" placeholder="E.g., TikTok, WhatsApp, LinkedIn">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="socialLinkUrlInput">URL *</label>
+          <input type="text" id="socialLinkUrlInput" class="modal-input" placeholder="https://...">
+        </div>
+        <p class="modal-message hidden" id="socialLinkModalMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="socialLinkModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="socialLinkModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="socialLinkModalSaveLabel">Add Link</span>
         </button>
       </div>
     </div>

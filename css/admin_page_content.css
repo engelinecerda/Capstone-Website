@@ -159,7 +159,7 @@
   resize: vertical; outline: none; transition: border-color .15s;
 }
 .about-body-input:focus { border-color: var(--input-focus); }
-.about-section-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.about-section-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .about-image-field { margin-top: 14px; }
 .about-image-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .about-preview-body h4 { font-family: 'Fraunces', serif; margin: 14px 0 6px; }
@@ -269,10 +269,10 @@
 .modal-overlay.hidden { display: none; }
 .modal {
   background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
-  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+  width: 100%; max-width: 660px; max-height: 90vh; overflow-y: auto;
   display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
 }
-.modal-sm { max-width: 420px; }
+.modal-sm { max-width: 500px; }
 .modal-header {
   display: flex; justify-content: space-between; align-items: flex-start;
   padding: 20px 22px 16px; gap: 12px; position: sticky; top: 0; background: var(--card-bg);
@@ -291,6 +291,11 @@
   border-top: 0.5px solid var(--border); position: sticky; bottom: 0; background: var(--card-bg);
 }
 .modal-field { display: flex; flex-direction: column; gap: 6px; }
+/* Elite Card Banner's fields (Eyebrow Label/Heading/Description/Zoom Image
+   Alt Text) sit as direct .card children, not inside a .modal-body (whose
+   own `gap: 16px` handles this everywhere else) — same root cause already
+   fixed once in css/super_admin_packages.css for its picker card. */
+#elite-banner .modal-field + .modal-field { margin-top: 16px; }
 .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .modal-label { font-size: 12px; font-weight: 600; color: var(--text); }
 .modal-input {

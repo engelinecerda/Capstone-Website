@@ -30,6 +30,7 @@ export const ICONS = {
   'database-backup': '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15"/>',
   'speakerphone': '<path d="M3 11v2a1 1 0 0 0 1 1h1l3 6h2l-2-6h2l7 4V6l-7 4H4a1 1 0 0 0-1 1z"/><path d="M14 8a3 3 0 0 1 0 8"/><path d="M18 5a7 7 0 0 1 0 14"/>',
   'alert-triangle': '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  'mail': '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22 6 12 13 2 6"/>',
 };
 
 export function iconSvg(key) {

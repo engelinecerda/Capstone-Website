@@ -28,6 +28,8 @@ export const ADMIN_NAV = [
       { label: 'Availability calendar', href: '/admin/availability-calendar', key: 'availability-calendar', iconKey: 'calendar-check' },
       { label: 'Payments',         href: '/admin/payments',                                          iconKey: 'receipt', adminOverride: { label: 'Payment records' } },
       { label: 'Contracts',        href: '/admin/contracts',                                         iconKey: 'file-text' },
+      { label: 'Inquiries',        href: '/admin/inquiries',           key: 'inquiries',             iconKey: 'mail' },
+      { label: 'Referral Sources', href: '/admin/referral-sources',    key: 'referral-sources',      iconKey: 'tags' },
       { label: 'Customers',        href: '/admin/customers',                                         iconKey: 'users' },
       { label: 'Employees',        href: '/admin/staff-roster',        key: 'staff-roster',          iconKey: 'id-badge' },
       { label: 'Reviews',          href: '/admin/reviews',                                           iconKey: 'star' },

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inquiries - Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=42">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=42">
+  <link rel="stylesheet" href="/css/admin_reservations.css?v=42">
+  <link rel="stylesheet" href="/css/admin_inquiries.css?v=1">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=42">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <img src="/images/eli-coffee-beans-dark.png" alt="" />
+      </div>
+      <div class="sidebar-brand-copy">
+        <p class="sidebar-brand-name">ELI Coffee Events</p>
+        <p class="sidebar-brand-role" id="sidebarRolePill">Loading...</p>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <nav class="sidebar-nav" id="adminNav" aria-label="Admin"></nav>
+
+      <div class="sidebar-user">
+        <a href="/admin/profile" class="sidebar-user-link" title="View profile">
+          <div class="sidebar-avatar" id="sidebarAvatar">--</div>
+          <div class="sidebar-user-copy">
+            <p class="sidebar-user-name" id="sidebarName">Loading...</p>
+            <p class="sidebar-user-role" id="sidebarRoleBottom">Manager</p>
+          </div>
+        </a>
+        <button type="button" class="sidebar-logout-btn" id="logoutBtn" title="Logout" aria-label="Logout">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="page-shell page-shell--wide">
+      <header class="page-header">
+        <div>
+          <h1 class="page-title">Inquiries<span class="view-only-pill hidden" id="inquiriesViewOnlyPill">View only</span></h1>
+          <p class="page-sub">Pre-booking leads submitted through the customer-facing inquiry form.</p>
+        </div>
+        <div class="header-actions">
+          <span id="managerNotifBell"></span>
+        </div>
+      </header>
+
+      <section class="toolbar-grid">
+        <div class="filters-bar">
+          <div class="filter-select-wrap">
+            <span class="filter-icon">Status</span>
+            <select id="statusDropdown">
+              <option value="all">All Inquiries</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="converted">Converted</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-grid">
+        <div class="workspace-main">
+          <section class="card table-card">
+            <div class="table-head">
+              <div>
+                <h2 class="card-title">All inquiries</h2>
+                <p class="card-sub">Open one to see full details, add an internal note, and update its status.</p>
+              </div>
+            </div>
+            <p class="dashboard-message" id="tableMessage">Loading inquiries...</p>
+            <div class="table-wrap">
+              <table class="reservation-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Event Type</th>
+                    <th>Event Date</th>
+                    <th>Submitted</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="inquiriesBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
+  <script type="module" src="../js/admin_inquiries.js"></script>
+</body>
+</html>

@@ -31,6 +31,7 @@ import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
+import { attachPhoneMask } from '/js/phone_format.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
@@ -326,6 +327,7 @@ const eventDateInput          = document.getElementById('event-date');
 const eventDateDisplayInput   = document.getElementById('event-date-display');
 const nameInput               = document.getElementById('name');
 const phoneInput              = document.getElementById('phone');
+attachPhoneMask(phoneInput);
 const emailInput              = document.getElementById('email');
 const availabilityGrid        = document.getElementById('availabilityGrid');
 const availabilityMonthLabel  = document.getElementById('availabilityMonthLabel');
@@ -3764,14 +3766,21 @@ async function submitDone() {
         msg.className = 'rs-summary-card';
         msg.style.cssText = 'text-align:center;padding:48px 20px;';
         msg.innerHTML =
-            '<div style="font-size:52px;margin-bottom:16px;">&#9989;</div>' +
+            '<i class="ti ti-circle-check" style="font-size:52px;margin-bottom:16px;color:#2E7D4F;" aria-hidden="true"></i>' +
             '<h3 style="color:#2A1408;font-size:22px;margin-bottom:10px;font-weight:700;">Reservation Submitted!</h3>' +
             '<p style="color:#777;line-height:1.8;font-size:15px;">Thank you, <strong>' + S.name + '</strong>!<br>' +
             'Reservation Number: <strong style="color:#6B3A1F;">' + (contractResult.reservation_number || '') + '</strong><br>' +
             'Your reservation is <strong style="color:#6B3A1F;">under review</strong>.<br>' +
             'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.</p>' +
-            '<p style="margin-top:14px;"><a href="' + contractResult.contract_url + '" target="_blank" rel="noopener noreferrer" class="dl-btn" style="text-decoration:none;">Download your signed contract</a></p>';
+            '<p style="margin-top:14px;"><a href="' + contractResult.contract_url + '" target="_blank" rel="noopener noreferrer" class="dl-btn" style="text-decoration:none;">Download your signed contract</a></p>' +
+            '<p style="margin-top:22px;padding-top:22px;border-top:1px solid #EFE8DC;color:#777;font-size:14px;">Enjoyed booking with us?<br>' +
+            '<a href="https://www.google.com/maps/place/Eli+Coffee+-+Binangonan/@14.4859006,121.183786,17z/data=!3m1!4b1!4m8!3m7!1s0x3397c323cec4b3b7:0xd94ed9b314980cd5!8m2!3d14.4859006!4d121.1863609!9m1!1b1!16s%2Fg%2F11r10q3pd6?entry=ttu" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;color:#6B3A1F;font-weight:600;text-decoration:none;"><i class="ti ti-brand-google" aria-hidden="true"></i> Leave us a Google Review</a></p>';
         document.querySelector('.reservation-container').appendChild(msg);
+        // Collapsing the multi-step form down to this one short card can
+        // otherwise leave the browser's scroll position wherever the user
+        // last was (mid-form, often near the bottom) — snap to top so the
+        // confirmation is what's actually on screen, with no visible scroll.
+        window.scrollTo({ top: 0, behavior: 'auto' });
 
     } catch (err) {
         showWarningModal(err.message, 'Something went wrong', 'error');

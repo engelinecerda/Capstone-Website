@@ -9,11 +9,14 @@ import { initAdminNav } from './admin_nav.js';
 import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { showToast } from './admin_toast.js';
+import { attachPhoneMask } from './phone_format.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let locations = [];
+let socialLinks = [];
 let contact   = null;
 let editingLocationId = null;
+let editingSocialLinkId = null;
 let pendingConfirmAction = null;
 let logoPendingFile = null;
 
@@ -22,8 +25,19 @@ const locationList = document.getElementById('locationList');
 const locationMsg  = document.getElementById('locationMsg');
 const contactMsg   = document.getElementById('contactMsg');
 
+const socialLinkList = document.getElementById('socialLinkList');
+const socialLinkMsg  = document.getElementById('socialLinkMsg');
+const socialLinkModal        = document.getElementById('socialLinkModal');
+const socialLinkModalTitle   = document.getElementById('socialLinkModalTitle');
+const socialLinkModalMessage = document.getElementById('socialLinkModalMessage');
+const socialLinkLabelInput   = document.getElementById('socialLinkLabelInput');
+const socialLinkUrlInput     = document.getElementById('socialLinkUrlInput');
+const socialLinkModalSave    = document.getElementById('socialLinkModalSave');
+const socialLinkModalSaveLabel = document.getElementById('socialLinkModalSaveLabel');
+
 const fieldBrandDesc = document.getElementById('fieldBrandDesc');
 const fieldPhone     = document.getElementById('fieldPhone');
+attachPhoneMask(fieldPhone);
 const fieldEmail     = document.getElementById('fieldEmail');
 const fieldFacebook  = document.getElementById('fieldFacebook');
 const fieldInstagram = document.getElementById('fieldInstagram');
@@ -78,15 +92,18 @@ function closeModal(modal) { modal.classList.add('hidden'); modal.setAttribute('
 
 // ── LOAD ─────────────────────────────────────────────────────────
 async function loadAll() {
-  const [{ data: locRows }, { data: contactRow }] = await Promise.all([
+  const [{ data: locRows }, { data: contactRow }, { data: socialRows }] = await Promise.all([
     supabase.from('business_location').select('*').order('sort_order', { ascending: true }),
-    supabase.from('business_contact').select('*').eq('id', true).maybeSingle()
+    supabase.from('business_contact').select('*').eq('id', true).maybeSingle(),
+    supabase.from('business_social_link').select('*').order('sort_order', { ascending: true })
   ]);
 
   locations = locRows || [];
   contact = contactRow || null;
+  socialLinks = socialRows || [];
 
   renderLocations();
+  renderSocialLinks();
 
   if (contact) {
     fieldBrandDesc.value = contact.brand_description || '';
@@ -247,6 +264,7 @@ function openConfirmRemoveLocation(id) {
 confirmOk.addEventListener('click', async () => {
   if (!pendingConfirmAction) return;
   confirmOk.disabled = true;
+  let toastMsg = 'Removed.';
   try {
     if (pendingConfirmAction.type === 'remove-location') {
       const loc = locations.find(l => l.id === pendingConfirmAction.id);
@@ -255,9 +273,18 @@ confirmOk.addEventListener('click', async () => {
       locations = locations.filter(l => l.id !== pendingConfirmAction.id);
       await logAudit({ action: 'Removed Location', category: 'business_profile', details: `Removed: ${loc?.name}`, entityId: pendingConfirmAction.id });
       renderLocations();
+      toastMsg = 'Location removed.';
+    } else if (pendingConfirmAction.type === 'remove-social-link') {
+      const link = socialLinks.find(l => l.id === pendingConfirmAction.id);
+      const { error } = await supabase.from('business_social_link').delete().eq('id', pendingConfirmAction.id);
+      if (error) throw error;
+      socialLinks = socialLinks.filter(l => l.id !== pendingConfirmAction.id);
+      await logAudit({ action: 'Removed Social Link', category: 'business_profile', details: `Removed: ${link?.label}`, entityId: pendingConfirmAction.id });
+      renderSocialLinks();
+      toastMsg = 'Link removed.';
     }
     closeModal(confirmModal);
-    showToast('Location removed.', 'success');
+    showToast(toastMsg, 'success');
   } catch (err) {
     setModalMsg(confirmMessage, `Failed: ${err.message}`);
   } finally {
@@ -268,6 +295,139 @@ confirmOk.addEventListener('click', async () => {
 document.getElementById('confirmClose').addEventListener('click', () => closeModal(confirmModal));
 document.getElementById('confirmCancel').addEventListener('click', () => closeModal(confirmModal));
 confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeModal(confirmModal); });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ADDITIONAL CONTACTS & SOCIAL LINKS — same shape as Locations above, just
+// with label/url instead of tag/name/address/hours. Facebook/Instagram
+// stay as their own fixed fields (they drive the footer's two fixed social
+// icons); this list is for anything beyond those two.
+// ═══════════════════════════════════════════════════════════════════════════
+function renderSocialLinks() {
+  if (!socialLinks.length) {
+    socialLinkList.innerHTML = '<p class="location-empty">No additional links yet.</p>';
+    return;
+  }
+  socialLinkList.innerHTML = socialLinks.map((link, i) => `
+    <div class="location-admin-row ${link.is_active ? '' : 'is-inactive'}" data-id="${link.id}">
+      <div class="location-admin-reorder">
+        <button type="button" class="btn-icon-xs" data-move-social="up" data-id="${link.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(link.label)} up">↑</button>
+        <button type="button" class="btn-icon-xs" data-move-social="down" data-id="${link.id}" ${i === socialLinks.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(link.label)} down">↓</button>
+      </div>
+      <div class="location-admin-body">
+        <div class="location-admin-name">${escapeHtml(link.label)}</div>
+        <div class="location-admin-address">${escapeHtml(link.url)}</div>
+      </div>
+      <div class="location-admin-actions">
+        <button type="button" class="btn-icon-xs" data-toggle-social="${link.id}" aria-label="${link.is_active ? 'Deactivate' : 'Activate'} ${escapeHtml(link.label)}">${link.is_active ? '●' : '○'}</button>
+        <button type="button" class="btn-outline-sm" data-edit-social="${link.id}">Edit</button>
+        <button type="button" class="btn-icon-xs" data-remove-social="${link.id}" aria-label="Remove ${escapeHtml(link.label)}">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+socialLinkList.addEventListener('click', e => {
+  const moveBtn = e.target.closest('[data-move-social]');
+  if (moveBtn) { moveSocialLink(moveBtn.dataset.id, moveBtn.dataset.moveSocial); return; }
+  const toggleBtn = e.target.closest('[data-toggle-social]');
+  if (toggleBtn) { toggleSocialLinkActive(toggleBtn.dataset.toggleSocial); return; }
+  const editBtn = e.target.closest('[data-edit-social]');
+  if (editBtn) { openSocialLinkModal(editBtn.dataset.editSocial); return; }
+  const removeBtn = e.target.closest('[data-remove-social]');
+  if (removeBtn) { openConfirmRemoveSocialLink(removeBtn.dataset.removeSocial); return; }
+});
+
+document.getElementById('addSocialLinkBtn').addEventListener('click', () => openSocialLinkModal(null));
+
+function openSocialLinkModal(id) {
+  editingSocialLinkId = id;
+  const link = id ? socialLinks.find(l => l.id === id) : null;
+  socialLinkModalTitle.textContent = link ? 'Edit Link' : 'Add Link';
+  socialLinkModalSaveLabel.textContent = link ? 'Save Changes' : 'Add Link';
+  socialLinkLabelInput.value = link?.label || '';
+  socialLinkUrlInput.value = link?.url || '';
+  setModalMsg(socialLinkModalMessage, '');
+  openModal(socialLinkModal);
+}
+
+socialLinkModalSave.addEventListener('click', async () => {
+  const label = socialLinkLabelInput.value.trim();
+  const url = socialLinkUrlInput.value.trim();
+  if (!label || !url) { setModalMsg(socialLinkModalMessage, 'Label and URL are both required.'); return; }
+
+  socialLinkModalSave.disabled = true;
+  try {
+    const payload = { label, url, updated_at: new Date().toISOString() };
+
+    if (editingSocialLinkId) {
+      const { error } = await supabase.from('business_social_link').update(payload).eq('id', editingSocialLinkId);
+      if (error) throw error;
+      Object.assign(socialLinks.find(l => l.id === editingSocialLinkId), payload);
+      await logAudit({ action: 'Updated Social Link', category: 'business_profile', details: `Updated: ${label}`, entityId: editingSocialLinkId });
+    } else {
+      const nextSort = socialLinks.length ? Math.max(...socialLinks.map(l => l.sort_order)) + 1 : 0;
+      const { data, error } = await supabase.from('business_social_link').insert({ ...payload, sort_order: nextSort }).select().single();
+      if (error) throw error;
+      socialLinks.push(data);
+      await logAudit({ action: 'Added Social Link', category: 'business_profile', details: `Added: ${label}`, entityId: data.id });
+    }
+    renderSocialLinks();
+    closeModal(socialLinkModal);
+    showToast(editingSocialLinkId ? 'Link updated.' : 'Link added.', 'success');
+  } catch (err) {
+    setModalMsg(socialLinkModalMessage, `Failed to save: ${err.message}`);
+  } finally {
+    socialLinkModalSave.disabled = false;
+  }
+});
+
+document.getElementById('socialLinkModalClose').addEventListener('click', () => closeModal(socialLinkModal));
+document.getElementById('socialLinkModalCancel').addEventListener('click', () => closeModal(socialLinkModal));
+socialLinkModal.addEventListener('click', e => { if (e.target === socialLinkModal) closeModal(socialLinkModal); });
+
+async function toggleSocialLinkActive(id) {
+  const link = socialLinks.find(l => l.id === id);
+  if (!link) return;
+  const nextActive = !link.is_active;
+  const { error } = await supabase.from('business_social_link').update({ is_active: nextActive }).eq('id', id);
+  if (error) { setMsg(socialLinkMsg, `Failed: ${error.message}`, 'error'); return; }
+  link.is_active = nextActive;
+  renderSocialLinks();
+}
+
+async function moveSocialLink(id, direction) {
+  const idx = socialLinks.findIndex(l => l.id === id);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (idx === -1 || swapIdx < 0 || swapIdx >= socialLinks.length) return;
+
+  const a = socialLinks[idx];
+  const b = socialLinks[swapIdx];
+  const [aOrder, bOrder] = [a.sort_order, b.sort_order];
+
+  try {
+    await Promise.all([
+      supabase.from('business_social_link').update({ sort_order: bOrder }).eq('id', a.id),
+      supabase.from('business_social_link').update({ sort_order: aOrder }).eq('id', b.id)
+    ]);
+  } catch (err) {
+    setMsg(socialLinkMsg, `Failed to reorder: ${err.message}`, 'error');
+    return;
+  }
+
+  a.sort_order = bOrder;
+  b.sort_order = aOrder;
+  socialLinks.sort((x, y) => x.sort_order - y.sort_order);
+  renderSocialLinks();
+}
+
+function openConfirmRemoveSocialLink(id) {
+  const link = socialLinks.find(l => l.id === id);
+  if (!link) return;
+  pendingConfirmAction = { type: 'remove-social-link', id };
+  confirmTitle.textContent = 'Remove Link';
+  confirmCopy.textContent = `Remove "${link.label}"? This can't be undone.`;
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VENUE MAP SCOPE

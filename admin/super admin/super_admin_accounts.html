@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
     <title>Users & Roles - ELI Coffee Events</title>
-    <link rel="stylesheet" href="/css/super_admin_only.css?v=39">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=39">
-  <link rel="stylesheet" href="/css/super_admin_accounts.css?v=39">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=39">
+    <link rel="stylesheet" href="/css/super_admin_only.css?v=42">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=42">
+  <link rel="stylesheet" href="/css/super_admin_accounts.css?v=43">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=42">
 </head>
 <body>
 
@@ -174,19 +174,19 @@
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label">First Name</label>
-              <input type="text" class="form-input" id="fieldFirstName" placeholder="e.g. Maria">
+              <input type="text" class="form-input" id="fieldFirstName" placeholder="e.g. Maria" maxlength="50" autocomplete="off">
             </div>
             <div class="form-group">
               <label class="form-label">Middle Name &nbsp;<span style="font-weight:500;text-transform:none;font-size:11px;">(optional)</span></label>
-              <input type="text" class="form-input" id="fieldMiddleName" placeholder="e.g. Santos">
+              <input type="text" class="form-input" id="fieldMiddleName" placeholder="e.g. Santos" maxlength="50" autocomplete="off">
             </div>
             <div class="form-group">
               <label class="form-label">Last Name</label>
-              <input type="text" class="form-input" id="fieldLastName" placeholder="e.g. Reyes">
+              <input type="text" class="form-input" id="fieldLastName" placeholder="e.g. Reyes" maxlength="50" autocomplete="off">
             </div>
             <div class="form-group full">
               <label class="form-label">Email Address</label>
-              <input type="email" class="form-input" id="fieldEmail" placeholder="e.g. staff@elicoffee.com">
+              <input type="email" class="form-input" id="fieldEmail" placeholder="e.g. staff@elicoffee.com" maxlength="254" autocomplete="off">
               <span class="form-hint" id="fieldEmailHint" style="display:none;">Email is managed through the login account and cannot be changed here.</span>
             </div>
           </div>
@@ -290,7 +290,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Staff Role &nbsp;<span style="font-weight:500;text-transform:none;font-size:11px;">(optional)</span></label>
-              <input type="text" class="form-input" id="addFieldStaffRole" placeholder="e.g. Event Coordinator">
+              <input type="text" class="form-input" id="addFieldStaffRole" placeholder="e.g. Event Coordinator" maxlength="60" autocomplete="off">
             </div>
             <div class="form-group full">
               <span class="form-hint">The account holder will receive an email to set their own password.</span>

@@ -99,6 +99,17 @@ async function initOurStoryTeaser() {
 
   const sections = await withConfigTimeout(loadAboutSections(supabase), []);
   const teaser = sections.find(s => s.section_key === 'home_teaser');
+
+  // Image is independent of the body text below — admin can set one without
+  // the other, so this applies even on the early "no body yet" return.
+  if (teaser?.image_url) {
+    const imgEl = document.querySelector('.about-img');
+    if (imgEl) {
+      imgEl.src = optimizedImageUrl(teaser.image_url, 640);
+      if (teaser.alt_text) imgEl.alt = teaser.alt_text;
+    }
+  }
+
   if (!teaser || !teaser.body) {
     revealConfigContent(...existingParas); // still in the DOM, untouched — reveal the fallback
     return;

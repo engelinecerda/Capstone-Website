@@ -61,6 +61,9 @@ import {
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { attachPhoneMask } from './phone_format.js';
+
+attachPhoneMask(document.getElementById('profile-phone'));
 
 const PAYMENT_METHODS = {
     card: {

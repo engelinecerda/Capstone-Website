@@ -25,6 +25,8 @@ async function loadBusinessContact() {
     const igLink = document.querySelector('.footer-new-social a[aria-label="Instagram"]');
     if (igLink && data.instagram_url) igLink.href = data.instagram_url;
 
+    await appendExtraSocialLinks();
+
     const phoneSpan = document.querySelector('.footer-new-contact-row .ti-phone')?.closest('.footer-new-contact-row')?.querySelector('span');
     if (phoneSpan && data.phone) phoneSpan.textContent = data.phone;
 
@@ -38,6 +40,37 @@ async function loadBusinessContact() {
     if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
   } catch (err) {
     // Falls back to the static footer text already in the HTML.
+  }
+}
+
+// Facebook/Instagram keep their own two fixed icon slots (above) — anything
+// an admin adds beyond those two (business_social_link, added from the
+// Business Profile > Additional Contacts & Social Links list) is appended
+// after them with a generic link icon, since we can't guess a brand icon
+// for an arbitrary platform label.
+async function appendExtraSocialLinks() {
+  try {
+    const { data, error } = await supabase
+      .from('business_social_link')
+      .select('label, url')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error || !data || !data.length) return;
+
+    const socialRow = document.querySelector('.footer-new-social');
+    if (!socialRow) return;
+
+    data.forEach((link) => {
+      const a = document.createElement('a');
+      a.href = link.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.setAttribute('aria-label', link.label);
+      a.innerHTML = '<i class="ti ti-external-link"></i>';
+      socialRow.appendChild(a);
+    });
+  } catch (err) {
+    // Fixed Facebook/Instagram icons still work — this is additive only.
   }
 }
 

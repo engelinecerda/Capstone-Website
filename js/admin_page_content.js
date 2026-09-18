@@ -53,8 +53,14 @@ let menuBannerPendingFile  = null;
 let editingValueId  = null;
 let valueModalIcon  = DEFAULT_VALUE_ICON;
 let pendingConfirmAction = null;
-let aboutImagePendingFile = null;  // resized File chosen but not yet uploaded/saved (who_we_are story image)
-let aboutImageRemoveFlag  = false; // true once "Remove image" is clicked, until Save/reload
+// Keyed by section_key — Home Page Teaser ("Our Story", on the home page)
+// and Who We Are (on the About page) both carry an image field, so a single
+// shared pending-file/remove-flag would misattribute a chosen file to
+// whichever section is saved next, regardless of which uploader it came
+// from.
+let aboutImagePendingFiles = {}; // { [section_key]: resized File chosen but not yet uploaded/saved }
+let aboutImageRemoveFlags  = {}; // { [section_key]: true once "Remove image" is clicked, until Save/reload }
+const SECTIONS_WITH_IMAGE = new Set(['who_we_are', 'home_teaser']);
 
 // ── DOM refs ─────────────────────────────────────────────────────
 const pageHeaderRows = document.getElementById('pageHeaderRows');
@@ -532,10 +538,10 @@ function renderAboutSections() {
         <span class="about-section-title">${escapeHtml(s.title)}</span>
       </div>
       <textarea class="about-body-input" data-about-body="${escapeHtml(s.section_key)}" rows="6">${escapeHtml(s.body || '')}</textarea>
-      ${s.section_key === 'who_we_are' ? `
+      ${SECTIONS_WITH_IMAGE.has(s.section_key) ? `
       <div class="modal-field about-image-field">
-        <label class="modal-label">Story Image</label>
-        <p class="modal-hint">Shown beside this text on the About page.</p>
+        <label class="modal-label">${s.section_key === 'home_teaser' ? 'Our Story Image' : 'Story Image'}</label>
+        <p class="modal-hint">${s.section_key === 'home_teaser' ? 'Shown beside this text on the home page.' : 'Shown beside this text on the About page.'}</p>
         <div class="uploader" data-about-uploader="${escapeHtml(s.section_key)}">
           <img class="uploader-preview ${s.image_url ? '' : 'hidden'}" data-about-img-preview="${escapeHtml(s.section_key)}" src="${escapeHtml(s.image_url || '')}" alt="">
           <div class="uploader-placeholder" data-about-img-placeholder="${escapeHtml(s.section_key)}" style="${s.image_url ? 'display:none' : ''}">
@@ -570,12 +576,12 @@ aboutSectionsEl.addEventListener('click', async e => {
   if (saveBtn) {
     const key = saveBtn.dataset.aboutSave;
     const textarea = aboutSectionsEl.querySelector(`textarea[data-about-body="${key}"]`);
-    const isWhoWeAre = key === 'who_we_are';
-    const altInput = isWhoWeAre ? aboutSectionsEl.querySelector(`input[data-about-alt-input="${key}"]`) : null;
+    const hasImageField = SECTIONS_WITH_IMAGE.has(key);
+    const altInput = hasImageField ? aboutSectionsEl.querySelector(`input[data-about-alt-input="${key}"]`) : null;
     const altText = altInput ? altInput.value.trim() : '';
     const section = aboutSections.find(s => s.section_key === key);
 
-    const willHaveImage = isWhoWeAre && !aboutImageRemoveFlag && (aboutImagePendingFile || section?.image_url);
+    const willHaveImage = hasImageField && !aboutImageRemoveFlags[key] && (aboutImagePendingFiles[key] || section?.image_url);
     if (willHaveImage && !altText) {
       setMsg(aboutMsg, 'Alt text is required for the story image.', 'error');
       return;
@@ -590,13 +596,13 @@ aboutSectionsEl.addEventListener('click', async e => {
       };
 
       let oldImageUrl = null;
-      if (isWhoWeAre) {
+      if (hasImageField) {
         let imageUrl = section?.image_url || null;
-        if (aboutImageRemoveFlag) {
+        if (aboutImageRemoveFlags[key]) {
           oldImageUrl = section?.image_url || null;
           imageUrl = null;
-        } else if (aboutImagePendingFile) {
-          imageUrl = await uploadToCloudinary(aboutImagePendingFile, 'eli_coffee_page_content');
+        } else if (aboutImagePendingFiles[key]) {
+          imageUrl = await uploadToCloudinary(aboutImagePendingFiles[key], 'eli_coffee_page_content');
           oldImageUrl = section?.image_url || null;
         }
         payload.image_url = imageUrl;
@@ -612,7 +618,7 @@ aboutSectionsEl.addEventListener('click', async e => {
       if (oldImageUrl) await destroyCloudinaryImage(supabase, oldImageUrl);
 
       if (section) Object.assign(section, payload);
-      if (isWhoWeAre) { aboutImagePendingFile = null; aboutImageRemoveFlag = false; }
+      if (hasImageField) { delete aboutImagePendingFiles[key]; delete aboutImageRemoveFlags[key]; }
 
       await logAudit({ action: 'Updated About Section', category: 'page_content', details: `Updated "${section?.title || key}"`, entityId: key });
       setMsg(aboutMsg, 'Saved successfully.', 'success');
@@ -628,8 +634,8 @@ aboutSectionsEl.addEventListener('click', async e => {
   const removeImageBtn = e.target.closest('[data-about-remove-image]');
   if (removeImageBtn) {
     const key = removeImageBtn.dataset.aboutRemoveImage;
-    aboutImageRemoveFlag = true;
-    aboutImagePendingFile = null;
+    aboutImageRemoveFlags[key] = true;
+    delete aboutImagePendingFiles[key];
     const preview = aboutSectionsEl.querySelector(`img[data-about-img-preview="${key}"]`);
     const placeholder = aboutSectionsEl.querySelector(`[data-about-img-placeholder="${key}"]`);
     const fileName = aboutSectionsEl.querySelector(`[data-about-file-name="${key}"]`);
@@ -668,8 +674,8 @@ async function handleAboutImageFile(key, file) {
   if (err) { setMsg(aboutMsg, err, 'error'); return; }
   setMsg(aboutMsg, '');
   const resized = await resizeImageFile(file);
-  aboutImagePendingFile = resized;
-  aboutImageRemoveFlag = false;
+  aboutImagePendingFiles[key] = resized;
+  delete aboutImageRemoveFlags[key];
 
   const preview = aboutSectionsEl.querySelector(`img[data-about-img-preview="${key}"]`);
   const placeholder = aboutSectionsEl.querySelector(`[data-about-img-placeholder="${key}"]`);

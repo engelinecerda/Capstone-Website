@@ -63,7 +63,7 @@
 .modal-overlay.hidden { display: none; }
 .modal {
   background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
-  width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto;
+  width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
   display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
 }
 .modal-header {

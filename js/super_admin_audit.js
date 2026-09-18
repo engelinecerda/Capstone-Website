@@ -25,7 +25,6 @@ const prevPageBtn        = document.getElementById('prevPageBtn');
 const nextPageBtn        = document.getElementById('nextPageBtn');
 const paginationInfo     = document.getElementById('paginationInfo');
 const exportAuditPdfBtn  = document.getElementById('exportAuditPdfBtn');
-const refreshAuditBtn    = document.getElementById('refreshAuditBtn');
 const auditDateFrom      = document.getElementById('auditDateFrom');
 const auditDateTo        = document.getElementById('auditDateTo');
 const clearDateRangeBtn  = document.getElementById('clearDateRangeBtn');
@@ -378,12 +377,6 @@ clearDateRangeBtn?.addEventListener('click', () => {
   if (auditDateTo)   auditDateTo.value   = '';
   setFilterRangeMessage('');
   currentPage = 1;
-  loadAuditLogs();
-});
-
-refreshAuditBtn?.addEventListener('click', () => {
-  currentPage = 1;
-  loadStats();
   loadAuditLogs();
 });
 

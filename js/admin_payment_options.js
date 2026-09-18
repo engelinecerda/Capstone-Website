@@ -9,6 +9,9 @@ import { logAudit } from './audit_logger.js';
 import { initAdminNav } from './admin_nav.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { attachPhoneMask } from './phone_format.js';
+
+attachPhoneMask(document.getElementById('pm2PhoneNumber'));
 
 // ── Confirm modal (Payment Rules) ────────────────────────────────────────────
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {

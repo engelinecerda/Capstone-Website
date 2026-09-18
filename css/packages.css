@@ -48,6 +48,21 @@ body { background: var(--cream); }
   text-transform: uppercase;
   color: rgba(255,255,255,.7);
 }
+.pkg-inquiry-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #FFFFFF;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+.pkg-inquiry-link:hover { opacity: 1; }
+.pkg-inquiry-link i { font-size: 13px; }
 
 /* ── SHARED LAYOUT ─────────────────────────────────────────────────────── */
 .pkg-wrap {

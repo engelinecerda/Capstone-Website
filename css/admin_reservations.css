@@ -1055,12 +1055,12 @@ body {
 }
 
 .modal-card {
-  width: min(100%, 520px);
+  width: min(100%, 620px);
   background: #FBF8F3;
   border: 1px solid var(--border);
   border-radius: 24px;
   box-shadow: 0 30px 80px rgba(58, 34, 17, 0.22);
-  padding: 24px;
+  padding: 28px;
   position: relative;
   max-height: calc(100vh - 48px);
   overflow-y: auto;

@@ -1,0 +1,120 @@
+/* css/admin_inquiries.css — small additions layered on admin_reservations.css
+   + manager-theme.css for the Inquiries list/detail pages and the Referral
+   Sources config page. Reuses .card/.table-wrap/.status-pill/.action-btn
+   from those shared files rather than redefining them. */
+
+/* Neither admin_reservations.css nor manager-theme.css/admin_sidebar.css
+   define a bare, generic .hidden utility (only compound selectors like
+   .modal-backdrop.hidden exist there) — this page's JS toggles classList
+   'hidden' on plain elements (the view-only pill, panels, table messages),
+   so the utility itself needs to exist here. */
+.hidden { display: none !important; }
+
+.inq-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 28px;
+  margin-top: 4px;
+}
+
+.inq-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #756756);
+  margin-bottom: 4px;
+}
+
+.inq-field-value {
+  font-size: 14px;
+  color: var(--text-dark, #2A1408);
+}
+
+.inq-field-value.inq-remarks {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.inq-manager-panel {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border, rgba(61,26,10,0.10));
+}
+
+.inq-manager-panel label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark, #2A1408);
+  margin-bottom: 6px;
+}
+
+.inq-status-select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-tan, #E5DBCC);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: #2A1408;
+  margin-bottom: 18px;
+}
+
+.inq-note-textarea {
+  width: 100%;
+  min-height: 100px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border-tan, #E5DBCC);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #2A1408;
+  resize: vertical;
+}
+
+.inq-save-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.inq-save-msg {
+  font-size: 13px;
+  color: var(--text-muted, #756756);
+}
+.inq-save-msg.error { color: #b42318; }
+
+.inq-readonly-note {
+  font-size: 13px;
+  color: var(--text-muted, #756756);
+  font-style: italic;
+}
+
+/* ── Referral Sources page ──────────────────────────────────────────────── */
+.rs-order-btns {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+.rs-order-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-tan, #E5DBCC);
+  border-radius: 6px;
+  background: #fff;
+  color: #4A2C17;
+  cursor: pointer;
+}
+.rs-order-btn:hover { background: #F7F2EA; }
+.rs-order-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .inq-detail-grid { grid-template-columns: 1fr; }
+}

@@ -452,6 +452,15 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
 }
 
+// Name fields are people's names, not free text — block digits and most
+// symbols (spammed/numeric input) while still allowing accented letters,
+// spaces, hyphens, apostrophes, and periods (e.g. "Jr."). maxlength on the
+// inputs themselves caps length; this catches character-class spam.
+const NAME_PATTERN = /^[\p{L}\s.'-]+$/u;
+function isValidNameInput(str) {
+  return NAME_PATTERN.test(str);
+}
+
 // ── CREATE ───────────────────────────────────────────────────────
 async function handleCreateAccount() {
   const firstName  = v('fieldFirstName');
@@ -462,6 +471,10 @@ async function handleCreateAccount() {
   const staffRole  = v('addFieldStaffRole');
 
   if (!firstName || !lastName) { showMsg('First and last name are required.', 'error'); return; }
+  if (!isValidNameInput(firstName) || !isValidNameInput(lastName) || (middleName && !isValidNameInput(middleName))) {
+    showMsg('Names can only contain letters, spaces, hyphens, and apostrophes.', 'error');
+    return;
+  }
   if (!email)    { showMsg('Email address is required.', 'error'); return; }
 
   showMsg('Sending invite…', 'info');
@@ -508,6 +521,10 @@ async function handleUpdateAccount(a) {
   const confirmPassword = document.getElementById('securityConfirmPassword').value;
 
   if (!firstName || !lastName) { showMsg('First and last name are required.', 'error'); return; }
+  if (!isValidNameInput(firstName) || !isValidNameInput(lastName) || (middleName && !isValidNameInput(middleName))) {
+    showMsg('Names can only contain letters, spaces, hyphens, and apostrophes.', 'error');
+    return;
+  }
 
   if (newPassword || confirmPassword) {
     if (newPassword.length < 8) {

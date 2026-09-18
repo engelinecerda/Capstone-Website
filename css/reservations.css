@@ -1982,11 +1982,20 @@
                 margin-top: 0;
                 padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
                 box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
-                /* Back (secondary, left) / Next (primary, right) instead of
-                   both bunched flex-end — standard bottom-bar stepper
-                   layout, keeps the primary action thumb-reachable on the
-                   right without stranding Back off in empty space. */
-                justify-content: space-between;
+                /* Next always anchors to the right edge — flex-end alone
+                   would do that with Back visible, but with Back hidden
+                   (step 1) a single flex child under space-between sits at
+                   flex-start instead, so Next jumped from left to right the
+                   moment Back appeared. margin-right:auto on Back (below)
+                   pushes Next to the same right edge in both states. */
+                justify-content: flex-end;
+            }
+            .btn-back { margin-right: auto; }
+            /* rs7's own divider-suppression (above) zeroes padding-top for
+               desktop's stacked divider, but on the fixed mobile bar that
+               also left Submit/Back touching the bar's top edge. */
+            .res-step#rs7.active ~ .reservation-buttons {
+                padding-top: 12px;
             }
             .location-options { grid-template-columns: 1fr; }
             .cards-grid       { grid-template-columns: 1fr; }

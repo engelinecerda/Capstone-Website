@@ -10,6 +10,7 @@ import {
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { initAdminNav } from './admin_nav.js';
+import { attachPhoneMask } from './phone_format.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -32,6 +33,7 @@ const profileMiddleName = document.getElementById('profileMiddleName');
 const profileLastName = document.getElementById('profileLastName');
 const profileEmail = document.getElementById('profileEmail');
 const profilePhone = document.getElementById('profilePhone');
+attachPhoneMask(profilePhone);
 const profileDateRegistered = document.getElementById('profileDateRegistered');
 const profileEditToggleBtn = document.getElementById('profileEditToggleBtn');
 const profileFormActions = document.getElementById('profileFormActions');
@@ -59,7 +61,11 @@ const mfaCancelDisableBtn = document.getElementById('mfaCancelDisableBtn');
 // identity managed by Supabase Auth, and Date Registered, which is purely
 // informational — both stay permanently `disabled`, in view mode and edit
 // mode alike).
-const EDITABLE_PROFILE_INPUTS = [profileFirstName, profileMiddleName, profileLastName, profilePhone];
+// Manager cannot self-edit their own name — that's restricted to Admin,
+// exclusively via the Users & Roles module (Edit action on the accounts
+// table). renderProfileShell() narrows this to [profilePhone] once
+// state.profile.role is known; Admin keeps the full set unchanged.
+let EDITABLE_PROFILE_INPUTS = [profileFirstName, profileMiddleName, profileLastName, profilePhone];
 const EDIT_ICON_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const CANCEL_ICON_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
@@ -96,7 +102,7 @@ function enterProfileEditMode() {
   if (profileFormActions) profileFormActions.hidden = false;
   setProfileEditToggleUI();
   setFormMessage(profileMessage, '');
-  profileFirstName?.focus();
+  EDITABLE_PROFILE_INPUTS[0]?.focus();
 }
 
 function exitProfileEditMode({ discard = false } = {}) {
@@ -166,6 +172,13 @@ function populateProfileForm() {
 function renderProfileShell() {
   const profile = state.profile;
   if (!profile) return;
+
+  // Manager cannot self-edit their own name — restricted to Admin,
+  // exclusively via Users & Roles (Edit action on the accounts table).
+  // Admin keeps the full set, completely unchanged.
+  EDITABLE_PROFILE_INPUTS = profile.role === 'manager'
+    ? [profilePhone]
+    : [profileFirstName, profileMiddleName, profileLastName, profilePhone];
 
   const identity = populatePortalIdentity({
     profile,
