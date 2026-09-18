@@ -1969,6 +1969,25 @@
             .page-hero { height: 320px; }
             .page-hero-title { font-size: 36px; }
             .reservation-container { padding: 18px; }
+            /* Extra bottom room so the fixed CTA bar below never covers the
+               last field/row of whatever step is active. */
+            .reservation-section { padding-bottom: 96px; }
+            .reservation-buttons {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 40;
+                background: #fff;
+                margin-top: 0;
+                padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+                box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+                /* Back (secondary, left) / Next (primary, right) instead of
+                   both bunched flex-end — standard bottom-bar stepper
+                   layout, keeps the primary action thumb-reachable on the
+                   right without stranding Back off in empty space. */
+                justify-content: space-between;
+            }
             .location-options { grid-template-columns: 1fr; }
             .cards-grid       { grid-template-columns: 1fr; }
             .input-row        { grid-template-columns: 1fr; }
@@ -1979,14 +1998,31 @@
             .availability-panel { padding: 18px 14px; }
             .availability-head { flex-direction: column; }
             .availability-nav { width: 100%; justify-content: space-between; }
+            .availability-nav-btn { width: 40px; height: 40px; }
             .availability-month { min-width: 0; flex: 1; }
             .availability-weekdays,
             .availability-grid { gap: 6px; }
             .availability-day { min-height: 40px; font-size: 14px; }
+            .venue-map-container { height: 240px; }
             .policy-modal-backdrop { padding: 16px; }
             .policy-modal-card { padding: 24px 16px 18px; }
             .policy-modal-actions { flex-direction: column-reverse; }
             .policy-btn { width: 100%; }
+        }
+
+        /* Narrowest phones (iPhone SE and similar, ~375px): the 600px
+           breakpoint above still leaves the 7-column availability calendar
+           with ~34px-wide day cells once .reservation-section/-container
+           padding is subtracted — too narrow to tap reliably. Tighten just
+           the outer chrome + the calendar's own padding/gap a second time
+           here so cells land closer to a real ~40px square, without
+           touching the more generous ≤600px numbers every other phone gets. */
+        @media (max-width: 420px) {
+            .reservation-section { padding-left: 10px; padding-right: 10px; }
+            .reservation-container { padding: 14px; }
+            .availability-panel { padding: 12px 8px; }
+            .availability-grid { gap: 4px; }
+            .availability-day { min-height: 40px; font-size: 13px; }
         }
 
 /* ── Guest notice banner ────────────────────────────────────────────────── */

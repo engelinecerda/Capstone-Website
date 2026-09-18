@@ -60,6 +60,7 @@ import {
 } from './reservation_shared.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const PAYMENT_METHODS = {
     card: {
@@ -1682,11 +1683,13 @@ function openSubmissionFeedbackModal({
     if (submissionFeedbackCopy) submissionFeedbackCopy.textContent = copy;
     submissionFeedbackBackdrop?.classList.remove('hidden');
     submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeSubmissionFeedbackModal() {
     submissionFeedbackBackdrop?.classList.add('hidden');
     submissionFeedbackBackdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 async function fetchContracts(reservationIds) {
@@ -2006,12 +2009,14 @@ function openReceiptModal(paymentId, reservationId) {
     state.receiptModalPaymentId = paymentId;
     receiptModalBackdrop?.classList.remove('hidden');
     receiptModalBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 function closeReceiptModal() {
     state.receiptModalPaymentId = null;
     receiptModalBackdrop?.classList.add('hidden');
     receiptModalBackdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
 }
 
 function setRescheduleModalMessage(message, isError = false) {
@@ -2237,6 +2242,7 @@ function closeRescheduleModal() {
     rescheduleModalBackdrop?.setAttribute('aria-hidden', 'true');
     rescheduleModalSubmit?.removeAttribute('disabled');
     setRescheduleModalMessage('');
+    unlockBodyScroll();
 }
 
 function setCancelModalMessage(message, isError = false) {
@@ -2251,6 +2257,7 @@ function closeCancelModal() {
     cancelReservationBackdrop?.setAttribute('aria-hidden', 'true');
     if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
     setCancelModalMessage('');
+    unlockBodyScroll();
 }
 
 // Swaps the hardcoded fallback copy inside a policy block for the
@@ -2276,6 +2283,7 @@ function openCancelModal(reservationId) {
     setCancelModalMessage('');
     cancelReservationBackdrop?.classList.remove('hidden');
     cancelReservationBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 }
 
 async function submitCancellationRequest() {
@@ -2357,6 +2365,7 @@ async function openRescheduleModal(reservationId) {
     setRescheduleModalMessage('Loading availability...');
     rescheduleModalBackdrop?.classList.remove('hidden');
     rescheduleModalBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
 
     try {
         await loadRescheduleAvailability(reservation);

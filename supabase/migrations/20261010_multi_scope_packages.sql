@@ -47,9 +47,36 @@ alter table public.package
     )
   );
 
+-- board_reservations_view (20260814_board_updated_at_and_cancelled_visibility.sql)
+-- selects reservations.booking_scope directly, so its dependent rule blocks
+-- the column type change below — drop and recreate it around the alter.
+drop view if exists public.board_reservations_view;
+
 alter table public.reservations
   alter column booking_scope type text[]
   using (case when booking_scope is null then null else array[booking_scope] end);
+
+create or replace view public.board_reservations_view
+with (security_invoker = true) as
+select
+  reservation_id,
+  event_type,
+  event_date,
+  event_time,
+  event_end_time,
+  start_time,
+  duration_hours,
+  guest_count,
+  location_type,
+  venue_location,
+  status,
+  package_id,
+  booking_scope,
+  reservation_number,
+  updated_at
+from public.reservations;
+
+grant select on public.board_reservations_view to authenticated;
 
 -- ── 2. enforce_reservation_capacity() — array-aware ─────────────────────────
 -- Full body reproduced from its current source (20261006_fix_missing_

@@ -23,6 +23,7 @@ const generateForecastBtn = document.getElementById('generateForecastBtn');
 const pageDate = document.getElementById('pageDate');
 const rescheduleAlert = document.getElementById('rescheduleAlert');
 const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
+const rescheduleAlertText = document.getElementById('rescheduleAlertText');
 const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
 const rescheduleAlertDismiss = document.getElementById('rescheduleAlertDismiss');
 const qaPendingCount = document.getElementById('qaPendingCount');
@@ -881,15 +882,35 @@ let dashboardUnseenChangeIds = [];
 // (js/reservation_shared.js's fetchUnseenReservationChanges); "Review"
 // here navigates to the Reservations module instead of filtering in
 // place, since this is the Dashboard.
+// Names the specific booking(s) that triggered the alert instead of a bare
+// count, so an admin can tell at a glance which reservation(s) changed
+// without clicking through. Shared with js/admin_reservations.js's own copy
+// of this helper — kept duplicated rather than imported since each page
+// sources its list from a different place (fetchUnseenReservationChanges's
+// `reservations` here vs. the already-loaded reservationsCache there).
+function describeChangedReservations(reservations) {
+    const MAX_NAMED = 3;
+    const names = (reservations || []).map((r) => r.reservation_number || r.contact_name || 'Unknown booking');
+    if (!names.length) return '';
+    const namedList = names.length > MAX_NAMED
+        ? `${names.slice(0, MAX_NAMED).join(', ')}, and ${names.length - MAX_NAMED} more`
+        : names.join(', ');
+    return `${namedList} — customers can cancel or reschedule without approval, this is just for visibility.`;
+}
+
 async function refreshChangesAlert() {
     if (!rescheduleAlert || !rescheduleAlertCount) return;
     try {
-        const { count, reservationIds } = await fetchUnseenReservationChanges(supabase);
+        const { count, reservationIds, reservations } = await fetchUnseenReservationChanges(supabase);
         dashboardUnseenChangeIds = reservationIds;
         rescheduleAlert.hidden = count === 0;
         rescheduleAlert.classList.toggle('hidden', count === 0);
         rescheduleAlert.setAttribute('aria-hidden', String(count === 0));
         rescheduleAlertCount.textContent = String(count);
+        if (rescheduleAlertText) {
+            rescheduleAlertText.textContent = describeChangedReservations(reservations)
+                || 'Customers can cancel or reschedule without approval — this is just for visibility.';
+        }
     } catch (error) {
         console.warn('Failed to load the recent-changes alert:', error.message);
     }

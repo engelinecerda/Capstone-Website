@@ -28,18 +28,18 @@ async function updateNavbar() {
             <div class="navbar__account-dropdown">
                 <button type="button" class="navbar__account-trigger" id="navbarAccountTrigger" aria-haspopup="true" aria-expanded="false" aria-label="Account menu for ${displayName}">
                     <span>Account</span>
-                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    <i class="ti ti-chevron-down" aria-hidden="true"></i>
                 </button>
                 <div class="navbar__account-menu" id="navbarAccountMenu" role="menu">
                     <a href="/account" class="navbar__account-menu-item" role="menuitem">
-                        <i class="fa-solid fa-user" aria-hidden="true"></i> My Profile
+                        <i class="ti ti-user" aria-hidden="true"></i> My Profile
                     </a>
                     <a href="/account?section=reservations" class="navbar__account-menu-item" role="menuitem">
-                        <i class="fa-solid fa-calendar-check" aria-hidden="true"></i> My Reservations
+                        <i class="ti ti-calendar-check" aria-hidden="true"></i> My Reservations
                     </a>
                     <div class="navbar__account-menu-divider" role="separator"></div>
                     <button type="button" class="navbar__account-menu-item navbar__account-menu-item--logout" id="navbarLogoutBtn" role="menuitem">
-                        <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Logout
+                        <i class="ti ti-logout" aria-hidden="true"></i> Logout
                     </button>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 import { portalSupabase as supabase } from './supabase.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const INACTIVITY_LIMIT = 2 * 60 * 60 * 1000;
 //const INACTIVITY_LIMIT = 1 * 60 * 1000; // 60,000 milliseconds
@@ -85,9 +86,11 @@ function showInactivityModal() {
             </div>
         `;
         document.body.appendChild(overlay);
+        lockBodyScroll();
 
         overlay.querySelector('.inactivity-modal-btn').addEventListener('click', () => {
             overlay.remove();
+            unlockBodyScroll();
             resolve();
         });
     });
