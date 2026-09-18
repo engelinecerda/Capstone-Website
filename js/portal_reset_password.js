@@ -1,5 +1,6 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
+import { validatePassword } from './password_rules.js';
 
 initPasswordToggles();
 
@@ -83,8 +84,12 @@ form?.addEventListener('submit', async (event) => {
     return;
   }
 
-  if (newPassword.length < 8) {
-    setMessage('error', 'Password must be at least 8 characters.');
+  // Same rules as signup/account/Users & Roles (js/password_rules.js) —
+  // this page must not accept a weaker password than any other password
+  // entry point in the app.
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    setMessage('error', passwordError);
     return;
   }
 

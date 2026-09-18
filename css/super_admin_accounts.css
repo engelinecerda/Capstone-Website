@@ -487,6 +487,19 @@ tbody tr .actions-cell { opacity: 1; }
   width: 100%;
   padding-right: 38px;
 }
+/* Hide the browser-native password reveal icon (Edge/IE inject one once
+   the field has text). Without this it renders on top of/beside our own
+   .password-toggle-btn at the same corner — looking like a duplicate
+   button that "appears" as you type, and stealing clicks meant for the
+   real toggle. Same fix already used on the other password fields in
+   this project (see .password-wrapper in login_signup.css,
+   portal_password.css, admin_login.css) — this page's wrapper is just
+   named .password-input-wrap instead. */
+.password-input-wrap input[type="password"]::-ms-reveal,
+.password-input-wrap input[type="password"]::-ms-clear {
+  display: none;
+}
+
 .password-toggle-btn {
   position: absolute;
   right: 8px;
