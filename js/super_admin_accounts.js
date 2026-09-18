@@ -200,8 +200,8 @@ function renderTable() {
             </div>
           </div>
         </td>
-        <td><span class="badge badge-${a.role}">${roleLabel(a)}${(!a.is_board_account && a.staff_role) ? ` · ${a.staff_role}` : ''}</span></td>
-        <td><span class="status-pill ${a._status}">${a._status.charAt(0).toUpperCase() + a._status.slice(1)}</span></td>
+        <td class="table-status-cell"><div class="status-stack"><span class="badge badge-${a.role}">${roleLabel(a)}${(!a.is_board_account && a.staff_role) ? ` · ${a.staff_role}` : ''}</span></div></td>
+        <td class="table-status-cell"><div class="status-stack"><span class="status-pill ${a._status}">${a._status.charAt(0).toUpperCase() + a._status.slice(1)}</span></div></td>
         <td class="mono muted-cell">${fmtRelative(a.last_sign_in_at)}</td>
         <td>
           <div class="actions-cell">

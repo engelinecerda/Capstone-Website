@@ -230,6 +230,7 @@ tbody tr:hover td { background: var(--btn-secondary-hover); }
 .badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 3px 9px;
   border-radius: 999px;
@@ -246,6 +247,23 @@ tbody tr:hover td { background: var(--btn-secondary-hover); }
 .status-pill.active      { background: var(--approved); color: var(--approved-txt); }
 .status-pill.invited     { background: var(--pending); color: var(--pending-txt); }
 .status-pill.deactivated { background: var(--neutral); color: var(--neutral-txt); }
+
+/* .status-stack is a CSS grid — grid items stretch to fill their track by
+   default, so the Role badge / Status pill span the full cell width and
+   center their text there, same pattern as the dashboard and reservations
+   tables (see css/admin_homepage.css, css/admin_reservations.css). Both
+   columns get the same explicit width so "Manager · Event Coordinator"
+   (Role's longest realistic label) and "Deactivated" (Status's longest)
+   line up with each other rather than each auto-sizing to its own column. */
+.status-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.table-status-cell {
+  min-width: 0;
+  width: 230px;
+}
 
 /* Mono — IDs, timestamps, counts (this project uses the existing system
    mono stack already established for figures elsewhere, not a new

@@ -464,13 +464,17 @@ function renderTable(list) {
             <span class="table-date-time">${escapeHtml(formatReservationTime(res.event_time))}</span>
           </div>
         </td>
-        <td data-label="Payment">
+        <td class="table-status-cell" data-label="Payment">
           <div class="table-summary-stack">
             <span class="status-pill ${escapeHtml(pay.key)}">${escapeHtml(pay.label)}</span>
             <span class="table-sub">${escapeHtml(pay.sublabel || '')}</span>
           </div>
         </td>
-        <td class="table-status-cell" data-label="Status"><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+        <td class="table-status-cell" data-label="Status">
+          <div class="table-summary-stack">
+            <span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
+          </div>
+        </td>
         <td data-label="Staff">
           <div class="staff-summary">
             <span class="table-main">${escapeHtml(staffSummary.label)}</span>
