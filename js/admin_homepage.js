@@ -145,10 +145,14 @@ function formatDate(value) {
 }
 
 function formatStatus(status) {
+    // Key normalization mirrors formatReservationStatus() in
+    // js/admin_contracts.js (the contracts tab's reference implementation):
+    // 'confirmed' collapses onto the 'approved' pill key/color so both
+    // pages render the exact same status-pill class for that state.
     const normalized = (status || 'pending').toLowerCase();
+    const key = normalized === 'confirmed' ? 'approved' : normalized;
     const labelMap = {
         pending: 'Pending',
-        confirmed: 'Approved',
         approved: 'Approved',
         declined: 'Declined',
         completed: 'Completed',
@@ -158,8 +162,8 @@ function formatStatus(status) {
         cancellation_approved: 'Cancellation Approved'
     };
     return {
-        key: normalized,
-        label: labelMap[normalized] || normalized.charAt(0).toUpperCase() + normalized.slice(1)
+        key,
+        label: labelMap[key] || key.charAt(0).toUpperCase() + key.slice(1)
     };
 }
 
@@ -170,17 +174,20 @@ function isReservationContractsColumnMissing(error, columnName) {
 }
 
 function getContractStatusMeta(contract) {
+    // key/label wording mirrors getContractReviewMeta() in
+    // js/admin_contracts.js (the contracts tab) so the same contract state
+    // reads identically — same pill color and same text — on both pages.
     if (!contract?.contract_url) {
-        return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
+        return { key: 'default', label: 'Contract missing', sublabel: 'No uploaded file' };
     }
     const reviewStatus = String(contract.review_status || '').toLowerCase();
     if (reviewStatus === 'verified' || contract.verified_date) {
-        return { key: 'approved', label: 'Verified', sublabel: 'Ready for approval' };
+        return { key: 'approved', label: 'Verified contract', sublabel: 'Ready for approval' };
     }
     if (reviewStatus === 'pending_review' || contract.contract_url) {
-        return { key: 'pending', label: 'Pending Review', sublabel: 'Initial contract uploaded' };
+        return { key: 'pending', label: 'Pending review', sublabel: 'Initial contract uploaded' };
     }
-    return { key: 'cancelled', label: 'Missing', sublabel: 'No uploaded file' };
+    return { key: 'default', label: 'Contract missing', sublabel: 'No uploaded file' };
 }
 
 function setTrend(elId, delta, wordSuffix) {
@@ -510,9 +517,17 @@ function renderReservationsTable(reservations, contractsByReservationId = {}) {
             : `Offsite - ${reservation.venue_location || 'Venue not provided'}`;
         const status = formatStatus(reservation.status);
         const contractStatus = getContractStatusMeta(contractsByReservationId[reservation.reservation_id]);
-        const contractCell = contractStatus.key === 'cancelled'
-            ? `<span class="no-contract">No contract</span>`
-            : `<span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span><span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span>`;
+        // Wrapped in .status-stack (a CSS grid) and marked .table-status-cell,
+        // matching the markup js/admin_contracts.js uses for the contracts
+        // tab's "Reservation Status" / "Contract Status" cells. Grid items
+        // stretch to fill their track by default, which is what makes the
+        // pill span the full cell width and center its text there — the
+        // same look the contracts tab has.
+        const contractCell = `
+            <div class="status-stack">
+                <span class="status-pill ${escapeHtml(contractStatus.key)}">${escapeHtml(contractStatus.label)}</span>
+                <span class="table-sub">${escapeHtml(contractStatus.sublabel)}</span>
+            </div>`;
         return `
             <tr>
                 <td><span class="table-main">${escapeHtml(customerName)}</span><span class="table-sub">${escapeHtml(customerEmail)}</span></td>
@@ -520,8 +535,8 @@ function renderReservationsTable(reservations, contractsByReservationId = {}) {
                 <td><span class="table-main date-cell">${escapeHtml(formatDate(reservation.event_date))}</span><span class="table-sub">${escapeHtml(reservation.event_time || 'No time selected')}</span></td>
                 <td><span class="table-main">${escapeHtml(packageName)}</span><span class="table-sub">${escapeHtml(String(reservation.guest_count || 0))} guests</span></td>
                 <td class="location-cell" title="${escapeHtml(location)}">${escapeHtml(location)}</td>
-                <td>${contractCell}</td>
-                <td><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></td>
+                <td class="table-status-cell" data-label="Contract">${contractCell}</td>
+                <td class="table-status-cell" data-label="Status"><div class="status-stack"><span class="status-pill ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span></div></td>
             </tr>`;
     }).join('');
 }
