@@ -314,3 +314,44 @@ body.sidebar-open .sidebar-overlay { display: block; }
   outline: none;
 }
 .admin-maintenance-strip svg { flex-shrink: 0; }
+
+/* ── LOGOUT IN PROGRESS ─────────────────────────────────────────
+   js/session_validation.js (setLogoutBusy) adds .is-loading + disabled to the
+   sidebar logout button as soon as it's clicked. The icon is replaced by a small
+   spinner and the button stays highlighted until the browser leaves the page, so
+   there's visible feedback while signOut() and the redirect finish. Lives here
+   because this sheet loads on every admin page. Hover colors are repeated on
+   purpose so this wins over .sidebar-logout-btn:hover regardless of load order. */
+.sidebar-logout-btn { position: relative; }
+
+.sidebar-logout-btn.is-loading {
+  background: var(--nav-hover-bg);
+  color: var(--sidebar-cream);
+  cursor: progress;
+}
+
+.sidebar-logout-btn.is-loading svg { opacity: 0; }
+
+.sidebar-logout-btn.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sidebar-logout-spin 0.7s linear infinite;
+}
+
+@keyframes sidebar-logout-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Slow the spin rather than remove it — it's the only sign that logout is
+   underway, so it should still read as "working". */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-logout-btn.is-loading::after { animation-duration: 1.8s; }
+}

@@ -137,11 +137,57 @@ export function wireLogoutButton(
   const btn = document.getElementById(buttonId);
 
   btn?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    // Already signing out (also blocked by `disabled`, this is belt-and-braces).
+    if (btn.classList.contains('is-loading')) return;
 
-    //  CLEAR CACHE
-    localStorage.removeItem('profile');
+    setLogoutBusy(btn, true);
 
-    window.location.replace(redirectTo);
+    try {
+      await supabase.auth.signOut();
+
+      //  CLEAR CACHE
+      localStorage.removeItem('profile');
+
+      // The spinner stays up until the browser actually leaves the page.
+      window.location.replace(redirectTo);
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setLogoutBusy(btn, false);
+    }
   });
+}
+
+// Shows / clears the "logging out…" state on a sidebar logout button: swaps the
+// icon for a spinner (see .sidebar-logout-btn.is-loading in admin_sidebar.css),
+// disables the button so it can't be double-clicked, and updates its accessible
+// label. signOut() plus the redirect can take a moment on a slow connection, and
+// before this the button gave no sign that the click had registered.
+export function setLogoutBusy(btn, busy) {
+  if (!btn) return;
+
+  if (busy) {
+    btn.dataset.idleLabel = btn.getAttribute('aria-label') || 'Logout';
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.setAttribute('aria-label', 'Logging out…');
+    btn.title = 'Logging out…';
+
+    // Coming back to this page via the browser's back/forward cache would
+    // otherwise restore it frozen mid-logout with the spinner still showing.
+    if (!btn.dataset.logoutPageshowBound) {
+      btn.dataset.logoutPageshowBound = '1';
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) setLogoutBusy(btn, false);
+      });
+    }
+    return;
+  }
+
+  const idleLabel = btn.dataset.idleLabel || 'Logout';
+  btn.classList.remove('is-loading');
+  btn.disabled = false;
+  btn.removeAttribute('aria-busy');
+  btn.setAttribute('aria-label', idleLabel);
+  btn.title = idleLabel;
 }

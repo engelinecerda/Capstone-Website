@@ -2,7 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
-import { applyRoleVisibility } from './session_validation.js';
+import { applyRoleVisibility, setLogoutBusy } from './session_validation.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
     getEffectiveReservationStatus,
@@ -580,8 +580,15 @@ async function loadReports({ silent = false } = {}) {
 }
 
 logoutBtn?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    redirectToAdminLogin();
+    if (logoutBtn.classList.contains('is-loading')) return;
+    setLogoutBusy(logoutBtn, true);
+    try {
+        await supabase.auth.signOut();
+        redirectToAdminLogin();
+    } catch (err) {
+        console.error('Logout failed:', err);
+        setLogoutBusy(logoutBtn, false);
+    }
 });
 
 exportExcelBtn?.addEventListener('click', exportReportsExcel);
