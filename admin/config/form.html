@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=43">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=43">
-  <link rel="stylesheet" href="/css/admin_reservation_form.css?v=43">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=43">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=41">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=41">
+  <link rel="stylesheet" href="/css/admin_reservation_form.css?v=41">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=41">
 </head>
 <body>
 
@@ -54,6 +54,9 @@
         <div>
           <h1 class="page-title">Reservation Form <span class="admin-badge" id="adminBadge">Loading...</span></h1>
           <p class="page-sub">Configure the fields, legal text, and event types customers see when booking.</p>
+        </div>
+        <div class="header-actions">
+          <span id="managerNotifBell"></span>
         </div>
       </div>
 
@@ -166,8 +169,8 @@
               <p class="ct-section-title">Title &amp; Introduction</p>
               <p class="ct-section-sub">The document's opening, shown above the Reservation Summary and clauses below — not tied to a specific field or clause, so it wasn't editable anywhere until now.</p>
               <label class="field-label" for="ct-title-input">Document title</label>
-              <input type="text" id="ct-title-input" class="res-input" style="width:100%;margin-bottom:28px;" maxlength="120" placeholder="RESERVATION SERVICE AGREEMENT">
-              <label class="field-label" for="ct-intro-input" style="display:block;margin-bottom:8px;">Introduction paragraph</label>
+              <input type="text" id="ct-title-input" class="res-input" style="width:100%;margin-bottom:12px;" maxlength="120" placeholder="RESERVATION SERVICE AGREEMENT">
+              <label class="field-label" for="ct-intro-input">Introduction paragraph</label>
               <textarea id="ct-intro-input" class="res-input" style="width:100%;min-height:90px;" maxlength="2000" placeholder="This Reservation Service Agreement (&quot;Agreement&quot;) is entered into between ELI Coffee Events Cafe Binangonan (&quot;the Venue&quot;) and {{customer_name}} (&quot;the Client&quot;) for the event and package described below."></textarea>
               <div style="display:flex;justify-content:flex-end;margin-top:12px;">
                 <button type="button" class="btn-primary" id="ct-intro-save">Save title &amp; introduction</button>
@@ -231,19 +234,21 @@
 
           <p class="rf-legal-hint" id="et-message"></p>
 
-          <table class="et-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="et-body">
-              <tr><td colspan="4">Loading…</td></tr>
-            </tbody>
-          </table>
+          <div class="table-wrap">
+            <table class="et-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="et-body">
+                <tr><td colspan="4">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -289,6 +294,8 @@
     import { setupInactivityLogout } from '/js/super_admin_inactivity.js';
     import { getPortalInitials } from '/js/admin_auth.js';
     import { initAdminNav } from '/js/admin_nav.js';
+    import { portalSupabase as supabase } from '/js/supabase.js';
+    import { initManagerNotificationBell } from '/js/manager_notification_bell.js';
     import { initReservationFormConfig } from '/js/admin_reservation_form_config.js';
     import { initContractTemplateTab } from '/js/admin_contract_template.js';
 
@@ -311,6 +318,7 @@
       watchAuthState();
       wireLogoutButton();
       setupInactivityLogout();
+      initManagerNotificationBell(supabase, result.session.user.id);
       initAdminNav({ role: result.profile.role });
 
       initReservationFormConfig();

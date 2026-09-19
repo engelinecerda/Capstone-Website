@@ -635,12 +635,32 @@
   .status-grid            { grid-template-columns: 1fr; }
   .status-item            { border-right: none; border-bottom: 0.5px solid var(--border); }
   .status-item:last-child { border-bottom: none; }
-  .auth-banner            { flex-direction: column; align-items: flex-start; }
+  .auth-banner            { flex-direction: column; align-items: stretch; }
+  /* flex-shrink: 0 (desktop) kept the status + Connect button at their full
+     natural width, which is wider than the stacked banner on a phone and
+     pushed the button past the card's right edge. */
+  .auth-banner-right      { width: 100%; flex-shrink: 1; min-width: 0; }
+  .auth-banner-right .btn-google { flex: 1 1 auto; justify-content: center; }
 }
 
 @media (max-width: 720px) {
-  .history-row   { flex-direction: column; align-items: flex-start; }
-  .history-right { width: 100%; flex-wrap: wrap; }
+  .history-row   { flex-direction: column; align-items: stretch; }
+
+  /* Status badge on its own line, then Download / Restore / Delete as three
+     equal-width buttons, instead of a ragged wrap of different-sized ones. */
+  .history-right {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .history-right .completed-badge { grid-column: 1 / -1; justify-self: start; }
+  .history-right .history-btn     { justify-content: center; width: 100%; }
+
+  /* Status text above a full-width Connect button. */
+  .auth-banner       { padding: 16px; }
+  .auth-banner-right { flex-direction: column; align-items: stretch; gap: 10px; }
+  .auth-status       { text-align: left; }
 }
 
 @media (prefers-reduced-motion: reduce) {

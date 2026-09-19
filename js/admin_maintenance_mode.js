@@ -5,6 +5,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { buildMaintenancePageHtml } from './maintenance_template.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
@@ -282,6 +283,7 @@ async function init() {
   wireLogoutButton();
   setupInactivityLogout(result.profile.role);
   initAdminSidebarBadges(supabase);
+  initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
   loadAll();
 }

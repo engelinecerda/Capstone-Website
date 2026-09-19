@@ -3,6 +3,7 @@ import { validateAdminSession, wireLogoutButton, watchAuthState } from './sessio
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { getPortalInitials } from './admin_auth.js';
 import { getBookingScope as getSharedBookingScope } from './reservation_availability.js';
 import { getPaymentStatusPillMeta, getCancellationFee } from './reservation_shared.js';
@@ -1815,6 +1816,7 @@ validateAdminSession({
       reviewBadgeEl: navReviewCount
     });
     window.__ADMIN_ACTIVE_NAV__ = 'reservations';
+    initManagerNotificationBell(supabase, session.user.id);
     initAdminNav({ role: profile.role });
     await init();
 

@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=43');
+@import url('./admin_reservations.css?v=45');
 
 /* admin_payments.css */
 
@@ -28,14 +28,24 @@
   border-bottom: 0.5px solid #EFE8DD;
 }
 
-.payments-table tbody td:first-child {
-  border-left: none;
-  border-radius: 0;
-}
+/* Scoped to real-table widths only — below min-width:1451px the table
+   converts to stacked cards (max-width: 1450px block further down),
+   where every card needs its own left/right border. Left unscoped,
+   these stripped the first card's left border and the last card's
+   right border (same-specificity, no card-mode rule redeclares those
+   two properties to win them back), so those corners had no edge to
+   round into and looked cut off. Mirrors the identical fix in
+   admin_reservations.css. */
+@media (min-width: 1451px) {
+  .payments-table tbody td:first-child {
+    border-left: none;
+    border-radius: 0;
+  }
 
-.payments-table tbody td:last-child {
-  border-right: none;
-  border-radius: 0;
+  .payments-table tbody td:last-child {
+    border-right: none;
+    border-radius: 0;
+  }
 }
 
 .payment-row:hover td {
@@ -558,7 +568,10 @@
     vertical-align: top;
     padding-left: 16px;
     padding-right: 16px;
-    border-bottom: none;
+    /* Action is this table's last column (:last-child too) — border-bottom
+       left unset here, not "none", so :last-child's border-bottom: 1px +
+       rounded bottom corners keep winning instead of getting cancelled
+       out by this equal-specificity, later-in-source rule. */
   }
 
   .actions.actions-single {
@@ -567,6 +580,23 @@
 
   .actions.actions-single .action-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Same narrow-phone fix as admin_reservations.css: the 110-144px fixed
+     label column above leaves too little room for the value column once
+     card/table padding is subtracted from a ~360px viewport, wrapping
+     amounts/references/names one fragment per line. Stack label above
+     value instead. */
+  .payments-table tbody td,
+  .payments-table tbody td.actions {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .payments-table tbody td::before {
+    padding-top: 0;
   }
 }
 

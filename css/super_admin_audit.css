@@ -167,8 +167,16 @@
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 720px) {
-  .page-header-actions { width: 100%; justify-content: flex-end; }
-  .filter-bar { flex-direction: column; align-items: stretch; }
+  .page-header-actions { width: 100%; justify-content: stretch; }
+  .page-header-actions > .btn-primary,
+  .page-header-actions > .btn-outline-sm { flex: 1 1 0; justify-content: center; }
+  /* Stay a wrapping row (not a column): search on its own row, then every
+     filter shares its row evenly. A column made .search-wrap's 220px
+     flex-basis its HEIGHT, and stacked each select at full width. */
+  .filter-bar { gap: 8px; padding: 10px 12px; }
+  .search-wrap { flex: 1 1 100%; min-width: 100%; padding: 0 12px; height: 40px; }
+  .filter-select { flex: 1 1 140px; min-width: 0; }
+  .filter-date { flex: 1 1 120px; min-width: 0; }
   .audit-detail-grid { grid-template-columns: 1fr; }
 }
 

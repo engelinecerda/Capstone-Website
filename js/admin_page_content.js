@@ -8,6 +8,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
@@ -1553,6 +1554,7 @@ async function init() {
   wireLogoutButton();
   setupInactivityLogout();
   initAdminSidebarBadges(supabase);
+  initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
   loadAll();
 }

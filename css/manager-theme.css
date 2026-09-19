@@ -6,6 +6,26 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
+/* ── RESPONSIVE SAFETY NET ─────────────────────────────────────
+   Loaded on nearly every admin page, so this is the right place for a
+   sitewide baseline: no element (images, embeds, oversized inline
+   content dropped in by page_content/report exports) should be able to
+   force horizontal scroll on the admin app regardless of what any
+   individual page CSS forgets to constrain. */
+img, svg, video, canvas, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* An inline SVG icon inside a flex container (every icon button — the "+"
+   in "Add Location", the arrows, the nav icons) is a flex item, and the
+   max-width: 100% above lets it shrink when the container is squeezed. A
+   narrow button then crushed its own icon to under 1px wide, so the "+"
+   simply disappeared. Icons must keep their intrinsic size. */
+svg {
+  flex-shrink: 0;
+}
+
 :root {
   --font: 'Inter', sans-serif;
 
@@ -78,7 +98,7 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* ============================================================
@@ -819,6 +839,7 @@ table td {
   top: calc(100% + 8px);
   right: 0;
   width: 360px;
+  max-width: calc(100vw - 24px);
   max-height: 420px;
   background: #FFFFFF;
   border: 0.5px solid var(--border);
@@ -1167,6 +1188,23 @@ body .fm-title {
   }
 }
 
+@media (max-width: 480px) {
+  /* Same fix as admin_reservations.css/admin_payments.css: the 110-148px
+     label column above is fine once the card has real room, but on a
+     ~360px phone (minus card/table padding) it leaves the value column
+     only ~85-90px wide, wrapping long values (emails, names, tokens)
+     one fragment per line even with overflow-wrap: anywhere. Stack
+     label above value instead so the value gets the full width. */
+  .table-responsive-cards tbody td {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .table-responsive-cards tbody td::before {
+    padding-top: 0;
+  }
+}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -1183,3 +1221,190 @@ body .fm-title {
   .stat-grid, .stat-row { grid-template-columns: 1fr 1fr; }
 }
 
+/* ============================================================
+   MOBILE TOOLBAR & ACTION ROWS (shared)
+   One place for the phone/tablet treatment of search + filter rows and
+   header/card action buttons, so every page that uses these shared
+   classes gets the same compact, evenly-balanced layout instead of each
+   page re-solving it (or not). Page CSS loads after this file and can
+   still override.
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Search gets its own full row; the filter control sits under it at
+     full width, instead of being squeezed beside it. */
+  .filters-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .filters-bar .search-wrap {
+    min-width: 100%;
+  }
+
+  .filters-bar .filter-select-wrap {
+    width: 100%;
+    border-left: none;
+    padding-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .filters-bar select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  /* A card title/description on the left with an action button on the
+     right stops fitting side by side on a phone — stack them, and let the
+     button span the row rather than sit small at one edge. */
+  .card-header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .card-header-row > .btn-primary,
+  .card-header-row > .btn-secondary,
+  .page-header > .btn-primary {
+    width: 100%;
+  }
+
+  /* Header with an action button beside the bell (Announcements, Users &
+     roles): the button takes the row, the bell stays at its right end. */
+  .page-header > .header-actions:has(> .btn-primary) { width: 100%; }
+  .header-actions > .btn-primary { flex: 1 1 auto; }
+}
+
+/* Section header rows (title + description with an "Add ..." button at the
+   right) are used on Business Profile, Page Content, Notifications config
+   and more. The button must never shrink — it used to squeeze until its
+   label wrapped into a column of single words — and on phones it moves
+   below the description at full width, like .card-header-row above. */
+.card-title-row > div { min-width: 0; }
+.card-title-row > .btn-primary { flex-shrink: 0; white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .card-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card-title-row > .btn-primary { width: 100%; }
+}
+
+/* ── NOTIFICATION PANEL: keep it on screen ─────────────────────
+   The panel is anchored to the bell's right edge and opens leftwards, which
+   works because the bell stays at the right of the page header (see the
+   header rule in manager-theme.css). On phones it becomes a full-width
+   sheet pinned to the viewport instead. */
+@media (max-width: 600px) {
+  .notif-dropdown-panel {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    /* Leave a strip below the sheet to tap outside and dismiss it. */
+    max-height: min(460px, calc(100vh - 96px));
+  }
+}
+
+/* Close (X) button in the notification panel header, so the panel can be
+   dismissed without hunting for a spot outside it — important now that it
+   is a full-width sheet on phones. */
+.notif-dropdown-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notif-close-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.notif-close-btn:hover {
+  background: var(--btn-secondary-hover, #F5EEE4);
+  color: var(--text);
+}
+
+.notif-close-btn:focus-visible {
+  outline: 2px solid var(--input-focus, #3D1A0A);
+  outline-offset: 1px;
+}
+
+/* ── BELL STAYS TOP-RIGHT ──────────────────────────────────────
+   Below 1050px .page-header stacks into a column, which dropped the
+   notification bell onto its own row under the title, at the left. When
+   the bell is the header's only action, keep title and bell on one row —
+   bell at the top-right, like desktop — so it costs no extra row and the
+   dropdown (right-anchored) opens within the screen. The :has() selector's
+   specificity outranks each page's own stacking rule. */
+@media (max-width: 1050px) {
+  .page-header:has(> .header-actions > #managerNotifBell:only-child),
+  .page-header:has(> .reports-header-actions > #managerNotifBell:only-child) {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .page-header:has(> .header-actions > #managerNotifBell:only-child) > :first-child,
+  .page-header:has(> .reports-header-actions > #managerNotifBell:only-child) > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .page-header:has(> .header-actions > #managerNotifBell:only-child) > .header-actions,
+  .page-header:has(> .reports-header-actions > #managerNotifBell:only-child) > .reports-header-actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+
+/* ── PHONE SHEET BACKDROP ─────────────────────────────────────
+   On phones the panel is a full-width sheet, effectively a modal. A light
+   dim layer (not a blur: backdrop-filter is costly on low-end phones and
+   muddy over dense tables) separates it from the page, gives a big tap
+   target to dismiss, and the page is scroll-locked while it is open.
+   Hidden entirely above 600px, where the panel is a small popover. */
+.notif-backdrop {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .notif-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 499;
+    background: rgba(42, 18, 8, 0.35);
+    animation: notifBackdropIn 0.15s ease;
+  }
+
+  html.notif-panel-open,
+  html.notif-panel-open body {
+    overflow: hidden;
+  }
+}
+
+@keyframes notifBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-backdrop { animation: none !important; }
+}

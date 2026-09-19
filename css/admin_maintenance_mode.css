@@ -31,7 +31,11 @@
 
 /* ── SCHEDULE CARD ── */
 .mm-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
-.mm-schedule-actions { display: flex; gap: 10px; }
+.mm-schedule-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .mm-schedule-actions > .btn-primary,
+  .mm-schedule-actions > .btn-cancel { flex: 1 1 140px; justify-content: center; }
+}
 
 /* ── MESSAGE EDITOR ── */
 .mm-editor-grid {

@@ -61,7 +61,7 @@ body {
   color: var(--text);
   display: flex;
   min-height: 100vh;
-  font-size: 16px;
+  font-size: 14px;
   overflow-x: hidden;
 }
 
@@ -454,8 +454,10 @@ body {
 }
 
 .donut-wrap-sm {
-  width: 120px;
-  height: 120px;
+  /* Same size as the status donut — the two cards sit side by side, and a
+     smaller ring here (120px vs 140px) made them look mismatched. */
+  width: 140px;
+  height: 140px;
 }
 
 .donut-center {
@@ -496,9 +498,9 @@ body {
 }
 
 .donut-legend .legend-swatch {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
   flex-shrink: 0;
   /* The lightest shades in the brown ramp (e.g. #F0E6D9) are nearly
      invisible against this white card with no edge to define them —
@@ -521,6 +523,11 @@ body {
   font-size: 12px;
   font-weight: 500;
   color: var(--text);
+  /* Fixed, right-aligned column so 9, 17 and 133 line up vertically
+     instead of each row's numbers starting at a different offset. */
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .donut-legend .legend-pct {
@@ -961,6 +968,7 @@ body {
   top: calc(100% + 8px);
   right: 0;
   width: 360px;
+  max-width: calc(100vw - 24px);
   max-height: 420px;
   background: #FFFFFF;
   border: 0.5px solid var(--border);
@@ -1130,13 +1138,24 @@ body {
 @media (max-width: 768px) {
   .stat-grid    { grid-template-columns: repeat(2, 1fr); }
   .demand-head  { flex-direction: column; align-items: flex-start; gap: 8px; }
+  /* Stacked header: the year dropdown sits at the right edge, opposite the
+     title (Monthly reservations) or the Generate Forecast button (Demand
+     forecasting), instead of hugging the left beside it. */
+  .demand-head > .demand-select { align-self: flex-end; }
+  .demand-head > .forecast-actions { width: 100%; justify-content: space-between; }
   .section-head { flex-direction: column; }
 }
 
 @media (max-width: 480px) {
   .stat-grid           { grid-template-columns: 1fr 1fr; }
   .quick-actions-grid  { grid-template-columns: 1fr; }
-  .donut-layout        { flex-direction: column; align-items: flex-start; }
+  /* Stacked: centre the ring above its legend and let the legend span the
+     card, rather than a small ring hugging the left edge with empty space
+     beside it. */
+  .donut-layout        { flex-direction: column; align-items: center; gap: 18px; }
+  .donut-wrap,
+  .donut-wrap-sm       { width: 160px; height: 160px; }
+  .donut-legend        { width: 100%; flex: 0 0 auto; }
 }
 
 /* ============================================================
@@ -1255,4 +1274,117 @@ body {
   background: rgba(42, 18, 8, 0.12);
   color: #2A1208;
   outline: none;
+}
+
+/* ── NOTIFICATION PANEL: keep it on screen ─────────────────────
+   The panel is anchored to the bell's right edge and opens leftwards, which
+   works because the bell stays at the right of the page header (see the
+   header rule in manager-theme.css). On phones it becomes a full-width
+   sheet pinned to the viewport instead. */
+@media (max-width: 600px) {
+  .notif-dropdown-panel {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    /* Leave a strip below the sheet to tap outside and dismiss it. */
+    max-height: min(460px, calc(100vh - 96px));
+  }
+}
+
+/* Close (X) button in the notification panel header, so the panel can be
+   dismissed without hunting for a spot outside it — important now that it
+   is a full-width sheet on phones. */
+.notif-dropdown-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notif-close-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.notif-close-btn:hover {
+  background: var(--btn-secondary-hover, #F5EEE4);
+  color: var(--text);
+}
+
+.notif-close-btn:focus-visible {
+  outline: 2px solid var(--input-focus, #3D1A0A);
+  outline-offset: 1px;
+}
+
+/* ── PHONE SHEET BACKDROP ─────────────────────────────────────
+   On phones the panel is a full-width sheet, effectively a modal. A light
+   dim layer (not a blur: backdrop-filter is costly on low-end phones and
+   muddy over dense tables) separates it from the page, gives a big tap
+   target to dismiss, and the page is scroll-locked while it is open.
+   Hidden entirely above 600px, where the panel is a small popover. */
+.notif-backdrop {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .notif-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 499;
+    background: rgba(42, 18, 8, 0.35);
+    animation: notifBackdropIn 0.15s ease;
+  }
+
+  html.notif-panel-open,
+  html.notif-panel-open body {
+    overflow: hidden;
+  }
+}
+
+@keyframes notifBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-backdrop { animation: none !important; }
+}
+
+/* ── BELL STAYS TOP-RIGHT (dashboard copy) ─────────────────────
+   The dashboard doesn't load manager-theme.css, so it never received the
+   shared rule that keeps the bell in the header's top-right when the header
+   stacks (<=1050px). Without it the bell dropped to its own row at the
+   left, and the right-anchored dropdown opened off the left of the screen
+   on tablets. */
+@media (max-width: 1050px) {
+  .page-header:has(> .header-actions > #managerNotifBell:only-child) {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .page-header:has(> .header-actions > #managerNotifBell:only-child) > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .page-header:has(> .header-actions > #managerNotifBell:only-child) > .header-actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
 }

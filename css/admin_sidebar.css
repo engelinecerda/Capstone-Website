@@ -105,9 +105,16 @@ body.sidebar-open .sidebar-overlay { display: block; }
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18) !important;
   }
 
-  /* Main content fills full width */
+  /* Main content fills full width.
+     margin-left alone isn't enough — manager-theme.css's base .main rule
+     also sets width/flex to calc(100% - var(--sidebar-w)), which still
+     reserved ~210px for the now off-canvas (transform-only) sidebar and
+     left a blank strip on the right on real mobile widths. Reset all
+     three together so .main actually spans the full viewport. */
   .main {
     margin-left: 0 !important;
+    width: 100% !important;
+    flex: 0 0 100% !important;
     padding: 64px 16px 40px !important;
   }
 

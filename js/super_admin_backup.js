@@ -8,6 +8,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
@@ -872,6 +873,7 @@ function init() {
       currentAdminId = session.user.id;
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+      initManagerNotificationBell(supabase, session.user.id);
       initAdminNav({ role: profile.role });
 
       const avatarEl = document.getElementById('sidebarAvatar');

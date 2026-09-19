@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
     <title>Users & Roles - ELI Coffee Events</title>
-    <link rel="stylesheet" href="/css/super_admin_only.css?v=43">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=43">
-  <link rel="stylesheet" href="/css/super_admin_accounts.css?v=43">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=43">
+    <link rel="stylesheet" href="/css/super_admin_only.css?v=44">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=44">
+  <link rel="stylesheet" href="/css/super_admin_accounts.css?v=44">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=44">
 </head>
 <body>
 
@@ -51,10 +51,13 @@
           <h1 class="page-title">Users &amp; roles <span class="admin-badge" id="adminBadge">Loading...</span></h1>
           <p class="page-sub">Who can sign in to the management system, and what they can do there</p>
         </div>
-        <button type="button" class="btn-primary" id="addAccountBtn">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Invite user
-        </button>
+        <div class="header-actions">
+          <button type="button" class="btn-primary" id="addAccountBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Invite user
+          </button>
+          <span id="managerNotifBell"></span>
+        </div>
       </div>
 
       <!-- STAT CARDS -->
