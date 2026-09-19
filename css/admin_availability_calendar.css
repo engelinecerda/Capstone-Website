@@ -14,7 +14,7 @@
    ============================================================ */
 .availability-layout {
   display: grid;
-  grid-template-columns: 1.55fr 1fr;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -202,4 +202,90 @@
   .availability-stat-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   Fill the viewport (side-by-side layout only)
+   The grid cells used to be a fixed 48px, so the calendar ended
+   ~40% of the way down the page with blank space beneath it. The
+   layout now stretches to the bottom of the viewport, the card
+   becomes a flex column, and the six week-rows share the extra
+   height equally. The 300px offset is roughly header + stat row +
+   page padding; the max() floor keeps short/landscape screens at
+   least as tall as before.
+   ============================================================ */
+@media (min-width: 901px) {
+  .availability-layout {
+    min-height: max(440px, calc(100vh - 300px));
+  }
+
+  .availability-calendar-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .availability-calendar-card .calendar-grid-wrap {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .availability-calendar-card .calendar-grid {
+    flex: 1 1 auto;
+    grid-auto-rows: minmax(48px, 1fr);
+  }
+
+  .availability-calendar-card .calendar-cell {
+    height: auto;
+    min-height: 48px;
+  }
+}
+
+/* Stacked (tablet) layout: no fixed viewport height to fill, so scale the
+   cells with the width instead of leaving them as thin 48px strips. */
+@media (min-width: 721px) and (max-width: 900px) {
+  .availability-calendar-card .calendar-cell {
+    height: clamp(56px, 9vw, 80px);
+  }
+}
+
+/* Larger cells can carry larger type — the 8.5-11px sizes were tuned for
+   48px-tall cells and looked lost in the bigger ones. */
+@media (min-width: 1200px) {
+  .availability-calendar-card .calendar-cell {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .availability-calendar-card .calendar-weekdays span {
+    font-size: 11px;
+    padding: 8px 0;
+  }
+
+  .availability-calendar-card .calendar-day-marker {
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .availability-calendar-card .calendar-day-dot {
+    width: 7px;
+    height: 7px;
+  }
+
+  .closed-date-name  { font-size: 12.5px; }
+  .closed-date-sub,
+  .closed-date-reason { font-size: 11.5px; }
+  .closed-dates-empty { font-size: 12.5px; }
+
+  .closed-date-reopen-btn {
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
+/* The status line under the grid reserves ~32px of margin even when empty;
+   collapse it until a message is actually set. */
+.availability-calendar-card .calendar-message:empty {
+  display: none;
 }

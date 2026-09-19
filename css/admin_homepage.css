@@ -305,6 +305,16 @@ body {
   margin: 0 auto;
 }
 
+/* The dashboard markup already carries .page-shell--wide, but that class is
+   defined in manager-theme.css, which this page doesn't load, so the fixed
+   1200px cap above always won and left empty margins on wide screens. Same
+   ceiling manager-theme.css gives every other admin page (and the same
+   doubled-selector fix admin_reports.css uses): grows with the viewport,
+   never narrower than 1200px. The Chart.js canvases resize with their cards. */
+.page-shell.page-shell--wide {
+  max-width: clamp(1200px, 96vw, 1760px);
+}
+
 /* Page header */
 .page-header {
   margin-bottom: 24px;

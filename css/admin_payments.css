@@ -526,19 +526,23 @@
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
     border-top: none;
-    border-bottom: none;
+    /* Divider under every field, like the Employees cards (see
+       .table-responsive-cards in manager-theme.css) and the Inquiries /
+       Contracts / Reservations cards. The last field swaps this for the
+       card's closing 1px border below. */
+    border-bottom: 0.5px solid #EFE8DD;
     border-radius: 0;
     background: #fff;
   }
 
   .payments-table tbody td:first-child {
     border-top: 1px solid var(--border);
-    border-radius: 18px 18px 0 0;
+    border-radius: 12px 12px 0 0;
   }
 
   .payments-table tbody td:last-child {
     border-bottom: 1px solid var(--border);
-    border-radius: 0 0 18px 18px;
+    border-radius: 0 0 12px 12px;
   }
 
   .payments-table tbody td::before {

@@ -59,6 +59,13 @@ body {
   margin: 0 auto;
 }
 
+/* .page-shell--wide is defined in manager-theme.css, but this stylesheet loads after it and
+   its plain .page-shell { max-width } rule used to win, pinning the page at a fixed width
+   and leaving dead space on wide screens. The doubled selector restores the wide ceiling. */
+.page-shell.page-shell--wide {
+  max-width: clamp(1200px, 96vw, 1760px);
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

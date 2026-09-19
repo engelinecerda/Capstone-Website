@@ -98,7 +98,6 @@
 .rs-order-btns {
   display: inline-flex;
   gap: 4px;
-  margin-right: 8px;
 }
 .rs-order-btn {
   width: 26px;
@@ -117,4 +116,320 @@
 
 @media (max-width: 600px) {
   .inq-detail-grid { grid-template-columns: 1fr; }
+}
+
+/* Referral Sources — use the whole card and viewport instead of a short table
+   floating at the top of a mostly empty page. */
+.rs-order-num {
+  display: inline-block;
+  min-width: 22px;
+  font-weight: 500;
+  color: var(--text-muted, #756756);
+}
+
+.referral-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.referral-card .table-wrap {
+  flex: 1 1 auto;
+}
+
+/* .card-header-row isn't styled on this page (it lives in page-specific
+   sheets like admin_staff_roster.css), so for managers the "Add source"
+   button dropped under the heading and overlapped the table header. */
+.referral-card .card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Card stretches to the bottom of the viewport on desktop/tablet. Skipped on
+   phones, where the table becomes stacked cards and a tall empty card would
+   just add scrolling. */
+@media (min-width: 721px) {
+  .referral-card {
+    min-height: calc(100vh - 210px);
+  }
+}
+
+/* The shared .reservation-table turns into stacked cards at <=1450px, which
+   suits wide reservation rows but not this 4-short-column table: on a normal
+   laptop each source became a ~185px-tall card and seven of them needed a
+   long scroll while the page looked empty. Keep it a real table wherever it
+   fits: >=901px, and 721-768px (where the sidebar has collapsed to a
+   hamburger so the content is wide again). In the 769-900px band the sidebar
+   is still showing and the four fixed-width columns would squeeze Label to
+   nothing, so the site's stacked-card layout is left in place there, and on
+   phones (<=720px). */
+@media (min-width: 901px), (min-width: 721px) and (max-width: 768px) {
+  .referral-table {
+    display: table;
+    table-layout: fixed;
+  }
+
+  .referral-table thead   { display: table-header-group; }
+  .referral-table tbody   { display: table-row-group; }
+
+  .referral-table th:nth-child(1) { width: 120px; }
+  .referral-table th:nth-child(3) { width: 120px; }
+  .referral-table th:last-child   { width: 210px; min-width: 210px; }
+
+  .referral-table tbody td,
+  .referral-table tbody td:first-child,
+  .referral-table tbody td:last-child {
+    display: table-cell;
+    width: auto;
+    padding: 14px 12px;
+    vertical-align: middle;
+    border: none;
+    border-bottom: 0.5px solid #EFE8DD;
+    border-radius: 0;
+  }
+
+  .referral-table tbody td::before {
+    display: none;
+  }
+
+  .referral-table tbody td:last-child {
+    text-align: center;
+  }
+
+  .referral-card .table-wrap {
+    overflow-x: auto;
+  }
+}
+
+@media (min-width: 1451px) {
+  .referral-table th:nth-child(1) { width: 140px; }
+  .referral-table th:nth-child(3) { width: 160px; }
+  .referral-table th:last-child   { width: 260px; min-width: 260px; }
+
+  .referral-table tbody td {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+}
+
+/* Number and arrows sit side by side on one line. They used to be separate
+   children of the <td>, which is a CSS grid in stacked-card mode, so each
+   landed in its own grid cell and the arrows dropped below the number. One
+   flex wrapper keeps them together in card mode and in table mode. */
+.rs-order-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+/* Stacked-card mode (phones, and the 769-900px band): give each card the same
+   look as the Employees cards - a divider line under every field and a
+   closing bottom border - instead of the shared reservation-card style, which
+   draws no lines between fields. Mirrors .table-responsive-cards in
+   manager-theme.css. Exact complement of the table-mode media query above. */
+@media (max-width: 720px), (min-width: 769px) and (max-width: 900px) {
+  .referral-table tbody td {
+    border-bottom: 0.5px solid #EFE8DD;
+    background: var(--card-bg);
+  }
+
+  .referral-table tbody td:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .referral-table tbody td:last-child {
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+  }
+}
+
+/* Inquiries — stacked-card mode (<=1450px, when the shared .reservation-table
+   converts to cards): same look as the Employees cards, i.e. a divider line
+   under every field and a closing bottom border, instead of the shared
+   reservation-card style, which draws no lines between fields. Mirrors
+   .table-responsive-cards in manager-theme.css. */
+@media (max-width: 1450px) {
+  .inquiries-table tbody td {
+    border-bottom: 0.5px solid #EFE8DD;
+    background: var(--card-bg);
+  }
+
+  .inquiries-table tbody td:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .inquiries-table tbody td:last-child {
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+  }
+}
+
+/* ── Referral Sources — Add/Edit modal ──────────────────────────────────────
+   This page only loads admin_reservations.css (modal shell) and
+   manager-theme.css (inputs/buttons). The form-grid / field / toggle /
+   action-bar pieces the Add/Edit modal uses are defined in
+   admin_staff_roster.css, which this page doesn't load, so the modal rendered
+   unstyled (inline label, native checkbox, oversized Cancel). They're mirrored
+   here, scoped to .rs-modal-card so nothing leaks to the other pages that share
+   this sheet. Matches the Add/Edit Employee modal. */
+.rs-modal-card {
+  width: min(100%, 520px);
+  padding: 20px 24px;
+}
+
+.rs-modal-card .modal-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: #6B3F23;
+  margin-bottom: 6px;
+}
+
+.rs-modal-card .modal-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.rs-modal-card .form-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.rs-modal-card .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rs-modal-card .field > .field-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rs-modal-card .field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.rs-modal-card .field-note {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  color: #9B8B7C;
+  line-height: 1.5;
+}
+
+/* "Active" label + toggle on one line, helper note wrapping underneath. */
+.rs-modal-card .rs-active-field {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rs-modal-card .rs-active-field .field-note {
+  margin-top: 6px;
+  flex-basis: 100%;
+}
+
+/* Toggle switch replacing the native checkbox. */
+.rs-modal-card .pm2-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.rs-modal-card .pm2-toggle input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.rs-modal-card .pm2-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: #D8D3CD;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.rs-modal-card .pm2-toggle-track::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.rs-modal-card .pm2-toggle input:checked + .pm2-toggle-track { background: var(--active-bg); }
+.rs-modal-card .pm2-toggle input:checked + .pm2-toggle-track::before { transform: translateX(16px); }
+.rs-modal-card .pm2-toggle input:focus-visible + .pm2-toggle-track {
+  outline: 2px solid var(--active-bg);
+  outline-offset: 2px;
+}
+
+/* The message line is only ever used for validation / save errors. */
+.rs-modal-card .form-message {
+  min-height: 18px;
+  font-size: 12.5px;
+  color: var(--declined-text, #A32D2D);
+  margin: 8px 0 0;
+}
+
+.rs-modal-card .action-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--border);
+}
+
+.rs-modal-card .modal-btn {
+  height: 36px;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.rs-modal-card .modal-btn-secondary {
+  border: 0.5px solid var(--btn-secondary-border, var(--border));
+  background: var(--card-bg, #fff);
+  color: var(--text);
+}
+
+.rs-modal-card .modal-btn-secondary:hover {
+  background: var(--btn-secondary-hover, #F5EEE4);
+}
+
+/* Phones: full-width buttons with Save on top (Cancel is first in the DOM, so
+   column-reverse puts it underneath) instead of a wide Cancel next to a
+   squeezed Save. */
+@media (max-width: 720px) {
+  .rs-modal-card .action-bar {
+    flex-direction: column-reverse;
+  }
+
+  .rs-modal-card .action-bar .modal-btn,
+  .rs-modal-card .action-bar .btn-primary {
+    width: 100%;
+  }
 }

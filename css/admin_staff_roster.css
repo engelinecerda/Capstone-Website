@@ -47,7 +47,13 @@
   color: var(--text);
 }
 
-.roster-table tbody tr:last-child td { border-bottom: none; }
+/* Drop the line under the final row — table mode only. At <=1450px this table
+   becomes stacked cards (.table-responsive-cards, manager-theme.css) where every
+   field is its own <td>, so this rule was also stripping the divider between
+   every field of the last card and the card's closing bottom border. */
+@media (min-width: 1451px) {
+  .roster-table tbody tr:last-child td { border-bottom: none; }
+}
 .roster-table tbody tr:hover td { background: #FBF8F3; }
 
 .roster-name-cell { font-weight: 600; }
@@ -59,22 +65,29 @@
 .roster-actions-inner { display: flex; gap: 8px; align-items: center; }
 .roster-count-suffix { font-size: 13px; font-weight: 400; color: var(--muted); }
 
+/* Filled soft-red pill (same look as the Delete buttons on the Packages tab:
+   .action-btn.danger) instead of bare red text. Sized to match the Edit button
+   beside it (.action-btn.view: 38px tall, 12px radius) so the pair lines up. */
 .roster-delete-btn {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #A32D2D;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--declined, #FCEBEB);
+  background: var(--declined, #FCEBEB);
+  color: var(--declined-txt, #A32D2D);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: filter 0.15s ease;
 }
 .roster-delete-btn:hover {
-  background: rgba(163, 45, 45, 0.08);
-  border-color: rgba(163, 45, 45, 0.35);
+  filter: brightness(0.97);
 }
 
 .modal-btn-danger {

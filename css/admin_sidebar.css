@@ -129,6 +129,21 @@ body.sidebar-open .sidebar-overlay { display: block; }
     flex-wrap: wrap !important;
   }
 
+  /* ...except a header whose only action is the notification bell: it keeps
+     title + bell on one row with the bell at the top-right, as
+     manager-theme.css intends ("BELL STAYS TOP-RIGHT"). The !important
+     stack above used to beat that rule below 768px and dropped the bell
+     onto its own row under the title on every admin page. This is a
+     separate override (not an edit to the rule above) on purpose: a browser
+     without :has() support just ignores it and behaves exactly as before.
+     Its ID-bearing selector outranks the plain .page-header rule above;
+     align-items/gap already match, so only direction and wrap are reset. */
+  .page-header:has(> .header-actions > #managerNotifBell:only-child),
+  .page-header:has(> .reports-header-actions > #managerNotifBell:only-child) {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+  }
+
   .page-title { font-size: 22px !important; }
 
   /* ── TOUCH TARGETS ──────────────────────────────────────────
