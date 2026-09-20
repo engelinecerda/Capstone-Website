@@ -10,6 +10,25 @@
    so the utility itself needs to exist here. */
 .hidden { display: none !important; }
 
+/* "← Back to Inquiries" — was a bare <a> inside .card-sub, so it rendered with the
+   browser's default blue underlined link. Now the same bordered .action-btn.view
+   button the Reservation details page uses for its back link. */
+.inq-back {
+  margin-bottom: 14px;
+}
+
+/* On phones the fixed 40px hamburger occupies the top-left corner, right where this
+   button starts — leave a little air between them. */
+@media (max-width: 768px) {
+  .inq-back { margin-top: 8px; }
+}
+
+/* .card-title has no bottom margin of its own (on the list page the .card-sub under
+   it supplies the gap), so here the title sat flush against the first field label. */
+.inq-detail-card .card-title {
+  margin-bottom: 12px;
+}
+
 .inq-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -244,6 +263,52 @@
   .referral-table tbody td:last-child {
     border-bottom: 1px solid var(--border);
     border-radius: 0 0 12px 12px;
+  }
+}
+
+/* Status-only filter bar (Inquiries has no search box). The shared rules draw a
+   divider to separate .filter-select-wrap from the search box: a vertical line to
+   its left on wide screens, and (at <=1450px, when .filters-bar stacks into a
+   column) a horizontal line above it. With nothing on the other side, either one
+   was left hanging at the edge of the card, so drop both and their padding. */
+.filters-bar--no-search .filter-select-wrap {
+  border-left: none;
+  border-top: none;
+  padding-left: 0;
+  padding-top: 0;
+}
+
+/* Mobile menu button. admin_sidebar.css paints it with --sidebar-bg (dark brown)
+   but colours the icon with --nav-text, which manager-theme.css never defines and
+   admin_reservations.css sets to near-black — so the three-line icon was dark on
+   dark and effectively invisible (just a plain dark square). Cream icon to match
+   the drawer it opens, and a matching hover colour (the shared hover background is
+   a light cream, which would otherwise swallow a cream icon). */
+/* "body" prefix: admin_sidebar.css is linked AFTER this file, so at equal
+   specificity its own .sidebar-hamburger rules would win. */
+body .sidebar-hamburger {
+  color: var(--sidebar-cream, #F5EBDD);
+  border-color: var(--sidebar-line, #4A2C17);
+}
+body .sidebar-hamburger:hover {
+  background: var(--nav-hover-bg, #3D1A0A);
+}
+
+/* Inquiries — real-table mode (>=1451px; the exact complement of the stacked-card
+   block below). The shared .reservation-table centres the last header ("Action")
+   and top-aligns every cell. The Reservations page compensates in its JS by giving
+   its action cell class="actions actions-single" (centred, vertical-align: middle),
+   but this page's JS renders a plain <td>, so the View button sat left in its
+   column — about 50px off the "Action" label — and hung ~11px below the text and
+   status pill beside it. Centre the last cell to match its header and middle-align
+   the row so the text, pill and button share one centre line. */
+@media (min-width: 1451px) {
+  .inquiries-table tbody td {
+    vertical-align: middle;
+  }
+
+  .inquiries-table tbody td:last-child {
+    text-align: center;
   }
 }
 

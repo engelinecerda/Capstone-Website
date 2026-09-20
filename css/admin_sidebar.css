@@ -67,7 +67,10 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
   z-index: 199;
 }
 
-body.sidebar-open .sidebar-overlay { display: block; }
+/* The overlay only shows at drawer widths (see the ≤768px block below).
+   It used to be unconditional, so opening the drawer on a phone/tablet and
+   then rotating or resizing past 768px left a dark overlay over the desktop
+   layout, with no hamburger visible to close it. */
 
 /* ── LARGE DESKTOP (≥ 1600px) ──────────────────────────────────
    This used to blow up .main with a blunt `zoom` (1.12, then 1.25) so
@@ -104,6 +107,8 @@ body.sidebar-open .sidebar-overlay { display: block; }
     transform: translateX(0) !important;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18) !important;
   }
+
+  body.sidebar-open .sidebar-overlay { display: block; }
 
   /* Main content fills full width.
      margin-left alone isn't enough — manager-theme.css's base .main rule

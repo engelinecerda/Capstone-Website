@@ -444,11 +444,41 @@
 }
 
 /* Two-per-row grid for short paired fields (Booking details, Payment).
-   Assumes exactly 4 items (2 rows) — the last row loses its divider. */
+   Assumes exactly 4 items (2 rows) — the last row loses its divider.
+
+   minmax(0, 1fr) — not plain 1fr — so a column can actually shrink below its
+   content's minimum width. With 1fr, a narrow card left each column wider than
+   its share, and the label + value in one cell spilled over into the
+   neighbouring cell (e.g. "₱2,639.12" printed on top of "Latest payment date").
+
+   The grid sits inside .dl-grid-wrap, a size container, so the switch to a
+   single column below keys off the CARD's width rather than the viewport's.
+   That matters because the card's width also depends on the sidebar and the
+   1.5fr / 1fr column split, so a viewport breakpoint would be wrong at some
+   widths. */
+.dl-grid-wrap {
+  container: dl-grid / inline-size;
+}
+
 .dl-grid-2col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 20px;
+}
+
+/* Below ~460px each half-column is under ~220px — too tight for the longest
+   label/value pair (e.g. "Latest payment date" + "No payments yet"), so stack
+   to one column. Every row then needs its divider back except the very last. */
+@container dl-grid (max-width: 460px) {
+  .dl-grid-2col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dl-grid-2col .dl-row:nth-last-child(-n+2) {
+    border-bottom: 0.5px solid var(--border);
+  }
+  .dl-grid-2col .dl-row:last-child {
+    border-bottom: none;
+  }
 }
 
 .dl-grid-2col .dl-row:nth-last-child(-n+2) {
@@ -476,6 +506,7 @@
   gap: 16px;
   padding: 8px 0;
   border-bottom: 0.5px solid var(--border);
+  min-width: 0;
 }
 
 .dl-row:last-child {
@@ -498,6 +529,8 @@
   font-weight: 500;
   color: var(--text);
   text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;   /* long values (emails, addresses) wrap instead of overflowing */
 }
 
 .dl-row.full .dl-value {

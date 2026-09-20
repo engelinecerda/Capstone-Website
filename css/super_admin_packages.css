@@ -360,9 +360,16 @@
   flex-wrap: wrap;
 }
 
+/* Every table action button (Dishes / Edit / Archive / Restore / Delete) shares
+   one width so the columns of buttons line up row to row instead of each button
+   sizing itself to its label. 76px fits the longest label ("Archive" / "Restore")
+   with the normal padding; min-width (not width) so a wider font can still grow
+   rather than clip. */
 .action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 76px;
   gap: 5px;
   padding: 6px 12px;
   border-radius: 8px;
@@ -435,6 +442,7 @@
   width: 100%;
   max-width: 660px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -509,6 +517,42 @@
   align-items: center;
   gap: 10px;
   flex-shrink: 0;                   
+}
+
+/* ── STACKED FOOTER (every modal on the Bookable Inventory page) ──
+   The validation message used to sit either inside the scrolling modal body
+   (hug-the-text pill) or, in the Package modal, in the same row as the action
+   buttons — where it got squeezed into whatever width was left and its fixed
+   36px height clipped anything longer than a few words (e.g. the
+   "Before this can go active: …" message). Now every modal's footer is a
+   column instead: the message gets its own row above the buttons and uses the
+   modal's full width, wrapping onto extra lines when needed. The divider moves onto the
+   actions row so the message reads as sitting above it — same look as the
+   Add Category modal. The footer stays sticky, so the message is always in
+   view even when the long form body is scrolled. */
+.modal-footer-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border-top: none;
+}
+
+.modal-footer-stacked .modal-message {
+  height: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  line-height: 1.45;
+  margin: 12px 22px 14px;
+  align-self: stretch;             /* fill the whole row edge to edge (within the 22px modal padding) */
+  flex: 0 0 auto;
+  overflow-wrap: anywhere;
+}
+
+.modal-footer-stacked .modal-footer-actions {
+  justify-content: flex-end;
+  padding: 14px 22px 18px;
+  border-top: 0.5px solid var(--border);
 }
 
 .modal-field {
@@ -718,6 +762,8 @@
 
 .inclusion-row input[type="text"] {
   flex: 1;
+  min-width: 0;   /* a text input's default min-content width (~200px) otherwise stops it
+                     shrinking, pushing the toggle / delete buttons out of a narrow modal */
   padding: 8px 10px;
   border: 1px solid var(--input-border);
   border-radius: 8px;
@@ -737,6 +783,7 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 1;
+  flex-shrink: 0;   /* keep the small icon buttons a fixed 26px square */
 }
 .inclusion-row button:hover, .reorder-btn:hover { color: var(--text); background: var(--btn-secondary-hover); }
 .inclusion-row button:disabled, .reorder-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -744,6 +791,16 @@
 .inclusion-row.is-archived-dish { opacity: 0.5; }
 .inclusion-row .dish-toggle-btn.is-hidden { color: var(--muted); }
 .inclusion-row .dish-toggle-btn.is-active { color: var(--success, #1a7f4b); }
+
+/* Catering "Add a dish" row. Was a .modal-row (1fr 1fr), so on desktop the
+   "+ Add" button took half the width and on phones it dropped under the input. */
+.dish-add-row {
+  display: flex;
+  align-items: stretch;   /* button matches the input's height */
+  gap: 8px;
+}
+.dish-add-row .modal-input { flex: 1 1 auto; min-width: 0; }
+.dish-add-row .btn-cancel  { flex: 0 0 auto; height: auto; white-space: nowrap; }  /* height:auto overrides .btn-cancel's fixed 36px so it stretches to the input's height */
 
 .checklist-item {
   display: flex;

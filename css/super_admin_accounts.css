@@ -379,6 +379,7 @@ tbody tr .actions-cell { opacity: 1; }
   width: 100%;
   max-width: 660px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
