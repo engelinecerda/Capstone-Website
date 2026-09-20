@@ -2,7 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
-import { applyRoleVisibility, setLogoutBusy } from './session_validation.js';
+import { applyRoleVisibility, wireLogoutButton } from './session_validation.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import {
     getEffectiveReservationStatus,
@@ -15,7 +15,6 @@ const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
 const sidebarAvatar = document.getElementById('sidebarAvatar');
-const logoutBtn = document.getElementById('logoutBtn');
 const exportExcelBtn = document.getElementById('exportExcelBtn');
 const reportDateFrom = document.getElementById('reportDateFrom');
 const reportDateTo = document.getElementById('reportDateTo');
@@ -579,17 +578,15 @@ async function loadReports({ silent = false } = {}) {
     }
 }
 
-logoutBtn?.addEventListener('click', async () => {
-    if (logoutBtn.classList.contains('is-loading')) return;
-    setLogoutBusy(logoutBtn, true);
-    try {
-        await supabase.auth.signOut();
-        redirectToAdminLogin();
-    } catch (err) {
-        console.error('Logout failed:', err);
-        setLogoutBusy(logoutBtn, false);
-    }
-});
+// Shared handler (signs out, clears the cached profile, shows the "logging out"
+// spinner, redirects to /admin). This page used to carry its own copy, then
+// imported the spinner helper `setLogoutBusy` directly. That named import is what
+// broke this page after a deploy: /js/ files are cached for 24h, so a browser
+// still holding the previous session_validation.js (no such export) got a
+// SyntaxError at module link time and the whole page stayed on "Loading...".
+// wireLogoutButton exists in every version of session_validation.js, so a stale
+// cached copy can only lose the spinner, never the page.
+wireLogoutButton('logoutBtn', '/admin');
 
 exportExcelBtn?.addEventListener('click', exportReportsExcel);
 reportDateFrom?.addEventListener('input', renderReports);

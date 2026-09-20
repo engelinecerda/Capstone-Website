@@ -1739,9 +1739,30 @@ function wireApprovalPrompt() {
 /* ---------------------------------------------------------------- */
 
 function wireStickyHeaderScroll() {
-  window.addEventListener('scroll', () => {
-    reservationStickyHeader.classList.toggle('is-stuck', window.scrollY > 4);
-  }, { passive: true });
+  // The page scrolls inside .main (not the window), and .main has top padding that
+  // sticky offsets are measured from — see .reservation-sticky-header in the CSS.
+  const scroller = reservationStickyHeader.closest('.main');
+
+  const syncOffset = () => {
+    const pad = scroller ? parseFloat(getComputedStyle(scroller).paddingTop) || 0 : 0;
+    reservationStickyHeader.style.setProperty('--sticky-top', `-${pad}px`);
+  };
+
+  // "Stuck" = the header has actually reached the top edge of the scroller. (It used
+  // to key off window.scrollY, which never changes here, so this state — and the
+  // divider line under the bar — never turned on.)
+  const syncStuck = () => {
+    const top = scroller ? scroller.getBoundingClientRect().top : 0;
+    const stuck = reservationStickyHeader.getBoundingClientRect().top <= top + 1
+      && (scroller ? scroller.scrollTop : window.scrollY) > 4;
+    reservationStickyHeader.classList.toggle('is-stuck', stuck);
+  };
+
+  syncOffset();
+  syncStuck();
+  (scroller || window).addEventListener('scroll', syncStuck, { passive: true });
+  window.addEventListener('scroll', syncStuck, { passive: true });
+  window.addEventListener('resize', () => { syncOffset(); syncStuck(); });
 }
 
 /* ---------------------------------------------------------------- */

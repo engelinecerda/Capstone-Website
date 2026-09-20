@@ -95,7 +95,12 @@
    ============================================================ */
 .reservation-sticky-header {
   position: sticky;
-  top: 0;
+  /* .main is the scroll container here and has its own top padding (28–64px by
+     breakpoint). Sticky offsets are measured from INSIDE that padding, so a plain
+     top: 0 parked the bar that far below the screen edge, with the scrolled cards
+     showing through the gap above it. js/admin_reservation_details.js sets
+     --sticky-top to minus that padding so the bar pins flush to the top instead. */
+  top: var(--sticky-top, 0px);
   z-index: 20;
   display: flex;
   align-items: flex-start;
@@ -111,6 +116,16 @@
 
 .reservation-sticky-header.is-stuck {
   border-bottom-color: var(--border);
+}
+
+/* On phones the fixed hamburger button (40px at top-left) sits over the top-left
+   corner of a header that is pinned to the top of the screen — leave room for it
+   so the avatar and name aren't underneath. Only while pinned: in normal flow the
+   header is below the hamburger's band and needs no extra room. */
+@media (max-width: 768px) {
+  .reservation-sticky-header.is-stuck {
+    padding-left: 48px;
+  }
 }
 
 .reservation-header-left {
