@@ -246,6 +246,36 @@
   margin-top: 3px;
 }
 
+/* Stacked actions inside an action card (primary restore + local upload) */
+.action-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-subtle {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.btn-subtle:hover {
+  background: var(--btn-secondary-hover);
+  color: var(--text);
+}
+
+.action-card-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.action-card-hint code {
+  font-family: inherit;
+  font-weight: 600;
+}
+
 /* ── CARD ── (page uses .section-title/.section-sub instead of the
    shared .card-title/.card-sub naming, so kept distinct here) */
 .card {
@@ -562,6 +592,26 @@
 }
 
 .restore-warning svg { flex-shrink: 0; margin-top: 1px; }
+
+/* Parsed-file summary shown in the restore modal before confirming */
+.restore-file-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--info);
+  border: 1px solid var(--info);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: var(--info-txt);
+  line-height: 1.5;
+}
+
+.restore-file-meta.hidden { display: none; }
+
+.restore-file-meta-row { display: flex; gap: 8px; justify-content: space-between; }
+.restore-file-meta-label { font-weight: 600; }
+.restore-file-meta-value { text-align: right; word-break: break-all; }
 
 .modal-message {
   font-size: 12.5px;

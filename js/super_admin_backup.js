@@ -10,36 +10,24 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { BACKUP_TABLES, readAllTables, restoreFromBundle, summarizeRestore, validateBundle } from './admin_backup_tables.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID  = '419921262357-ci1j9bi3i9v3hebp11m3077fa0b805pv.apps.googleusercontent.com';
 const DRIVE_FOLDER_NAME = 'ELI Coffee Backups';
 const DRIVE_SCOPE       = 'https://www.googleapis.com/auth/drive.file';
 
-// ─── All tables to back up (in dependency order for safe restore) ─────────────
-const BACKUP_TABLES = [
-  'profiles',
-  'package',
-  'contract_templates',
-  'reservations',
-  'reservation_contracts',
-  'reservation_staff_assignments',
-  'reservation_status',
-  'payment',
-  'payment_method',
-  'receipts',
-  'reschedule_requests',
-  'reservation_cancellations',
-  'calendar_blackouts',
-  'reservation_forecast',
-  'reviews',
-];
+// ─── Local upload config ──────────────────────────────────────────────────────
+// Backups are plain JSON; a real one is a few MB. The cap stops the browser
+// from trying to parse a huge unrelated file the admin picked by mistake.
+const MAX_LOCAL_BACKUP_BYTES = 50 * 1024 * 1024; // 50 MB
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let driveAccessToken      = null;
 let driveFolderId         = null;
 let backupHistory         = [];
 let pendingRestoreFile    = null;
+let pendingRestoreBundle  = null;   // parsed bundle when restoring from a local file
 let pendingSettingsAction = null;
 let settings              = { retentionDays: 0 };
 let currentAdminId        = null;
@@ -58,6 +46,8 @@ const emptyHistory          = document.getElementById('emptyHistory');
 const configureRetentionBtn = document.getElementById('configureRetentionBtn');
 const googleAuthBtn         = document.getElementById('googleAuthBtn');
 const googleAuthStatus      = document.getElementById('googleAuthStatus');
+const uploadBackupBtn       = document.getElementById('uploadBackupBtn');
+const localBackupInput      = document.getElementById('localBackupInput');
 
 // Confirm backup modal
 const confirmBackupModal   = document.getElementById('confirmBackupModal');
@@ -80,6 +70,7 @@ const restoreMessage      = document.getElementById('restoreMessage');
 const restoreProgressWrap = document.getElementById('restoreProgressWrap');
 const restoreProgressBar  = document.getElementById('restoreProgressBar');
 const restoreProgressLabel= document.getElementById('restoreProgressLabel');
+const restoreFileMeta     = document.getElementById('restoreFileMeta');
 
 // Settings modal
 const settingsModal      = document.getElementById('settingsModal');
@@ -370,30 +361,6 @@ async function loadBackupHistory() {
   }
 }
 
-// ─── Read all Supabase tables ─────────────────────────────────────────────────
-async function readAllTables(onProgress) {
-  const snapshot = {};
-  const skipped  = [];
-
-  for (let i = 0; i < BACKUP_TABLES.length; i++) {
-    const table   = BACKUP_TABLES[i];
-    const percent = Math.round((i / BACKUP_TABLES.length) * 70);
-    onProgress(percent, `Reading ${table}…`);
-
-    const { data, error } = await supabase.from(table).select('*');
-
-    if (error) {
-      skipped.push(table);
-      snapshot[table] = [];
-      continue;
-    }
-
-    snapshot[table] = data || [];
-  }
-
-  return { snapshot, skipped };
-}
-
 // ─── Upload JSON to Google Drive ──────────────────────────────────────────────
 async function uploadToDrive(filename, jsonContent, description, onProgress) {
   onProgress(75, 'Uploading to Google Drive…');
@@ -458,7 +425,7 @@ confirmBackupOk?.addEventListener('click', async () => {
   try {
     await ensureValidToken();
 
-    const { snapshot, skipped } = await readAllTables(onProgress);
+    const { snapshot, skipped } = await readAllTables(supabase, onProgress);
 
     onProgress(72, 'Building backup file…');
     const now    = new Date();
@@ -470,7 +437,7 @@ confirmBackupOk?.addEventListener('click', async () => {
         table_counts: Object.fromEntries(
           BACKUP_TABLES.map(t => [t, snapshot[t]?.length ?? 0])
         ),
-        version: '1.0'
+        version: '2.0'
       },
       data: snapshot
     };
@@ -535,19 +502,100 @@ restoreSystemBtn?.addEventListener('click', async () => {
   }
 
   const latest = backupHistory[0];
-  openRestoreModal(latest.id, latest.name, latest.createdTime);
+  openRestoreModal({ source: 'drive', id: latest.id, name: latest.name, createdTime: latest.createdTime });
 });
 
-function openRestoreModal(fileId, name, createdTime) {
-  pendingRestoreFile       = { id: fileId, name };
-  restoreModalSub.textContent = name;
-  restoreCopy.textContent  = `Restoring from the backup created on ${formatDriveDate(createdTime)} will overwrite all current data in every table.`;
+const RESTORE_SCOPE_NOTE = 'Matching records in the restorable tables will be overwritten. The audit log, notifications, reminder log and maintenance mode are kept in the backup but never written back.';
+
+function renderRestoreFileMeta(stats) {
+  if (!restoreFileMeta) return;
+
+  if (!stats) {
+    restoreFileMeta.classList.add('hidden');
+    restoreFileMeta.innerHTML = '';
+    return;
+  }
+
+  const rows = [
+    ['Created',        stats.createdAt ? formatDriveDate(stats.createdAt) : 'Not recorded'],
+    ['Backup version', stats.version],
+    ['Tables to restore', `${stats.tablesToRestore} of ${stats.tablesRecognised} recognised`],
+    ['Total rows',     stats.rowCount.toLocaleString('en-PH')],
+  ];
+
+  if (stats.unknown.length) {
+    rows.push(['Unknown tables (skipped)', stats.unknown.join(', ')]);
+  }
+
+  restoreFileMeta.innerHTML = rows.map(([label, value]) => `
+    <div class="restore-file-meta-row">
+      <span class="restore-file-meta-label">${escapeHtml(label)}</span>
+      <span class="restore-file-meta-value">${escapeHtml(value)}</span>
+    </div>
+  `).join('');
+  restoreFileMeta.classList.remove('hidden');
+}
+
+// Opens the confirm-restore modal for either source:
+//   drive → { source:'drive', id, name, createdTime }  (downloaded on confirm)
+//   local → { source:'local', name, bundle, stats }    (already parsed & validated)
+function openRestoreModal({ source, id = null, name, createdTime = null, bundle = null, stats = null }) {
+  pendingRestoreFile   = { source, id, name };
+  pendingRestoreBundle = source === 'local' ? bundle : null;
+
+  restoreModalSub.textContent = source === 'local' ? `${name} — uploaded file` : name;
+  restoreCopy.textContent = source === 'local'
+    ? `This file was uploaded from your computer and has been checked against the system's table list. ${RESTORE_SCOPE_NOTE}`
+    : `Restoring from the backup created on ${formatDriveDate(createdTime)} will overwrite matching records in the restorable tables. The audit log, notifications, reminder log and maintenance mode are kept in the backup but never written back.`;
+
+  renderRestoreFileMeta(stats);
   setModalMsg(restoreMessage, '');
   hideProgress(restoreProgressWrap);
   restoreOk.disabled       = false;
   restoreOk.textContent    = 'Restore Now';
   openModal(restoreModal);
 }
+
+// ─── Restore from a local file (file explorer) ───────────────────────────────
+uploadBackupBtn?.addEventListener('click', () => {
+  localBackupInput?.click();
+});
+
+localBackupInput?.addEventListener('change', async () => {
+  const file = localBackupInput.files?.[0];
+  // Reset immediately so picking the same file again still fires 'change'.
+  localBackupInput.value = '';
+  if (!file) return;
+
+  if (!/\.json$/i.test(file.name)) {
+    setPageMessage('Only .json backup files can be uploaded.', 'error');
+    return;
+  }
+
+  if (file.size > MAX_LOCAL_BACKUP_BYTES) {
+    setPageMessage(`That file is ${formatBytes(file.size)}. The maximum backup size is ${formatBytes(MAX_LOCAL_BACKUP_BYTES)}.`, 'error');
+    return;
+  }
+
+  setPageMessage(`Reading ${file.name}…`);
+
+  let bundle;
+  try {
+    bundle = JSON.parse(await file.text());
+  } catch {
+    setPageMessage('That file is not valid JSON. It may be corrupted or incomplete.', 'error');
+    return;
+  }
+
+  const check = validateBundle(bundle);
+  if (!check.ok) {
+    setPageMessage(`This file cannot be restored: ${check.error}`, 'error');
+    return;
+  }
+
+  setPageMessage('');
+  openRestoreModal({ source: 'local', name: file.name, bundle, stats: check.stats });
+});
 
 // ─── Restore: download from Drive and upsert ──────────────────────────────────
 restoreOk?.addEventListener('click', async () => {
@@ -561,49 +609,55 @@ restoreOk?.addEventListener('click', async () => {
     setProgress(restoreProgressBar, restoreProgressLabel, restoreProgressWrap, pct, text);
 
   try {
-    await ensureValidToken();
+    let bundle;
 
-    onProgress(5, 'Downloading backup from Google Drive…');
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${pendingRestoreFile.id}?alt=media`,
-      { headers: { 'Authorization': `Bearer ${driveAccessToken}` } }
-    );
+    if (pendingRestoreFile.source === 'local') {
+      // Already read from disk, parsed and validated when the file was picked.
+      onProgress(20, 'Preparing uploaded backup…');
+      bundle = pendingRestoreBundle;
+      if (!bundle) throw new Error('The uploaded backup is no longer available. Please select the file again.');
 
-    if (!res.ok) throw new Error(`Failed to download backup (HTTP ${res.status})`);
+    } else {
+      await ensureValidToken();
 
-    onProgress(20, 'Parsing backup file…');
-    const bundle = await res.json();
+      onProgress(5, 'Downloading backup from Google Drive…');
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${pendingRestoreFile.id}?alt=media`,
+        { headers: { 'Authorization': `Bearer ${driveAccessToken}` } }
+      );
 
-    if (!bundle?.data || !bundle?.meta) {
-      throw new Error('Invalid backup file format.');
+      if (!res.ok) throw new Error(`Failed to download backup (HTTP ${res.status})`);
+
+      onProgress(20, 'Parsing backup file…');
+      bundle = await res.json();
+
+      const check = validateBundle(bundle);
+      if (!check.ok) throw new Error(check.error);
     }
 
-    const { data }  = bundle;
-    const tables    = bundle.meta.tables || BACKUP_TABLES;
+    const result = await restoreFromBundle(supabase, bundle, onProgress);
 
-    for (let i = 0; i < tables.length; i++) {
-      const table = tables[i];
-      const rows  = data[table];
-      if (!rows?.length) continue;
-
-      const pct = 20 + Math.round(((i + 1) / tables.length) * 75);
-      onProgress(pct, `Restoring ${table} (${rows.length} rows)…`);
-
-      const BATCH = 500;
-      for (let b = 0; b < rows.length; b += BATCH) {
-        const chunk = rows.slice(b, b + BATCH);
-        const { error } = await supabase
-          .from(table)
-          .upsert(chunk, { onConflict: getPrimaryKey(table) });
-
-        if (error) throw new Error(`Failed to restore table "${table}": ${error.message}`);
-      }
+    // Some tables can be refused (e.g. this role is read-only on operational
+    // data). The rest are still restored, so report what did and didn't go in
+    // rather than calling the whole restore a success or a failure.
+    if (result.failures.length) {
+      console.warn('Restore problems:', result.failures);
+      closeRestoreModal();
+      setPageMessage(
+        `Restore finished with problems — ${result.restored.length} of ${result.total} tables restored. ${summarizeRestore(result)}`,
+        'error'
+      );
+      return;
     }
 
     onProgress(100, 'Restore complete!');
+    const note   = summarizeRestore(result);
+    const origin = pendingRestoreFile.source === 'local'
+      ? `the uploaded file ${pendingRestoreFile.name}`
+      : 'the selected backup';
     setTimeout(() => {
-      closeModal(restoreModal);
-      setPageMessage('System restored successfully from the selected backup.', 'success');
+      closeRestoreModal();
+      setPageMessage(`System restored successfully from ${origin}.${note ? ' ' + note : ''}`, note ? 'error' : 'success');
     }, 800);
 
   } catch (err) {
@@ -615,28 +669,6 @@ restoreOk?.addEventListener('click', async () => {
     restoreCancel.disabled = false;
   }
 });
-
-// ─── Primary key map ──────────────────────────────────────────────────────────
-function getPrimaryKey(table) {
-  const keys = {
-    profiles:                      'user_id',
-    package:                       'package_id',
-    contract_templates:            'template_id',
-    reservations:                  'reservation_id',
-    reservation_contracts:         'reservation_contract_id',
-    reservation_staff_assignments: 'assignment_id',
-    reservation_status:            'status_id',
-    payment:                       'payment_id',
-    payment_method:                'payment_method_id',
-    receipts:                      'receipt_id',
-    reschedule_requests:           'reschedule_request_id',
-    reservation_cancellations:     'cancellation_id',
-    calendar_blackouts:            'blackout_id',
-    reservation_forecast:          'forecast_id',
-    reviews:                       'review_id',
-  };
-  return keys[table] || 'id';
-}
 
 // ─── Download backup file ─────────────────────────────────────────────────────
 async function handleDownload(fileId, filename) {
@@ -798,7 +830,7 @@ historyList?.addEventListener('click', e => {
   const { action, id, name, date } = btn.dataset;
 
   if (action === 'download') handleDownload(id, name);
-  if (action === 'restore')  openRestoreModal(id, name, date);
+  if (action === 'restore')  openRestoreModal({ source: 'drive', id, name, createdTime: date });
   if (action === 'delete')   handleDelete(id, name);
 });
 
@@ -839,22 +871,31 @@ settingsSave?.addEventListener('click', async () => {
   closeModal(settingsModal);
 });
 
+// Releases the uploaded bundle so a cancelled restore does not keep a whole
+// backup file in memory, and so a stale file can never be restored later.
+function closeRestoreModal() {
+  pendingRestoreFile   = null;
+  pendingRestoreBundle = null;
+  renderRestoreFileMeta(null);
+  closeModal(restoreModal);
+}
+
 // ─── Modal close wiring ───────────────────────────────────────────────────────
 confirmBackupClose?.addEventListener('click',  () => closeModal(confirmBackupModal));
 confirmBackupCancel?.addEventListener('click', () => closeModal(confirmBackupModal));
-restoreClose?.addEventListener('click',        () => closeModal(restoreModal));
-restoreCancel?.addEventListener('click',       () => closeModal(restoreModal));
+restoreClose?.addEventListener('click',        () => closeRestoreModal());
+restoreCancel?.addEventListener('click',       () => closeRestoreModal());
 settingsClose?.addEventListener('click',       () => closeModal(settingsModal));
 settingsCancel?.addEventListener('click',      () => closeModal(settingsModal));
 
 confirmBackupModal?.addEventListener('click', e => { if (e.target === confirmBackupModal) closeModal(confirmBackupModal); });
-restoreModal?.addEventListener('click',       e => { if (e.target === restoreModal)       closeModal(restoreModal); });
+restoreModal?.addEventListener('click',       e => { if (e.target === restoreModal)       closeRestoreModal(); });
 settingsModal?.addEventListener('click',      e => { if (e.target === settingsModal)      closeModal(settingsModal); });
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!confirmBackupModal?.classList.contains('hidden')) closeModal(confirmBackupModal);
-  if (!restoreModal?.classList.contains('hidden'))       closeModal(restoreModal);
+  if (!restoreModal?.classList.contains('hidden'))       closeRestoreModal();
   if (!settingsModal?.classList.contains('hidden'))      closeModal(settingsModal);
 });
 
