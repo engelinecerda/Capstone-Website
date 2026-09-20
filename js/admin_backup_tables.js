@@ -1,4 +1,4 @@
-// backup_core.js
+// admin_backup_tables.js
 // What Backup & Restore covers, and how it reads and writes it.
 // js/super_admin_backup.js owns the UI and Google Drive; everything that
 // touches the database lives here so the table list has ONE home.

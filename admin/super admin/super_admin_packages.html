@@ -11,8 +11,8 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
   <link rel="stylesheet" href="/css/super_admin_only.css?v=44">
   <link rel="stylesheet" href="/css/manager-theme.css?v=44">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=45">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=44">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=44">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=45">
 </head>
 <body>
 
@@ -417,16 +417,14 @@
           <textarea id="catInclusionsInput" class="modal-textarea" rows="4" placeholder="E.g., Main Hall access, 3 hours use, buffet setup, drinks, lights and sounds..."></textarea>
           <span class="modal-hint">Shown as a highlights blurb on this category's customer-facing overview card — separate from each package's own inclusions list. One item per line or comma separated.</span>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="catModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-cancel" id="catModalCancel">Cancel</button>
-          <button type="button" class="btn-primary" id="catModalSave">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span id="catModalSaveLabel">Add Category</span>
-          </button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="catModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="catModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="catModalSaveLabel">Add Category</span>
+        </button>
       </div>
     </div>
   </div>
@@ -589,7 +587,7 @@
           </label>
         </div>
       </div>
-      <div class="modal-footer modal-footer-stacked">
+      <div class="modal-footer">
         <p class="modal-message hidden" id="pkgModalMessage"></p>
         <div class="modal-footer-actions">
           <button type="button" class="btn-cancel" id="pkgModalCancel">Cancel</button>
@@ -613,13 +611,11 @@
       </div>
       <div class="modal-body">
         <p class="confirm-copy" id="confirmCopy"></p>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="confirmMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
-          <button type="button" class="btn-danger" id="confirmOk">Confirm</button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmOk">Confirm</button>
       </div>
     </div>
   </div>
@@ -642,12 +638,10 @@
           <label class="modal-label">Assignable badges</label>
           <div id="badgeChipList" class="badge-chip-list"></div>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="badgeModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-primary" id="badgeModalDone">Done</button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="badgeModalDone">Done</button>
       </div>
     </div>
   </div>
@@ -702,14 +696,12 @@
         </div>
 
         <p class="discount-preview" id="discountPreview"></p>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="discountModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-secondary hidden" id="discountEndBtn">End Discount</button>
-          <button type="button" class="btn-secondary hidden" id="discountNewBtn">+ New Discount</button>
-          <button type="button" class="btn-primary" id="discountSaveBtn">Save</button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary hidden" id="discountEndBtn">End Discount</button>
+        <button type="button" class="btn-secondary hidden" id="discountNewBtn">+ New Discount</button>
+        <button type="button" class="btn-primary" id="discountSaveBtn">Save</button>
       </div>
     </div>
   </div>
@@ -749,16 +741,14 @@
           <label class="modal-label">Packages mapped to this venue</label>
           <div id="venueMappedPackagesList" class="checklist-list"></div>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="venueModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-cancel" id="venueModalCancel">Cancel</button>
-          <button type="button" class="btn-primary" id="venueModalSave">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span id="venueModalSaveLabel">Add Venue</span>
-          </button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="venueModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="venueModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="venueModalSaveLabel">Add Venue</span>
+        </button>
       </div>
     </div>
   </div>
@@ -803,16 +793,14 @@
             <option value="global">One overall, across the whole catalogue</option>
           </select>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="badgeTypeModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-cancel" id="badgeTypeModalCancel">Cancel</button>
-          <button type="button" class="btn-primary" id="badgeTypeModalSave">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span id="badgeTypeModalSaveLabel">Add Badge Type</span>
-          </button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="badgeTypeModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="badgeTypeModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="badgeTypeModalSaveLabel">Add Badge Type</span>
+        </button>
       </div>
     </div>
   </div>
@@ -873,16 +861,14 @@
             <input type="number" id="cateringPrice50" class="modal-input" placeholder="50 pax" min="0">
           </div>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="cateringCategoryModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-cancel" id="cateringCategoryModalCancel">Cancel</button>
-          <button type="button" class="btn-primary" id="cateringCategoryModalSave">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span id="cateringCategoryModalSaveLabel">Add Category</span>
-          </button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="cateringCategoryModalCancel">Cancel</button>
+        <button type="button" class="btn-primary" id="cateringCategoryModalSave">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="cateringCategoryModalSaveLabel">Add Category</span>
+        </button>
       </div>
     </div>
   </div>
@@ -903,17 +889,15 @@
         <div id="cateringDishDrawerList"><p class="modal-hint">No dishes yet.</p></div>
         <div class="modal-field" style="margin-top:14px;">
           <label class="modal-label" for="cateringNewDishInput">Add a dish</label>
-          <div class="dish-add-row">
+          <div class="modal-row">
             <input type="text" id="cateringNewDishInput" class="modal-input" placeholder="E.g., Chicken ala King">
-            <button type="button" class="btn-cancel" id="cateringAddDishBtn">+ Add</button>
+            <button type="button" class="btn-cancel" id="cateringAddDishBtn" style="white-space:nowrap;">+ Add</button>
           </div>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="cateringDishDrawerMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-primary" id="cateringDishDrawerDone">Done</button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="cateringDishDrawerDone">Done</button>
       </div>
     </div>
   </div>
@@ -933,13 +917,11 @@
           <label class="modal-label" for="deleteReassignSelect">Reassign affected packages to</label>
           <select id="deleteReassignSelect" class="modal-input modal-select"></select>
         </div>
-      </div>
-      <div class="modal-footer modal-footer-stacked">
         <p class="modal-message hidden" id="deleteModalMessage"></p>
-        <div class="modal-footer-actions">
-          <button type="button" class="btn-cancel" id="deleteModalCancel">Cancel</button>
-          <button type="button" class="btn-danger" id="deleteModalOk">Delete</button>
-        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="deleteModalCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="deleteModalOk">Delete</button>
       </div>
     </div>
   </div>
