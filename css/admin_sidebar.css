@@ -35,20 +35,29 @@ body.is-super-admin .sidebar-nav .nav-badge { display: none !important; }
 
 body.is-super-admin .view-only-pill { display: inline-flex; }
 
-/* ── HAMBURGER BUTTON (hidden on desktop, shown on mobile) ─── */
+/* ── HAMBURGER BUTTON (hidden on desktop, shown on mobile) ───
+   Its own background is --sidebar-bg (dark brown, #2A1208), same as the
+   drawer it opens — so its icon must be a light color to read against
+   that, not --nav-text. --nav-text isn't defined here at all: on most
+   pages that left the var() fallback (#20150b, near-black) painting a
+   dark icon on the dark-brown button — effectively invisible, reading as
+   a plain brown square. A couple of pages (admin_inquiries.css) patched
+   this locally with a cream icon; moved here so every admin page gets it,
+   this file being the icon's one shared home. Do not reintroduce a
+   page-specific override — fix color/hover here instead. */
 .sidebar-hamburger {
   display: none;
   position: fixed;
   top: 14px;
   left: 14px;
   z-index: 300;
-  background: var(--sidebar-bg, #fffaf5);
-  border: 1px solid var(--border, #eadfd2);
+  background: var(--sidebar-bg, #2A1208);
+  border: 1px solid var(--sidebar-line, #4A2C17);
   border-radius: 10px;
   width: 40px;
   height: 40px;
   cursor: pointer;
-  color: var(--nav-text, #20150b);
+  color: var(--sidebar-cream, #F5EBDD);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
   align-items: center;
   justify-content: center;
@@ -56,7 +65,12 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
   transition: background .15s;
 }
 
-.sidebar-hamburger:hover { background: var(--bg, #f5efe7); }
+/* A light hover fill (the old --bg/cream page background) behind a cream
+   icon reduced contrast on tap instead of confirming it — and on touch
+   devices this :hover applies immediately on tap and stays until the next
+   tap elsewhere, so it read as the button's real, resting appearance
+   rather than a hover state. Use the same dark hover the nav rows use. */
+.sidebar-hamburger:hover { background: var(--nav-hover-bg, #3D1A0A); }
 
 /* ── SIDEBAR OVERLAY ─────────────────────────────────────────── */
 .sidebar-overlay {
@@ -175,6 +189,36 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
 
   .pagination-controls {
     gap: 8px !important;
+  }
+
+  /* Rail-collapse only has a visual effect at >=769px (see the
+     min-width:769px block below); below that its click still ran (icon
+     flipped) but nothing else happened, which read as a broken control.
+     The drawer (hamburger + overlay, above) is mobile's own collapse UI. */
+  .sidebar-collapse-btn { display: none !important; }
+
+  /* Once the drawer is open, the fixed hamburger sits in front of the
+     sidebar's own (dark) brand row instead of the page behind it, so a
+     dark button on a dark sidebar read as a near-invisible block sitting
+     on top of the logo. Switch it to a light scheme to read clearly
+     against the dark drawer, matching the drawer's cream nav-hover fill. */
+  body.sidebar-open .sidebar-hamburger {
+    background: var(--card-bg, #FFFFFF);
+    border-color: var(--border, #E8DFD3);
+    color: var(--text, #1A1A1A);
+  }
+  body.sidebar-open .sidebar-hamburger:hover {
+    background: var(--bg, #FAF6F0);
+  }
+
+  /* The button is fixed at the same top-left corner the drawer's own logo
+     occupies (14px in vs. the brand icon's 18px), so opening the drawer
+     always sat it directly on top of the logo and clipped the brand name
+     next to it. Push the brand row down clear of the button's footprint
+     (40px tall + 14px top offset + a small gap) instead of moving the
+     button, which stays anchored to the same corner on every admin page. */
+  body.sidebar-open .sidebar-brand {
+    padding-top: 46px;
   }
 }
 

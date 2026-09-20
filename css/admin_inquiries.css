@@ -278,21 +278,9 @@
   padding-top: 0;
 }
 
-/* Mobile menu button. admin_sidebar.css paints it with --sidebar-bg (dark brown)
-   but colours the icon with --nav-text, which manager-theme.css never defines and
-   admin_reservations.css sets to near-black — so the three-line icon was dark on
-   dark and effectively invisible (just a plain dark square). Cream icon to match
-   the drawer it opens, and a matching hover colour (the shared hover background is
-   a light cream, which would otherwise swallow a cream icon). */
-/* "body" prefix: admin_sidebar.css is linked AFTER this file, so at equal
-   specificity its own .sidebar-hamburger rules would win. */
-body .sidebar-hamburger {
-  color: var(--sidebar-cream, #F5EBDD);
-  border-color: var(--sidebar-line, #4A2C17);
-}
-body .sidebar-hamburger:hover {
-  background: var(--nav-hover-bg, #3D1A0A);
-}
+/* The dark-icon-on-dark-button fix that used to live here as a page-only
+   patch is now the shared default in admin_sidebar.css (.sidebar-hamburger),
+   so every admin page gets it, not just this one. Nothing to override here. */
 
 /* Inquiries — real-table mode (>=1451px; the exact complement of the stacked-card
    block below). The shared .reservation-table centres the last header ("Action")
