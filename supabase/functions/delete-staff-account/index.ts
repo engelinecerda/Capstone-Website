@@ -3,6 +3,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+// The very first admin account — the only account allowed to hard-delete
+// Manager or Staff accounts. Every other admin can still manage accounts
+// (edit, deactivate/reactivate, reset passwords, clear lockouts) but not
+// remove them. Admin accounts can never be removed by anyone, including
+// this one. This is the real enforcement point; the matching check in
+// js/super_admin_accounts.js only hides the "Remove" menu item and must
+// not be relied on by itself.
+const SUPER_ADMIN_EMAIL = 'adminelicoffee@gmail.com';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -40,12 +49,20 @@ Deno.serve(async (req: Request) => {
 
   const { data: callerProfile, error: callerProfileError } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, email')
     .eq('user_id', callerData.user.id)
     .maybeSingle();
 
   if (callerProfileError || callerProfile?.role !== 'admin') {
     return jsonResponse({ error: 'This action requires the Admin role' }, 403);
+  }
+
+  // Only the first admin account can remove accounts — this keeps any
+  // other admin from removing another admin (or anyone else). Checked by
+  // email rather than a flag column since that's how the account is
+  // identified elsewhere in this project.
+  if ((callerProfile.email || '').trim().toLowerCase() !== SUPER_ADMIN_EMAIL) {
+    return jsonResponse({ error: 'Only the primary admin account can remove accounts.' }, 403);
   }
 
   let body: Record<string, unknown>;
@@ -72,26 +89,12 @@ Deno.serve(async (req: Request) => {
 
   const targetName = [target.first_name, target.last_name].filter(Boolean).join(' ') || target.email || 'This account';
 
+  // Admin accounts can never be removed — not even by the first admin.
+  // Only Manager and Staff accounts are eligible for removal.
   if (target.role === 'admin') {
-    const { count, error: adminCountError } = await supabaseAdmin
-      .from('profiles')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('role', 'admin')
-      .eq('is_locked', false)
-      .neq('user_id', userId);
-
-    if (adminCountError) {
-      return jsonResponse({ error: `Failed to check remaining admins: ${adminCountError.message}` }, 500);
-    }
-    if ((count ?? 0) === 0) {
-      return jsonResponse({ error: 'At least one admin is required.' }, 409);
-    }
+    return jsonResponse({ error: 'Admin accounts cannot be removed.' }, 403);
   }
 
-  // Defense in depth — the profiles trigger (protect_last_admin) already
-  // blocks this at the DB level; this is just a friendlier message than a
-  // raw Postgres exception.
-  //
   // Reference check: only hard-delete an account nothing else points to.
   // Mirrors delete-payment-method's exact reference-count-then-delete
   // pattern. A referenced account is deactivated instead (is_locked = true),

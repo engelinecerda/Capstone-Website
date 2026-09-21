@@ -12,10 +12,10 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
   <aside class="sidebar">
@@ -134,7 +134,9 @@
               <div class="card-head-row">
                 <h2 class="card-title">Booking details</h2>
               </div>
-              <div class="dl-grid-2col" id="bookingDetailsGrid"></div>
+              <div class="dl-grid-wrap">
+                <div class="dl-grid-2col" id="bookingDetailsGrid"></div>
+              </div>
               <div class="dl-rows" id="bookingDetailsRows"></div>
             </section>
 
@@ -146,7 +148,9 @@
                   <a class="card-head-link" id="openPaymentsLink" href="#">Open payments &rarr;</a>
                 </div>
               </div>
-              <div class="dl-grid-2col" id="paymentDetailsGrid"></div>
+              <div class="dl-grid-wrap">
+                <div class="dl-grid-2col" id="paymentDetailsGrid"></div>
+              </div>
               <div class="dl-rows" id="paymentDetailsRows"></div>
 
               <div class="payment-history-wrap">
@@ -349,6 +353,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="../js/admin_reservation_details.js?v=46"></script>
+  <script type="module" src="../js/admin_reservation_details.js?v=47"></script>
 </body>
 </html>

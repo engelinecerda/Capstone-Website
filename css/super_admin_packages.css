@@ -551,6 +551,7 @@
 
 .modal-footer-stacked .modal-footer-actions {
   justify-content: flex-end;
+  flex-wrap: wrap;                 /* 3-button footers (Discount) wrap instead of overflowing on narrow phones */
   padding: 14px 22px 18px;
   border-top: 0.5px solid var(--border);
 }
@@ -1043,10 +1044,14 @@
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(42, 18, 8, .04);
-  transition: transform .15s ease, box-shadow .15s ease;
+  transition: top .15s ease, box-shadow .15s ease;
 }
+/* The hover lift uses top (the card is position: relative) rather than
+   transform on purpose: a transformed ancestor becomes the containing
+   block for position: fixed descendants, which would pin the kebab menu
+   to the card and let overflow: hidden clip it again. */
 .pkg-card:hover, .pkg-card:focus-within {
-  transform: translateY(-2px);
+  top: -2px;
   box-shadow: 0 10px 24px rgba(42, 18, 8, .12);
 }
 .pkg-card.is-archived { opacity: .55; }
@@ -1254,6 +1259,13 @@
   box-shadow: 0 12px 28px rgba(42, 18, 8, .16);
   padding: 6px;
   z-index: 20;
+  /* JS (positionCardMenu) switches this to position: fixed on open and
+     caps max-height to the space actually available; these make that
+     safe on short/narrow screens. */
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .card-menu-popover[hidden] { display: none; }
 .card-menu-item {
@@ -1334,4 +1346,18 @@
   .filter-right #statusSeg .seg-btn { flex: 1 1 0; justify-content: center; }
   .filter-right #viewSeg .seg-btn { padding: 6px 12px; }
   .inventory-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Four-up input row (catering "Price per pax bracket": 20 / 30 / 40 / 50) ──
+   This used to be .modal-row-three with an inline grid-template-columns:
+   repeat(4, 1fr). Inline styles beat every media query, so the row stayed four
+   columns wide on phones and each input was ~55px — cutting the placeholders
+   ("20 pa"). A real class lets it drop to a 2 x 2 grid on small screens.
+   minmax(0, 1fr) lets the number inputs shrink to their column instead of
+   pushing the modal wider. Two-class selector so it beats the generic
+   .modal-row { 1fr } in the 720px block above regardless of source order. */
+.modal-row.modal-row-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 560px) {
+  .modal-row.modal-row-four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

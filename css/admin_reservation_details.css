@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=46');
+@import url('./admin_reservations.css?v=47');
 
 /* ============================================================
    Hidden-state overrides.
@@ -503,7 +503,11 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  /* Wrap as a last resort: if a row is too narrow for its label AND a
+     readable slice of the value, the value drops onto its own line under the
+     label instead of being squeezed into a sliver. See .dl-value below. */
+  flex-wrap: wrap;
+  gap: 4px 16px;
   padding: 8px 0;
   border-bottom: 0.5px solid var(--border);
   min-width: 0;
@@ -531,6 +535,18 @@
   text-align: right;
   min-width: 0;
   overflow-wrap: anywhere;   /* long values (emails, addresses) wrap instead of overflowing */
+}
+
+/* The label is flex-shrink: 0, so in a narrow row the value used to get
+   whatever was left over — sometimes ~20px, which with overflow-wrap: anywhere
+   printed amounts and dates one character per line ("₱3,298." / "90").
+   Give the value a readable floor (9ch) and let it grow to fill the rest of the
+   row. It only wraps below the label when even that floor doesn't fit. Scoped
+   to horizontal rows — .dl-row.full is a column, where a zero flex-basis would
+   collapse the value's height. */
+.dl-row:not(.full) > .dl-value {
+  flex: 1 1 0;
+  min-width: min(100%, 9ch);
 }
 
 .dl-row.full .dl-value {
@@ -1023,6 +1039,16 @@
   color: var(--muted-2);
   font-size: 12px;
   border-bottom: none;
+}
+
+/* The empty-state cell spans the whole table, and on phones the table is wider
+   than its scroll wrapper (its column headers don't wrap). Centering the text
+   across that full width pushed it partly off-screen ("No payments recorded
+   ye…"), so anchor it to the left edge, which is always in view. */
+@media (max-width: 600px) {
+  .payment-history-empty-row td {
+    text-align: left;
+  }
 }
 
 /* ============================================================

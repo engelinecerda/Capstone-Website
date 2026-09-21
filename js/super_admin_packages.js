@@ -683,7 +683,7 @@ categoryRail.addEventListener('click', (e) => {
       popover.hidden = false;
       menuTrigger.setAttribute('aria-expanded', 'true');
       openCardMenuEl = popover;
-      positionRailPopover(popover, menuTrigger);
+      positionCardMenu(popover, menuTrigger);
     }
     return;
   }
@@ -703,44 +703,67 @@ categoryRail.addEventListener('click', (e) => {
   }
 });
 
-// The category rail scrolls its own contents (overflow-y: auto), which
-// clips the popover's default CSS positioning (absolute, relative to the
-// narrow rail row) — it visually gets cut off inside that row instead of
-// floating over the page. Fixed-positioning it from the trigger's real
-// on-screen coordinates escapes that clipping entirely.
-function positionRailPopover(popover, trigger) {
-  const rect = trigger.getBoundingClientRect();
-  popover.style.position = 'fixed';
-  popover.style.top = '0px';
-  popover.style.bottom = 'auto';
-  popover.style.left = '0px';
-  popover.style.right = 'auto'; 
+// Every kebab popover on this page (category rail, package list rows and
+// package grid cards) lives inside something that clips its default
+// absolute positioning: the rail scrolls its own contents (overflow-y:
+// auto), the list sits in .table-wrap (overflow-x: auto, which also clips
+// vertically), and .pkg-card has overflow: hidden. Pinning the popover with
+// position: fixed from the trigger's on-screen coordinates lets it float
+// over the page instead. It flips upward when there isn't room below,
+// stays inside the viewport horizontally, and gets a max-height (scrollable
+// via CSS) when the viewport is too short to show every item.
+function positionCardMenu(popover, trigger) {
+  const MARGIN = 8;   // minimum gap kept from every viewport edge
+  const GAP    = 4;   // gap between trigger and popover
+  const rect   = trigger.getBoundingClientRect();
 
-  const popRect = popover.getBoundingClientRect(); 
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const openUpward = spaceBelow < popRect.height + 12 && rect.top > popRect.height + 12;
-
-  if (openUpward) {
-    popover.style.top = 'auto';
-    popover.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-  } else {
-    popover.style.top = `${rect.bottom + 4}px`;
-    popover.style.bottom = 'auto';
-  }
-
-  let leftPos = rect.right - popRect.width;
-  if (leftPos < 8) leftPos = 8;
-  popover.style.left = `${leftPos}px`;
+  popover.style.position  = 'fixed';
   // Escaping to fixed positioning moves this into the root stacking
   // context, where the admin sidebar/topbar (z-index up to 500) would
   // otherwise sit on top of it.
-  popover.style.zIndex = '600';
+  popover.style.zIndex    = '600';
+  popover.style.right     = 'auto';
+  popover.style.bottom    = 'auto';
+  popover.style.maxHeight = '';
+  popover.style.top       = '0px';
+  popover.style.left      = '0px';
+
+  const vw = document.documentElement.clientWidth;
+  const vh = window.innerHeight;
+  const popW = popover.offsetWidth;
+  const naturalH = popover.offsetHeight;
+
+  const spaceBelow = vh - rect.bottom - GAP - MARGIN;
+  const spaceAbove = rect.top - GAP - MARGIN;
+  const openUpward = naturalH > spaceBelow && spaceAbove > spaceBelow;
+  const available  = Math.max(openUpward ? spaceAbove : spaceBelow, 96);
+
+  if (naturalH > available) popover.style.maxHeight = `${available}px`;
+  const popH = popover.offsetHeight;
+
+  const top = openUpward ? rect.top - GAP - popH : rect.bottom + GAP;
+  popover.style.top = `${Math.max(MARGIN, top)}px`;
+
+  // Right-align to the trigger, then clamp inside the viewport on both sides.
+  const left = Math.min(rect.right - popW, vw - popW - MARGIN);
+  popover.style.left = `${Math.max(MARGIN, left)}px`;
 }
 
-// A fixed-position popover doesn't track the rail scrolling beneath it, so
-// close it rather than leave it visually detached from its trigger.
-categoryRail.addEventListener('scroll', () => {
-  if (openCardMenuEl && categoryRail.contains(openCardMenuEl)) closeOpenCardMenu();
+// A fixed-position popover doesn't follow its trigger when the page, the
+// rail or the table's own horizontal scroll moves underneath it, so close
+// it on scroll rather than leave it floating detached — except when the
+// scroll is the popover's own list scrolling on a short screen. Resizing /
+// rotating the device just re-anchors it to the trigger. (Scroll events
+// don't bubble, hence the capture flag.)
+window.addEventListener('scroll', (e) => {
+  if (!openCardMenuEl) return;
+  if (e.target instanceof Node && openCardMenuEl.contains(e.target)) return;
+  closeOpenCardMenu();
+}, true);
+window.addEventListener('resize', () => {
+  if (!openCardMenuEl) return;
+  const trigger = openCardMenuEl.previousElementSibling;
+  if (trigger) positionCardMenu(openCardMenuEl, trigger);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -754,6 +777,7 @@ function closeOpenCardMenu() {
     openCardMenuEl.style.bottom = '';
     openCardMenuEl.style.left = '';
     openCardMenuEl.style.right = '';
+    openCardMenuEl.style.maxHeight = '';
     openCardMenuEl.style.zIndex = '';
     const trigger = openCardMenuEl.previousElementSibling;
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
@@ -803,7 +827,12 @@ function handleInventoryClick(e) {
     const popover = trigger.nextElementSibling;
     const isOpen = openCardMenuEl === popover;
     closeOpenCardMenu();
-    if (!isOpen) { popover.hidden = false; trigger.setAttribute('aria-expanded', 'true'); openCardMenuEl = popover; }
+    if (!isOpen) {
+      popover.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      openCardMenuEl = popover;
+      positionCardMenu(popover, trigger);
+    }
     return;
   }
   if (e.target.closest('[data-pkg-action]')) {

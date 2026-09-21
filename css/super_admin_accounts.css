@@ -307,6 +307,13 @@ tbody tr:hover td { background: var(--btn-secondary-hover); }
   box-shadow: 0 12px 28px rgba(42, 18, 8, .16);
   padding: 6px;
   z-index: 20;
+  /* JS (positionCardMenu) switches this to position: fixed on open and
+     caps max-height to the space actually available; these make that
+     safe on short/narrow screens. */
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .card-menu-popover[hidden] { display: none; }
 .card-menu-item {

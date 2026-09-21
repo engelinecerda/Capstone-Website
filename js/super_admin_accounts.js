@@ -37,6 +37,17 @@ const PER_PAGE  = 10;
 let openCardMenuEl = null;       // currently-open kebab popover element
 let lastFocusedTrigger = null;   // element to return focus to when a modal closes
 
+// The very first admin account — the only one allowed to hard-delete
+// Manager or Staff accounts. Every other admin can still manage accounts
+// (edit, deactivate/reactivate, reset passwords, clear lockouts) but not
+// remove them. Admin accounts can never be removed by anyone, including
+// this one. This mirrors the server-side check in the
+// delete-staff-account edge function; this client-side check is only for
+// hiding the menu item, not real enforcement, so it must never be trusted
+// on its own.
+const SUPER_ADMIN_EMAIL = 'adminelicoffee@gmail.com';
+let currentAdminEmail = '';
+
 // ── LOAD ─────────────────────────────────────────────────────────
 // silent=true is used by the auto-refresh triggers: it skips blanking the
 // table with "Loading accounts…" first, and on failure it keeps the
@@ -72,6 +83,14 @@ async function loadAccounts({ silent = false } = {}) {
     _status: a.is_locked ? 'deactivated' : (!a.last_sign_in_at ? 'invited' : 'active')
   }));
   updateStats();
+
+  // Auto-refresh guard: renderTable() rebuilds every row, which destroys an
+  // open kebab menu (and its trigger) out from under the person using it.
+  // allAccounts and the stat cards are already up to date at this point, so
+  // for a silent background refresh just leave the table as-is while a menu
+  // is open — the next refresh (or any filter/search/page change) redraws it.
+  if (silent && openCardMenuEl) return;
+
   applyFilters({ resetPage: !silent });
 }
 
@@ -154,8 +173,15 @@ function buildRowMenu(a) {
   if (a.is_board_account) items.push({ action: 'reset-board-password', label: 'Reset board password' });
   items.push({ action: 'lock', label: a._status === 'deactivated' ? 'Reactivate' : 'Deactivate' });
   items.push({ action: 'clear-login-lock', label: 'Clear login lockout' });
-  items.push({ divider: true });
-  items.push({ action: 'delete', label: 'Remove', destructive: true });
+  // Only the first admin (SUPER_ADMIN_EMAIL) can remove accounts, and even
+  // they can only remove Manager/Staff — Admin accounts can never be
+  // removed by anyone, including the first admin. Real enforcement lives
+  // in the delete-staff-account edge function; this just keeps the menu
+  // honest about what will work.
+  if (currentAdminEmail === SUPER_ADMIN_EMAIL && a.role !== 'admin') {
+    items.push({ divider: true });
+    items.push({ action: 'delete', label: 'Remove', destructive: true });
+  }
 
   const itemsHtml = items.map(it => {
     if (it.divider) return '<div class="card-menu-divider"></div>';
@@ -172,10 +198,61 @@ function buildRowMenu(a) {
 function closeOpenCardMenu() {
   if (openCardMenuEl) {
     openCardMenuEl.hidden = true;
+    // Clear the inline fixed-position styles set by positionCardMenu() so
+    // the next open re-measures from a clean slate.
+    openCardMenuEl.style.position = '';
+    openCardMenuEl.style.top = '';
+    openCardMenuEl.style.left = '';
+    openCardMenuEl.style.right = '';
+    openCardMenuEl.style.bottom = '';
+    openCardMenuEl.style.maxHeight = '';
+    openCardMenuEl.style.zIndex = '';
     const trigger = openCardMenuEl.previousElementSibling;
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
     openCardMenuEl = null;
   }
+}
+
+// The accounts table sits in .table-wrap { overflow-x: auto }, and any
+// non-visible overflow value forces overflow-y to clip too — so the
+// popover's default absolute positioning gets cut off at the bottom edge
+// of the table (very obvious when there are only a few rows). Pinning it
+// with position: fixed from the trigger's on-screen coordinates lets it
+// float over the page instead. It also flips upward when there isn't room
+// below, stays inside the viewport horizontally, and gets a max-height
+// (scrollable via CSS) when the viewport is too short to show every item.
+function positionCardMenu(popover, trigger) {
+  const MARGIN = 8;   // minimum gap kept from every viewport edge
+  const GAP    = 4;   // gap between trigger and popover
+  const rect   = trigger.getBoundingClientRect();
+
+  popover.style.position  = 'fixed';
+  popover.style.zIndex    = '600';   // above sidebar/topbar (up to 500)
+  popover.style.right     = 'auto';
+  popover.style.bottom    = 'auto';
+  popover.style.maxHeight = '';
+  popover.style.top       = '0px';
+  popover.style.left      = '0px';
+
+  const vw = document.documentElement.clientWidth;
+  const vh = window.innerHeight;
+  const popW = popover.offsetWidth;
+  const naturalH = popover.offsetHeight;
+
+  const spaceBelow = vh - rect.bottom - GAP - MARGIN;
+  const spaceAbove = rect.top - GAP - MARGIN;
+  const openUpward = naturalH > spaceBelow && spaceAbove > spaceBelow;
+  const available  = Math.max(openUpward ? spaceAbove : spaceBelow, 96);
+
+  if (naturalH > available) popover.style.maxHeight = `${available}px`;
+  const popH = popover.offsetHeight;
+
+  const top = openUpward ? rect.top - GAP - popH : rect.bottom + GAP;
+  popover.style.top = `${Math.max(MARGIN, top)}px`;
+
+  // Right-align to the trigger, then clamp inside the viewport on both sides.
+  const left = Math.min(rect.right - popW, vw - popW - MARGIN);
+  popover.style.left = `${Math.max(MARGIN, left)}px`;
 }
 
 function renderTable() {
@@ -238,7 +315,12 @@ document.getElementById('accountsBody').addEventListener('click', e => {
     const popover = trigger.nextElementSibling;
     const isOpen = openCardMenuEl === popover;
     closeOpenCardMenu();
-    if (!isOpen) { popover.hidden = false; trigger.setAttribute('aria-expanded', 'true'); openCardMenuEl = popover; }
+    if (!isOpen) {
+      popover.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      openCardMenuEl = popover;
+      positionCardMenu(popover, trigger);
+    }
     return;
   }
 
@@ -254,7 +336,7 @@ document.getElementById('accountsBody').addEventListener('click', e => {
   if (btn.dataset.action === 'clear-login-lock')      clearLoginLock(a);
   if (btn.dataset.action === 'reset-password')        sendPasswordReset(a);
   if (btn.dataset.action === 'reset-board-password')  openBoardResetConfirm(a);
-  if (btn.dataset.action === 'delete')                openRemoveConfirm(a);
+  if (btn.dataset.action === 'delete' && currentAdminEmail === SUPER_ADMIN_EMAIL && a.role !== 'admin') openRemoveConfirm(a);
 });
 
 document.addEventListener('click', e => {
@@ -262,6 +344,22 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && openCardMenuEl) closeOpenCardMenu();
+});
+
+// A fixed-position popover doesn't follow its trigger when the page (or the
+// table's own horizontal scroll) moves underneath it, so close it on scroll
+// rather than leave it floating detached — except when the scroll is the
+// popover's own list scrolling on a short screen. Resizing / rotating the
+// device just re-anchors it to the trigger.
+window.addEventListener('scroll', e => {
+  if (!openCardMenuEl) return;
+  if (e.target instanceof Node && openCardMenuEl.contains(e.target)) return;
+  closeOpenCardMenu();
+}, true);
+window.addEventListener('resize', () => {
+  if (!openCardMenuEl) return;
+  const trigger = openCardMenuEl.previousElementSibling;
+  if (trigger) positionCardMenu(openCardMenuEl, trigger);
 });
 
 // ── FILTER EVENTS ────────────────────────────────────────────────
@@ -930,6 +1028,8 @@ async function init() {
     window.location.replace('/admin/dashboard');
     return;
   }
+
+  currentAdminEmail = (result.profile.email || '').trim().toLowerCase();
 
   const avatarEl = document.getElementById('sidebarAvatar');
   if (avatarEl) avatarEl.textContent = getPortalInitials(result.profile);
