@@ -48,7 +48,7 @@ function ensureStylesheet() {
     }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/css/feedback_modal.css?v=25';
+    link.href = '/css/feedback_modal.css?v=48';
     link.setAttribute('data-feedback-modal', '');
     stylesheetReady = new Promise((resolve) => {
         link.addEventListener('load', resolve, { once: true });
