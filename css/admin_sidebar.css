@@ -35,20 +35,29 @@ body.is-super-admin .sidebar-nav .nav-badge { display: none !important; }
 
 body.is-super-admin .view-only-pill { display: inline-flex; }
 
-/* ── HAMBURGER BUTTON (hidden on desktop, shown on mobile) ─── */
+/* ── HAMBURGER BUTTON (hidden on desktop, shown on mobile) ───
+   Its own background is --sidebar-bg (dark brown, #2A1208), same as the
+   drawer it opens — so its icon must be a light color to read against
+   that, not --nav-text. --nav-text isn't defined here at all: on most
+   pages that left the var() fallback (#20150b, near-black) painting a
+   dark icon on the dark-brown button — effectively invisible, reading as
+   a plain brown square. A couple of pages (admin_inquiries.css) patched
+   this locally with a cream icon; moved here so every admin page gets it,
+   this file being the icon's one shared home. Do not reintroduce a
+   page-specific override — fix color/hover here instead. */
 .sidebar-hamburger {
   display: none;
   position: fixed;
   top: 14px;
   left: 14px;
   z-index: 300;
-  background: var(--sidebar-bg, #fffaf5);
-  border: 1px solid var(--border, #eadfd2);
+  background: var(--sidebar-bg, #2A1208);
+  border: 1px solid var(--sidebar-line, #4A2C17);
   border-radius: 10px;
   width: 40px;
   height: 40px;
   cursor: pointer;
-  color: var(--nav-text, #20150b);
+  color: var(--sidebar-cream, #F5EBDD);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
   align-items: center;
   justify-content: center;
@@ -56,7 +65,12 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
   transition: background .15s;
 }
 
-.sidebar-hamburger:hover { background: var(--bg, #f5efe7); }
+/* A light hover fill (the old --bg/cream page background) behind a cream
+   icon reduced contrast on tap instead of confirming it — and on touch
+   devices this :hover applies immediately on tap and stays until the next
+   tap elsewhere, so it read as the button's real, resting appearance
+   rather than a hover state. Use the same dark hover the nav rows use. */
+.sidebar-hamburger:hover { background: var(--nav-hover-bg, #3D1A0A); }
 
 /* ── SIDEBAR OVERLAY ─────────────────────────────────────────── */
 .sidebar-overlay {
@@ -67,7 +81,10 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
   z-index: 199;
 }
 
-body.sidebar-open .sidebar-overlay { display: block; }
+/* The overlay only shows at drawer widths (see the ≤768px block below).
+   It used to be unconditional, so opening the drawer on a phone/tablet and
+   then rotating or resizing past 768px left a dark overlay over the desktop
+   layout, with no hamburger visible to close it. */
 
 /* ── LARGE DESKTOP (≥ 1600px) ──────────────────────────────────
    This used to blow up .main with a blunt `zoom` (1.12, then 1.25) so
@@ -105,9 +122,18 @@ body.sidebar-open .sidebar-overlay { display: block; }
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18) !important;
   }
 
-  /* Main content fills full width */
+  body.sidebar-open .sidebar-overlay { display: block; }
+
+  /* Main content fills full width.
+     margin-left alone isn't enough — manager-theme.css's base .main rule
+     also sets width/flex to calc(100% - var(--sidebar-w)), which still
+     reserved ~210px for the now off-canvas (transform-only) sidebar and
+     left a blank strip on the right on real mobile widths. Reset all
+     three together so .main actually spans the full viewport. */
   .main {
     margin-left: 0 !important;
+    width: 100% !important;
+    flex: 0 0 100% !important;
     padding: 64px 16px 40px !important;
   }
 
@@ -120,6 +146,21 @@ body.sidebar-open .sidebar-overlay { display: block; }
     align-items: flex-start !important;
     gap: 12px !important;
     flex-wrap: wrap !important;
+  }
+
+  /* ...except a header whose only action is the notification bell: it keeps
+     title + bell on one row with the bell at the top-right, as
+     manager-theme.css intends ("BELL STAYS TOP-RIGHT"). The !important
+     stack above used to beat that rule below 768px and dropped the bell
+     onto its own row under the title on every admin page. This is a
+     separate override (not an edit to the rule above) on purpose: a browser
+     without :has() support just ignores it and behaves exactly as before.
+     Its ID-bearing selector outranks the plain .page-header rule above;
+     align-items/gap already match, so only direction and wrap are reset. */
+  .page-header:has(> .header-actions > #managerNotifBell:only-child),
+  .page-header:has(> .reports-header-actions > #managerNotifBell:only-child) {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
   }
 
   .page-title { font-size: 22px !important; }
@@ -148,6 +189,36 @@ body.sidebar-open .sidebar-overlay { display: block; }
 
   .pagination-controls {
     gap: 8px !important;
+  }
+
+  /* Rail-collapse only has a visual effect at >=769px (see the
+     min-width:769px block below); below that its click still ran (icon
+     flipped) but nothing else happened, which read as a broken control.
+     The drawer (hamburger + overlay, above) is mobile's own collapse UI. */
+  .sidebar-collapse-btn { display: none !important; }
+
+  /* Once the drawer is open, the fixed hamburger sits in front of the
+     sidebar's own (dark) brand row instead of the page behind it, so a
+     dark button on a dark sidebar read as a near-invisible block sitting
+     on top of the logo. Switch it to a light scheme to read clearly
+     against the dark drawer, matching the drawer's cream nav-hover fill. */
+  body.sidebar-open .sidebar-hamburger {
+    background: var(--card-bg, #FFFFFF);
+    border-color: var(--border, #E8DFD3);
+    color: var(--text, #1A1A1A);
+  }
+  body.sidebar-open .sidebar-hamburger:hover {
+    background: var(--bg, #FAF6F0);
+  }
+
+  /* The button is fixed at the same top-left corner the drawer's own logo
+     occupies (14px in vs. the brand icon's 18px), so opening the drawer
+     always sat it directly on top of the logo and clipped the brand name
+     next to it. Push the brand row down clear of the button's footprint
+     (40px tall + 14px top offset + a small gap) instead of moving the
+     button, which stays anchored to the same corner on every admin page. */
+  body.sidebar-open .sidebar-brand {
+    padding-top: 46px;
   }
 }
 
@@ -292,3 +363,44 @@ body.sidebar-open .sidebar-overlay { display: block; }
   outline: none;
 }
 .admin-maintenance-strip svg { flex-shrink: 0; }
+
+/* ── LOGOUT IN PROGRESS ─────────────────────────────────────────
+   js/session_validation.js (setLogoutBusy) adds .is-loading + disabled to the
+   sidebar logout button as soon as it's clicked. The icon is replaced by a small
+   spinner and the button stays highlighted until the browser leaves the page, so
+   there's visible feedback while signOut() and the redirect finish. Lives here
+   because this sheet loads on every admin page. Hover colors are repeated on
+   purpose so this wins over .sidebar-logout-btn:hover regardless of load order. */
+.sidebar-logout-btn { position: relative; }
+
+.sidebar-logout-btn.is-loading {
+  background: var(--nav-hover-bg);
+  color: var(--sidebar-cream);
+  cursor: progress;
+}
+
+.sidebar-logout-btn.is-loading svg { opacity: 0; }
+
+.sidebar-logout-btn.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sidebar-logout-spin 0.7s linear infinite;
+}
+
+@keyframes sidebar-logout-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Slow the spin rather than remove it — it's the only sign that logout is
+   underway, so it should still read as "working". */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-logout-btn.is-loading::after { animation-duration: 1.8s; }
+}

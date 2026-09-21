@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kumbh+Sans:wght@400;500;600;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=44">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=44">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=44">
-  <link rel="stylesheet" href="/css/super_admin_backup.css?v=44">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_backup.css?v=46">
   <!-- Google Identity Services (token model, no redirect needed) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -56,6 +56,9 @@
         <div>
           <h1 class="page-title">Backup Module <span class="admin-badge" id="adminBadge">Loading...</span></h1>
           <p class="page-sub">Manage system database backups and restore operations</p>
+        </div>
+        <div class="header-actions">
+          <span id="managerNotifBell"></span>
         </div>
       </div>
 
@@ -112,10 +115,18 @@
               <p class="action-card-sub">Restore all tables from a previous backup file</p>
             </div>
           </div>
-          <button type="button" class="btn-outline btn-full" id="restoreSystemBtn" disabled>
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-            Restore Latest Backup
-          </button>
+          <div class="action-card-actions">
+            <button type="button" class="btn-outline btn-full" id="restoreSystemBtn" disabled>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+              Restore Latest Backup
+            </button>
+            <button type="button" class="btn-outline btn-full btn-subtle" id="uploadBackupBtn">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Backup File
+            </button>
+            <input type="file" id="localBackupInput" accept="application/json,.json" hidden>
+            <p class="action-card-hint">Restore from a <code>.json</code> backup stored on this computer — no Google Drive connection required.</p>
+          </div>
         </div>
       </div>
 
@@ -239,6 +250,7 @@
           <span>This will upsert all rows from the backup into every table. Existing records will be overwritten. This cannot be undone.</span>
         </div>
         <p class="confirm-copy" id="restoreCopy">Restore from selected backup?</p>
+        <div class="restore-file-meta hidden" id="restoreFileMeta"></div>
         <div class="progress-wrap hidden" id="restoreProgressWrap">
           <div class="progress-header">
             <span class="progress-label" id="restoreProgressLabel">Preparing…</span>
@@ -277,6 +289,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="/js/super_admin_backup.js"></script>
+  <script type="module" src="/js/super_admin_backup.js?v=46"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
    .status-pill/.et-action-btn, which redeclared its own cream/Kumbh-Sans
    :root and silently overrode the shared dark-sidebar theme on this page
    only. Those classes are now defined locally, in the shared palette. */
-@import url('admin_payment_options.css?v=44');
+@import url('admin_payment_options.css?v=46');
 
 /* ── TOP-LEVEL TABS ── */
 .settings-tabs {
@@ -95,7 +95,14 @@
 }
 .res-input:focus { border-color: var(--input-focus); }
 
-.et-table { width: 100%; border-collapse: collapse; }
+/* Wraps .et-table in admin/config/form.html — this table has 4 columns
+   (Name, Description, Status, Actions) and was the only table on the
+   page not given a horizontal-scroll wrapper, so it clipped/overflowed
+   below ~600px. Matches the .table-wrap pattern already used by
+   super_admin_settings.css/super_admin_packages.css/etc. */
+.table-wrap { overflow-x: auto; }
+
+.et-table { width: 100%; min-width: 480px; border-collapse: collapse; }
 .et-table th, .et-table td {
   text-align: left;
   padding: 10px 12px 10px 0;
@@ -202,6 +209,7 @@
   max-width: 640px;
   width: 100%;
   max-height: 84vh;
+  max-height: 84dvh;
   display: flex;
   flex-direction: column;
   padding: 24px;
@@ -394,4 +402,10 @@
   .settings-card { padding: 20px 16px; }
   .ct-field-row { flex-wrap: wrap; }
   .ct-field-sample { display: none; }
+  .et-table { min-width: 420px; }
+}
+
+@media (max-width: 480px) {
+  .settings-tab-btn { min-width: 110px; font-size: 12px; padding: 8px 12px; }
+  .ct-picker-row .res-input { min-width: 0; width: 100%; }
 }

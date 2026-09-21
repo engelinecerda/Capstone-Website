@@ -62,10 +62,16 @@ export function initManagerNotificationBell(supabase, userId) {
                 ${BELL_SVG}
                 <span class="notif-bell-badge" id="notifBellBadge" hidden>0</span>
             </button>
+            <div class="notif-backdrop" id="notifBackdrop" hidden></div>
             <div class="notif-dropdown-panel" id="notifDropdownPanel" hidden role="dialog" aria-label="Notifications">
                 <div class="notif-dropdown-header">
                     <span class="notif-dropdown-title">Notifications</span>
-                    <button type="button" class="notif-mark-all-link" id="notifMarkAllBtn" hidden>Mark all as read</button>
+                    <div class="notif-dropdown-header-actions">
+                        <button type="button" class="notif-mark-all-link" id="notifMarkAllBtn" hidden>Mark all as read</button>
+                        <button type="button" class="notif-close-btn" id="notifCloseBtn" aria-label="Close notifications">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <ul class="notif-dropdown-list" id="notifDropdownList"></ul>
                 <div class="notif-dropdown-footer">
@@ -80,6 +86,8 @@ export function initManagerNotificationBell(supabase, userId) {
     const panelEl = document.getElementById('notifDropdownPanel');
     const listEl = document.getElementById('notifDropdownList');
     const markAllBtn = document.getElementById('notifMarkAllBtn');
+    const closeBtn = document.getElementById('notifCloseBtn');
+    const backdropEl = document.getElementById('notifBackdrop');
 
     let notifications = [];
 
@@ -144,6 +152,10 @@ export function initManagerNotificationBell(supabase, userId) {
     function openPanel() {
         if (!panelEl) return;
         panelEl.hidden = false;
+        // The dim layer and scroll lock only take effect on phones — the
+        // CSS ignores both above 600px, where this stays a small popover.
+        if (backdropEl) backdropEl.hidden = false;
+        document.documentElement.classList.add('notif-panel-open');
         bellBtn?.setAttribute('aria-expanded', 'true');
         document.addEventListener('click', handleOutsideClick, true);
         document.addEventListener('keydown', handleEscKey);
@@ -152,10 +164,25 @@ export function initManagerNotificationBell(supabase, userId) {
     function closePanel() {
         if (!panelEl) return;
         panelEl.hidden = true;
+        if (backdropEl) backdropEl.hidden = true;
+        document.documentElement.classList.remove('notif-panel-open');
         bellBtn?.setAttribute('aria-expanded', 'false');
         document.removeEventListener('click', handleOutsideClick, true);
         document.removeEventListener('keydown', handleEscKey);
     }
+
+    // Tapping the dimmed area closes the sheet. (handleOutsideClick can't
+    // catch this: the backdrop lives inside the bell's mount element.)
+    backdropEl?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closePanel();
+    });
+
+    closeBtn?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closePanel();
+        bellBtn?.focus();
+    });
 
     bellBtn?.addEventListener('click', (event) => {
         event.stopPropagation();

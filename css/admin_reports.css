@@ -1,4 +1,11 @@
-@import url('./admin_homepage.css?v=44');
+@import url('./admin_homepage.css?v=46');
+
+/* .page-shell--wide is defined in manager-theme.css, but this stylesheet loads after it and
+   its plain .page-shell { max-width } rule used to win, pinning the page at a fixed width
+   and leaving dead space on wide screens. The doubled selector restores the wide ceiling. */
+.page-shell.page-shell--wide {
+  max-width: clamp(1200px, 96vw, 1760px);
+}
 
 .reports-shell {
   display: grid;
@@ -82,6 +89,12 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+/* 9 cards don't divide evenly into 4 (or 2) columns; let the last one span the row
+   rather than sitting alone with a blank area beside it. */
+.reports-summary-grid > .report-summary-card:last-child:nth-child(4n + 1) {
+  grid-column: 1 / -1;
 }
 
 .report-summary-card {
@@ -192,6 +205,10 @@
   .reports-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .reports-summary-grid > .report-summary-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 760px) {
@@ -201,8 +218,19 @@
     flex-direction: column;
   }
 
+  /* Was width: 100%, from when this header stacked (title above actions).
+     admin_sidebar.css now keeps title + bell on one non-wrapping row on
+     phones, where a 100%-wide actions box left the title zero width and the
+     bell sitting on top of it. Actions shrink to the bell; the title takes
+     the rest and may shrink/wrap. */
   .reports-header-actions {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .reports-page-header > div:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .reports-table-head {

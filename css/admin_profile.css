@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=44');
+@import url('./admin_reservations.css?v=46');
 
 /* This page builds directly on manager-theme.css's shared design system
    (.card, .btn-primary/.primary-btn, .btn-secondary/.secondary-btn,
@@ -13,8 +13,12 @@
   margin-bottom: 22px;
 }
 
+/* Centre the title's first line on the 36px notification bell beside it.
+   The old fixed 8px only lined up at the desktop 18px title; admin_sidebar.css
+   shrinks/grows the title per breakpoint, so derive the offset from the
+   font size instead: bell centre (18px) minus half the 1.2 line-height. */
 .page-title {
-  margin-top: 8px;
+  margin-top: calc(18px - 0.6em);
 }
 
 .page-message {
@@ -28,8 +32,14 @@
   color: var(--declined-txt);
 }
 
+/* No max-width here on purpose. This used to cap at 1240px while the
+   header above (title + notification bell) spans the full .page-shell, so
+   on any screen wider than ~1450px the cards stopped short and the bell
+   floated past their right edge with a dead gutter beside it. Width is now
+   governed by .page-shell--wide alone (see admin/profile.html), so the
+   cards and the bell always share one right edge at every screen size. */
 .profile-shell {
-  max-width: 1240px;
+  min-width: 0;
 }
 
 .profile-layout {
@@ -63,6 +73,22 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* Personal Information sits beside the (taller) Account details panel and
+   is stretched to match it, which used to leave a blank strip under the
+   last field. Let the form take that extra height and spread its rows,
+   the same way the side panel's detail cards already stretch to fill.
+   When the panels stack (narrow screens) there is no extra height, so
+   nothing changes there. */
+.profile-panel-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-panel-main > .profile-form {
+  flex: 1 1 auto;
+  align-content: space-between;
 }
 
 .panel-head {
@@ -213,6 +239,14 @@
   min-height: 18px;
   color: var(--muted);
   font-size: 13px;
+}
+
+/* An empty status line used to reserve 18px plus a 16px grid gap — the
+   ~50px hole between "Use at least 8 characters." and the Update Password
+   button. Collapse it while empty; js/admin_profile.js always writes
+   messages via textContent, so it reappears as soon as there is text. */
+.form-message:empty {
+  display: none;
 }
 
 .form-message.error {

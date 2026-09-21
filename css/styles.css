@@ -26,6 +26,20 @@ html {
 }
 
 /* ========================
+   Responsive safety net
+   Loaded on every public page. Caps any image/embed to its container's
+   width so a page-content image (admin-configurable, arbitrary source
+   dimensions) or an embedded iframe can never be the thing that forces
+   horizontal scroll on a phone. height:auto only applies where no more
+   specific rule already sets height (e.g. .page-hero-img's height:100%
+   with object-fit:cover), since class selectors outrank this bare-tag one.
+======================== */
+img, svg, video, canvas, iframe {
+    max-width: 100%;
+    height: auto;
+}
+
+/* ========================
    Config-driven content skeleton
    Applied to any element whose real content is admin-configurable
    (js/page_content.js consumers). An opaque shimmer ::after overlay sits

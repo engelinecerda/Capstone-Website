@@ -11,6 +11,7 @@ import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { initAutoRefresh } from './auto_refresh.js';
 
 const PAGE_SIZE = 15;
@@ -206,6 +207,7 @@ async function init() {
   wireLogoutButton();
   setupInactivityLogout(result.profile.role);
   initAdminSidebarBadges(supabase);
+  initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
 
   startPolling();

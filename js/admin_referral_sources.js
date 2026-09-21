@@ -87,18 +87,21 @@ function renderTable() {
   tbody.innerHTML = sources.map((row, idx) => `
     <tr>
       <td data-label="Order">
+        <div class="rs-order-cell">
+        <span class="rs-order-num">${idx + 1}</span>
         ${isManager ? `
           <span class="rs-order-btns">
             <button type="button" class="rs-order-btn" data-action="up" data-id="${row.id}" ${idx === 0 ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
             <button type="button" class="rs-order-btn" data-action="down" data-id="${row.id}" ${idx === sources.length - 1 ? 'disabled' : ''} aria-label="Move down">&darr;</button>
           </span>` : ''}
+        </div>
       </td>
       <td data-label="Label">${escapeHtml(row.label)}</td>
       <td class="table-status-cell" data-label="Status"><span class="status-pill ${row.is_active ? 'approved' : 'cancelled'}">${row.is_active ? 'Active' : 'Inactive'}</span></td>
       <td data-label="Action">
         ${isManager ? `
           <button type="button" class="action-btn view" data-action="edit" data-id="${row.id}">Edit</button>
-          <button type="button" class="action-btn" data-action="toggle" data-id="${row.id}">${row.is_active ? 'Deactivate' : 'Activate'}</button>
+          <button type="button" class="action-btn${row.is_active ? ' decline' : ''}" data-action="toggle" data-id="${row.id}">${row.is_active ? 'Deactivate' : 'Activate'}</button>
         ` : '—'}
       </td>
     </tr>

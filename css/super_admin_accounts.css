@@ -379,6 +379,7 @@ tbody tr .actions-cell { opacity: 1; }
   width: 100%;
   max-width: 660px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -621,7 +622,12 @@ tbody tr .actions-cell { opacity: 1; }
   .stat-row { grid-template-columns: 1fr; }
   .roles-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
-  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 10px; }
+  /* .search-wrap is flex: 1 1 240px on desktop; in this column layout that
+     240px basis becomes its HEIGHT (the oversized search box). */
+  .search-wrap { flex: 0 0 auto; height: 40px; padding: 0 12px; }
+  .toolbar .seg-control { display: flex; overflow-x: auto; }
+  .toolbar .seg-btn { flex: 1 1 auto; justify-content: center; white-space: nowrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {

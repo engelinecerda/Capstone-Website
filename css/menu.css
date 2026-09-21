@@ -270,6 +270,19 @@ body { background: var(--cream, #FAF8F4); }
 .menu-lb-img.dragging { cursor: grabbing; }
 
 /* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+
+/* Tablet (768–1024): the single-column .menu-section was already fluid
+   enough not to overflow at this width, but at the full 900px cap +
+   32px side padding it sat noticeably narrower than the viewport with
+   large empty margins on a 768–1024px tablet — tightening the outer
+   padding here uses that space better without changing the column
+   layout (menu items are large hero-style images, not a grid, so they
+   don't benefit from a 2-column tablet layout the way card grids do). */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .menu-section { padding: 44px 24px 72px; }
+  .page-hero-body { padding: 0 28px; }
+}
+
 @media (max-width: 640px) {
   .page-hero { height: 300px; }
   .menu-section { padding: 36px 16px 64px; }

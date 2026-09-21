@@ -100,7 +100,11 @@ const STATUS_SEGMENT_COLORS = {
 // Wedding" were indistinguishable in both the ring and the legend. The
 // original 6 shades are untouched; these two just extend the same brown
 // family so an 8th category still won't collide with the first two.
-const PACKAGE_COLOR_RAMP = ['#4A2C17', '#6B3F23', '#A9805F', '#C9AE9B', '#E2D0BF', '#F0E6D9', '#8C6239', '#D9C2A0'];
+// Same brown shades as before, reordered so neighbouring slices (and legend
+// rows) alternate dark and light. Slices are sorted by size, so in the old
+// order the two biggest packages were #4A2C17 and #6B3F23 — nearly the same
+// colour, impossible to tell apart in the ring or the legend.
+const PACKAGE_COLOR_RAMP = ['#4A2C17', '#C9AE9B', '#8C6239', '#E2D0BF', '#6B3F23', '#D9C2A0', '#A9805F', '#F0E6D9'];
 
 // Warm the backend as early as possible so cold starts on Render's free
 // tier overlap with auth/session checks instead of stacking on top of them.
@@ -364,6 +368,8 @@ function renderPackageChart(data) {
                 <li>
                     <span class="legend-swatch" style="background:${colors[i]}"></span>
                     <span class="legend-label">${escapeHtml(d.package)}</span>
+                    <span class="legend-count">${d.count || 0}</span>
+                    <span class="legend-pct">${total > 0 ? (((d.count || 0) / total) * 100).toFixed(1) : '0.0'}%</span>
                 </li>`).join('')
             : `<li class="legend-empty">No package data yet.</li>`;
     }

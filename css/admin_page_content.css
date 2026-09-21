@@ -269,7 +269,7 @@
 .modal-overlay.hidden { display: none; }
 .modal {
   background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
-  width: 100%; max-width: 660px; max-height: 90vh; overflow-y: auto;
+  width: 100%; max-width: 660px; max-height: 90vh; max-height: 90dvh; overflow-y: auto;
   display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
 }
 .modal-sm { max-width: 500px; }
@@ -331,8 +331,108 @@
 @media (max-width: 700px) {
   .gallery-admin-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .header-row { flex-direction: column; align-items: flex-start; }
+  /* Add/Edit service modal: Link URL + Link Label sit side by side on desktop,
+     which leaves ~130px per input on a phone. Stack them like the other
+     admin modals' .modal-row (announcements, business profile, packages). */
+  .modal-row { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .btn-cancel, .btn-danger, .btn-outline-sm, .btn-icon-xs, .modal-close, .uploader { transition: none !important; }
+}
+/* ============================================================
+   LIST ROWS + SECTION HEADERS — ALIGNMENT & RESPONSIVE
+   Services, Menu Images, Values and FAQs all render the same shape
+   (reorder arrows, thumbnail/icon, text body, action buttons) but were
+   styled separately. Their action buttons had different heights (Edit
+   ~30px vs 26px icon buttons) and a different button order per list, and
+   the actions column (flex-shrink: 0) stayed beside the text at every
+   width, squeezing the body into a sliver a word wide.
+   ============================================================ */
+
+/* One button size and one order (Edit, then Activate/Deactivate, then
+   Remove) in every list, at every width. `order` avoids touching the JS
+   templates, which emit a different sequence per list. */
+.service-admin-actions .btn-outline-sm,
+.menu-section-admin-actions .btn-outline-sm,
+.value-admin-actions .btn-outline-sm,
+.faq-admin-actions .btn-outline-sm {
+  order: -1;
+  height: 32px;
+  padding: 0 14px;
+  justify-content: center;
+}
+.service-admin-actions .btn-icon-xs,
+.menu-section-admin-actions .btn-icon-xs,
+.value-admin-actions .btn-icon-xs,
+.faq-admin-actions .btn-icon-xs {
+  width: 32px;
+  height: 32px;
+}
+
+/* Long unbroken strings (the Services link path, URLs in FAQ answers)
+   would otherwise force the row wider than the card. */
+.service-admin-body,
+.menu-section-admin-body,
+.value-admin-body,
+.faq-admin-body,
+.header-row-body { overflow-wrap: anywhere; }
+
+/* The section title row: the "Add ..." button must never shrink and wrap
+   its label into a column of single words. */
+.card-title-row > div { min-width: 0; }
+.card-title-row > .btn-primary { flex-shrink: 0; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  /* Reorder + thumbnail + text on the first line(s); the actions get
+     their own full-width line below, so the text gets the card's width. */
+  .service-admin-row,
+  .menu-section-admin-row,
+  .value-admin-row,
+  .faq-admin-row {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .service-admin-body,
+  .menu-section-admin-body,
+  .value-admin-body,
+  .faq-admin-body {
+    flex: 1 1 180px;
+  }
+
+  .service-admin-actions,
+  .menu-section-admin-actions,
+  .value-admin-actions,
+  .faq-admin-actions {
+    flex: 1 1 100%;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+  }
+
+  /* Edit stretches; the two icon buttons stay square at the row's end. */
+  .service-admin-actions .btn-outline-sm,
+  .menu-section-admin-actions .btn-outline-sm,
+  .value-admin-actions .btn-outline-sm,
+  .faq-admin-actions .btn-outline-sm {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Title + description above, full-width "Add ..." button below. */
+  .card-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card-title-row > .btn-primary { width: 100%; }
+
+  /* Page Headers rows: Edit spans the card instead of sitting small at
+     the left edge. */
+  .header-row { align-items: stretch; }
+  .header-row > .btn-outline-sm {
+    width: 100%;
+    height: 34px;
+    justify-content: center;
+  }
 }

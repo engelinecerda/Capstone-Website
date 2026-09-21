@@ -6,6 +6,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { getPortalInitials } from './admin_auth.js';
 import { logAudit } from './audit_logger.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allLogs     = [];
@@ -478,7 +479,7 @@ function init() {
   wireLogoutButton('logoutBtn');
   watchAuthState(); 
   validateAdminSession({
-    onSuccess: ({ profile }) => {
+    onSuccess: ({ session, profile }) => {
       if (profile.role !== 'admin') {
         window.location.replace('/admin/dashboard');
         return;
@@ -486,6 +487,7 @@ function init() {
 
       setupInactivityLogout(profile.role);
       initAdminSidebarBadges(supabase);
+      initManagerNotificationBell(supabase, session.user.id);
       initAdminNav({ role: profile.role });
 
       const avatarEl = document.getElementById('sidebarAvatar');

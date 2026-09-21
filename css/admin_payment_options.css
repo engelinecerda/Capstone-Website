@@ -2,7 +2,7 @@
    Built on the same design system as Reservations/Payments/Contracts (dark
    sidebar, .card/.table/.modal-* component language) instead of the older
    Settings/Packages look this page was originally extracted from. */
-@import url('./admin_reservations.css?v=42');
+@import url('./admin_reservations.css?v=46');
 
 /* ── Section spacing ─────────────────────────────────────────────────────── */
 .card + .card { margin-top: 20px; }
@@ -311,3 +311,116 @@ select.field-input {
 }
 .sc-example-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 4px; }
 .sc-example-text { font-size: 13px; color: var(--text); margin: 0; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
+
+/* ============================================================
+   CONSISTENT CONTROL SIZING + RESPONSIVE LAYOUT
+   ============================================================ */
+
+/* Inputs and Save buttons in this page's rows used three different
+   radii (8px / 10px / 12px from .action-btn) at the same 38px height, so
+   they sat side by side looking mismatched. One radius and height. */
+.pt-label-input,
+.pr-input-inline,
+.pr-row-control .action-btn,
+.sc-save-category-btn {
+  min-height: 38px;
+  border-radius: 8px;
+}
+.pr-row-control .action-btn,
+.sc-save-category-btn {
+  padding: 8px 18px;
+}
+
+/* The category override field was fixed at 90px, cutting its own
+   "Inherits default (10%)" placeholder off mid-word. */
+.sc-override-input {
+  width: 100%;
+  min-width: 150px;
+  max-width: 220px;
+  text-align: left;
+}
+
+/* ── Tables become labelled cards instead of scrolling sideways ──
+   Payment methods has 6 columns and the category table 4 including a
+   text field and a button — too wide to read below ~1000px, and the
+   scroll hid the Active toggle and Edit/Delete buttons entirely.
+   Each td carries a data-label (set in admin_payment_options.js). */
+@media (max-width: 1000px) {
+  .pm2-table,
+  .pm2-table tbody { display: block; width: 100%; }
+  .pm2-table thead { display: none; }
+  .pm2-table tbody { display: grid; gap: 12px; }
+
+  .pm2-table tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg);
+    overflow: hidden;
+  }
+
+  .pm2-table tbody tr:nth-child(n) td {
+    display: grid;
+    grid-template-columns: minmax(84px, 112px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    overflow-wrap: anywhere;
+  }
+  .pm2-table tbody tr:nth-child(n) td:last-child { border-bottom: none; }
+  .pm2-table tbody tr:hover td { background: transparent; }
+
+  .pm2-table tbody td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    justify-self: start;
+    text-align: left;
+  }
+
+  /* Labels hug the left edge and their values hug the right edge, so
+     each line is anchored on both sides of the card instead of the values
+     floating left-aligned with empty space trailing to the right. */
+  .pm2-table tbody tr:nth-child(n) td[data-label] {
+    justify-items: end;
+    text-align: right;
+  }
+
+  /* Cells with no label (Edit/Delete, Save, "Loading…" rows) span the card. */
+  .pm2-table tbody td:not([data-label]) { grid-template-columns: minmax(0, 1fr); }
+  .pm2-table tbody td:not([data-label])::before { display: none; }
+
+  .pm2-table tbody td.pm2-actions-cell {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .pm2-table tbody td.pm2-actions-cell .action-btn,
+  .pm2-table tbody td .sc-save-category-btn { width: 100%; }
+
+  .sc-override-input { max-width: none; }
+}
+
+/* ── Settings rows: stack copy above controls on phones ──
+   .pr-row-control is flex-shrink: 0, so its label input (150px) + number
+   + toggle + Save could not fit beside the description and pushed off
+   the edge of the card. */
+@media (max-width: 720px) {
+  .pr-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .pr-row-copy { max-width: none; }
+  .pr-row-control,
+  .pt-row-control {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .pt-label-input { flex: 1 1 100%; width: 100%; }
+  .pr-row-control > .action-btn { margin-left: auto; }
+}

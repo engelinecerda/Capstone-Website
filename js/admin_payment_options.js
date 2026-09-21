@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { uploadToCloudinary } from './cloudinary_payment_methods.js';
 import { logAudit } from './audit_logger.js';
 import { initAdminNav } from './admin_nav.js';
+import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { attachPhoneMask } from './phone_format.js';
@@ -72,16 +73,16 @@ function renderPm2Rows() {
 
   body.innerHTML = pm2Methods.map((m) => `
     <tr>
-      <td class="pm2-label-cell">${escHtml(m.label)}</td>
-      <td>
+      <td class="pm2-label-cell" data-label="Label">${escHtml(m.label)}</td>
+      <td data-label="Type">
         <span class="pm2-icon-pill">
           ${paymentMethodIconSvg(m.icon_key)}
           <span class="pm2-type-pill ${escHtml(m.type)}">${escHtml(m.type)}</span>
         </span>
       </td>
-      <td class="pm2-detail-cell">${escHtml(pm2DetailLabel(m))}</td>
-      <td>${m.qr_image ? `<img class="pm2-qr-thumb" src="${escHtml(m.qr_image)}" alt="QR for ${escHtml(m.label)}">` : '—'}</td>
-      <td>
+      <td class="pm2-detail-cell" data-label="Details">${escHtml(pm2DetailLabel(m))}</td>
+      <td data-label="QR">${m.qr_image ? `<img class="pm2-qr-thumb" src="${escHtml(m.qr_image)}" alt="QR for ${escHtml(m.label)}">` : '—'}</td>
+      <td data-label="Active">
         <label class="pm2-toggle">
           <input type="checkbox" class="pm2-active-toggle" data-id="${escHtml(m.payment_method_id)}" ${m.is_active ? 'checked' : ''}>
           <span class="pm2-toggle-track"></span>
@@ -777,9 +778,9 @@ function renderCategoryOverrideTable(globalPct) {
     const effective = hasOverride ? Number(cat.service_charge_percent) : globalPct;
     return `
       <tr data-category-id="${cat.package_category_id}">
-        <td>${escapeHtmlSc(cat.category_name || 'Untitled')}${cat.is_active === false ? ' <span class="field-note" style="margin:0;">(inactive)</span>' : ''}</td>
-        <td>${effective}%</td>
-        <td>
+        <td data-label="Category">${escapeHtmlSc(cat.category_name || 'Untitled')}${cat.is_active === false ? ' <span class="field-note" style="margin:0;">(inactive)</span>' : ''}</td>
+        <td data-label="Effective rate">${effective}%</td>
+        <td data-label="Override">
           <input type="number" class="pr-input-inline sc-override-input" min="0" max="100" step="0.5"
                  placeholder="Inherits default (${globalPct}%)"
                  value="${hasOverride ? effective : ''}">
@@ -960,6 +961,7 @@ async function init() {
   wireLogoutButton();
   setupInactivityLogout();
   initAdminSidebarBadges(supabase);
+  initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
 
   await loadPaymentMethods();

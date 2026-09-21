@@ -39,6 +39,15 @@
 .ann-msg-cell { max-width: 320px; }
 .ann-window-cell { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .ann-actions-cell { display: flex; gap: 6px; flex-wrap: wrap; white-space: nowrap; }
+/* Edit / Enable-Disable / Delete were each as wide as their own label, so
+   stacked they formed a ragged column. One fixed width (wide enough for
+   "Disable") makes every button identical, whether they sit in a row or
+   wrap into a stack. */
+.ann-actions-cell .btn-outline-sm {
+  flex: 0 0 80px;
+  width: 80px;
+  justify-content: center;
+}
 .ann-empty { text-align: center; color: var(--muted); padding: 32px 12px; }
 
 /* ── KIND BADGE ── */
@@ -63,7 +72,7 @@
 .modal-overlay.hidden { display: none; }
 .modal {
   background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
-  width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
+  width: 100%; max-width: 720px; max-height: 90vh; max-height: 90dvh; overflow-y: auto;
   display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
 }
 .modal-header {

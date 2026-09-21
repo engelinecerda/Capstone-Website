@@ -31,7 +31,11 @@
 
 /* ── SCHEDULE CARD ── */
 .mm-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
-.mm-schedule-actions { display: flex; gap: 10px; }
+.mm-schedule-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .mm-schedule-actions > .btn-primary,
+  .mm-schedule-actions > .btn-cancel { flex: 1 1 140px; justify-content: center; }
+}
 
 /* ── MESSAGE EDITOR ── */
 .mm-editor-grid {
@@ -72,7 +76,7 @@
 .modal-overlay.hidden { display: none; }
 .modal {
   background: var(--card-bg); border-radius: 14px; border: 0.5px solid var(--border);
-  width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+  width: 100%; max-width: 480px; max-height: 90vh; max-height: 90dvh; overflow-y: auto;
   display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(42, 18, 8, 0.18);
 }
 .modal-header {

@@ -373,14 +373,24 @@ body {
   border-bottom: 0.5px solid #EFE8DD;
 }
 
-.reservation-table tbody td:first-child {
-  border-left: none;
-  border-radius: 0;
-}
+/* Scoped to real-table widths only (min-width: 1451px) — below that the
+   table converts to stacked cards (see the max-width: 1450px block
+   further down), where every card needs its own full left/right border
+   to read as a distinct bordered card. Left unscoped, these two rules
+   (same selector, same specificity as the card-mode equivalents) were
+   winning on the property neither card-mode rule redeclares: the first
+   card's left border and the last card's right border stayed stripped,
+   so their rounded corners had no edge to curve into and looked cut off. */
+@media (min-width: 1451px) {
+  .reservation-table tbody td:first-child {
+    border-left: none;
+    border-radius: 0;
+  }
 
-.reservation-table tbody td:last-child {
-  border-right: none;
-  border-radius: 0;
+  .reservation-table tbody td:last-child {
+    border-right: none;
+    border-radius: 0;
+  }
 }
 
 .reservation-row {
@@ -1066,14 +1076,15 @@ body {
 }
 
 .modal-card {
-  width: min(100%, 620px);
+  width: min(100%, 520px);
   background: #FBF8F3;
   border: 1px solid var(--border);
   border-radius: 24px;
   box-shadow: 0 30px 80px rgba(58, 34, 17, 0.22);
-  padding: 28px;
+  padding: 24px;
   position: relative;
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
 }
 
@@ -1337,6 +1348,18 @@ body {
     grid-template-columns: minmax(120px, 148px) minmax(0, 1fr);
   }
 
+  /* #reservationsBody .table-status-cell { width: 190px } (near the top of
+     this file) is an ID selector, so it outranks .reservation-table tbody
+     td's width:100% at every viewport, including this stacked-card mode.
+     That pinned the Payment/Status cells to 190px while their siblings
+     went full-width, leaving dead space and making the cell's own
+     border-right look like a stray line cutting through the middle of
+     the card. Match its specificity (id + class) to override it back to
+     full width once the table is in card mode. */
+  #reservationsBody .table-status-cell {
+    width: 100%;
+  }
+
   .table-status-cell .status-pill {
     justify-self: start;
   }
@@ -1358,7 +1381,11 @@ body {
     vertical-align: top;
     padding-left: 16px;
     padding-right: 16px;
-    border-bottom: none;
+    /* Action is always this table's last column, i.e. always :last-child
+       too — border-bottom is intentionally left unset here (rather than
+       "none") so :last-child's border-bottom: 1px + its rounded bottom
+       corners keep winning instead of this rule cancelling them out on
+       the equal-specificity, later-in-source tiebreak. */
   }
 
   .actions-single {
@@ -1491,4 +1518,70 @@ body {
 
 @media (max-width: 480px) {
   .stat-row { grid-template-columns: 1fr 1fr; }
+
+  /* .reservation-table tbody td (and .table-status-cell) reserve a fixed
+     120-148px label column at every width up to 1450px — fine once the
+     card itself has real room, but on a ~360px phone that leaves the
+     value column only ~85-90px after padding/gaps, so IDs, emails and
+     names wrapped one word-fragment per line (visible as e.g.
+     "ELI-" / "261011-" / "001" instead of one readable block). Stack
+     label above value instead of beside it so the value gets the full
+     content width. */
+  .reservation-table tbody td,
+  .reservation-table tbody td.actions,
+  .table-status-cell {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .reservation-table tbody td::before {
+    padding-top: 0;
+  }
+}
+
+/* ── STATUS CHIPS: balanced grid instead of ragged wrap ─────────
+   The chips wrapped as a flex row, so widths differed per label and rows
+   ended up 3 / 3 / 2 / 1 with a lone "Rescheduled" chip on the last line.
+   A grid gives every chip the same width and fills every row evenly:
+   4 columns on tablets (2 rows of 4), 2 on phones (4 rows of 2). */
+@media (max-width: 768px) {
+  .chips-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .chip {
+    min-width: 0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 600px) {
+  .chips-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Reservations — stacked-card mode (<=1450px, when the shared .reservation-table
+   converts to cards): same look as the Employees cards, i.e. a divider line
+   under every field and a closing bottom border, instead of the shared
+   reservation-card style, which draws no lines between fields. Mirrors
+   .table-responsive-cards in manager-theme.css and the Inquiries cards
+   (admin_inquiries.css). Desktop table mode (>=1451px) is unchanged. */
+@media (max-width: 1450px) {
+  .reservations-table tbody td {
+    border-bottom: 0.5px solid #EFE8DD;
+    background: var(--card-bg);
+  }
+
+  .reservations-table tbody td:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .reservations-table tbody td:last-child {
+    border-bottom: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+  }
 }

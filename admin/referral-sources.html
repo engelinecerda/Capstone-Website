@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=42">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=42">
-  <link rel="stylesheet" href="/css/admin_reservations.css?v=42">
-  <link rel="stylesheet" href="/css/admin_inquiries.css?v=1">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=42">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
+  <link rel="stylesheet" href="/css/admin_reservations.css?v=46">
+  <link rel="stylesheet" href="/css/admin_inquiries.css?v=46">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
 </head>
 <body>
   <aside class="sidebar">
@@ -46,7 +46,7 @@
   </aside>
 
   <main class="main">
-    <section class="page-shell">
+    <section class="page-shell page-shell--wide">
       <header class="page-header">
         <div>
           <h1 class="page-title">Referral Sources<span class="view-only-pill hidden" id="rsViewOnlyPill">View only</span></h1>
@@ -57,7 +57,7 @@
         </div>
       </header>
 
-      <section class="card table-card">
+      <section class="card table-card referral-card">
         <div class="card-header-row">
           <div>
             <h2 class="card-title">All referral sources</h2>
@@ -70,7 +70,7 @@
         </div>
         <p class="dashboard-message" id="rsMessage">Loading...</p>
         <div class="table-wrap">
-          <table class="reservation-table">
+          <table class="reservation-table referral-table">
             <thead>
               <tr>
                 <th>Order</th>
@@ -88,7 +88,7 @@
 
   <!-- ── Add / Edit Modal ── -->
   <div class="modal-backdrop hidden" id="rsModal" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rsModalTitle">
+    <div class="modal-card rs-modal-card" role="dialog" aria-modal="true" aria-labelledby="rsModalTitle">
       <p class="modal-eyebrow" id="rsModalEyebrow">Add Referral Source</p>
       <h2 class="modal-title" id="rsModalTitle">Add referral source</h2>
 
@@ -97,7 +97,7 @@
           <label class="field-label">Label</label>
           <input type="text" class="field-input" id="rsLabelInput" placeholder="e.g. TikTok">
         </div>
-        <div class="field roster-active-field">
+        <div class="field rs-active-field">
           <label class="field-label">Active</label>
           <label class="pm2-toggle">
             <input type="checkbox" id="rsActiveInput" checked>
@@ -117,6 +117,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="../js/admin_referral_sources.js"></script>
+  <script type="module" src="../js/admin_referral_sources.js?v=48"></script>
 </body>
 </html>
