@@ -279,15 +279,21 @@ function renderGalleryHero(pkg) {
   }
 
   const count = photos.length;
+  // 3+ photos all share one responsive grid (pkg-gallery-hero--grid) that
+  // itself reshapes per breakpoint — desktop shows 3, tablet 6, mobile up
+  // to 8 — via nth-child visibility rules in CSS, not separate JS-computed
+  // layout classes per count. Only 1-2 photos need a distinct layout since
+  // the grid's column/row tracks would otherwise reserve empty cells.
   const layoutClass = count === 1 ? 'pkg-gallery-hero--single'
     : count === 2 ? 'pkg-gallery-hero--double'
-    : count === 3 ? 'pkg-gallery-hero--triple'
-    : count === 4 ? 'pkg-gallery-hero--quad'
-    : 'pkg-gallery-hero--five-plus';
+    : 'pkg-gallery-hero--grid';
 
   pkgGalleryHero.className = `pkg-gallery-hero ${layoutClass}`;
 
-  const visible = photos.slice(0, 5);
+  // Mobile's breakpoint shows the most tiles (up to 8) of any breakpoint,
+  // so that's the slice ceiling — narrower breakpoints just hide the tail
+  // via CSS, they don't need fewer tiles physically in the DOM.
+  const visible = photos.slice(0, 8);
 
   const tilesHtml = visible.map((ph, i) => `
     <button type="button" class="pkg-gallery-tile" data-index="${i}" aria-label="View photo ${i + 1} of ${count} for ${esc(name)}">
