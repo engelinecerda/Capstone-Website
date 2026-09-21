@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
     <title>Users & Roles - ELI Coffee Events</title>
-    <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/super_admin_accounts.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+    <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/super_admin_accounts.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
 
@@ -111,7 +111,7 @@
         <div class="toolbar">
           <div class="search-wrap">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="searchInput" placeholder="Search by name or email…">
+            <input type="text" id="searchInput" placeholder="Search by name or email…" maxlength="100">
           </div>
           <div class="seg-control" id="statusFilterSeg">
             <button type="button" class="seg-btn active" data-status="">All</button>
@@ -209,7 +209,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Staff Role &nbsp;<span style="font-weight:500;text-transform:none;font-size:11px;">(optional)</span></label>
-              <input type="text" class="form-input" id="fieldStaffRole" placeholder="e.g. Event Coordinator">
+              <input type="text" class="form-input" id="fieldStaffRole" placeholder="e.g. Event Coordinator" maxlength="60" autocomplete="off">
             </div>
             <div class="form-group full">
               <label class="form-label">Account Status</label>
@@ -369,6 +369,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="/js/super_admin_accounts.js?v=46"></script>
+  <script type="module" src="/js/super_admin_accounts.js?v=47"></script>
 </body>
 </html>

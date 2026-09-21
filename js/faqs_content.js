@@ -33,7 +33,7 @@ async function initFaqs() {
     <div class="faq">
       <button class="faq-header">
         ${escapeHtml(f.question)}
-        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
       </button>
       <div class="faq-body">
         <p>${escapeHtml(f.answer)}</p>

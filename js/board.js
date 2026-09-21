@@ -22,6 +22,7 @@ const boardLogoutConfirmBtn = document.getElementById('boardLogoutConfirmBtn');
 
 const IDLE_RETURN_MS = 40000;
 const RECENTLY_UPDATED_MS = 4 * 60 * 60 * 1000;
+const SCHEDULE_REFRESH_MS = 10000;
 
 const state = {
   days: [],
@@ -316,7 +317,7 @@ function renderFooter() {
   const timeLabel = state.lastUpdatedAt
     ? state.lastUpdatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
     : '--:--';
-  boardFooterMessage.textContent = `Updated ${timeLabel} · refreshes every 60 seconds`;
+  boardFooterMessage.textContent = `Updated ${timeLabel} · refreshes every ${SCHEDULE_REFRESH_MS / 1000} seconds`;
 }
 
 async function fetchSchedule() {
@@ -553,7 +554,7 @@ async function init() {
   setInterval(async () => {
     const stillSignedIn = await checkSession();
     if (stillSignedIn) await refreshSchedule();
-  }, 60000);
+  }, SCHEDULE_REFRESH_MS);
 
   supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') showSignedOutState();

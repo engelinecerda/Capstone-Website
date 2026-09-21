@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <title>Business Profile - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_business_profile.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_business_profile.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
@@ -101,7 +101,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Brand Name</label>
-            <input type="text" id="fieldBrandName" class="modal-input" placeholder="ELI Coffee Events">
+            <input type="text" id="fieldBrandName" class="modal-input" placeholder="ELI Coffee Events" maxlength="100">
           </div>
           <div class="form-group">
             <label class="form-label">Logo</label>
@@ -129,23 +129,23 @@
         <div class="form-grid">
           <div class="form-group full">
             <label class="form-label">Brand Description</label>
-            <textarea id="fieldBrandDesc" class="modal-textarea" rows="2" placeholder="A short line shown under the logo in the footer"></textarea>
+            <textarea id="fieldBrandDesc" class="modal-textarea" rows="2" placeholder="A short line shown under the logo in the footer" maxlength="300"></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Phone</label>
-            <input type="text" id="fieldPhone" class="modal-input" placeholder="0917 000 0000">
+            <input type="text" id="fieldPhone" class="modal-input" placeholder="0917 000 0000" maxlength="50">
           </div>
           <div class="form-group">
             <label class="form-label">Email</label>
-            <input type="email" id="fieldEmail" class="modal-input" placeholder="hello@example.com">
+            <input type="email" id="fieldEmail" class="modal-input" placeholder="hello@example.com" maxlength="254">
           </div>
           <div class="form-group">
             <label class="form-label">Facebook URL</label>
-            <input type="text" id="fieldFacebook" class="modal-input" placeholder="https://www.facebook.com/...">
+            <input type="text" id="fieldFacebook" class="modal-input" placeholder="https://www.facebook.com/..." maxlength="500">
           </div>
           <div class="form-group">
             <label class="form-label">Instagram URL</label>
-            <input type="text" id="fieldInstagram" class="modal-input" placeholder="https://www.instagram.com/...">
+            <input type="text" id="fieldInstagram" class="modal-input" placeholder="https://www.instagram.com/..." maxlength="500">
           </div>
         </div>
         <p class="form-message" id="contactMsg"></p>
@@ -188,20 +188,20 @@
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="locationTagInput">Branch Tag</label>
-            <input type="text" id="locationTagInput" class="modal-input" placeholder="E.g., Main Branch">
+            <input type="text" id="locationTagInput" class="modal-input" placeholder="E.g., Main Branch" maxlength="50">
           </div>
           <div class="modal-field">
             <label class="modal-label" for="locationNameInput">Name *</label>
-            <input type="text" id="locationNameInput" class="modal-input" placeholder="E.g., ELI Coffee Events Cafe Binangonan">
+            <input type="text" id="locationNameInput" class="modal-input" placeholder="E.g., ELI Coffee Events Cafe Binangonan" maxlength="150">
           </div>
         </div>
         <div class="modal-field">
           <label class="modal-label" for="locationAddressInput">Address *</label>
-          <input type="text" id="locationAddressInput" class="modal-input" placeholder="Full street address">
+          <input type="text" id="locationAddressInput" class="modal-input" placeholder="Full street address" maxlength="300">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="locationHoursInput">Hours</label>
-          <input type="text" id="locationHoursInput" class="modal-input" placeholder="E.g., Daily · 1:00 PM – 10:00 PM">
+          <input type="text" id="locationHoursInput" class="modal-input" placeholder="E.g., Daily · 1:00 PM – 10:00 PM" maxlength="100">
         </div>
         <p class="modal-message hidden" id="locationModalMessage"></p>
       </div>
@@ -227,11 +227,11 @@
       <div class="modal-body">
         <div class="modal-field">
           <label class="modal-label" for="socialLinkLabelInput">Label *</label>
-          <input type="text" id="socialLinkLabelInput" class="modal-input" placeholder="E.g., TikTok, WhatsApp, LinkedIn">
+          <input type="text" id="socialLinkLabelInput" class="modal-input" placeholder="E.g., TikTok, WhatsApp, LinkedIn" maxlength="50">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="socialLinkUrlInput">URL *</label>
-          <input type="text" id="socialLinkUrlInput" class="modal-input" placeholder="https://...">
+          <input type="text" id="socialLinkUrlInput" class="modal-input" placeholder="https://..." maxlength="500">
         </div>
         <p class="modal-message hidden" id="socialLinkModalMessage"></p>
       </div>

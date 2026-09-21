@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=46" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=46"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=47" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=47"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
     <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
@@ -19,11 +19,11 @@
          content on first paint. Only genuinely non-critical assets above
          (webfonts, icon font, Leaflet map CSS) and the JS-injected
          announcement banner below stay async. -->
-    <link rel="stylesheet" href="/css/styles.css?v=46">
-    <link rel="stylesheet" href="/css/reservations.css?v=46">
-    <link rel="stylesheet" href="/css/home.css?v=46">
-    <link rel="preload" as="style" href="/css/announcement_banner.css?v=46" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=46"></noscript>
+    <link rel="stylesheet" href="/css/styles.css?v=47">
+    <link rel="stylesheet" href="/css/reservations.css?v=47">
+    <link rel="stylesheet" href="/css/home.css?v=47">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=47" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=47"></noscript>
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -230,8 +230,14 @@
                     <div id="addon-venue-content" class="res-locked-content">
                         <p id="rs-addon-or-venue-desc"></p>
 
-                        <!-- Onsite: optional snack add-on -->
+                        <!-- Onsite: room picker (shown only when the selected package maps
+                             to more than one venue — a single-venue package auto-resolves
+                             with no picker), then the optional snack add-on -->
                         <div id="addon-section" class="hidden">
+                            <div id="room-picker-block" class="hidden">
+                                <div class="section-label"><i class="ti ti-door" aria-hidden="true"></i> Which room?</div>
+                                <div class="cards-grid" id="room-picker-grid"></div>
+                            </div>
                             <div class="section-label"><i class="ti ti-cookie" aria-hidden="true"></i> Add a Snack Bar Corner? <small style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(Optional)</small></div>
                             <div class="cards-grid" id="snack-grid"></div>
                         </div>
@@ -240,17 +246,17 @@
                         <div id="venue-section" class="hidden">
                             <p class="venue-map-hint"><strong>Rizal province only.</strong> Search for your venue address or click the map to drop a pin. The address is filled in automatically &mdash; you can edit it below if it's not quite right.</p>
                             <div class="venue-search-row">
-                                <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)">
+                                <input type="text" id="venue-search-input" class="res-input" placeholder="Search address in Rizal (e.g., Binangonan, Antipolo, Tanay)" maxlength="200">
                                 <button type="button" id="venue-search-btn" class="venue-search-btn">Search</button>
                             </div>
                             <div id="venue-map" class="venue-map-container"></div>
                             <div class="venue-pinned-row">
                                 <span class="venue-pin-icon"><i class="ti ti-map-pin" aria-hidden="true"></i></span>
-                                <textarea id="venue-pinned-label" class="venue-pinned-input" rows="2" placeholder="Click the map or search an address to pin your venue." aria-label="Pinned venue address (editable)"></textarea>
+                                <textarea id="venue-pinned-label" class="venue-pinned-input" rows="2" placeholder="Click the map or search an address to pin your venue." aria-label="Pinned venue address (editable)" maxlength="300"></textarea>
                             </div>
                             <div class="venue-details-row">
                                 <label for="venue-address-details" class="venue-details-label">Additional address details <small>(house/unit no., lot/block no., building name, landmark &mdash; optional but recommended)</small></label>
-                                <input type="text" id="venue-address-details" class="res-input" placeholder="e.g., Unit 4B, Lot 7 Blk 2, near the yellow gate">
+                                <input type="text" id="venue-address-details" class="res-input" placeholder="e.g., Unit 4B, Lot 7 Blk 2, near the yellow gate" maxlength="300">
                             </div>
                             <input type="hidden" id="venue-location" value="">
                         </div>
@@ -318,7 +324,7 @@
 
                 <div class="res-field-group">
                     <label class="res-field-label" for="name">Full Name</label>
-                    <input class="res-input" type="text" id="name" placeholder="Full Name *">
+                    <input class="res-input" type="text" id="name" placeholder="Full Name *" maxlength="150">
                 </div>
 
                 <div class="res-field-group">
@@ -328,12 +334,12 @@
 
                 <div class="res-field-group">
                     <label class="res-field-label" for="email">Email Address</label>
-                    <input class="res-input" type="email" id="email" placeholder="Email Address *">
+                    <input class="res-input" type="email" id="email" placeholder="Email Address *" maxlength="254">
                 </div>
 
                 <div class="res-field-group">
                     <label class="res-field-label" for="requests">Notes &amp; Special Requests <span class="res-field-optional">(Optional)</span></label>
-                    <textarea class="res-input" id="requests" placeholder="Notes &amp; Special Requests"></textarea>
+                    <textarea class="res-input" id="requests" placeholder="Notes &amp; Special Requests" maxlength="1000"></textarea>
                 </div>
             </div>
 
@@ -416,7 +422,7 @@
                         </div>
 
                         <div class="signature-type-panel hidden" id="signature-type-panel">
-                            <input type="text" id="signature-type-input" class="signature-type-input" placeholder="Type your full name" aria-label="Type your full name as your signature" autocomplete="off">
+                            <input type="text" id="signature-type-input" class="signature-type-input" placeholder="Type your full name" aria-label="Type your full name as your signature" autocomplete="off" maxlength="100">
                             <p class="signature-type-preview" id="signature-type-preview" aria-live="polite"></p>
                         </div>
 

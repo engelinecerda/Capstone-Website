@@ -459,7 +459,7 @@ function getHeaderStatusMeta(pageState) {
         return { cssKey: 'pending', icon: 'clock', label: 'Reschedule Fee Due' };
     }
     if (balance.isPastDue) {
-        return { cssKey: 'overdue', icon: 'triangle-exclamation', label: 'Overdue' };
+        return { cssKey: 'overdue', icon: 'alert-triangle', label: 'Overdue' };
     }
     if (balance.hasPartialPayment) {
         return { cssKey: 'pending', icon: 'clock', label: 'Partially Paid' };
@@ -498,7 +498,7 @@ function renderSummaryStrip(reservation) {
                 </div>
             </div>
             <div class="payment-hero-right">
-                <span class="res-status ${escapeHtml(statusMeta.cssKey)}"><i class="fa-solid fa-${escapeHtml(statusMeta.icon)}" aria-hidden="true"></i> ${escapeHtml(statusMeta.label)}</span>
+                <span class="res-status ${escapeHtml(statusMeta.cssKey)}"><i class="ti ti-${escapeHtml(statusMeta.icon)}" aria-hidden="true"></i> ${escapeHtml(statusMeta.label)}</span>
                 <div>
                     <div class="payment-hero-pay-value">${escapeHtml(payValueText)}</div>
                 </div>
@@ -524,7 +524,7 @@ function renderOverdueStrip(reservation) {
 
     return `
         <div class="payment-overdue-strip">
-            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <i class="ti ti-alert-triangle" aria-hidden="true"></i>
             <p>
                 Payment was due ${escapeHtml(balance.dueDateLabel)}. Unpaid reservations are automatically
                 cancelled after ${escapeHtml(balance.graceDeadlineLabel || 'the grace period')}, and the
@@ -564,7 +564,7 @@ function renderCancellationCard(reservation, pageState) {
     return `
         <section class="payment-focus-card">
             <div class="payment-cancellation-card">
-                <span class="res-status cancelled"><i class="fa-solid fa-ban" aria-hidden="true"></i> Cancelled</span>
+                <span class="res-status cancelled"><i class="ti ti-ban" aria-hidden="true"></i> Cancelled</span>
                 <h2 class="payment-readonly-title">This reservation has been cancelled</h2>
                 <p class="payment-readonly-copy">${escapeHtml(getCancellationReasonText(reservation))}</p>
                 ${feePayment ? `
@@ -580,7 +580,7 @@ function renderCancellationCard(reservation, pageState) {
                     </div>
                 ` : ''}
                 <a class="res-link-btn" href="${escapeHtml(contractUrl)}">
-                    <i class="fa-solid fa-file-lines" aria-hidden="true"></i> View service agreement
+                    <i class="ti ti-file-text" aria-hidden="true"></i> View service agreement
                 </a>
             </div>
             ${feeOwed ? `
@@ -677,6 +677,7 @@ function renderCustomAmountPanel(reservation, option) {
                 placeholder="e.g. ${escapeHtml(option.minAmount)}"
                 data-field="customAmount"
                 value="${escapeHtml(raw)}"
+                maxlength="12"
             >
             <p class="payment-custom-amount-hint">Minimum ${escapeHtml(formatCurrency(option.minAmount))} &middot; Maximum ${escapeHtml(formatCurrency(option.maxAmount))}</p>
             ${validationMessage ? `<p class="payment-custom-amount-error">${escapeHtml(validationMessage)}</p>` : `
@@ -720,8 +721,8 @@ function renderPaymentTypeButtons(reservation) {
     return `${chips}${renderCustomAmountPanel(reservation, selectedOption)}`;
 }
 
-const COPY_ICON = `<i class="fa-regular fa-copy" aria-hidden="true"></i>`;
-const INFO_ICON = `<i class="fa-solid fa-circle-info" aria-hidden="true"></i>`;
+const COPY_ICON = `<i class="ti ti-copy" aria-hidden="true"></i>`;
+const INFO_ICON = `<i class="ti ti-info-circle" aria-hidden="true"></i>`;
 
 function getArrivalDateBounds(reservation) {
     const balance = getActiveBalance(reservation);
@@ -825,6 +826,7 @@ function renderFormSection(reservation) {
                                 data-field="referenceNumber"
                                 placeholder="${escapeHtml(refPattern?.placeholder || 'Reference number')}"
                                 value="${escapeHtml(state.form.referenceNumber)}"
+                                maxlength="100"
                             >
                             ${refPattern ? `<p class="payment-field-hint">${escapeHtml(selectedMethodObj?.label)} reference numbers are ${escapeHtml(refPattern.hint)}.</p>` : ''}
                         </div>
@@ -848,10 +850,10 @@ function renderFormSection(reservation) {
                                 <div class="payment-proof-uploaded-thumb">
                                     ${state.form.proofPreviewDataUrl
                                         ? `<img src="${escapeHtml(state.form.proofPreviewDataUrl)}" alt="Proof of payment preview">`
-                                        : `<i class="fa-solid fa-file-image" aria-hidden="true"></i>`}
+                                        : `<i class="ti ti-photo" aria-hidden="true"></i>`}
                                 </div>
                                 <div class="payment-proof-uploaded-info">
-                                    <div class="payment-proof-uploaded-status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Uploaded successfully</div>
+                                    <div class="payment-proof-uploaded-status"><i class="ti ti-circle-check" aria-hidden="true"></i> Uploaded successfully</div>
                                     <div class="payment-proof-uploaded-name">${escapeHtml(state.form.proofFile.name)}</div>
                                     <div class="payment-proof-uploaded-size">${escapeHtml(formatFileSize(state.form.proofFile.size))}</div>
                                 </div>
@@ -864,7 +866,7 @@ function renderFormSection(reservation) {
                         ` : `
                             <label class="payment-proof-dropzone" for="payment-proof-file">
                                 <input id="payment-proof-file" class="payment-proof-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" data-field="proofFile">
-                                <div class="payment-proof-icon"><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i></div>
+                                <div class="payment-proof-icon"><i class="ti ti-upload" aria-hidden="true"></i></div>
                                 <div class="payment-proof-cta">Drop file here or <span>browse</span></div>
                                 <div class="payment-proof-name">PNG, JPG up to 10MB</div>
                             </label>
@@ -884,7 +886,7 @@ function renderFormSection(reservation) {
                 `}
                 <div class="payment-field-group full">
                     <label for="payment-note">Note for admin (optional)</label>
-                    <textarea id="payment-note" data-field="notes" placeholder="Any message for the organizer">${escapeHtml(state.form.notes)}</textarea>
+                    <textarea id="payment-note" data-field="notes" placeholder="Any message for the organizer" maxlength="1000">${escapeHtml(state.form.notes)}</textarea>
                 </div>
             </div>
             <div class="payment-submit-actions">
@@ -984,7 +986,7 @@ function renderPendingCard(reservation) {
     return `
         <section class="payment-focus-card">
             <div class="payment-readonly-card">
-                <span class="res-status ${escapeHtml(paymentStatus.key)}"><i class="fa-solid fa-clock" aria-hidden="true"></i> ${escapeHtml(paymentStatus.label)}</span>
+                <span class="res-status ${escapeHtml(paymentStatus.key)}"><i class="ti ti-clock" aria-hidden="true"></i> ${escapeHtml(paymentStatus.label)}</span>
                 <h2 class="payment-readonly-title">Payment submitted and waiting for admin review</h2>
                 <p class="payment-readonly-copy">Your latest payment is already in review. Once the admin confirms it, your balance and receipt records will update here automatically.</p>
                 <div class="payment-dl">
@@ -1018,7 +1020,7 @@ function renderCompleteCard(reservation) {
     return `
         <section class="payment-focus-card">
             <div class="payment-readonly-card">
-                <span class="res-status approved"><i class="fa-solid fa-check" aria-hidden="true"></i> Paid in Full</span>
+                <span class="res-status approved"><i class="ti ti-check" aria-hidden="true"></i> Paid in Full</span>
                 <h2 class="payment-readonly-title">This reservation is already fully paid</h2>
                 <p class="payment-readonly-copy">All required payments for this reservation have been approved and recorded. You can still review your payment history and receipts below.</p>
                 <div class="payment-dl">
@@ -1137,7 +1139,7 @@ function renderCurrentTab(reservation) {
                             <div class="payment-item-meta">${escapeHtml(`${formatCurrency(latestPayment.amount)} · ${methodLabel} · Submitted ${formatDateTime(latestPayment.submitted_at)}`)}</div>
                         </div>
                         <div class="payment-item-actions">
-                            <span class="res-status pending"><i class="fa-solid fa-clock" aria-hidden="true"></i> Pending Review</span>
+                            <span class="res-status pending"><i class="ti ti-clock" aria-hidden="true"></i> Pending Review</span>
                             ${latestPayment.proof_url ? `<a class="res-link-btn" href="${escapeHtml(latestPayment.proof_url)}" target="_blank" rel="noopener noreferrer">View Proof</a>` : ''}
                         </div>
                     </div>
@@ -1174,7 +1176,7 @@ function renderCurrentTab(reservation) {
                             <div class="payment-item-title">${escapeHtml(getPaymentLabel(latestOverall.payment_type))}</div>
                             <div class="payment-item-meta">${escapeHtml(`${formatCurrency(latestOverall.amount)} · ${methodLabel} · Submitted ${formatDateTime(latestOverall.submitted_at)}`)}</div>
                         </div>
-                        <span class="res-status rejected"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> Rejected</span>
+                        <span class="res-status rejected"><i class="ti ti-circle-x" aria-hidden="true"></i> Rejected</span>
                     </div>
                 </div>
                 <p class="payment-current-copy">${escapeHtml(latestOverall.rejection_reason ? `Reason: ${latestOverall.rejection_reason}` : 'This submission was rejected.')} Please review and resubmit using the form above.</p>
@@ -1500,7 +1502,7 @@ paymentApp?.addEventListener('click', async (event) => {
         }
         const origInner = copyButton.innerHTML;
         copyButton.classList.add('copied');
-        copyButton.innerHTML = `<i class="fa-solid fa-check" aria-hidden="true"></i> Copied!`;
+        copyButton.innerHTML = `<i class="ti ti-check" aria-hidden="true"></i> Copied!`;
         setTimeout(() => {
             if (document.body.contains(copyButton)) {
                 copyButton.classList.remove('copied');

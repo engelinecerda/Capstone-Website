@@ -1,20 +1,44 @@
-/* board.css — Operations Board kiosk display, built on manager-theme.css tokens */
+/* board.css — Schedule Board kiosk display.
+   Deliberately self-contained: a light, brown-only palette independent of
+   manager-theme.css's dark portal theme, since the board is a public-facing
+   counter display, not part of the admin/manager portal chrome. */
 
 :root {
-  /* Board-specific tokens: solid (non-translucent) card colors so proximity
-     states read as distinct, not as a washed-out gray. */
-  --board-imminent-bg: #FAEEDA;
-  --board-imminent-border: #EF9F27;
-  --board-later-bg: #3E2716;
-  --board-text-secondary: #D9C3AC;
-  --board-text-secondary-strong: #F1E4D5;
+  --board-canvas: #F3E9DB;
+  --board-surface: #FFFFFF;
+  --board-surface-muted: #FBF6EF;
+  --board-border: #E5D5C2;
+  --board-divider: #DFD0BC;
+
+  --board-text-primary: #2A1208;
+  --board-text-secondary: #6B5645;
+  --board-text-muted: #8A6F5C;
+
+  --board-espresso: #3D1A0A;
+  --board-mid-brown: #B39168;
+  --board-accent-text: #6B4A2A;
+  --board-cream-text: #F3E9DB;
+  --board-gold-icon: #E8CFA8;
+
+  --board-tan-pill-bg: #EFE4D4;
+  --board-tan-pill-text: #6B4A2A;
+
+  --board-completed-pill-bg: #E5D5C2;
+  --board-completed-pill-text: #6B5645;
+
+  /* The one intentional non-brown pair: green/red is a universal live/
+     offline convention, kept for the footer's connection-status dot. */
+  --board-live-dot: #5E7D3A;
+  --board-lost-dot: #A32D2D;
+
+  --board-btn-border: #C0A483;
 }
 
 html, body.board-body {
   min-height: 100%;
   margin: 0;
-  background: var(--sidebar-bg);
-  color: var(--sidebar-cream);
+  background: var(--board-canvas);
+  color: var(--board-text-primary);
   font-family: var(--font);
 }
 
@@ -82,7 +106,7 @@ body.kiosk-mode {
   align-items: center;
   justify-content: space-between;
   padding-bottom: 16px;
-  border-bottom: 0.5px solid var(--sidebar-line);
+  border-bottom: 0.5px solid var(--board-divider);
   flex-shrink: 0;
 }
 
@@ -96,7 +120,7 @@ body.kiosk-mode {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: var(--sidebar-cream);
+  background: var(--board-espresso);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,12 +131,16 @@ body.kiosk-mode {
   width: 18px;
   height: auto;
   display: block;
+  /* Source asset is a dark-brown mark; invert then warm it toward the
+     gold-icon token — an approximation, since a fixed-color raster image
+     can't be hex-matched exactly through filters alone. */
+  filter: invert(1) sepia(0.4) saturate(3) hue-rotate(-10deg) brightness(1.05);
 }
 
 .board-brand-name {
   font-size: 16px;
   font-weight: 600;
-  color: var(--sidebar-cream);
+  color: var(--board-text-primary);
   line-height: 1.3;
 }
 
@@ -122,7 +150,7 @@ body.kiosk-mode {
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--user-role);
+  color: var(--board-text-muted);
 }
 
 .board-clock-wrap {
@@ -132,7 +160,7 @@ body.kiosk-mode {
 .board-clock {
   font-size: clamp(22px, 5vw, 32px);
   font-weight: 600;
-  color: var(--sidebar-cream);
+  color: var(--board-text-primary);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
@@ -140,7 +168,7 @@ body.kiosk-mode {
 .board-date {
   margin-top: 2px;
   font-size: 13px;
-  color: var(--user-role);
+  color: var(--board-text-primary);
 }
 
 /* ============================================================
@@ -159,8 +187,8 @@ body.kiosk-mode {
 .board-week-rail {
   display: flex;
   flex-direction: column;
-  background: rgba(245, 235, 221, 0.04);
-  border: 0.5px solid var(--sidebar-line);
+  background: var(--board-surface-muted);
+  border: 0.5px solid var(--board-border);
   border-radius: 14px;
   padding: 18px 20px;
 }
@@ -173,13 +201,13 @@ body.kiosk-mode {
 .board-panel-title {
   font-size: clamp(14px, 2vw, 16px);
   font-weight: 600;
-  color: var(--sidebar-cream);
+  color: var(--board-text-primary);
 }
 
 .board-panel-sub {
   margin-top: 3px;
   font-size: 12.5px;
-  color: var(--board-text-secondary);
+  color: var(--board-text-muted);
 }
 
 .board-today-list,
@@ -191,33 +219,41 @@ body.kiosk-mode {
 
 /* ============================================================
    EVENT CARDS (Today)
-   — default card = "later today": solid dark card, clearly active.
-   — imminent (within ~1hr or in progress): promoted cream card + amber border.
-   — completed/cancelled: the only states that dim.
-   Colors are solid (not translucent) so states read as distinct, not gray.
+   — default card = "later today": white card, mid-brown left accent.
+   — imminent (within ~1hr or in progress): same white card, espresso
+     left accent + solid espresso pill.
+   — completed: dims the whole card.
+   — cancelled: white card, no left accent, struck-through title.
+   Differentiated by brown depth (fill/border weight), never by hue.
    ============================================================ */
 .board-event-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--board-later-bg);
-  border: 2px solid var(--sidebar-line);
+  background: var(--board-surface);
+  border: 1px solid var(--board-border);
+  border-left: 5px solid var(--board-mid-brown);
   border-radius: 12px;
   padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(42, 18, 8, 0.06);
 }
 
 .board-event-card.board-event-imminent {
-  background: var(--board-imminent-bg);
-  border: 3px solid var(--board-imminent-border);
+  border-left-color: var(--board-espresso);
 }
 
-.board-event-card.board-event-completed,
+.board-event-card.board-event-completed {
+  opacity: 0.6;
+}
+
 .board-event-card.board-event-cancelled {
-  opacity: 0.7;
+  border-left-width: 1px;
+  border-left-color: var(--board-border);
 }
 
 .board-event-card.board-event-cancelled .board-event-name-inline {
   text-decoration: line-through;
+  color: var(--board-text-secondary);
 }
 
 .board-event-card-head {
@@ -234,11 +270,7 @@ body.kiosk-mode {
   font-size: clamp(15px, 2vw, 18px);
   font-weight: 700;
   line-height: 1.35;
-  color: var(--sidebar-cream);
-}
-
-.board-event-card.board-event-imminent .board-event-heading {
-  color: var(--text);
+  color: var(--board-text-primary);
 }
 
 .board-event-sep {
@@ -259,10 +291,6 @@ body.kiosk-mode {
   color: var(--board-text-secondary);
 }
 
-.board-event-card.board-event-imminent .board-event-meta {
-  color: var(--muted);
-}
-
 .board-staff-chips {
   display: flex;
   flex-wrap: wrap;
@@ -276,19 +304,19 @@ body.kiosk-mode {
   min-height: 40px;
   padding: 4px 14px 4px 4px;
   border-radius: 999px;
-  background: var(--input-bg);
-  border: 0.5px solid var(--input-border);
+  background: var(--board-espresso);
+  border: none;
   font-size: clamp(14px, 1.6vw, 16px);
   font-weight: 600;
-  color: var(--text);
+  color: var(--board-cream-text);
 }
 
 .board-staff-avatar {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: var(--avatar-bg);
-  color: var(--sidebar-cream);
+  background: var(--board-mid-brown);
+  color: var(--board-cream-text);
   font-size: 13px;
   font-weight: 700;
   display: flex;
@@ -303,15 +331,10 @@ body.kiosk-mode {
   min-height: 40px;
   padding: 4px 16px;
   border-radius: 999px;
-  border: 1.5px dashed var(--user-role);
+  border: 1.5px dashed var(--board-mid-brown);
   font-size: clamp(13px, 1.6vw, 15px);
   font-weight: 600;
   color: var(--board-text-secondary);
-}
-
-.board-event-card.board-event-imminent .board-staff-chip-outline {
-  color: var(--muted);
-  border-color: var(--muted);
 }
 
 .board-update-badge {
@@ -323,8 +346,9 @@ body.kiosk-mode {
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
-  background: var(--info);
-  color: var(--info-txt);
+  background: var(--board-tan-pill-bg);
+  color: var(--board-tan-pill-text);
+  border: 1px solid rgba(107, 74, 42, 0.25);
 }
 
 .board-event-notes {
@@ -333,11 +357,7 @@ body.kiosk-mode {
   line-height: 1.5;
 }
 
-.board-event-card.board-event-imminent .board-event-notes {
-  color: var(--muted);
-}
-
-/* Proximity pill — replaces the old status pill; carries "when", not status. */
+/* Proximity pill — carries "when"/state, not a restated status label. */
 .board-proximity-pill {
   display: inline-flex;
   align-items: center;
@@ -351,23 +371,23 @@ body.kiosk-mode {
 
 .board-proximity-now,
 .board-proximity-imminent {
-  background: var(--board-imminent-border);
-  color: #2A1208;
+  background: var(--board-espresso);
+  color: var(--board-cream-text);
 }
 
 .board-proximity-later {
-  background: rgba(245, 235, 221, 0.16);
-  color: var(--board-text-secondary-strong);
+  background: var(--board-tan-pill-bg);
+  color: var(--board-tan-pill-text);
 }
 
 .board-proximity-completed {
-  background: rgba(138, 106, 85, 0.28);
-  color: var(--board-text-secondary);
+  background: var(--board-completed-pill-bg);
+  color: var(--board-completed-pill-text);
 }
 
 .board-proximity-cancelled {
-  background: rgba(163, 45, 45, 0.2);
-  color: #F3B4B4;
+  background: var(--board-tan-pill-bg);
+  color: var(--board-tan-pill-text);
 }
 
 .board-empty-day {
@@ -377,7 +397,7 @@ body.kiosk-mode {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: var(--user-role);
+  color: var(--board-text-muted);
   font-size: 14px;
 }
 
@@ -393,8 +413,8 @@ body.kiosk-mode {
   width: 100%;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 2px solid transparent;
-  background: rgba(245, 235, 221, 0.05);
+  border: 2px solid var(--board-border);
+  background: var(--board-surface);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -406,11 +426,13 @@ body.kiosk-mode {
 }
 
 .board-week-row-today {
-  background: var(--active-bg);
+  background: var(--board-surface-muted);
 }
 
 .board-week-row-selected {
-  border-color: var(--pending-txt);
+  background: var(--board-espresso);
+  border-color: var(--board-espresso);
+  color: var(--board-cream-text);
 }
 
 .board-week-row-main {
@@ -428,9 +450,13 @@ body.kiosk-mode {
 .board-week-row-label {
   font-size: 12px;
   font-weight: 700;
-  color: var(--sidebar-cream);
+  color: var(--board-accent-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.board-week-row-selected .board-week-row-label {
+  color: var(--board-cream-text);
 }
 
 .board-week-row-viewing {
@@ -442,8 +468,10 @@ body.kiosk-mode {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: var(--pending);
-  color: var(--pending-txt);
+  /* Only ever rendered inside a selected (espresso-filled) row — an
+     inverted cream tag so it still pops against the dark fill. */
+  background: var(--board-cream-text);
+  color: var(--board-espresso);
 }
 
 .board-week-row-events {
@@ -455,21 +483,33 @@ body.kiosk-mode {
 
 .board-week-row-chevron {
   flex-shrink: 0;
-  color: var(--user-role);
+  color: var(--board-mid-brown);
   font-size: 14px;
+}
+
+.board-week-row-selected .board-week-row-chevron {
+  color: var(--board-cream-text);
 }
 
 .board-week-event {
   display: flex;
   gap: 8px;
   font-size: 12px;
-  color: var(--board-text-secondary);
+  color: var(--board-text-primary);
+}
+
+.board-week-row-selected .board-week-event {
+  color: var(--board-cream-text);
 }
 
 .board-week-event-time {
   flex-shrink: 0;
   font-weight: 600;
-  color: var(--sidebar-cream);
+  color: var(--board-text-primary);
+}
+
+.board-week-row-selected .board-week-event-time {
+  color: var(--board-cream-text);
 }
 
 /* ============================================================
@@ -479,12 +519,12 @@ body.kiosk-mode {
   flex-shrink: 0;
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 0.5px solid var(--sidebar-line);
+  border-top: 0.5px solid var(--board-divider);
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 12.5px;
-  color: var(--user-role);
+  color: var(--board-text-muted);
 }
 
 .board-footer-right {
@@ -497,6 +537,7 @@ body.kiosk-mode {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  color: var(--board-text-secondary);
 }
 
 .board-logout-btn {
@@ -504,25 +545,24 @@ body.kiosk-mode {
   align-items: center;
   gap: 7px;
   background: transparent;
-  border: 0.5px solid var(--sidebar-line);
+  border: 1px solid var(--board-btn-border);
   border-radius: 8px;
   padding: 6px 12px;
   font: inherit;
   font-size: 12px;
   font-weight: 500;
-  color: var(--user-role);
+  color: var(--board-espresso);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 
 @media (hover: hover) {
   .board-logout-btn:hover {
-    background: var(--nav-hover-bg);
-    color: var(--sidebar-cream);
+    background: var(--board-surface-muted);
   }
 
-  .board-week-row:hover {
-    background: rgba(245, 235, 221, 0.09);
+  .board-week-row:not(.board-week-row-selected):hover {
+    background: var(--board-surface-muted);
   }
 
   .board-back-to-today-btn:hover {
@@ -534,12 +574,12 @@ body.kiosk-mode {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: var(--approved-txt);
-  box-shadow: 0 0 0 3px rgba(59, 109, 17, 0.25);
+  background: var(--board-live-dot);
+  box-shadow: 0 0 0 3px rgba(94, 125, 58, 0.25);
 }
 
 .board-status-dot-lost {
-  background: var(--declined-txt);
+  background: var(--board-lost-dot);
   box-shadow: 0 0 0 3px rgba(163, 45, 45, 0.25);
 }
 
@@ -551,17 +591,17 @@ body.kiosk-mode {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--sidebar-bg);
+  background: var(--board-canvas);
 }
 
 .board-fullscreen-card {
   text-align: center;
-  color: var(--sidebar-cream);
+  color: var(--board-text-primary);
 }
 
 .board-fullscreen-card i {
   font-size: 40px;
-  color: var(--user-role);
+  color: var(--board-text-muted);
 }
 
 .board-fullscreen-card h1 {
@@ -573,7 +613,7 @@ body.kiosk-mode {
 .board-fullscreen-card p {
   margin-top: 8px;
   font-size: 14px;
-  color: var(--user-role);
+  color: var(--board-text-secondary);
 }
 
 /* ============================================================
@@ -584,8 +624,8 @@ body.kiosk-mode {
   margin-bottom: 12px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: var(--info);
-  color: var(--info-txt);
+  background: var(--board-tan-pill-bg);
+  color: var(--board-tan-pill-text);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -602,8 +642,8 @@ body.kiosk-mode {
   padding: 10px 16px;
   border: none;
   border-radius: 10px;
-  background: var(--info-txt);
-  color: #fff;
+  background: var(--board-espresso);
+  color: var(--board-cream-text);
   font: inherit;
   font-size: 13px;
   font-weight: 700;
@@ -624,8 +664,8 @@ body.kiosk-mode {
 }
 
 .board-logout-confirm-card {
-  background: var(--sidebar-cream);
-  color: var(--text);
+  background: var(--board-surface);
+  color: var(--board-text-primary);
   border-radius: 14px;
   padding: 28px 32px;
   text-align: center;
@@ -646,8 +686,8 @@ body.kiosk-mode {
   padding: 14px;
   font: inherit;
   font-weight: 700;
-  background: var(--btn-primary-bg);
-  color: var(--sidebar-cream);
+  background: var(--board-espresso);
+  color: var(--board-cream-text);
   border: none;
   border-radius: 10px;
   cursor: pointer;
@@ -659,8 +699,8 @@ body.kiosk-mode {
   font: inherit;
   font-weight: 500;
   background: transparent;
-  color: var(--declined-txt);
-  border: 0.5px solid var(--declined);
+  color: var(--board-espresso);
+  border: 1px solid var(--board-btn-border);
   border-radius: 10px;
   cursor: pointer;
 }

@@ -614,6 +614,7 @@ async function saveSchedulingSettings() {
   await logAudit({ action: 'Updated Buffer & Capacity', category: 'scheduling_config', details: `buffer=${bufferMinutes}min, default_capacity=${defaultCapacity}` });
   setCapacityMsg('Buffer & capacity saved successfully.');
   renderScopeCapacityTable(); // refresh "effective" column, which falls back to this default
+  renderVenueCapacityTable(); // same — venue overrides fall back to this default too
 }
 
 // ── Per-scope capacity override ─────────────────────────────────────────────
@@ -693,6 +694,97 @@ async function saveScopeCapacity() {
   setScopeCapacityMsg('Per-scope overrides saved successfully.');
 }
 
+// ── Per-Venue Capacity Override (supabase/migrations/20261016_venue_
+// capacity_and_selection.sql) — same shape/fallback as Per-Scope above, but
+// the venue list is dynamic (public.venue), not a fixed 3-value array, so
+// it's fetched fresh on each load rather than hardcoded like SCOPES. ──────
+let venueCapacityCache = {}; // { venue_id: capacity|null }
+let venueListCache = []; // [{ venue_id, name }]
+
+function setVenueCapacityMsg(msg, isError = false) {
+  const el = document.getElementById('venue-capacity-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+function renderVenueCapacityTable() {
+  const body = document.getElementById('venueCapacityBody');
+  if (!body) return;
+
+  if (!venueListCache.length) {
+    body.innerHTML = '<tr><td colspan="3">No active venues yet — add one under Bookable Inventory &gt; Venues.</td></tr>';
+    return;
+  }
+
+  const globalDefaultEl = document.getElementById('field-default-capacity');
+  const globalDefault = Number(globalDefaultEl?.value) || defaultCapacityForDisplay;
+
+  body.innerHTML = venueListCache.map(({ venue_id, name }) => {
+    const override = venueCapacityCache[venue_id];
+    const effective = override ?? globalDefault;
+    return `
+      <tr data-venue="${venue_id}">
+        <td>${escapeHtmlSettings(name)}</td>
+        <td><input type="number" min="1" step="1" data-venue-capacity value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
+        <td>${effective}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Local, minimal escaper — this file has no shared one imported elsewhere.
+function escapeHtmlSettings(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.matches('[data-venue-capacity]')) {
+    const row = e.target.closest('tr[data-venue]');
+    if (!row) return;
+    const venueId = row.dataset.venue;
+    const raw = e.target.value.trim();
+    venueCapacityCache[venueId] = raw === '' ? null : Number(raw);
+    renderVenueCapacityTable();
+    document.querySelector(`tr[data-venue="${venueId}"] [data-venue-capacity]`)?.focus();
+  }
+});
+
+async function loadVenueCapacity() {
+  const [{ data: venues }, { data: overrides }] = await Promise.all([
+    supabase.from('venue').select('venue_id, name').eq('is_active', true).order('sort_order', { ascending: true }),
+    supabase.from('venue_capacity').select('venue_id, capacity'),
+  ]);
+
+  venueListCache = venues || [];
+  venueCapacityCache = {};
+  (overrides || []).forEach((row) => { venueCapacityCache[row.venue_id] = row.capacity; });
+  renderVenueCapacityTable();
+}
+
+async function saveVenueCapacity() {
+  for (const { venue_id } of venueListCache) {
+    const val = venueCapacityCache[venue_id];
+    if (val !== null && val !== undefined && (!Number.isFinite(val) || val < 1)) {
+      setVenueCapacityMsg('Capacity overrides must be at least 1, or left blank to use the default.', true);
+      return;
+    }
+  }
+
+  if (!venueListCache.length) return;
+
+  const rows = venueListCache.map(({ venue_id }) => ({
+    venue_id,
+    capacity: venueCapacityCache[venue_id] ?? null,
+    updated_at: new Date().toISOString(),
+  }));
+  const { error } = await supabase.from('venue_capacity').upsert(rows, { onConflict: 'venue_id' });
+
+  if (error) { setVenueCapacityMsg('Failed to save: ' + error.message, true); return; }
+  await logAudit({ action: 'Updated Per-Venue Capacity', category: 'scheduling_config', details: JSON.stringify(rows) });
+  setVenueCapacityMsg('Per-venue overrides saved successfully.');
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
   const result = await validateAdminSession({ fallbackLabel: 'Admin' });
@@ -723,6 +815,7 @@ async function init() {
   await loadExtensionRules();
   await loadSchedulingSettings();
   await loadScopeCapacity();
+  await loadVenueCapacity();
 
   document.getElementById('saveHoursBtn')?.addEventListener('click', saveOperatingHours);
   document.getElementById('saveMinAdvanceBtn')?.addEventListener('click', saveMinAdvanceDays);
@@ -744,6 +837,7 @@ async function init() {
   });
   document.getElementById('saveCapacityBtn')?.addEventListener('click', saveSchedulingSettings);
   document.getElementById('saveScopeCapacityBtn')?.addEventListener('click', saveScopeCapacity);
+  document.getElementById('saveVenueCapacityBtn')?.addEventListener('click', saveVenueCapacity);
 }
 
 init();

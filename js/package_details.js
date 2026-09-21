@@ -465,13 +465,32 @@ function renderPolicyCard(pkg, loc) {
     });
   }
 
+  // Both time-based cancellation rules are independently opt-in (see the
+  // admin Cancellation Notice Rules panel) — a customer can have either
+  // one set, both, or neither, and the fee itself still applies regardless
+  // of which (if any) are configured. Previously this row only ever
+  // checked cancellation_request_window_days, so leaving that one unchecked
+  // hid the fee entirely even when a fee amount (and/or the min-notice
+  // rule) was configured. Wording mirrors getCancellationBlockReason() in
+  // reservation_shared.js — the function that actually enforces these
+  // rules on the cancel flow — so the two never describe the policy
+  // differently.
   const cancelFee = loc === 'offsite' ? paymentRules?.cancellation_fee_offsite : paymentRules?.cancellation_fee_onsite;
-  const cancelWindow = paymentRules?.cancellation_request_window_days;
-  if (cancelFee != null && cancelWindow != null) {
+  const minNotice = paymentRules?.cancellation_min_notice_days;
+  const requestWindow = paymentRules?.cancellation_request_window_days;
+  if (cancelFee != null) {
+    const clauses = [];
+    if (requestWindow != null) {
+      clauses.push(`within ${requestWindow} day${requestWindow !== 1 ? 's' : ''} of booking`);
+    }
+    if (minNotice != null) {
+      clauses.push(`at least ${minNotice} day${minNotice !== 1 ? 's' : ''} before the event`);
+    }
+    const suffix = clauses.length ? ` if requested ${clauses.join(' and ')}` : '';
     rows.push({
       icon: 'ti-calendar-x',
       label: 'Cancellation fee',
-      value: `₱${Number(cancelFee).toLocaleString()} within ${cancelWindow} day${cancelWindow !== 1 ? 's' : ''} of event`
+      value: `₱${Number(cancelFee).toLocaleString()}${suffix}`
     });
   }
 

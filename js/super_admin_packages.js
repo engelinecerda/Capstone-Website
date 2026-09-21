@@ -1437,7 +1437,7 @@ function renderPkgPhotosGrid() {
             <button type="button" data-photo-action="right" title="Move right">›</button>
             <button type="button" data-photo-action="remove" title="Remove">✕</button>
           </div>
-          <input type="text" class="photo-alt-input" data-photo-alt-index="${index}" placeholder="Alt text (required)" value="${escapeHtml(photo.alt_text || '')}">
+          <input type="text" class="photo-alt-input" data-photo-alt-index="${index}" placeholder="Alt text (required)" value="${escapeHtml(photo.alt_text || '')}" maxlength="200">
         </div>
       `;
     }).join('');
@@ -1516,7 +1516,7 @@ function renderPkgInclusionsList() {
       <div class="inclusion-row" data-index="${index}">
         <button type="button" class="reorder-btn" data-inclusion-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
         <button type="button" class="reorder-btn" data-inclusion-action="down" ${index === pkgInclusions.length - 1 ? 'disabled' : ''}>↓</button>
-        <input type="text" data-inclusion-index="${index}" value="${escapeHtml(item)}" placeholder="e.g. 3-hour venue use">
+        <input type="text" data-inclusion-index="${index}" value="${escapeHtml(item)}" placeholder="e.g. 3-hour venue use" maxlength="200">
         <button type="button" data-inclusion-action="remove" title="Remove">✕</button>
       </div>
     `).join('');
@@ -3697,7 +3697,7 @@ function renderCateringDishDrawerList() {
     <div class="inclusion-row ${!dish.is_active ? 'is-archived-dish' : ''}" data-dish-id="${dish.dish_id}">
       <button type="button" class="reorder-btn" data-dish-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
       <button type="button" class="reorder-btn" data-dish-action="down" ${index === dishes.length - 1 ? 'disabled' : ''}>↓</button>
-      <input type="text" data-dish-name-input value="${escapeHtml(dish.name)}" placeholder="Dish name">
+      <input type="text" data-dish-name-input value="${escapeHtml(dish.name)}" placeholder="Dish name" maxlength="150">
       <button type="button" class="dish-toggle-btn ${dish.is_active ? 'is-active' : 'is-hidden'}" data-dish-action="toggle" title="${dish.is_active ? 'Hide from customers' : 'Show to customers'}">${dish.is_active ? '●' : '○'}</button>
       <button type="button" data-dish-action="remove" title="Delete dish">✕</button>
     </div>

@@ -3,6 +3,7 @@
 // ever sees the shared auth-gate modal, never the form itself.
 import { customerSupabase as supabase } from '/js/supabase.js';
 import { showFeedbackModal } from '/js/feedback_modal.js';
+import { attachPhoneMask } from '/js/phone_format.js';
 
 const guestBlock  = document.getElementById('inquiryGuestBlock');
 const formWrap    = document.getElementById('inquiryFormWrap');
@@ -14,6 +15,7 @@ const eventDateInput = document.getElementById('inquiry-event-date');
 const guestCountInput = document.getElementById('inquiry-guest-count');
 const emailInput    = document.getElementById('inquiry-email');
 const mobileInput   = document.getElementById('inquiry-mobile');
+attachPhoneMask(mobileInput);
 const referralSel   = document.getElementById('inquiry-referral');
 const remarksInput  = document.getElementById('inquiry-remarks');
 const form          = document.getElementById('inquiryForm');

@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
   await supabaseAdmin.rpc('notify_admins', {
     p_type: 'admin_board_password_reset',
     p_title: 'Board account password reset',
-    p_body: `The shared Operations Board account password was reset by ${performedBy}.`,
+    p_body: `The shared Schedule Board account password was reset by ${performedBy}.`,
     p_link: '/admin/super%20admin/super_admin_accounts.html',
   });
 

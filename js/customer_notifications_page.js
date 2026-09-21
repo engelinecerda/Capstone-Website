@@ -74,9 +74,9 @@ function renderPagination(totalPages) {
       data-page="${pageNum}" ${pageNum === currentPage ? 'aria-current="page"' : ''}>${pageNum}</button>
   `).join('');
   paginationEl.innerHTML = `
-    <button type="button" class="notif-page-pagination-btn" data-page="prev" aria-label="Previous page" ${currentPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+    <button type="button" class="notif-page-pagination-btn" data-page="prev" aria-label="Previous page" ${currentPage <= 1 ? 'disabled' : ''}><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
     ${pageButtons}
-    <button type="button" class="notif-page-pagination-btn" data-page="next" aria-label="Next page" ${currentPage >= totalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+    <button type="button" class="notif-page-pagination-btn" data-page="next" aria-label="Next page" ${currentPage >= totalPages ? 'disabled' : ''}><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
   `;
 }
 

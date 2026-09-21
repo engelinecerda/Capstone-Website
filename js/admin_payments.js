@@ -1089,7 +1089,7 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
       reviewActions.push(`
         <div class="reject-reason-inline">
           <label class="record-payment-field-label" for="rejectReasonInput">Reason for rejection <span class="record-payment-optional">(required)</span></label>
-          <textarea id="rejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Receipt image was unreadable">${escapeHtml(payment.rejection_reason || '')}</textarea>
+          <textarea id="rejectReasonInput" class="record-payment-textarea" rows="2" placeholder="e.g. Receipt image was unreadable" maxlength="1000">${escapeHtml(payment.rejection_reason || '')}</textarea>
         </div>
         <button type="button" class="modal-btn modal-btn-secondary" data-action="cancel-reject-payment" data-payment-id="${payment.payment_id}">Cancel</button>
         <button type="button" class="modal-btn modal-btn-outline-danger" data-action="confirm-reject-payment" data-payment-id="${payment.payment_id}">Confirm rejection</button>

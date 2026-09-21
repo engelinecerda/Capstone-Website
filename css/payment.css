@@ -558,11 +558,22 @@ body {
 .payment-form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    align-items: start;
     gap: 14px;
 }
 
+/* Reference number carries an optional .payment-field-hint line (format
+   guidance, e.g. "GCash reference numbers are 13 digits.") that Amount
+   Paid never has — with the default grid stretch, that extra line made
+   the two field-groups different heights and let Amount Paid's input
+   drift out of line with Reference Number's. align-items: start above
+   keeps both field-groups top-anchored so their labels/inputs always sit
+   on the same row regardless of which one has trailing hint text; this
+   align-content: start is the same fix one level down, in case a field-
+   group's own auto rows ever get stretched by a taller sibling elsewhere. */
 .payment-field-group {
     display: grid;
+    align-content: start;
     gap: 6px;
 }
 

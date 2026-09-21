@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_reservations.css?v=46">
-  <link rel="stylesheet" href="/css/admin_staff_roster.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_reservations.css?v=47">
+  <link rel="stylesheet" href="/css/admin_staff_roster.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
   <aside class="sidebar">
@@ -100,20 +100,20 @@
       <div class="form-grid">
         <div class="field">
           <label class="field-label">First name</label>
-          <input type="text" class="field-input" id="rosterFirstName" placeholder="e.g. Maria">
+          <input type="text" class="field-input" id="rosterFirstName" placeholder="e.g. Maria" maxlength="50">
         </div>
         <div class="field">
           <label class="field-label">Last name <span class="field-label-opt">(optional)</span></label>
-          <input type="text" class="field-input" id="rosterLastName" placeholder="e.g. Santos">
+          <input type="text" class="field-input" id="rosterLastName" placeholder="e.g. Santos" maxlength="50">
         </div>
         <div class="field">
           <label class="field-label">Email <span class="field-label-opt">(optional, recommended)</span></label>
-          <input type="email" class="field-input" id="rosterEmail" placeholder="e.g. maria@example.com">
+          <input type="email" class="field-input" id="rosterEmail" placeholder="e.g. maria@example.com" maxlength="254">
           <span class="field-note">Contact detail only — not a login.</span>
         </div>
         <div class="field">
           <label class="field-label">Position <span class="field-label-opt">(optional)</span></label>
-          <input type="text" class="field-input" id="rosterPosition" placeholder="e.g. Server, Barista, Coordinator">
+          <input type="text" class="field-input" id="rosterPosition" placeholder="e.g. Server, Barista, Coordinator" maxlength="100">
         </div>
         <div class="field roster-active-field">
           <label class="field-label">Active</label>

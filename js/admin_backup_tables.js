@@ -54,6 +54,7 @@ export const BACKUP_TABLE_CONFIG = [
   { name: 'operating_hours',               pk: 'weekday' },
   { name: 'scheduling_settings',           pk: 'id' },
   { name: 'scope_capacity',                pk: 'scope' },
+  { name: 'venue_capacity',                pk: 'venue_id' },
   { name: 'calendar_blackouts',            pk: 'blackout_id' },
   { name: 'notification_trigger',          pk: 'code' },
   { name: 'notification_template',         pk: 'trigger_code' },

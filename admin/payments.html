@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_payments.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_payments.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
   <aside class="sidebar">
@@ -83,7 +83,7 @@
             <span class="search-icon">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </span>
-            <input id="searchInput" type="text" placeholder="Search by customer, package, payment type, or method..." />
+            <input id="searchInput" type="text" placeholder="Search by customer, package, payment type, or method..." maxlength="100" />
           </label>
           <div class="filter-select-wrap">
             <span class="filter-icon">Status</span>
@@ -215,7 +215,7 @@
         <p class="record-payment-planned-note hidden" id="recordPaymentPlannedNote"></p>
 
         <label class="record-payment-field-label" for="recordPaymentReferenceInput">Official receipt no. <span class="record-payment-optional">(optional)</span></label>
-        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" />
+        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" maxlength="100" />
 
         <label class="record-payment-field-label">Receipt photo <span class="record-payment-optional">(optional)</span></label>
         <label class="record-payment-file-drop" for="recordPaymentFileInput">
@@ -230,7 +230,7 @@
         </div>
 
         <label class="record-payment-field-label" for="recordPaymentNotesInput">Notes <span class="record-payment-optional">(optional)</span></label>
-        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks"></textarea>
+        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks" maxlength="1000"></textarea>
       </div>
 
       <p class="modal-message" id="recordPaymentMessage"></p>

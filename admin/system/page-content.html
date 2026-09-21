@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <title>Page Content - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_page_content.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_page_content.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
   <!-- Values icon picker previews the same Tabler glyphs the public About
        page renders (about_value.icon stores raw "ti-*" class names) — the
        rest of the admin portal uses inline SVGs instead of this webfont,
        so it's loaded here only, matching the customer pages that already do. -->
-<link rel="preload" as="style" href="/css/tabler-icons-local.css?v=46" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=46"></noscript>
+<link rel="preload" as="style" href="/css/tabler-icons-local.css?v=47" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=47"></noscript>
 </head>
 <body>
 
@@ -109,19 +109,19 @@
 
         <div class="modal-field">
           <label class="modal-label" for="menuBannerLabelInput">Eyebrow Label</label>
-          <input type="text" id="menuBannerLabelInput" class="modal-input" placeholder="E.g., Members Only">
+          <input type="text" id="menuBannerLabelInput" class="modal-input" placeholder="E.g., Members Only" maxlength="60">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="menuBannerHeadingInput">Heading</label>
-          <input type="text" id="menuBannerHeadingInput" class="modal-input" placeholder="E.g., Elite Card">
+          <input type="text" id="menuBannerHeadingInput" class="modal-input" placeholder="E.g., Elite Card" maxlength="100">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="menuBannerDescInput">Description</label>
-          <textarea id="menuBannerDescInput" class="modal-textarea" rows="3" placeholder="Shown next to the heading"></textarea>
+          <textarea id="menuBannerDescInput" class="modal-textarea" rows="3" placeholder="Shown next to the heading" maxlength="300"></textarea>
         </div>
         <div class="modal-field">
           <label class="modal-label" for="menuBannerAltInput">Zoom Image Alt Text</label>
-          <input type="text" id="menuBannerAltInput" class="modal-input" placeholder="Describe the image for screen readers">
+          <input type="text" id="menuBannerAltInput" class="modal-input" placeholder="Describe the image for screen readers" maxlength="200">
         </div>
         <label class="plain-checkbox-row">
           <input type="checkbox" id="menuBannerActiveInput" checked>
@@ -248,15 +248,15 @@
         </div>
         <div class="modal-field">
           <label class="modal-label" for="headerAltInput">Alt Text *</label>
-          <input type="text" id="headerAltInput" class="modal-input" placeholder="Describe the image for screen readers">
+          <input type="text" id="headerAltInput" class="modal-input" placeholder="Describe the image for screen readers" maxlength="200">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="headerHeadingInput">Heading</label>
-          <input type="text" id="headerHeadingInput" class="modal-input" placeholder="E.g., Where every sip tells a story">
+          <input type="text" id="headerHeadingInput" class="modal-input" placeholder="E.g., Where every sip tells a story" maxlength="150">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="headerSubInput">Subheading</label>
-          <input type="text" id="headerSubInput" class="modal-input" placeholder="A short line under the heading">
+          <input type="text" id="headerSubInput" class="modal-input" placeholder="A short line under the heading" maxlength="200">
         </div>
         <div class="modal-field">
           <label class="modal-label">Preview</label>
@@ -294,11 +294,11 @@
         <img id="galleryEditPreview" class="gallery-edit-preview" alt="">
         <div class="modal-field">
           <label class="modal-label" for="galleryAltInput">Alt Text *</label>
-          <input type="text" id="galleryAltInput" class="modal-input" placeholder="Describe the image for screen readers">
+          <input type="text" id="galleryAltInput" class="modal-input" placeholder="Describe the image for screen readers" maxlength="200">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="galleryCaptionInput">Caption</label>
-          <input type="text" id="galleryCaptionInput" class="modal-input" placeholder="Optional caption">
+          <input type="text" id="galleryCaptionInput" class="modal-input" placeholder="Optional caption" maxlength="150">
         </div>
         <p class="modal-message hidden" id="galleryEditMessage"></p>
       </div>
@@ -339,11 +339,11 @@
       <div class="modal-body">
         <div class="modal-field">
           <label class="modal-label" for="faqQuestionInput">Question *</label>
-          <input type="text" id="faqQuestionInput" class="modal-input" placeholder="E.g., Do you accept walk-in reservations?">
+          <input type="text" id="faqQuestionInput" class="modal-input" placeholder="E.g., Do you accept walk-in reservations?" maxlength="300">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="faqAnswerInput">Answer *</label>
-          <textarea id="faqAnswerInput" class="modal-textarea" rows="4" placeholder="Answer shown when this question is expanded"></textarea>
+          <textarea id="faqAnswerInput" class="modal-textarea" rows="4" placeholder="Answer shown when this question is expanded" maxlength="2000"></textarea>
         </div>
         <p class="modal-message hidden" id="faqModalMessage"></p>
       </div>
@@ -381,20 +381,20 @@
         </div>
         <div class="modal-field">
           <label class="modal-label" for="serviceTitleInput">Title *</label>
-          <input type="text" id="serviceTitleInput" class="modal-input" placeholder="E.g., Cafe & Lounge">
+          <input type="text" id="serviceTitleInput" class="modal-input" placeholder="E.g., Cafe & Lounge" maxlength="100">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="serviceDescInput">Description</label>
-          <textarea id="serviceDescInput" class="modal-textarea" rows="3" placeholder="A short description of this service"></textarea>
+          <textarea id="serviceDescInput" class="modal-textarea" rows="3" placeholder="A short description of this service" maxlength="500"></textarea>
         </div>
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="serviceLinkUrlInput">Link URL</label>
-            <input type="text" id="serviceLinkUrlInput" class="modal-input" placeholder="/packages.html">
+            <input type="text" id="serviceLinkUrlInput" class="modal-input" placeholder="/packages.html" maxlength="500">
           </div>
           <div class="modal-field">
             <label class="modal-label" for="serviceLinkLabelInput">Link Label</label>
-            <input type="text" id="serviceLinkLabelInput" class="modal-input" placeholder="E.g., View packages">
+            <input type="text" id="serviceLinkLabelInput" class="modal-input" placeholder="E.g., View packages" maxlength="60">
           </div>
         </div>
         <p class="modal-message hidden" id="serviceModalMessage"></p>
@@ -433,11 +433,11 @@
         </div>
         <div class="modal-field">
           <label class="modal-label" for="menuSectionHeadingInput">Heading *</label>
-          <input type="text" id="menuSectionHeadingInput" class="modal-input" placeholder="E.g., Sulit Picks Meals">
+          <input type="text" id="menuSectionHeadingInput" class="modal-input" placeholder="E.g., Sulit Picks Meals" maxlength="100">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="menuSectionAltInput">Alt Text *</label>
-          <input type="text" id="menuSectionAltInput" class="modal-input" placeholder="Describe the menu image for screen readers">
+          <input type="text" id="menuSectionAltInput" class="modal-input" placeholder="Describe the menu image for screen readers" maxlength="200">
         </div>
         <p class="modal-message hidden" id="menuSectionModalMessage"></p>
       </div>
@@ -463,11 +463,11 @@
       <div class="modal-body">
         <div class="modal-field">
           <label class="modal-label" for="valueLabelInput">Label *</label>
-          <input type="text" id="valueLabelInput" class="modal-input" placeholder="E.g., Quality Coffee">
+          <input type="text" id="valueLabelInput" class="modal-input" placeholder="E.g., Quality Coffee" maxlength="60">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="valueDescInput">Description *</label>
-          <textarea id="valueDescInput" class="modal-textarea" rows="3" placeholder="A short sentence about this value"></textarea>
+          <textarea id="valueDescInput" class="modal-textarea" rows="3" placeholder="A short sentence about this value" maxlength="300"></textarea>
         </div>
         <div class="modal-field">
           <label class="modal-label" id="valueIconPickerLabel">Icon *</label>

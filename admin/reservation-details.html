@@ -224,7 +224,7 @@
             id="assignmentSearchInput"
             class="assignment-search-input"
             type="search"
-            placeholder="Search by name or role"
+            placeholder="Search by name or role" maxlength="100"
           />
         </label>
 
@@ -325,7 +325,7 @@
         <p class="record-payment-planned-note hidden" id="recordPaymentPlannedNote"></p>
 
         <label class="record-payment-field-label" for="recordPaymentReferenceInput">Official receipt no. <span class="record-payment-optional">(optional)</span></label>
-        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" />
+        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" maxlength="100" />
 
         <label class="record-payment-field-label">Receipt photo <span class="record-payment-optional">(optional)</span></label>
         <label class="record-payment-file-drop" for="recordPaymentFileInput">
@@ -340,7 +340,7 @@
         </div>
 
         <label class="record-payment-field-label" for="recordPaymentNotesInput">Notes <span class="record-payment-optional">(optional)</span></label>
-        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks"></textarea>
+        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks" maxlength="1000"></textarea>
 
         <p class="modal-message" id="recordPaymentMessage"></p>
       </div>
