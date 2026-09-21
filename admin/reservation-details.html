@@ -12,10 +12,10 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
   <aside class="sidebar">
@@ -220,7 +220,7 @@
             id="assignmentSearchInput"
             class="assignment-search-input"
             type="search"
-            placeholder="Search by name or role"
+            placeholder="Search by name or role" maxlength="100"
           />
         </label>
 
@@ -321,7 +321,7 @@
         <p class="record-payment-planned-note hidden" id="recordPaymentPlannedNote"></p>
 
         <label class="record-payment-field-label" for="recordPaymentReferenceInput">Official receipt no. <span class="record-payment-optional">(optional)</span></label>
-        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" />
+        <input id="recordPaymentReferenceInput" class="record-payment-input" type="text" placeholder="Receipt number" maxlength="100" />
 
         <label class="record-payment-field-label">Receipt photo <span class="record-payment-optional">(optional)</span></label>
         <label class="record-payment-file-drop" for="recordPaymentFileInput">
@@ -336,7 +336,7 @@
         </div>
 
         <label class="record-payment-field-label" for="recordPaymentNotesInput">Notes <span class="record-payment-optional">(optional)</span></label>
-        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks"></textarea>
+        <textarea id="recordPaymentNotesInput" class="record-payment-textarea" rows="2" placeholder="Optional remarks" maxlength="1000"></textarea>
 
         <p class="modal-message" id="recordPaymentMessage"></p>
       </div>
@@ -349,6 +349,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="../js/admin_reservation_details.js?v=46"></script>
+  <script type="module" src="../js/admin_reservation_details.js?v=47"></script>
 </body>
 </html>

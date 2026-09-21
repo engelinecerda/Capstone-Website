@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
 
@@ -85,7 +85,7 @@
         <div class="filter-bar">
           <div class="search-wrap">
             <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="inventorySearchInput" class="search-input" placeholder="Search packages and add-ons...">
+            <input type="text" id="inventorySearchInput" class="search-input" placeholder="Search packages and add-ons..." maxlength="100">
           </div>
           <div class="filter-right">
             <div class="seg-control" id="kindSeg">
@@ -404,17 +404,17 @@
         <!-- Category name field -->
         <div class="modal-field">
           <label class="modal-label" for="catNameInput">Category Name *</label>
-          <input type="text" id="catNameInput" class="modal-input" placeholder="E.g., Birthday Packages">
+          <input type="text" id="catNameInput" class="modal-input" placeholder="E.g., Birthday Packages" maxlength="100">
         </div>
         <!-- Description field -->
         <div class="modal-field">
           <label class="modal-label" for="catDescriptionInput">Description *</label>
-          <textarea id="catDescriptionInput" class="modal-textarea" rows="4" placeholder="Venue and catering package for intimate weddings and simple celebrations..."></textarea>
+          <textarea id="catDescriptionInput" class="modal-textarea" rows="4" placeholder="Venue and catering package for intimate weddings and simple celebrations..." maxlength="1000"></textarea>
         </div>
         <!-- Category Highlights field (catalogue display copy — not inherited by packages) -->
         <div class="modal-field">
           <label class="modal-label" for="catInclusionsInput">Category Highlights</label>
-          <textarea id="catInclusionsInput" class="modal-textarea" rows="4" placeholder="E.g., Main Hall access, 3 hours use, buffet setup, drinks, lights and sounds..."></textarea>
+          <textarea id="catInclusionsInput" class="modal-textarea" rows="4" placeholder="E.g., Main Hall access, 3 hours use, buffet setup, drinks, lights and sounds..." maxlength="1000"></textarea>
           <span class="modal-hint">Shown as a highlights blurb on this category's customer-facing overview card — separate from each package's own inclusions list. One item per line or comma separated.</span>
         </div>
         <p class="modal-message hidden" id="catModalMessage"></p>
@@ -450,7 +450,7 @@
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="pkgName">Package Name *</label>
-            <input type="text" id="pkgName" class="modal-input" placeholder="E.g., VIP Plus Package">
+            <input type="text" id="pkgName" class="modal-input" placeholder="E.g., VIP Plus Package" maxlength="150">
             <span class="field-error hidden" id="pkgNameError"></span>
           </div>
           <div class="modal-field">
@@ -474,7 +474,7 @@
 
         <div class="modal-field">
           <label class="modal-label" for="pkgDescription">Description *</label>
-          <textarea id="pkgDescription" class="modal-textarea" rows="6" placeholder="Brief description of the package..."></textarea>
+          <textarea id="pkgDescription" class="modal-textarea" rows="6" placeholder="Brief description of the package..." maxlength="2000"></textarea>
         </div>
 
         <!-- Inclusions (structured, repeatable list — not the description) -->
@@ -722,7 +722,7 @@
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="venueName">Venue Name *</label>
-            <input type="text" id="venueName" class="modal-input" placeholder="E.g., Main Hall">
+            <input type="text" id="venueName" class="modal-input" placeholder="E.g., Main Hall" maxlength="100">
           </div>
           <div class="modal-field">
             <label class="modal-label" for="venueCapacity">Capacity (guests) *</label>
@@ -731,7 +731,7 @@
         </div>
         <div class="modal-field">
           <label class="modal-label" for="venueDescription">Description</label>
-          <textarea id="venueDescription" class="modal-textarea" rows="2" placeholder="E.g., second floor, garden-facing"></textarea>
+          <textarea id="venueDescription" class="modal-textarea" rows="2" placeholder="E.g., second floor, garden-facing" maxlength="500"></textarea>
         </div>
         <div class="modal-field">
           <label class="modal-label" for="venueSortOrder">Sort Order</label>
@@ -768,7 +768,7 @@
       <div class="modal-body">
         <div class="modal-field">
           <label class="modal-label" for="badgeTypeLabelInput">Label *</label>
-          <input type="text" id="badgeTypeLabelInput" class="modal-input" placeholder="E.g., Limited Slots">
+          <input type="text" id="badgeTypeLabelInput" class="modal-input" placeholder="E.g., Limited Slots" maxlength="60">
         </div>
         <div class="modal-row">
           <div class="modal-field">
@@ -821,7 +821,7 @@
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="cateringCatName">Category Name *</label>
-            <input type="text" id="cateringCatName" class="modal-input" placeholder="E.g., Chicken, Drinks">
+            <input type="text" id="cateringCatName" class="modal-input" placeholder="E.g., Chicken, Drinks" maxlength="100">
           </div>
           <div class="modal-field">
             <label class="modal-label" for="cateringCatIcon">Icon (optional)</label>
@@ -890,7 +890,7 @@
         <div class="modal-field" style="margin-top:14px;">
           <label class="modal-label" for="cateringNewDishInput">Add a dish</label>
           <div class="modal-row">
-            <input type="text" id="cateringNewDishInput" class="modal-input" placeholder="E.g., Chicken ala King">
+            <input type="text" id="cateringNewDishInput" class="modal-input" placeholder="E.g., Chicken ala King" maxlength="150">
             <button type="button" class="btn-cancel" id="cateringAddDishBtn" style="white-space:nowrap;">+ Add</button>
           </div>
         </div>

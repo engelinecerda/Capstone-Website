@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_payment_options.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_payment_options.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
 
@@ -105,7 +105,7 @@
             <p class="pr-row-desc">Flat fee to confirm an onsite reservation. Offsite reservations use a separate fixed ₱5,000 fee, unaffected by this setting.</p>
           </div>
           <div class="pr-row-control pt-row-control">
-            <input type="text" class="field-input pt-label-input" id="pt-reservation_fee-label" placeholder="Label">
+            <input type="text" class="field-input pt-label-input" id="pt-reservation_fee-label" placeholder="Label" maxlength="60">
             <span class="field-note">₱</span>
             <input type="number" class="pr-input-inline" id="pt-reservation_fee-flat" min="0" step="1">
             <label class="pm2-toggle">
@@ -121,7 +121,7 @@
             <p class="pr-row-desc">Percentage of the reservation total due as a deposit. Subtracts what's already been paid, capped at the remaining balance.</p>
           </div>
           <div class="pr-row-control pt-row-control">
-            <input type="text" class="field-input pt-label-input" id="pt-down_payment-label" placeholder="Label">
+            <input type="text" class="field-input pt-label-input" id="pt-down_payment-label" placeholder="Label" maxlength="60">
             <input type="number" class="pr-input-inline" id="pt-down_payment-percent" min="0" max="100" step="1">
             <span class="field-note">%</span>
             <label class="pm2-toggle">
@@ -137,7 +137,7 @@
             <p class="pr-row-desc">Settles the entire remaining balance in one payment. No separate amount to configure.</p>
           </div>
           <div class="pr-row-control pt-row-control">
-            <input type="text" class="field-input pt-label-input" id="pt-full_payment-label" placeholder="Label">
+            <input type="text" class="field-input pt-label-input" id="pt-full_payment-label" placeholder="Label" maxlength="60">
             <label class="pm2-toggle">
               <input type="checkbox" id="pt-full_payment-active">
               <span class="pm2-toggle-track"></span>
@@ -151,7 +151,7 @@
             <p class="pr-row-desc">Lets a customer enter their own amount. Minimum is the greater of the percentage below or the peso floor, capped at the remaining balance so a final small balance is always payable.</p>
           </div>
           <div class="pr-row-control pt-row-control">
-            <input type="text" class="field-input pt-label-input" id="pt-partial_payment-label" placeholder="Label">
+            <input type="text" class="field-input pt-label-input" id="pt-partial_payment-label" placeholder="Label" maxlength="60">
             <input type="number" class="pr-input-inline" id="pt-partial_payment-percent" min="0" max="100" step="1">
             <span class="field-note">% min,</span>
             <span class="field-note">₱</span>
@@ -345,7 +345,7 @@
         </div>
         <div class="field">
           <label class="field-label">Label</label>
-          <input type="text" class="field-input" id="pm2Label" placeholder="e.g. GCash – Personal">
+          <input type="text" class="field-input" id="pm2Label" placeholder="e.g. GCash – Personal" maxlength="100">
           <span class="field-note">Shown to customers as the method name.</span>
         </div>
         <div class="field">
@@ -363,19 +363,19 @@
         <!-- Bank + E-wallet: account name -->
         <div class="field pm2-fields-bank pm2-fields-ewallet">
           <label class="field-label">Account name</label>
-          <input type="text" class="field-input" id="pm2AccountName" placeholder="e.g. ELI Coffee Events">
+          <input type="text" class="field-input" id="pm2AccountName" placeholder="e.g. ELI Coffee Events" maxlength="150">
         </div>
 
         <!-- Bank only -->
         <div class="field pm2-fields-bank">
           <label class="field-label">Account number</label>
-          <input type="text" class="field-input" id="pm2AccountNumber" placeholder="e.g. 1234-5678-90">
+          <input type="text" class="field-input" id="pm2AccountNumber" placeholder="e.g. 1234-5678-90" maxlength="50">
         </div>
 
         <!-- E-wallet only -->
         <div class="field pm2-fields-ewallet">
           <label class="field-label">Mobile number</label>
-          <input type="text" class="field-input" id="pm2PhoneNumber" placeholder="e.g. 0917 123 4567">
+          <input type="text" class="field-input" id="pm2PhoneNumber" placeholder="e.g. 0917 123 4567" maxlength="30">
         </div>
 
         <!-- Bank + E-wallet: QR upload -->
@@ -394,7 +394,7 @@
         <!-- Cash only -->
         <div class="field pm2-fields-cash">
           <label class="field-label">Instructions</label>
-          <textarea class="field-input" id="pm2Instructions" rows="2" placeholder="e.g. Pay in cash at the counter."></textarea>
+          <textarea class="field-input" id="pm2Instructions" rows="2" placeholder="e.g. Pay in cash at the counter." maxlength="500"></textarea>
         </div>
         <div class="field pm2-fields-cash">
           <label class="field-label">Latest pay-by (days before event)</label>
@@ -402,7 +402,7 @@
         </div>
         <div class="field pm2-fields-cash">
           <label class="field-label">Pay-in location <span class="field-label-opt">(optional)</span></label>
-          <input type="text" class="field-input" id="pm2PayLocation" placeholder="e.g. Counter">
+          <input type="text" class="field-input" id="pm2PayLocation" placeholder="e.g. Counter" maxlength="100">
         </div>
       </div>
 

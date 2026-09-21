@@ -7,14 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=46">
-  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/styles.css?v=46">
-  <link rel="stylesheet" href="/css/account.css?v=46">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=47">
+  <link rel="stylesheet" href="/css/styles.css?v=47">
+  <link rel="stylesheet" href="/css/account.css?v=47">
 </head>
 <body>
 
@@ -65,14 +62,14 @@
     <div class="account-tabs-inner">
       <div class="account-tabs-group">
         <button class="account-tab active" data-section="profile">
-          <i class="fa-solid fa-user" aria-hidden="true"></i> Profile
+          <i class="ti ti-user" aria-hidden="true"></i> Profile
         </button>
         <button class="account-tab" data-section="reservations">
-          <i class="fa-solid fa-calendar-check" aria-hidden="true"></i> Reservations
+          <i class="ti ti-calendar-check" aria-hidden="true"></i> Reservations
         </button>
       </div>
       <button type="button" class="account-tabs-logout" id="tab-logout-btn">
-        <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Logout
+        <i class="ti ti-logout" aria-hidden="true"></i> Logout
       </button>
     </div>
   </div>
@@ -92,7 +89,7 @@
               <p class="info-card-subtitle">Your account and contact details on file.</p>
             </div>
             <button type="button" class="btn-edit-profile" id="edit-profile-btn">
-              <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit Profile
+              <i class="ti ti-edit" aria-hidden="true"></i> Edit Profile
             </button>
           </div>
 
@@ -126,7 +123,7 @@
             </div>
             <div class="info-actions">
               <button type="button" class="pill-btn" id="change-password-btn">
-                <i class="fa-solid fa-lock" aria-hidden="true"></i> Change Password
+                <i class="ti ti-lock" aria-hidden="true"></i> Change Password
               </button>
             </div>
           </div>
@@ -153,7 +150,7 @@
 
               <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" id="profile-email" placeholder="Email" required>
+                <input type="email" id="profile-email" placeholder="Email" required maxlength="254">
                 <p class="field-note">If you change your email, confirm the link sent to both addresses before the new login email becomes active.</p>
                 <p class="field-note pending-email-note" id="pending-email-note" hidden></p>
               </div>
@@ -216,7 +213,7 @@
       <section class="account-section" id="section-reservations">
         <div id="reservations-list">
           <div class="empty-state">
-            <div class="empty-icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></div>
+            <div class="empty-icon"><i class="ti ti-calendar" aria-hidden="true"></i></div>
             <h3>No reservations yet</h3>
             <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
           </div>
@@ -246,7 +243,7 @@
       <p class="account-modal-copy">Pick an available date first, then select a new start time for your event.</p>
 
       <div class="cancel-policy-block">
-        <div class="cancel-policy-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="ti ti-alert-triangle"></i></div>
         <div class="cancel-policy-body" id="reschedule-policy-body">
           <p class="cancel-policy-heading">Rescheduling Policy</p>
           <p class="cancel-policy-text">Requests are subject to availability on the new date and time you select. Your original booking stays in place until an admin approves the request.</p>
@@ -313,7 +310,7 @@
       <h2 class="account-modal-title" id="cancel-modal-title">Cancel Reservation</h2>
 
       <div class="cancel-policy-block">
-        <div class="cancel-policy-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="ti ti-alert-triangle"></i></div>
         <div class="cancel-policy-body" id="cancel-policy-body">
           <p class="cancel-policy-heading">Non-Refundable Policy</p>
           <p class="cancel-policy-text">All payments already made for this reservation are strictly non-refundable. Cancelling will not reverse any amounts previously submitted or verified.</p>
@@ -328,7 +325,7 @@
 
       <div class="cancel-reason-field">
         <label class="cancel-reason-label" for="cancel-reason-input">Reason for cancellation</label>
-        <textarea class="cancel-reason-input" id="cancel-reason-input" rows="3" placeholder="Let us know why you're cancelling this reservation..." required></textarea>
+        <textarea class="cancel-reason-input" id="cancel-reason-input" rows="3" placeholder="Let us know why you're cancelling this reservation..." required maxlength="1000"></textarea>
       </div>
 
       <p class="account-modal-message" id="cancel-modal-message"></p>

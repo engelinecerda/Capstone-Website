@@ -538,7 +538,7 @@ function renderAboutSections() {
       <div class="about-section-head">
         <span class="about-section-title">${escapeHtml(s.title)}</span>
       </div>
-      <textarea class="about-body-input" data-about-body="${escapeHtml(s.section_key)}" rows="6">${escapeHtml(s.body || '')}</textarea>
+      <textarea class="about-body-input" data-about-body="${escapeHtml(s.section_key)}" rows="6" maxlength="10000">${escapeHtml(s.body || '')}</textarea>
       ${SECTIONS_WITH_IMAGE.has(s.section_key) ? `
       <div class="modal-field about-image-field">
         <label class="modal-label">${s.section_key === 'home_teaser' ? 'Our Story Image' : 'Story Image'}</label>
@@ -555,7 +555,7 @@ function renderAboutSections() {
           <span class="modal-hint" data-about-file-name="${escapeHtml(s.section_key)}">No file chosen</span>
           <button type="button" class="btn-outline-sm" data-about-remove-image="${escapeHtml(s.section_key)}" style="${s.image_url ? '' : 'display:none'}">Remove image</button>
         </div>
-        <input type="text" class="modal-input" data-about-alt-input="${escapeHtml(s.section_key)}" value="${escapeHtml(s.alt_text || '')}" placeholder="Describe the image for screen readers">
+        <input type="text" class="modal-input" data-about-alt-input="${escapeHtml(s.section_key)}" value="${escapeHtml(s.alt_text || '')}" placeholder="Describe the image for screen readers" maxlength="200">
       </div>` : ''}
       <div class="about-section-actions">
         <button type="button" class="btn-outline-sm" data-about-preview="${escapeHtml(s.section_key)}">Preview</button>

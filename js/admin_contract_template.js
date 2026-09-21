@@ -217,7 +217,7 @@ function renderFieldsList() {
         <input type="checkbox" data-field-visible ${f.is_visible !== false ? 'checked' : ''}>
         <span class="pm2-toggle-track"></span>
       </label>
-      <input type="text" class="ct-field-label-input" data-field-label value="${escHtml(f.label)}">
+      <input type="text" class="ct-field-label-input" data-field-label value="${escHtml(f.label)}" maxlength="100">
       <span class="ct-field-token">{{${escHtml(f.token)}}}</span>
       <span class="ct-field-sample">${escHtml(tokenValues[f.token] ?? '')}</span>
       <div class="ct-field-actions">
@@ -287,14 +287,14 @@ function clauseRowHtml(clause, index) {
   return `
     <div class="ct-clause-row" data-clause-index="${index}">
       <div class="ct-clause-head">
-        <input type="text" class="ct-clause-heading" data-clause-heading value="${escHtml(clause.heading)}" placeholder="Clause heading, e.g. Payment Terms">
+        <input type="text" class="ct-clause-heading" data-clause-heading value="${escHtml(clause.heading)}" placeholder="Clause heading, e.g. Payment Terms" maxlength="150">
         <div class="ct-clause-actions">
           <button type="button" data-clause-action="up" ${index === 0 ? 'disabled' : ''} title="Move up">↑</button>
           <button type="button" data-clause-action="down" ${index === templateClauses.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
           <button type="button" data-clause-action="remove" title="Remove">✕</button>
         </div>
       </div>
-      <textarea class="ct-clause-body" data-clause-body rows="4" placeholder="Clause text. Use {{tokens}} for figures that come from elsewhere.">${escHtml(clause.body)}</textarea>
+      <textarea class="ct-clause-body" data-clause-body rows="4" placeholder="Clause text. Use {{tokens}} for figures that come from elsewhere." maxlength="5000">${escHtml(clause.body)}</textarea>
       <p class="ct-clause-error hidden" data-clause-error></p>
     </div>
   `;
@@ -319,12 +319,12 @@ function lockedClauseRowHtml(key) {
     <div class="ct-clause-row" data-locked-key="${escHtml(key)}">
       <div class="ct-clause-head">
         <span class="ct-lock-icon" title="Unlocked for editing">🔓</span>
-        <input type="text" class="ct-clause-heading" data-locked-heading value="${escHtml(clause.heading)}">
+        <input type="text" class="ct-clause-heading" data-locked-heading value="${escHtml(clause.heading)}" maxlength="150">
         <div class="ct-clause-actions">
           <button type="button" class="et-action-btn" data-relock-clause="${escHtml(key)}" style="width:auto;padding:5px 10px;">Lock</button>
         </div>
       </div>
-      <textarea class="ct-clause-body" data-locked-body rows="4">${escHtml(clause.body)}</textarea>
+      <textarea class="ct-clause-body" data-locked-body rows="4" maxlength="5000">${escHtml(clause.body)}</textarea>
       <p class="ct-clause-error hidden" data-clause-error></p>
       <div style="display:flex;justify-content:flex-end;margin-top:8px;">
         <button type="button" class="btn-primary" data-save-locked="${escHtml(key)}" style="height:32px;padding:0 14px;font-size:12px;">Save this clause</button>

@@ -7,15 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=46">
-  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/styles.css?v=46">
-  <link rel="stylesheet" href="/css/account.css?v=46">
-  <link rel="stylesheet" href="/css/reservation_details.css?v=46">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=47">
+  <link rel="stylesheet" href="/css/styles.css?v=47">
+  <link rel="stylesheet" href="/css/account.css?v=47">
+  <link rel="stylesheet" href="/css/reservation_details.css?v=47">
 </head>
 <body>
 
@@ -53,7 +50,7 @@
   <div class="account-content rd-page">
     <div class="account-content-inner">
       <a href="/account?section=reservations" class="rd-back-link">
-        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> My reservations
+        <i class="ti ti-arrow-left" aria-hidden="true"></i> My reservations
       </a>
       <div id="reservation-details-page"></div>
     </div>
@@ -66,7 +63,7 @@
       <h2 class="account-modal-title" id="cancel-modal-title">Cancel Reservation</h2>
 
       <div class="cancel-policy-block">
-        <div class="cancel-policy-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="ti ti-alert-triangle"></i></div>
         <div class="cancel-policy-body" id="cancel-policy-body">
           <p class="cancel-policy-heading">Non-Refundable Policy</p>
           <p class="cancel-policy-text">All payments already made for this reservation are strictly non-refundable. Cancelling will not reverse any amounts previously submitted or verified.</p>
@@ -81,7 +78,7 @@
 
       <div class="cancel-reason-field">
         <label class="cancel-reason-label" for="cancel-reason-input">Reason for cancellation</label>
-        <textarea class="cancel-reason-input" id="cancel-reason-input" rows="3" placeholder="Let us know why you're cancelling this reservation..." required></textarea>
+        <textarea class="cancel-reason-input" id="cancel-reason-input" rows="3" placeholder="Let us know why you're cancelling this reservation..." required maxlength="1000"></textarea>
       </div>
 
       <p class="account-modal-message" id="cancel-modal-message"></p>

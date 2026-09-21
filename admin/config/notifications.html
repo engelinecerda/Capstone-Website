@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <title>Notifications - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/admin_notifications_config.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/admin_notifications_config.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
 
@@ -129,11 +129,11 @@
         </div>
         <div class="modal-field" id="editorSubjectField">
           <label class="modal-label" for="editorSubjectInput">Email Subject</label>
-          <input type="text" id="editorSubjectInput" class="modal-input" placeholder="Shown only in the email — the in-app title uses the trigger's own label">
+          <input type="text" id="editorSubjectInput" class="modal-input" placeholder="Shown only in the email — the in-app title uses the trigger's own label" maxlength="150">
         </div>
         <div class="modal-field">
           <label class="modal-label" for="editorBodyInput">Message Body</label>
-          <textarea id="editorBodyInput" class="modal-textarea" rows="6" placeholder="Use {{tokens}} for figures that come from the reservation"></textarea>
+          <textarea id="editorBodyInput" class="modal-textarea" rows="6" placeholder="Use {{tokens}} for figures that come from the reservation" maxlength="5000"></textarea>
           <p class="modal-hint" id="editorTokenError"></p>
         </div>
         <div class="modal-field">
@@ -157,6 +157,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="/js/admin_notifications_config.js?v=46"></script>
+  <script type="module" src="/js/admin_notifications_config.js?v=47"></script>
 </body>
 </html>
