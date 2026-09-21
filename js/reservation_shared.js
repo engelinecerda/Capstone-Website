@@ -190,11 +190,11 @@ export function getReservationStatusMeta(status) {
     };
 }
 
-// Font Awesome icon name (without the fa- prefix) for status badges, for
+// Tabler icon name (without the ti- prefix) for status badges, for
 // at-a-glance recognition alongside the existing tone colors.
 export function getReservationStatusIcon(statusKey) {
     const normalizedStatus = String(statusKey || '').toLowerCase();
-    if (['cancelled', 'declined'].includes(normalizedStatus)) return 'xmark';
+    if (['cancelled', 'declined'].includes(normalizedStatus)) return 'x';
     if (normalizedStatus === 'completed') return 'check';
     if (['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) return 'check';
     return 'clock';

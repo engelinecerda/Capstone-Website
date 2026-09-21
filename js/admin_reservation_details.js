@@ -551,6 +551,8 @@ async function fetchReservationDetail(idParam) {
     guest_count,
     location_type,
     venue_location,
+    venue_id,
+    venue:venue_id ( name ),
     special_requests,
     total_price,
     created_at,
@@ -819,6 +821,11 @@ function renderBookingDetails() {
     dlRow('End time', reservation.event_end_time ? formatTimeOfDay(reservation.event_end_time) : 'Not available'),
     dlRow('Guests', reservation.guest_count ? `${reservation.guest_count} pax` : 'Not specified'),
     dlRow('Location type', capitalize(reservation.location_type) || 'Not specified'),
+    // Only ever set for an onsite booking whose package resolved to a
+    // specific room (supabase/migrations/20261016_venue_capacity_and_
+    // selection.sql) — a combo package or one mapped to zero/2+ venues with
+    // no resolution leaves this blank, same as before the feature existed.
+    ...(reservation.venue?.name ? [dlRow('Room', reservation.venue.name)] : []),
     dlRow('Contact number', reservation.contact_phone || 'No phone on file')
   ].join('');
 

@@ -304,7 +304,7 @@ function buildStepperMarkup(steps) {
                 <li class="rd-step ${escapeHtml(step.state)}">
                     <span class="rd-step-track">
                         <span class="rd-step-connector ${connectorClass(steps[index - 1])}" aria-hidden="true"></span>
-                        <span class="rd-step-dot" aria-hidden="true">${step.state === 'done' ? '<i class="fa-solid fa-check"></i>' : ''}</span>
+                        <span class="rd-step-dot" aria-hidden="true">${step.state === 'done' ? '<i class="ti ti-check"></i>' : ''}</span>
                         <span class="rd-step-connector ${connectorClass(index < steps.length - 1 ? step : null)}" aria-hidden="true"></span>
                     </span>
                     <span class="rd-step-text">
@@ -324,7 +324,7 @@ function buildCancellationNotice(reservation, effectiveStatus, cancellationInfo,
     return `
         <div class="rd-cancel-notice">
             <div class="rd-cancel-notice-head">
-                <i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>
+                <i class="ti ti-circle-x" aria-hidden="true"></i>
                 <strong>${escapeHtml(title)}</strong>
             </div>
             ${cancellationInfo?.reason ? `
@@ -363,7 +363,7 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
     if (!verificationDone) {
         return {
             tone: 'amber',
-            icon: 'circle-info',
+            icon: 'info-circle',
             body: "Your contract is being verified by our team. Payment unlocks once it's approved — no action needed from you right now."
         };
     }
@@ -378,7 +378,7 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
 
     return {
         tone: 'amber',
-        icon: 'circle-info',
+        icon: 'info-circle',
         body: balance.helperText || 'Your contract is verified. Complete your payment to confirm this booking.'
     };
 }
@@ -399,40 +399,40 @@ function buildEventDetailsPanel(reservation) {
             <h2 class="rd-panel-title">Event details</h2>
             <dl class="rd-dl">
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-calendar" aria-hidden="true"></i> Date</dt>
+                    <dt><i class="ti ti-calendar" aria-hidden="true"></i> Date</dt>
                     <dd>${escapeHtml(formatDate(reservation.event_date))}</dd>
                 </div>
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-clock" aria-hidden="true"></i> Start time</dt>
+                    <dt><i class="ti ti-clock" aria-hidden="true"></i> Start time</dt>
                     <dd>${escapeHtml(reservation.event_time || 'No time selected')}</dd>
                 </div>
                 ${reservation.event_end_time ? `
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-hourglass-end" aria-hidden="true"></i> End time</dt>
+                    <dt><i class="ti ti-hourglass" aria-hidden="true"></i> End time</dt>
                     <dd>${escapeHtml(formatTimeOfDay(reservation.event_end_time))}</dd>
                 </div>
                 ` : ''}
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-users" aria-hidden="true"></i> Guests</dt>
+                    <dt><i class="ti ti-users" aria-hidden="true"></i> Guests</dt>
                     <dd>${escapeHtml(String(reservation.guest_count || 0))} guests</dd>
                 </div>
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Location</dt>
+                    <dt><i class="ti ti-map-pin" aria-hidden="true"></i> Location</dt>
                     <dd>${escapeHtml(getReservationLocationLabel(reservation))}</dd>
                 </div>
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-box" aria-hidden="true"></i> Package</dt>
+                    <dt><i class="ti ti-box" aria-hidden="true"></i> Package</dt>
                     <dd>${escapeHtml(getReservationPackageName(reservation))}</dd>
                 </div>
                 ${addOnName ? `
                     <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-gift" aria-hidden="true"></i> Add-on</dt>
+                        <dt><i class="ti ti-gift" aria-hidden="true"></i> Add-on</dt>
                         <dd>${escapeHtml(addOnName)}</dd>
                     </div>
                 ` : ''}
                 ${specialRequests ? `
                     <div class="rd-dl-row rd-dl-row-wrap">
-                        <dt><i class="fa-solid fa-note-sticky" aria-hidden="true"></i> Special requests</dt>
+                        <dt><i class="ti ti-notes" aria-hidden="true"></i> Special requests</dt>
                         <dd>${escapeHtml(specialRequests)}</dd>
                     </div>
                 ` : ''}
@@ -510,13 +510,13 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
 
             <div class="rd-contract-inset">
                 <div class="rd-contract-inset-head">
-                    <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                    <i class="ti ti-file-text" aria-hidden="true"></i>
                     <span class="rd-contract-inset-title">Signed contract</span>
                     <span class="res-status ${escapeHtml(contractBadgeClass(contractMeta))}">${escapeHtml(contractMeta.label)}</span>
                 </div>
                 ${contract?.contract_url ? `
                     <a class="rd-btn-outline" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">
-                        <i class="fa-solid fa-eye" aria-hidden="true"></i> View contract
+                        <i class="ti ti-eye" aria-hidden="true"></i> View contract
                     </a>
                 ` : `
                     <p class="rd-inline-note">Your signed contract will appear here once submitted.</p>
@@ -530,7 +530,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="fa-solid fa-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : (nothingOwed ? 'View payment history' : 'Continue payment')))}
+                    ${locked ? '<i class="ti ti-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : (nothingOwed ? 'View payment history' : 'Continue payment')))}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your reservation is verified</p>` : ''}
             ` : ''}
@@ -562,16 +562,16 @@ function buildCancellationRequestCard(reservation, cancellationFeePayment, payme
             </div>
             <dl class="rd-dl">
                 <div class="rd-dl-row rd-dl-row-wrap">
-                    <dt><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Reason</dt>
+                    <dt><i class="ti ti-info-circle" aria-hidden="true"></i> Reason</dt>
                     <dd${reservation.cancellation_reason ? '' : ' class="muted"'}>${escapeHtml(reservation.cancellation_reason || 'No reason provided')}</dd>
                 </div>
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-coins" aria-hidden="true"></i> Cancellation fee</dt>
+                    <dt><i class="ti ti-coins" aria-hidden="true"></i> Cancellation fee</dt>
                     <dd>${escapeHtml(formatCurrency(cancellationFeePayment?.amount ?? getCancellationFee(reservation, paymentRules)))}</dd>
                 </div>
                 ${isPending && reservation.cancellation_hold_expires_at ? `
                     <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Hold expires</dt>
+                        <dt><i class="ti ti-hourglass" aria-hidden="true"></i> Hold expires</dt>
                         <dd>${escapeHtml(formatDateTime(reservation.cancellation_hold_expires_at))} &mdash; pay and get verified by then, or this finalizes automatically and your date releases</dd>
                     </div>
                 ` : ''}
@@ -622,7 +622,7 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
         return `
             <div class="rd-reschedule-row">
                 <div class="rd-reschedule-row-left">
-                    <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                    <i class="ti ti-calendar-event" aria-hidden="true"></i>
                     <span>Need to change your event date?</span>
                 </div>
                 <div class="rd-reschedule-row-actions">
@@ -647,18 +647,18 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
             </div>
             <dl class="rd-dl">
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> Requested date</dt>
+                    <dt><i class="ti ti-calendar-event" aria-hidden="true"></i> Requested date</dt>
                     <dd>${escapeHtml(formatDate(latestRequest.requested_date))} at ${escapeHtml(latestRequest.requested_time || 'No time selected')}</dd>
                 </div>
                 ${isPendingReschedule && latestRequest.hold_expires_at ? `
                     <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Hold expires</dt>
+                        <dt><i class="ti ti-hourglass" aria-hidden="true"></i> Hold expires</dt>
                         <dd>${escapeHtml(formatDateTime(latestRequest.hold_expires_at))} &mdash; pay by then to keep this date</dd>
                     </div>
                 ` : ''}
                 ${latestRequest.reviewed_at ? `
                     <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-clock" aria-hidden="true"></i> Admin response</dt>
+                        <dt><i class="ti ti-clock" aria-hidden="true"></i> Admin response</dt>
                         <dd>Reviewed ${escapeHtml(formatShortDate(latestRequest.reviewed_at))}</dd>
                     </div>
                 ` : ''}
@@ -704,7 +704,7 @@ function buildExtensionSection(reservation, extensions, effectiveStatus) {
         return `
             <div class="rd-reschedule-row">
                 <div class="rd-reschedule-row-left">
-                    <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>
+                    <i class="ti ti-hourglass" aria-hidden="true"></i>
                     <span>Need more time for your event?</span>
                 </div>
                 <div class="rd-reschedule-row-actions">
@@ -728,18 +728,18 @@ function buildExtensionSection(reservation, extensions, effectiveStatus) {
             </div>
             <dl class="rd-dl">
                 <div class="rd-dl-row">
-                    <dt><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Requested hours</dt>
+                    <dt><i class="ti ti-hourglass" aria-hidden="true"></i> Requested hours</dt>
                     <dd>${escapeHtml(String(latestExtension.requested_hours))} hour${Number(latestExtension.requested_hours) === 1 ? '' : 's'} &middot; ${escapeHtml(formatCurrency(latestExtension.total_price))}</dd>
                 </div>
                 ${pendingEndTime ? `
                     <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pending end time</dt>
+                        <dt><i class="ti ti-info-circle" aria-hidden="true"></i> Pending end time</dt>
                         <dd>${escapeHtml(pendingEndTime)} &mdash; not yet confirmed</dd>
                     </div>
                 ` : ''}
                 ${isAwaitingPayment && latestExtension.hold_expires_at ? `
                     <div class="rd-dl-row">
-                        <dt><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Hold expires</dt>
+                        <dt><i class="ti ti-hourglass" aria-hidden="true"></i> Hold expires</dt>
                         <dd>${escapeHtml(formatDateTime(latestExtension.hold_expires_at))} &mdash; pay by then to keep this time</dd>
                     </div>
                 ` : ''}
@@ -755,7 +755,7 @@ function buildReviewRow(effectiveStatus, review, reservationId) {
         return `
             <div class="rd-reschedule-row">
                 <div class="rd-reschedule-row-left">
-                    <i class="fa-solid fa-star" aria-hidden="true"></i>
+                    <i class="ti ti-star" aria-hidden="true"></i>
                     <span>You reviewed this event (${escapeHtml(String(review.rating || 0))}/5).</span>
                 </div>
             </div>
@@ -766,7 +766,7 @@ function buildReviewRow(effectiveStatus, review, reservationId) {
     return `
         <div class="rd-reschedule-row">
             <div class="rd-reschedule-row-left">
-                <i class="fa-solid fa-star" aria-hidden="true"></i>
+                <i class="ti ti-star" aria-hidden="true"></i>
                 <span>How was your event?</span>
             </div>
             <div class="rd-reschedule-row-actions">
@@ -828,7 +828,7 @@ function render() {
                 <div class="rd-header-left">
                     <div class="rd-title-row">
                         <h1 class="rd-event-title">${escapeHtml(reservation.event_type || 'Event')}</h1>
-                        <span class="res-status ${escapeHtml(reservationStatus.key)}"><i class="fa-solid fa-${escapeHtml(statusIcon)}" aria-hidden="true"></i> ${escapeHtml(reservationStatus.label)}</span>
+                        <span class="res-status ${escapeHtml(reservationStatus.key)}"><i class="ti ti-${escapeHtml(statusIcon)}" aria-hidden="true"></i> ${escapeHtml(reservationStatus.label)}</span>
                     </div>
                     <p class="rd-subline">${[reservation.reservation_number, getReservationPackageName(reservation)].filter(Boolean).map(escapeHtml).join(' &middot; ')}</p>
                 </div>
@@ -860,7 +860,7 @@ function render() {
                 const note = getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance);
                 return `
                     <div class="rd-note-strip tone-${escapeHtml(note.tone)}">
-                        <i class="fa-solid fa-${escapeHtml(note.icon)}" aria-hidden="true"></i>
+                        <i class="ti ti-${escapeHtml(note.icon)}" aria-hidden="true"></i>
                         <p>${escapeHtml(note.body)}</p>
                     </div>
                 `;

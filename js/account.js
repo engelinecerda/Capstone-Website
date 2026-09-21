@@ -1380,7 +1380,7 @@ function buildReservationCard(reservation, view) {
                 <div class="reservation-card-header-left">
                     <div class="reservation-card-title-row">
                         <h3>${escapeHtml(reservation.event_type || 'Event')}</h3>
-                        <span class="res-status ${escapeHtml(reservationStatus.key)}"><i class="fa-solid fa-${escapeHtml(statusIcon)}" aria-hidden="true"></i> ${escapeHtml(reservationStatus.label)}</span>
+                        <span class="res-status ${escapeHtml(reservationStatus.key)}"><i class="ti ti-${escapeHtml(statusIcon)}" aria-hidden="true"></i> ${escapeHtml(reservationStatus.label)}</span>
                     </div>
                     <p class="reservation-card-subline">${escapeHtml(packageName)} &middot; ${escapeHtml(reservation.reservation_number || '—')}</p>
                 </div>
@@ -1392,19 +1392,19 @@ function buildReservationCard(reservation, view) {
 
             <div class="reservation-card-meta">
                 <div class="reservation-card-meta-item">
-                    <i class="fa-solid fa-calendar" aria-hidden="true"></i>
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
                     <span>${escapeHtml(formatShortDate(reservation.event_date))}</span>
                 </div>
                 <div class="reservation-card-meta-item">
-                    <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                    <i class="ti ti-clock" aria-hidden="true"></i>
                     <span>${escapeHtml(reservation.event_time || 'No time selected')}</span>
                 </div>
                 <div class="reservation-card-meta-item">
-                    <i class="fa-solid fa-users" aria-hidden="true"></i>
+                    <i class="ti ti-users" aria-hidden="true"></i>
                     <span>${escapeHtml(String(reservation.guest_count || 0))} Guests</span>
                 </div>
                 <div class="reservation-card-meta-item">
-                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                    <i class="ti ti-map-pin" aria-hidden="true"></i>
                     <span>${escapeHtml(location)}</span>
                 </div>
             </div>
@@ -1425,13 +1425,13 @@ function buildReservationCard(reservation, view) {
             <div class="reservation-card-footer">
                 <div class="reservation-summary-actions">
                     ${paymentIsActionable ? `
-                        <button type="button" class="reservation-card-cta open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-target-type="${escapeHtml(paymentTarget.type)}" data-target-id="${escapeHtml(paymentTarget.id)}">${escapeHtml(paymentTarget.label)} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                        <button type="button" class="reservation-card-cta open-payments-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}" data-target-type="${escapeHtml(paymentTarget.type)}" data-target-id="${escapeHtml(paymentTarget.id)}">${escapeHtml(paymentTarget.label)} <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
                     ` : ''}
-                    <a class="reservation-card-cta-secondary" href="${escapeHtml(detailsUrl)}">View details <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+                    <a class="reservation-card-cta-secondary" href="${escapeHtml(detailsUrl)}">View details <i class="ti ti-arrow-right" aria-hidden="true"></i></a>
                     ${review
-                        ? `<span class="reservation-reviewed-badge"><i class="fa-solid fa-check" aria-hidden="true"></i> Reviewed</span>`
+                        ? `<span class="reservation-reviewed-badge"><i class="ti ti-check" aria-hidden="true"></i> Reviewed</span>`
                         : (view === 'past' && reservationStatus.key === 'completed'
-                            ? `<a class="reservation-card-cta-secondary" href="/reviews?review_reservation_id=${encodeURIComponent(reservation.reservation_id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Leave a Review</a>`
+                            ? `<a class="reservation-card-cta-secondary" href="/reviews?review_reservation_id=${encodeURIComponent(reservation.reservation_id)}"><i class="ti ti-pencil" aria-hidden="true"></i> Leave a Review</a>`
                             : '')}
                 </div>
             </div>
@@ -1466,7 +1466,7 @@ function renderReservations() {
     if (!state.reservations.length) {
         reservationsList.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i></div>
+                <div class="empty-icon"><i class="ti ti-calendar-x" aria-hidden="true"></i></div>
                 <h3>No reservations yet</h3>
                 <p>You haven't made any bookings yet. When you do, they'll appear here.</p>
                 <a href="/reservations" class="res-book-btn">Book an Event</a>
@@ -1527,9 +1527,9 @@ function renderReservations() {
                 </div>
                 ${totalPages > 1 ? `
                     <div class="reservation-pagination">
-                        <button type="button" class="reservation-pagination-btn" data-reservation-page="prev" aria-label="Previous page" ${state.reservationPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                        <button type="button" class="reservation-pagination-btn" data-reservation-page="prev" aria-label="Previous page" ${state.reservationPage <= 1 ? 'disabled' : ''}><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
                         ${pageNumberButtons}
-                        <button type="button" class="reservation-pagination-btn" data-reservation-page="next" aria-label="Next page" ${state.reservationPage >= totalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                        <button type="button" class="reservation-pagination-btn" data-reservation-page="next" aria-label="Next page" ${state.reservationPage >= totalPages ? 'disabled' : ''}><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
                     </div>
                 ` : ''}
             </div>
@@ -1659,7 +1659,7 @@ function renderPaymentsModule() {
     if (!paymentReservations.length) {
         paymentsList.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></div>
+                <div class="empty-icon"><i class="ti ti-receipt" aria-hidden="true"></i></div>
                 <h3>No payments yet</h3>
                 <p>Approved reservations that need payment will appear here.</p>
             </div>

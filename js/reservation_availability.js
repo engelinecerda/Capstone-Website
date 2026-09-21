@@ -206,7 +206,14 @@ function normalizeStartTimeRow(row) {
 // scopes reports available, so this calls it once per scope and ANDs
 // is_available together per matching time_label, rather than teaching the
 // RPC a second, array-typed signature.
-export async function fetchAvailableStartTimes(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null } = {}) {
+//
+// venueId (supabase/migrations/20261016_venue_capacity_and_selection.sql):
+// when a specific onsite room has been resolved for the booking, pass it
+// through so the RPC checks/caps by that room instead of its whole scope —
+// only meaningful for a single-scope booking, so it's only ever passed
+// alongside a one-element scopes array in practice; combo (2-scope)
+// bookings never have a resolved venue and this stays null for them.
+export async function fetchAvailableStartTimes(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null, venueId = null } = {}) {
     if (!eventDate) return [];
 
     const scopes = asScopeArray(scope);
@@ -217,7 +224,8 @@ export async function fetchAvailableStartTimes(supabase, { eventDate, scope = ''
             p_event_date: eventDate,
             p_scope: null,
             p_duration_hours: durationParam,
-            p_exclude_reservation_id: excludeReservationId || null
+            p_exclude_reservation_id: excludeReservationId || null,
+            p_venue_id: venueId || null
         });
         if (error) throw error;
         return (Array.isArray(data) ? data : []).map(normalizeStartTimeRow);
@@ -228,7 +236,8 @@ export async function fetchAvailableStartTimes(supabase, { eventDate, scope = ''
             p_event_date: eventDate,
             p_scope: singleScope,
             p_duration_hours: durationParam,
-            p_exclude_reservation_id: excludeReservationId || null
+            p_exclude_reservation_id: excludeReservationId || null,
+            p_venue_id: venueId || null
         });
         if (error) throw error;
         return (Array.isArray(data) ? data : []).map(normalizeStartTimeRow);

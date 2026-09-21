@@ -93,6 +93,12 @@ const S = {
     locationType: '',
     categoryId: '',
     miniPackage: null,
+    // Onsite room selection (supabase/migrations/20261016_venue_capacity_and_selection.sql).
+    // venueOptions is the current package's active mapped venues (package_venue
+    // join venue); venueId is null until exactly resolved — either auto (one
+    // option) or by the customer via the picker (more than one option).
+    venueOptions: [],
+    venueId: null,
     snackAddon: null,
     offsiteCategory: '',
     offsitePackage: null,
@@ -773,7 +779,7 @@ document.getElementById('guest-count')?.addEventListener('blur', function () {
 });
 
 // ── URL param entry handling ───────────────────────────────────────────
-function applyUrlParams() {
+async function applyUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const pkgId  = params.get('package');
     if (!pkgId) return false;
@@ -784,6 +790,11 @@ function applyUrlParams() {
         S.locationType = 'onsite';
         S.categoryId   = onsitePkg.categoryId;
         S.miniPackage  = onsitePkg;
+        // No card click happens for a pre-selected package (see the comment
+        // at this function's call site) — resolve the room the same way
+        // buildMiniGrid()'s onclick does, so a multi-venue package still
+        // shows its picker instead of silently booking with no venue at all.
+        await resolveVenueOptionsForPackage(onsitePkg);
         document.querySelectorAll('.location-card').forEach(c => {
             c.classList.toggle('active', c.dataset.val === 'onsite');
         });
@@ -2060,6 +2071,8 @@ async function selectCategory(cat) {
     S.offsiteCategory = S.locationType === 'offsite' ? deriveOffsiteCategoryFlag(cat.name) : '';
     if (prev !== cat.id) {
         S.miniPackage    = null;
+        S.venueOptions   = [];
+        S.venueId        = null;
         S.offsitePackage = null;
         S.snackAddon     = null;
         S.cateringCart   = [];
@@ -2185,6 +2198,7 @@ function buildMiniGrid() {
             activate(g, c);
             updateSectionLocks();
             clampGuestCountToSelection();
+            await resolveVenueOptionsForPackage(p);
             buildAddonOrVenueStep();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2238,6 +2252,71 @@ function buildOffsiteSub(categoryId) {
 }
 
 // ── Add-on / Venue conditional step ───────────────────────────────────
+// ── Onsite room resolution (supabase/migrations/20261016_venue_capacity_
+// and_selection.sql) — package_venue/venue are both publicly readable, so
+// this queries them directly rather than needing a dedicated RPC. Mirrors
+// the server's own resolution rule: 0 mapped venues or a combo (multi-
+// scope) package never gets a resolved venue and falls back to pure
+// scope-based booking; exactly 1 auto-resolves silently; 2+ needs the
+// customer to pick one below. ──────────────────────────────────────────
+async function resolveVenueOptionsForPackage(pkg) {
+    S.venueOptions = [];
+    S.venueId = null;
+    const isComboPackage = Array.isArray(pkg?.bookingScope) && pkg.bookingScope.length > 1;
+    if (!pkg?.id || isComboPackage) return;
+
+    try {
+        const { data, error } = await supabase
+            .from('package_venue')
+            .select('venue_id, venue:venue_id(venue_id, name, description, is_active)')
+            .eq('package_id', pkg.id);
+        if (error) throw error;
+
+        const options = (data || [])
+            .map(row => row.venue)
+            .filter(v => v && v.is_active);
+        S.venueOptions = options;
+        if (options.length === 1) S.venueId = options[0].venue_id;
+    } catch {
+        // Non-critical — falls back to scope-only booking, same as a
+        // package with zero mapped venues.
+        S.venueOptions = [];
+        S.venueId = null;
+    }
+}
+
+function buildRoomPickerBlock() {
+    const block = document.getElementById('room-picker-block');
+    const g = document.getElementById('room-picker-grid');
+    if (!block || !g) return;
+
+    // Nothing to choose — either zero or exactly one (already auto-resolved).
+    if (S.venueOptions.length < 2) {
+        block.classList.add('hidden');
+        g.innerHTML = '';
+        return;
+    }
+
+    block.classList.remove('hidden');
+    g.innerHTML = '';
+    S.venueOptions.forEach(v => {
+        const c = card(
+            '<div class="rpkg-body">' +
+                '<h4 class="rpkg-name">' + escapeHtml(v.name) + '</h4>' +
+                (v.description ? '<p class="rpkg-desc">' + escapeHtml(v.description) + '</p>' : '') +
+            '</div>',
+            S.venueId === v.venue_id
+        );
+        c.onclick = async () => {
+            S.venueId = v.venue_id;
+            S.time = '';
+            buildRoomPickerBlock();
+            await refreshAvailabilityForSelectedScope();
+        };
+        g.appendChild(c);
+    });
+}
+
 function buildAddonOrVenueStep() {
     const title      = document.getElementById('rs-addon-or-venue-title');
     const desc       = document.getElementById('rs-addon-or-venue-desc');
@@ -2254,10 +2333,16 @@ function buildAddonOrVenueStep() {
     }
 
     if (S.locationType === 'onsite') {
-        if (title) title.innerHTML = 'Want to add a <em>Snack Bar</em>?';
-        if (desc)  desc.textContent = 'This optional add-on pairs perfectly with your gathering. You can skip it and proceed.';
+        const needsRoomChoice = S.venueOptions.length > 1;
+        if (title) title.innerHTML = needsRoomChoice
+            ? 'Choose your <em>room</em>'
+            : 'Want to add a <em>Snack Bar</em>?';
+        if (desc)  desc.textContent = needsRoomChoice
+            ? 'This package is available in more than one room — pick which one, then add a Snack Bar Corner if you\'d like.'
+            : 'This optional add-on pairs perfectly with your gathering. You can skip it and proceed.';
         if (addonSect) addonSect.classList.remove('hidden');
         if (venueSect) venueSect.classList.add('hidden');
+        buildRoomPickerBlock();
         buildSnackGrid();
     } else {
         if (title) title.innerHTML = 'Where is your <em>venue</em>?';
@@ -2970,7 +3055,8 @@ async function buildTimeGrid() {
         rows = await fetchAvailableStartTimes(supabase, {
             eventDate: S.eventDate,
             scope: selectedScope,
-            durationHours: getSelectedDurationHours()
+            durationHours: getSelectedDurationHours(),
+            venueId: S.venueId
         });
     } catch (err) {
         if (requestToken !== timeGridRequestToken) return;
@@ -3288,6 +3374,13 @@ function validate(n) {
             S.venueLocation = venueVal;
         }
 
+        // 1D — Room pick (onsite only, and only when the package maps to
+        // more than one venue — a single-venue package already auto-resolved).
+        if (S.locationType === 'onsite' && S.venueOptions.length > 1 && !S.venueId) {
+            showWarningModal('Please choose which room for your booking.');
+            scrollToSection('sub-addon-venue'); return false;
+        }
+
         // 1E — Date
         const ed = document.getElementById('event-date')?.value;
         if (!ed) {
@@ -3528,6 +3621,8 @@ document.querySelectorAll('.location-card').forEach(c => {
         if (prev !== S.locationType) {
             S.categoryId      = '';
             S.miniPackage     = null;
+            S.venueOptions    = [];
+            S.venueId         = null;
             S.snackAddon      = null;
             S.offsiteCategory = '';
             S.offsitePackage  = null;
@@ -3641,7 +3736,7 @@ async function submitDone() {
         }
 
         const latestStartTimes = await fetchAvailableStartTimes(supabase, {
-            eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours()
+            eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours(), venueId: S.venueId
         });
         const chosenRow = latestStartTimes.find(r => r.timeLabel === S.time);
         if (!chosenRow || !chosenRow.isAvailable) {
@@ -3718,6 +3813,7 @@ async function submitDone() {
                 guest_count:      parseInt(S.guestCount),
                 location_type:    S.locationType,
                 venue_location:   S.venueLocation || null,
+                venue_id:         S.locationType === 'onsite' ? (S.venueId || null) : null,
                 package_id:       packageId,
                 add_on_id:        addOnId,
                 total_price:      totalPrice,
@@ -3867,7 +3963,7 @@ function hideDraftResumeModal() {
 const hasUrlPackage = new URLSearchParams(window.location.search).has('package');
 if (hasUrlPackage) {
     clearDraft();
-    const paramApplied = applyUrlParams();
+    const paramApplied = await applyUrlParams();
     cur = 1;
     showStep(cur);
     if (paramApplied) {

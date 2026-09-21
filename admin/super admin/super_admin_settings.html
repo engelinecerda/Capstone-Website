@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=46">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=46">
-  <link rel="stylesheet" href="/css/super_admin_settings.css?v=46">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=46">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=47">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=47">
+  <link rel="stylesheet" href="/css/super_admin_settings.css?v=47">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=47">
 </head>
 <body>
 
@@ -320,6 +320,27 @@
 
         <div class="action-bar">
           <button type="button" class="btn-primary" id="saveScopeCapacityBtn">Save Overrides</button>
+        </div>
+      </div>
+
+      <!-- ── PER-VENUE CAPACITY OVERRIDE ── -->
+      <div class="card" id="venue-capacity-overrides">
+        <p class="card-title">Per-Venue Capacity Override</p>
+        <p class="card-sub">Only for a room that's actually been chosen on a booking (a package mapped to just one venue resolves it automatically; one mapped to several lets the customer pick). Leave blank to use the global default above — same fallback as Per-Scope, just one level more specific once a venue is known.</p>
+
+        <div class="table-wrap">
+          <table class="et-table" id="venueCapacityTable">
+            <thead><tr><th>Venue</th><th>Capacity override</th><th>Effective</th></tr></thead>
+            <tbody id="venueCapacityBody">
+              <tr><td colspan="3">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="form-message" id="venue-capacity-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveVenueCapacityBtn">Save Overrides</button>
         </div>
       </div>
 

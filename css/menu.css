@@ -117,6 +117,17 @@ body { background: var(--cream, #FAF8F4); }
   scrollbar-width: none;
 }
 .menu-chips::-webkit-scrollbar { display: none; }
+/* Both start empty until loadMenuSections() resolves (menu.html) — give
+   the cfg-loading shimmer something sized to cover, since neither has any
+   hardcoded fallback content underneath it to size against anymore. */
+.menu-chips.cfg-loading { min-height: 40px; }
+#menuSectionsContainer.cfg-loading { min-height: 480px; }
+.menu-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-light, #9E7558);
+  font-size: 14.5px;
+}
 
 .menu-chip {
   display: inline-flex;

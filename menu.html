@@ -8,16 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=46">
-  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/styles.css?v=46">
-  <link rel="stylesheet" href="/css/home.css?v=46">
-  <link rel="stylesheet" href="/css/menu.css?v=46">
-  <link rel="stylesheet" href="/css/announcement_banner.css?v=46">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=47">
+  <link rel="stylesheet" href="/css/styles.css?v=47">
+  <link rel="stylesheet" href="/css/home.css?v=47">
+  <link rel="stylesheet" href="/css/menu.css?v=47">
+  <link rel="stylesheet" href="/css/announcement_banner.css?v=47">
   <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -64,90 +61,41 @@
   <!-- MENU CONTENT -->
   <main class="menu-section">
 
-    <!-- ELITE CARD PROMO BANNER — text/image below are the fallback shown
-         until/unless js/page_content.js's loadMenuBanner() overwrites them
-         with the admin-configured banner (Page Content > Elite Card Banner). -->
-    <button class="menu-elite-banner" id="eliteCardBtn" aria-label="View Elite Membership Card — tap to zoom" data-lb-src="/images/menu/elite-card.png" data-lb-alt="ELI Coffee Elite Membership Card — 20% off for members">
+    <!-- ELITE CARD PROMO BANNER — no hardcoded text/image: unlike the menu
+         images below, this banner is genuinely optional (admin can turn it
+         off entirely), so instead of a cfg-loading shimmer this just stays
+         hidden until loadMenuBanner() confirms there's a real, active
+         banner to show — never a stale label/heading/description flashing
+         before JS overwrites it, and never an empty promo shown if the
+         fetch fails or nothing is configured. -->
+    <button class="menu-elite-banner hidden" id="eliteCardBtn" aria-label="View Elite Membership Card — tap to zoom">
       <div class="menu-elite-icon"><i class="ti ti-id-badge-2"></i></div>
       <div class="menu-elite-text">
-        <p class="menu-elite-label" id="menuEliteLabel">Members Only</p>
-        <p class="menu-elite-desc"><strong id="menuEliteHeading">Elite Card</strong> — <span id="menuEliteDesc">Get 20% off on all orders. Elite price shown on menu sheets is exclusive to card holders.</span></p>
+        <p class="menu-elite-label" id="menuEliteLabel"></p>
+        <p class="menu-elite-desc"><strong id="menuEliteHeading"></strong> — <span id="menuEliteDesc"></span></p>
       </div>
       <i class="ti ti-chevron-right menu-elite-caret"></i>
     </button>
 
-    <!-- CATEGORY CHIPS — fallback below, replaced if loadMenuSections()
-         returns rows (see the module script near the bottom of this file). -->
-    <nav class="menu-chips" id="menuChips" aria-label="Jump to menu section">
-      <a href="#sulit-picks"       class="menu-chip">Sulit picks</a>
-      <a href="#pizza-appetizers"  class="menu-chip">Pizza &amp; appetizers</a>
-      <a href="#mains-sets"        class="menu-chip">Mains &amp; sets</a>
-      <a href="#drinks"            class="menu-chip">Drinks</a>
-      <a href="#desserts"          class="menu-chip">Desserts</a>
-    </nav>
+    <!-- CATEGORY CHIPS — no hardcoded fallback: this page's menu content
+         changes independently of any code deploy (admin-managed via Page
+         Content > Menu Images), so baking specific categories/images into
+         the HTML meant a deleted-in-admin item could still flash on screen
+         for every visitor until loadMenuSections() below resolved and
+         replaced it. cfg-loading (css/styles.css) keeps this covered with a
+         neutral shimmer — never a specific stale category name — until
+         real data replaces it; its 8s CSS-only safety net still reveals
+         this (now-empty) container if the fetch hangs, matching every
+         other cfg-loading consumer's failure mode. -->
+    <nav class="menu-chips cfg-loading" id="menuChips" aria-label="Jump to menu section"></nav>
 
-    <!-- MENU IMAGES — fallback below, replaced if loadMenuSections() returns
-         rows. Kept as static markup (not just an empty container) so the
-         page still shows the current 5 menus if the fetch fails or the
-         table is empty, matching js/page_content.js's "hardcoded markup
-         stays on screen" resilience convention. -->
-    <div id="menuSectionsContainer">
-
-      <!-- 1. SULIT PICKS -->
-      <section class="menu-img-section" id="sulit-picks">
-        <h2 class="menu-img-section-title">Sulit Picks Meals</h2>
-        <div class="menu-img-wrap" data-lb-src="/images/menu/sulit-picks.jpg" data-lb-alt="ELI Coffee Sulit Picks budget meals menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Sulit Picks Meals menu">
-          <img src="/images/menu/sulit-picks.jpg"
-               alt="ELI Coffee Sulit Picks budget meals menu with prices"
-               loading="eager" />
-          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-        </div>
-      </section>
-
-      <!-- 2. PIZZA, APPETIZERS & WAFFLES -->
-      <section class="menu-img-section" id="pizza-appetizers">
-        <h2 class="menu-img-section-title">Pizzas / Appetizers / Waffles</h2>
-        <div class="menu-img-wrap" data-lb-src="/images/menu/pizza-appetizers-waffles.jpg" data-lb-alt="ELI Coffee pizza, appetizer, and waffle menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Pizza, Appetizers and Waffles menu">
-          <img src="/images/menu/pizza-appetizers-waffles.jpg"
-               alt="ELI Coffee pizza, appetizer, and waffle menu with prices"
-               loading="lazy" />
-          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-        </div>
-      </section>
-
-      <!-- 3. MAINS, PASTAS & SALU-SALO SETS -->
-      <section class="menu-img-section" id="mains-sets">
-        <h2 class="menu-img-section-title">Main Dish / Pastas / Salu-Salo Sets</h2>
-        <div class="menu-img-wrap" data-lb-src="/images/menu/main-pasta-sets.jpg" data-lb-alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices" role="button" tabindex="0" aria-label="Tap to zoom Mains, Pastas and Salu-Salo Sets menu">
-          <img src="/images/menu/main-pasta-sets.jpg"
-               alt="ELI Coffee main dish, pasta, and salu-salo set menu with prices"
-               loading="lazy" />
-          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-        </div>
-      </section>
-
-      <!-- 4. DRINKS -->
-      <section class="menu-img-section" id="drinks">
-        <h2 class="menu-img-section-title">Drinks</h2>
-        <div class="menu-img-wrap" data-lb-src="/images/menu/drinks.png" data-lb-alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades" role="button" tabindex="0" aria-label="Tap to zoom Drinks menu">
-          <img src="/images/menu/drinks.png"
-               alt="ELI Coffee drinks menu — cold brew, blended, matcha, fruit tea, juices, hot coffee and upgrades"
-               loading="lazy" />
-          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-        </div>
-      </section>
-
-      <!-- 5. TIRAMISU -->
-      <section class="menu-img-section" id="desserts">
-        <h2 class="menu-img-section-title">Tiramisu by ELI Coffee</h2>
-        <div class="menu-img-wrap" data-lb-src="/images/menu/tiramisu.png" data-lb-alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices" role="button" tabindex="0" aria-label="Tap to zoom Tiramisu menu">
-          <img src="/images/menu/tiramisu.png"
-               alt="Tiramisu by ELI Coffee — dessert menu with sizes and prices"
-               loading="lazy" />
-          <button class="menu-zoom-btn" aria-hidden="true" tabindex="-1"><i class="ti ti-zoom-in"></i></button>
-        </div>
-      </section>
-
+    <!-- MENU IMAGES — same reasoning as the chips above: no hardcoded
+         images, so a removed-in-admin menu can never flash before
+         loadMenuSections() replaces this container. The empty-state
+         message only ever appears if the fetch genuinely returns zero
+         active rows — it names no specific menu, so it can't go stale. -->
+    <div id="menuSectionsContainer" class="cfg-loading">
+      <p class="menu-empty-state hidden" id="menuEmptyState">Our menu is being updated — please check back shortly.</p>
     </div>
 
     <p class="menu-price-note">Prices subject to change without prior notice.</p>
@@ -219,7 +167,7 @@
 
   <script type="module">
     import { customerSupabase as supabase } from '/js/supabase.js';
-    import { loadPageHeader, loadMenuSections, loadMenuBanner } from '/js/page_content.js';
+    import { loadPageHeader, loadMenuSections, loadMenuBanner, revealConfigContent } from '/js/page_content.js';
 
     loadPageHeader(supabase, 'menu', {
       imgEl: document.getElementById('menuHeroImg'),
@@ -233,18 +181,15 @@
       ));
     }
 
-    // Elite Card banner — the button's markup/dataset already hold the
-    // fallback shown until this resolves. Only overwrite on success.
-    // 1920, not a small card width — banner.image_url doubles as the
-    // Elite Card's lightbox source (dataset.lbSrc below), opened at
+    // Elite Card banner — the button starts hidden (see the HTML comment
+    // above it) and is only ever revealed here, once we know there's a
+    // real, active banner to show — nothing to reveal, nothing stays
+    // hidden. 1920, not a small card width — banner.image_url doubles as
+    // the Elite Card's lightbox source (dataset.lbSrc below), opened at
     // near-fullscreen size.
     loadMenuBanner(supabase, 1920).then((banner) => {
-      if (!banner) return;
+      if (!banner || banner.is_active === false) return;
       const btn = document.getElementById('eliteCardBtn');
-      if (banner.is_active === false) {
-        btn.classList.add('hidden');
-        return;
-      }
       document.getElementById('menuEliteLabel').textContent = banner.label || 'Members Only';
       document.getElementById('menuEliteHeading').textContent = banner.heading || 'Elite Card';
       document.getElementById('menuEliteDesc').textContent = banner.description || '';
@@ -252,26 +197,37 @@
         btn.dataset.lbSrc = banner.image_url;
         btn.dataset.lbAlt = banner.alt_text || '';
       }
+      btn.classList.remove('hidden');
     });
 
-    // Menu category images — #menuChips / #menuSectionsContainer already
-    // hold the current 5 menus as a fallback; only rebuild them if the
-    // admin-configured list resolves with at least one active row. The
-    // lightbox trigger and the chip scroll-highlight (the plain inline
-    // script further down this file) are both delegated/re-queried live,
-    // so they pick up this replacement without needing to be re-wired here.
+    // Menu category images — #menuChips / #menuSectionsContainer start
+    // empty (covered by the cfg-loading shimmer, see the HTML comments
+    // above them) and are populated here once the admin-configured list
+    // resolves. The lightbox trigger and the chip scroll-highlight (the
+    // plain inline script further down this file) are both delegated/
+    // re-queried live, so they pick up this content without needing to be
+    // re-wired here. revealConfigContent() runs on every path (has rows,
+    // zero rows) so the shimmer always clears once we know what to show.
     // 1920 — s.image_url is used both for the inline <img> and as the
     // zoom lightbox source (up to 6x scale, see the plain script below),
     // so it needs to stay large enough to read menu text/prices clearly
     // when zoomed, not just look right at its small inline size.
-    loadMenuSections(supabase, 1920).then((sections) => {
-      if (!sections.length) return;
+    const menuChipsEl = document.getElementById('menuChips');
+    const menuSectionsEl = document.getElementById('menuSectionsContainer');
+    const menuEmptyStateEl = document.getElementById('menuEmptyState');
 
-      document.getElementById('menuChips').innerHTML = sections.map((s) =>
+    loadMenuSections(supabase, 1920).then((sections) => {
+      if (!sections.length) {
+        menuEmptyStateEl.classList.remove('hidden');
+        revealConfigContent(menuChipsEl, menuSectionsEl);
+        return;
+      }
+
+      menuChipsEl.innerHTML = sections.map((s) =>
         `<a href="#ms-${s.id}" class="menu-chip">${escapeHtml(s.heading)}</a>`
       ).join('');
 
-      document.getElementById('menuSectionsContainer').innerHTML = sections.map((s, i) => `
+      menuSectionsEl.innerHTML = sections.map((s, i) => `
         <section class="menu-img-section" id="ms-${s.id}">
           <h2 class="menu-img-section-title">${escapeHtml(s.heading)}</h2>
           <div class="menu-img-wrap" data-lb-src="${escapeHtml(s.image_url)}" data-lb-alt="${escapeHtml(s.alt_text)}" role="button" tabindex="0" aria-label="Tap to zoom ${escapeHtml(s.heading)} menu">
@@ -280,6 +236,7 @@
           </div>
         </section>`
       ).join('');
+      revealConfigContent(menuChipsEl, menuSectionsEl);
     });
   </script>
 

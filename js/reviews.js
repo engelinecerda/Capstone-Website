@@ -163,11 +163,11 @@ function renderReviews() {
             ? escapeHtml(r.comment)
             : 'No written comment — rating only.';
         const badgeHtml   = hasComment
-            ? `<span class="review-card__badge"><i class="fa-solid fa-circle-check"></i> Verified Reservation</span>`
-            : `<span class="review-card__rating-only-badge"><i class="fa-solid fa-star"></i> Rating Only</span>`;
+            ? `<span class="review-card__badge"><i class="ti ti-circle-check"></i> Verified Reservation</span>`
+            : `<span class="review-card__rating-only-badge"><i class="ti ti-star"></i> Rating Only</span>`;
 
         const packageHtml = r.packageName
-            ? `<div class="review-card__package"><i class="fa-solid fa-box"></i> ${escapeHtml(r.packageName)}</div>`
+            ? `<div class="review-card__package"><i class="ti ti-box"></i> ${escapeHtml(r.packageName)}</div>`
             : '';
 
         return `
@@ -203,7 +203,7 @@ function renderReviews() {
         loadMoreWrapper.hidden = false;
         loadMoreBtn.hidden = false;
         countText.textContent = `Showing ${visible.length} of ${totalFiltered} reviews`;
-        loadMoreBtn.innerHTML = `Load More Reviews <i class="fa-solid fa-chevron-down"></i>`;
+        loadMoreBtn.innerHTML = `Load More Reviews <i class="ti ti-chevron-down"></i>`;
     }
 }
 
@@ -254,7 +254,7 @@ function showError(message) {
     const list = document.getElementById('reviewsList');
     list.innerHTML = `
         <div class="reviews-loading" style="grid-column:1/-1;">
-            <i class="fa-solid fa-triangle-exclamation" style="color:#c0392b;"></i>
+            <i class="ti ti-alert-triangle" style="color:#c0392b;"></i>
             <h3 style="color:#c0392b;">Could not load reviews</h3>
             <p>${escapeHtml(message)}</p>
         </div>
@@ -381,7 +381,7 @@ function renderReviewPickerList() {
                 <div class="review-picker-item__title">${escapeHtml(reservation.event_type || 'Event')}</div>
                 <div class="review-picker-item__meta">${getReservationEventMeta(reservation)}</div>
             </div>
-            <i class="fa-solid fa-chevron-right review-picker-item__chevron" aria-hidden="true"></i>
+            <i class="ti ti-chevron-right review-picker-item__chevron" aria-hidden="true"></i>
         </button>
     `).join('');
 }
