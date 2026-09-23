@@ -113,7 +113,17 @@ const S = {
     venueLocation: '',
     eventDate: '',
     time: '',
-    name: '', phone: '', email: '', requests: ''
+    name: '', phone: '', email: '', requests: '',
+    // Contract step (rs7) progress — mirrors signatureState + the two consent
+    // checkboxes so a refresh (or navigating back to Review and forward to
+    // Contract again) doesn't force a re-scroll/re-sign/re-check. See
+    // applyOrResetContractProgress() and refreshContractGatingUI().
+    contractAgreementViewMethod: '',   // '' | 'scrolled_inline' | 'opened_full_view'
+    contractSignatureMode: 'draw',     // 'draw' | 'type'
+    contractSignatureDrawData: null,   // SignaturePad.toData() output (vector strokes, JSON-safe)
+    contractSignatureTypedText: '',
+    contractAgreementTermsChecked: false,
+    contractAgreementEsignChecked: false
 };
 
 // Guest count is validated against the selected package's min_guests/max_guests.
@@ -979,7 +989,10 @@ function initSignaturePad() {
     // after a stroke never happened, while Type-instead (a plain <input>
     // 'input' listener, unrelated to this library) worked fine.
     signatureState.pad.addEventListener('beginStroke', () => setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false));
-    signatureState.pad.addEventListener('endStroke', () => refreshContractGatingUI());
+    signatureState.pad.addEventListener('endStroke', () => {
+        S.contractSignatureDrawData = signatureState.pad.toData();
+        refreshContractGatingUI();
+    });
     resizeSignatureCanvas();
     window.addEventListener('resize', resizeSignatureCanvas);
 }
@@ -1020,10 +1033,10 @@ function refreshContractGatingUI() {
     // just dimmed), and re-locked (auto-unchecked) the instant the
     // signature that unlocked them is no longer present — e.g. Clear.
     contractSectionConsent?.classList.toggle('is-locked', !unlocked);
-    [contractAgreementTerms, contractAgreementEsign].forEach((cb) => {
+    [[contractAgreementTerms, 'contractAgreementTermsChecked'], [contractAgreementEsign, 'contractAgreementEsignChecked']].forEach(([cb, key]) => {
         if (!cb) return;
         cb.disabled = !unlocked;
-        if (!unlocked) cb.checked = false;
+        if (!unlocked) { cb.checked = false; S[key] = false; }
     });
     if (contractStep3Status) {
         contractStep3Status.textContent = unlocked ? '' : 'Sign the contract above to unlock this step';
@@ -1331,10 +1344,75 @@ function resetAgreementGating() {
     refreshContractGatingUI();
 }
 
+// Restores contract-step progress from S (persisted the same way as every
+// other field — see saveDraft()/restoreDraft()) instead of unconditionally
+// wiping it on every visit to this step. Fixes two related annoyances: a
+// refresh losing "read the contract" + the signature + both checkboxes, and
+// navigating back to Review and forward to Contract again within the same
+// visit re-locking an already-completed step. Falls through to the original
+// reset when there's genuinely nothing saved (first-ever visit this step).
+function applyOrResetContractProgress() {
+    const hasSavedProgress = !!S.contractAgreementViewMethod ||
+        !!S.contractSignatureTypedText ||
+        (Array.isArray(S.contractSignatureDrawData) && S.contractSignatureDrawData.length > 0);
+
+    if (!hasSavedProgress) {
+        resetAgreementGating();
+        return;
+    }
+
+    // Captured up front, before anything below runs: setSignatureMode()
+    // (called a few lines down to re-select the saved Draw/Type mode)
+    // calls refreshContractGatingUI() internally the instant it's invoked
+    // — at that exact moment the signature payload (typed text / drawn
+    // strokes) hasn't been reapplied to the DOM/pad yet, so
+    // isSignaturePresent() still reports "nothing signed", unlocked comes
+    // out false, and refreshContractGatingUI()'s own force-uncheck branch
+    // (the one that re-locks Step 3 the instant a signature disappears —
+    // e.g. Clear) wipes S.contractAgreementTermsChecked/EsignChecked to
+    // false right there, before this function ever gets a chance to read
+    // them. Reading S up front, before that happens, is what actually
+    // survives to the restore below — reading S again after the mode
+    // switch would just read back the wiped-out false.
+    const savedTermsChecked = !!S.contractAgreementTermsChecked;
+    const savedEsignChecked = !!S.contractAgreementEsignChecked;
+
+    signatureState.agreementViewMethod = S.contractAgreementViewMethod || '';
+    signatureState.agreementViewedAt = signatureState.agreementViewMethod ? new Date().toISOString() : '';
+
+    if (S.contractSignatureMode === 'type') {
+        setSignatureMode('type');
+        if (signatureTypeInput) signatureTypeInput.value = S.contractSignatureTypedText || '';
+        if (signatureTypePreview) signatureTypePreview.textContent = (S.contractSignatureTypedText || '').trim();
+        fitSignatureTypePreview();
+        if (S.contractSignatureTypedText) setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false);
+    } else {
+        setSignatureMode('draw');
+        if (Array.isArray(S.contractSignatureDrawData) && S.contractSignatureDrawData.length) {
+            try {
+                signatureState.pad?.fromData(S.contractSignatureDrawData);
+                setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, false);
+            } catch { /* corrupt/incompatible saved stroke data — customer just re-draws */ }
+        }
+    }
+
+    // Restore from the captured values, not from S (see above) — by this
+    // point both "read" and "signed" are true again, so the final
+    // refreshContractGatingUI() call below only enables the checkboxes,
+    // it never force-unchecks them.
+    S.contractAgreementTermsChecked = savedTermsChecked;
+    S.contractAgreementEsignChecked = savedEsignChecked;
+    if (contractAgreementTerms) contractAgreementTerms.checked = savedTermsChecked;
+    if (contractAgreementEsign) contractAgreementEsign.checked = savedEsignChecked;
+
+    refreshContractGatingUI();
+}
+
 function markAgreementViewed(method) {
     if (signatureState.agreementViewMethod) return; // already satisfied
     signatureState.agreementViewMethod = method;
     signatureState.agreementViewedAt = new Date().toISOString();
+    S.contractAgreementViewMethod = method;
     refreshContractGatingUI();
 }
 
@@ -1377,7 +1455,7 @@ async function buildContractStep() {
 
     signatureState.agreementText = '';
     signatureState.contractLoaded = false;
-    resetAgreementGating();
+    applyOrResetContractProgress();
 
     if (!pkgId) {
         contractViewer.innerHTML = '<p class="contract-viewer-loading">Select a package first so the correct contract can be loaded.</p>';
@@ -3946,8 +4024,14 @@ availabilityNextMonthBtn?.addEventListener('click', async () => {
     await loadAvailabilityCalendar();
 });
 
-contractAgreementTerms?.addEventListener('change', () => { if (contractAgreementTerms.checked) setContractPolicyMessage(''); });
-contractAgreementEsign?.addEventListener('change', () => { if (contractAgreementEsign.checked) setContractPolicyMessage(''); });
+contractAgreementTerms?.addEventListener('change', () => {
+    S.contractAgreementTermsChecked = contractAgreementTerms.checked;
+    if (contractAgreementTerms.checked) setContractPolicyMessage('');
+});
+contractAgreementEsign?.addEventListener('change', () => {
+    S.contractAgreementEsignChecked = contractAgreementEsign.checked;
+    if (contractAgreementEsign.checked) setContractPolicyMessage('');
+});
 // Only one signature format is ever submitted — switching modes discards
 // whichever one the customer is leaving. Confirm first if there's actually
 // something to lose; an empty mode switches silently.
@@ -3970,12 +4054,15 @@ async function switchSignatureMode(nextMode) {
 
     if (leavingMode === 'draw') {
         signatureState.pad?.clear();
+        S.contractSignatureDrawData = null;
         setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, true);
     } else {
         if (signatureTypeInput) signatureTypeInput.value = '';
         if (signatureTypePreview) signatureTypePreview.textContent = '';
+        S.contractSignatureTypedText = '';
     }
 
+    S.contractSignatureMode = nextMode;
     setSignatureMode(nextMode);
 }
 
@@ -3983,12 +4070,14 @@ sigModeDrawBtn?.addEventListener('click', () => switchSignatureMode('draw'));
 sigModeTypeBtn?.addEventListener('click', () => switchSignatureMode('type'));
 signatureClearBtn?.addEventListener('click', () => {
     signatureState.pad?.clear();
+    S.contractSignatureDrawData = null;
     setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, true);
     refreshContractGatingUI();
     setSignatureStatus('');
 });
 signatureTypeInput?.addEventListener('input', () => {
     const text = signatureTypeInput.value.trim();
+    S.contractSignatureTypedText = signatureTypeInput.value;
     if (signatureTypePreview) signatureTypePreview.textContent = text;
     fitSignatureTypePreview();
     refreshContractGatingUI();
