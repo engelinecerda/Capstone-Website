@@ -408,6 +408,15 @@ body.kiosk-mode {
 /* ============================================================
    COMING UP — tappable day list
    ============================================================ */
+.board-week-month-divider {
+  padding: 2px 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  font-variant-caps: small-caps;
+  color: var(--board-text-muted);
+}
+
 .board-week-row {
   min-height: 64px;
   width: 100%;

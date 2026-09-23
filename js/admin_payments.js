@@ -95,7 +95,8 @@ const PAYMENT_TYPE_LABELS = {
   partial_payment: 'Custom Amount',
   reschedule_fee: 'Reschedule Fee',
   cancellation_fee: 'Cancellation Fee',
-  extension_fee: 'Extension Fee'
+  extension_fee: 'Extension Fee',
+  additional_head_fee: 'Additional Guests Fee'
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 
@@ -109,6 +110,7 @@ let reservationMap = {};
 let receiptMap = {};
 let rescheduleRequestMap = {};
 let extensionRequestMap = {};
+let additionalHeadRequestMap = {};
 let paymentSummaryMap = {};
 let paymentMethodMap = {};
 let recordPaymentTargetPayment = null;
@@ -334,6 +336,10 @@ function getRescheduleRequest(requestId) {
 
 function getExtensionRequest(extensionId) {
   return extensionRequestMap[extensionId] || null;
+}
+
+function getAdditionalHeadRequest(requestId) {
+  return additionalHeadRequestMap[requestId] || null;
 }
 
 function getReservationDurationHours(reservation) {
@@ -654,6 +660,28 @@ async function fetchExtensionRequests(extensionIds) {
   }, {});
 }
 
+async function fetchAdditionalHeadRequests(requestIds) {
+  if (!requestIds.length) return {};
+  const { data, error } = await supabase
+    .from('reservation_additional_head_requests')
+    .select(`
+      additional_head_request_id,
+      reservation_id,
+      requested_heads,
+      price_per_head,
+      total_price,
+      status,
+      rejection_reason
+    `)
+    .in('additional_head_request_id', requestIds);
+
+  if (error) throw error;
+  return (data || []).reduce((map, request) => {
+    map[request.additional_head_request_id] = request;
+    return map;
+  }, {});
+}
+
 async function fetchPayments() {
   const { data, error } = await supabase
     .from('payment')
@@ -662,6 +690,7 @@ async function fetchPayments() {
       reservation_id,
       reschedule_request_id,
       extension_id,
+      additional_head_request_id,
       payment_type,
       payment_method,
       payment_method_id,
@@ -946,6 +975,13 @@ function getExpectedPaymentAmount(payment, reservation, paymentRules) {
       label: 'Extension fee'
     };
   }
+  if (payment.payment_type === 'additional_head_fee') {
+    const additionalHeadRequest = payment.additional_head_request_id ? getAdditionalHeadRequest(payment.additional_head_request_id) : null;
+    return {
+      amount: additionalHeadRequest ? Number(additionalHeadRequest.total_price) : null,
+      label: 'Additional guests fee'
+    };
+  }
   return { amount: null, label: 'No fixed amount for this payment type' };
 }
 
@@ -1013,11 +1049,14 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   const balance = getReservationBalanceSummary(payment.reservation_id);
   const paymentInfo = getPaymentInfoSummary(payment);
   const extensionRequest = payment.extension_id ? getExtensionRequest(payment.extension_id) : null;
+  const additionalHeadRequest = payment.additional_head_request_id ? getAdditionalHeadRequest(payment.additional_head_request_id) : null;
   const paymentTypeSub = payment.reschedule_request_id
     ? 'Linked to reschedule fee'
     : (extensionRequest
       ? `+${extensionRequest.requested_hours} hour${Number(extensionRequest.requested_hours) === 1 ? '' : 's'} at ${formatCurrency(extensionRequest.price_per_hour)}/hr`
-      : 'Reservation payment');
+      : (additionalHeadRequest
+        ? `+${additionalHeadRequest.requested_heads} guest${Number(additionalHeadRequest.requested_heads) === 1 ? '' : 's'} at ${formatCurrency(additionalHeadRequest.price_per_head)}/guest`
+        : 'Reservation payment'));
   const proofExists = Boolean(payment.proof_url);
   const isCafeIssued = resolvePaymentEvidenceSource(payment, paymentMethodMap) === 'cafe_issued';
   const reviewActions = [];
@@ -1386,6 +1425,9 @@ async function loadData({ silent = false } = {}) {
     );
     extensionRequestMap = await fetchExtensionRequests(
       Array.from(new Set(paymentsCache.map((payment) => payment.extension_id).filter(Boolean)))
+    );
+    additionalHeadRequestMap = await fetchAdditionalHeadRequests(
+      Array.from(new Set(paymentsCache.map((payment) => payment.additional_head_request_id).filter(Boolean)))
     );
     paymentSummaryMap = await fetchPaymentSummaries(
       Array.from(new Set(paymentsCache.map((payment) => payment.reservation_id).filter(Boolean)))

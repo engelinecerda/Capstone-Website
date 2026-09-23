@@ -91,6 +91,15 @@ function formatDayLabel(dateKey, isToday) {
   return isToday ? `Today · ${monthDay}` : `${weekday} · ${monthDay}`;
 }
 
+function getMonthKey(dateKey) {
+  return String(dateKey || '').slice(0, 7);
+}
+
+function formatMonthLabel(dateKey) {
+  const date = parseDateKey(dateKey);
+  return date ? date.toLocaleDateString('en-PH', { month: 'long' }) : '';
+}
+
 function formatFullDayHeading(dateKey) {
   const today = getTodayKey();
   const date = parseDateKey(dateKey);
@@ -282,7 +291,14 @@ function render() {
     : '<div class="board-empty-day"><i class="fa-solid fa-mug-hot"></i><p>No events scheduled</p></div>';
 
   const daysWithEvents = state.days.filter((day) => day.events.length > 0);
+  let lastMonthKey = null;
   boardWeekDays.innerHTML = daysWithEvents.map((day) => {
+    const monthKey = getMonthKey(day.date);
+    const dividerHtml = monthKey !== lastMonthKey
+      ? `<div class="board-week-month-divider">${escapeHtml(formatMonthLabel(day.date))}</div>`
+      : '';
+    lastMonthKey = monthKey;
+
     const isToday = day.date === todayKey;
     const isSelected = day.date === state.selectedDate;
     const eventsHtml = day.events.map((event) => `
@@ -293,6 +309,7 @@ function render() {
       `).join('');
 
     return `
+      ${dividerHtml}
       <button type="button" class="board-week-row${isToday ? ' board-week-row-today' : ''}${isSelected ? ' board-week-row-selected' : ''}" data-date="${escapeHtml(day.date)}">
         <div class="board-week-row-main">
           <div class="board-week-row-head">
@@ -320,9 +337,11 @@ function renderFooter() {
   boardFooterMessage.textContent = `Updated ${timeLabel} · refreshes every ${SCHEDULE_REFRESH_MS / 1000} seconds`;
 }
 
+const SCHEDULE_WINDOW_DAYS = 90;
+
 async function fetchSchedule() {
   const todayKey = getTodayKey();
-  const weekEndKey = addDaysKey(todayKey, 6);
+  const windowEndKey = addDaysKey(todayKey, SCHEDULE_WINDOW_DAYS);
 
   const { data: reservations, error: reservationsError } = await supabase
     .from('board_reservations_view')
@@ -342,7 +361,12 @@ async function fetchSchedule() {
       package:package_id ( package_name )
     `)
     .gte('event_date', todayKey)
-    .lte('event_date', weekEndKey);
+    .lt('event_date', windowEndKey)
+    // event_time is stored as free text ("1:00 PM"), not a sortable time
+    // type, so ordering by it here would sort lexicographically, not
+    // chronologically. Each day's events are already correctly ordered
+    // client-side below via getEventStartDate(), which parses it properly.
+    .order('event_date', { ascending: true });
 
   if (reservationsError) throw reservationsError;
 
@@ -368,7 +392,7 @@ async function fetchSchedule() {
   }
 
   const dayBuckets = {};
-  for (let i = 0; i <= 6; i += 1) {
+  for (let i = 0; i < SCHEDULE_WINDOW_DAYS; i += 1) {
     const key = addDaysKey(todayKey, i);
     dayBuckets[key] = [];
   }

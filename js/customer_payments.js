@@ -1,4 +1,4 @@
-import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed, isRescheduleFeeOwed, isExtensionFeeOwed } from './reservation_shared.js';
+import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed, isRescheduleFeeOwed, isExtensionFeeOwed, isAdditionalHeadFeeOwed } from './reservation_shared.js';
 
 const CLOUDINARY_CONFIG = {
     cloudName: 'dtt707f1w',
@@ -326,7 +326,7 @@ export function getReservationReceipts(paymentsByReservationId, receiptsByPaymen
 }
 
 export function getNormalPayments(paymentsByReservationId, reservationId) {
-    return getReservationPayments(paymentsByReservationId, reservationId).filter((payment) => !payment.reschedule_request_id && !payment.extension_id);
+    return getReservationPayments(paymentsByReservationId, reservationId).filter((payment) => !payment.reschedule_request_id && !payment.extension_id && !payment.additional_head_request_id);
 }
 
 // Excludes cancellation_fee/reschedule_fee the same way public.
@@ -336,7 +336,7 @@ export function getNormalPayments(paymentsByReservationId, reservationId) {
 // but cancellation_fee rows carry no reschedule_request_id, so without this
 // filter an approved cancellation fee would inflate "amount paid" and
 // understate the remaining balance shown to the customer.
-const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee', 'extension_fee']);
+const NON_BASE_PAYMENT_TYPES = new Set(['cancellation_fee', 'reschedule_fee', 'extension_fee', 'additional_head_fee']);
 
 export function getApprovedBasePaymentsTotal(paymentsByReservationId, reservationId) {
     return getNormalPayments(paymentsByReservationId, reservationId)
@@ -386,7 +386,17 @@ export function getReservationBalanceDueDate(reservation, fullPaymentDays = RESE
 
 export function getReservationBalanceDetails(reservation, paymentsByReservationId, options = {}) {
     const reservationId = reservation?.reservation_id;
-    const totalPrice = roundCurrency(Number(reservation?.total_price || 0));
+    const basePackagePrice = roundCurrency(Number(reservation?.total_price || 0));
+    // Manual Charge for Special Requests (20261022_manual_reservation_
+    // charges.sql) — non-voided manager-added charges inflate the
+    // EFFECTIVE total the base balance is computed against, without ever
+    // touching reservation.total_price itself (keeps contract snapshotting
+    // intact — the signed contract stays frozen at its signed total).
+    // options.chargesByReservationId is optional so every existing caller
+    // that hasn't been updated to load/pass it degrades safely to 0, not
+    // an error.
+    const manualChargesTotal = roundCurrency(getActiveChargesTotal(options.chargesByReservationId, reservationId));
+    const totalPrice = roundCurrency(basePackagePrice + manualChargesTotal);
     const approvedBaseTotal = roundCurrency(getApprovedBasePaymentsTotal(paymentsByReservationId, reservationId));
     const remainingBalance = roundCurrency(Math.max(totalPrice - approvedBaseTotal, 0));
     const dueDate = getReservationBalanceDueDate(reservation, options.reservationRules?.full_payment_days);
@@ -430,6 +440,8 @@ export function getReservationBalanceDetails(reservation, paymentsByReservationI
 
     return {
         totalPrice,
+        basePackagePrice,
+        manualChargesTotal,
         approvedBaseTotal,
         remainingBalance,
         dueDate,
@@ -486,6 +498,7 @@ function buildPaymentOption(reservation, paymentType, amount, paymentsByReservat
         displayDescription: options.displayDescription || baseDescription,
         rescheduleRequestId: options.rescheduleRequestId || '',
         extensionId: options.extensionId || '',
+        additionalHeadRequestId: options.additionalHeadRequestId || '',
         minAmount: options.minAmount,
         maxAmount: options.maxAmount
     };
@@ -657,6 +670,28 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             }
         });
 
+    // Additional Head Requests (post-booking) — mirrors the extension_fee
+    // block above exactly: one payment option per still-unpaid request
+    // (status 'pending_payment'), amount pre-filled from the request's own
+    // snapshotted total_price.
+    const additionalHeadRequests = options.additionalHeadRequestsByReservationId?.[reservationId] || [];
+    additionalHeadRequests
+        .filter((request) => String(request.status || '').toLowerCase() === 'pending_payment')
+        .forEach((request) => {
+            const hasExistingFee = getReservationPayments(paymentsByReservationId, reservationId).some((payment) => (
+                String(payment.additional_head_request_id || '') === String(request.additional_head_request_id)
+                && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+            ));
+
+            if (!hasExistingFee) {
+                optionsList.push(buildPaymentOption(reservation, 'additional_head_fee', Number(request.total_price || 0), paymentsByReservationId, {
+                    ...options,
+                    displayDescription: `${PAYMENT_TYPE_META.additional_head_fee.description} (${request.requested_heads} guest${Number(request.requested_heads) === 1 ? '' : 's'})`,
+                    additionalHeadRequestId: request.additional_head_request_id
+                }));
+            }
+        });
+
     return optionsList.filter((option) => option.amount > 0 || option.paymentType === 'partial_payment');
 }
 
@@ -740,10 +775,11 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             options
         );
         const pendingTargetType = pendingPayment.payment_type === 'extension_fee' ? 'extension'
+            : pendingPayment.payment_type === 'additional_head_fee' ? 'additional_head'
             : pendingPayment.payment_type === 'reschedule_fee' ? 'reschedule'
             : pendingPayment.payment_type === 'cancellation_fee' ? 'cancellation'
             : 'reservation';
-        const pendingTargetId = pendingPayment.extension_id || pendingPayment.reschedule_request_id || reservationId;
+        const pendingTargetId = pendingPayment.extension_id || pendingPayment.additional_head_request_id || pendingPayment.reschedule_request_id || reservationId;
         return {
             mode: 'pending_review',
             submittable: false,
@@ -806,6 +842,23 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             label: 'Extension fee pending',
             key: 'info',
             sublabel: 'Complete the extension fee to confirm your added hours'
+        };
+    }
+
+    const additionalHeadRequests = options.additionalHeadRequestsByReservationId?.[reservationId] || [];
+    if (isAdditionalHeadFeeOwed(additionalHeadRequests, payments)) {
+        const openRequest = additionalHeadRequests.find((request) => String(request.status || '').toLowerCase() === 'pending_payment');
+        const amountDue = Number(openRequest?.total_price || 0);
+        return {
+            mode: 'additional_head_fee_due',
+            submittable: true,
+            amountDue,
+            balance,
+            targetType: 'additional_head',
+            targetId: openRequest?.additional_head_request_id || null,
+            label: 'Additional guests fee pending',
+            key: 'info',
+            sublabel: 'Complete the additional guests fee to confirm your added guests'
         };
     }
 
@@ -924,6 +977,7 @@ export async function fetchPayments(supabase, reservationIds) {
             reservation_id,
             reschedule_request_id,
             extension_id,
+            additional_head_request_id,
             payment_type,
             payment_method,
             amount,
@@ -1029,6 +1083,84 @@ export async function fetchExtensions(supabase, reservationIds) {
     }, {});
 }
 
+export async function fetchAdditionalHeadRequests(supabase, reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reservation_additional_head_requests')
+        .select(`
+            additional_head_request_id,
+            reservation_id,
+            requested_heads,
+            price_per_head,
+            total_price,
+            status,
+            hold_expires_at,
+            requested_at,
+            decided_at,
+            rejection_reason
+        `)
+        .in('reservation_id', reservationIds)
+        .order('requested_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).reduce((map, request) => {
+        if (!map[request.reservation_id]) {
+            map[request.reservation_id] = [];
+        }
+        map[request.reservation_id].push(request);
+        return map;
+    }, {});
+}
+
+// Manual Charge for Special Requests — manager-added priced lines that
+// inflate the reservation's effective total (see getReservationBalanceDetails
+// below and get_reservation_effective_total() server-side, 20261022_
+// manual_reservation_charges.sql). Unlike extensions/additional-head
+// requests, there's no status lifecycle — a charge is either live or voided.
+export async function fetchReservationCharges(supabase, reservationIds) {
+    if (!reservationIds.length) return {};
+
+    const { data, error } = await supabase
+        .from('reservation_charges')
+        .select(`
+            charge_id,
+            reservation_id,
+            label,
+            amount,
+            note,
+            added_by,
+            voided,
+            voided_by,
+            voided_at,
+            void_reason,
+            created_at
+        `)
+        .in('reservation_id', reservationIds)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).reduce((map, charge) => {
+        if (!map[charge.reservation_id]) {
+            map[charge.reservation_id] = [];
+        }
+        map[charge.reservation_id].push(charge);
+        return map;
+    }, {});
+}
+
+export function getReservationCharges(chargesByReservationId, reservationId) {
+    return (chargesByReservationId || {})[reservationId] || [];
+}
+
+export function getActiveChargesTotal(chargesByReservationId, reservationId) {
+    return getReservationCharges(chargesByReservationId, reservationId)
+        .filter((charge) => !charge.voided)
+        .reduce((sum, charge) => sum + Number(charge.amount || 0), 0);
+}
+
 export async function fetchCustomerReservations(supabase, userId, options = {}) {
     const includeReviewPrompt = Boolean(options.includeReviewPrompt);
     const selectClause = includeReviewPrompt
@@ -1067,10 +1199,12 @@ export async function fetchCustomerReservations(supabase, userId, options = {}) 
 export async function loadCustomerPaymentBundle(supabase, userId, options = {}) {
     const reservations = await fetchCustomerReservations(supabase, userId, options);
     const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
-    const [paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId] = await Promise.all([
+    const [paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId] = await Promise.all([
         fetchPayments(supabase, reservationIds),
         fetchRescheduleRequests(supabase, reservationIds),
-        fetchExtensions(supabase, reservationIds)
+        fetchExtensions(supabase, reservationIds),
+        fetchAdditionalHeadRequests(supabase, reservationIds),
+        fetchReservationCharges(supabase, reservationIds)
     ]);
     const paymentIds = Object.values(paymentsByReservationId)
         .flat()
@@ -1083,7 +1217,9 @@ export async function loadCustomerPaymentBundle(supabase, userId, options = {}) 
         paymentsByReservationId,
         receiptsByPaymentId,
         reschedulesByReservationId,
-        extensionsByReservationId
+        extensionsByReservationId,
+        additionalHeadRequestsByReservationId,
+        chargesByReservationId
     };
 }
 
@@ -1093,11 +1229,14 @@ export async function submitCustomerPayment({
     paymentsByReservationId,
     reschedulesByReservationId,
     extensionsByReservationId = {},
+    additionalHeadRequestsByReservationId = {},
+    chargesByReservationId = {},
     reservationId,
     selectedMethod,
     paymentType,
     rescheduleRequestId = null,
     extensionId = null,
+    additionalHeadRequestId = null,
     customAmount = null,
     referenceNumber = '',
     paymentDate = null,
@@ -1114,17 +1253,18 @@ export async function submitCustomerPayment({
         throw new Error('This reservation could not be found.');
     }
 
-    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
+    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules, chargesByReservationId });
     const availableOptions = getAvailablePaymentOptions(
         reservation,
         paymentsByReservationId,
         reschedulesByReservationId,
-        { formatDate, reservationRules, paymentTypes, extensionsByReservationId }
+        { formatDate, reservationRules, paymentTypes, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId }
     );
     const selectedOption = availableOptions.find((option) => (
         option.paymentType === paymentType
         && String(option.rescheduleRequestId || '') === String(rescheduleRequestId || '')
         && String(option.extensionId || '') === String(extensionId || '')
+        && String(option.additionalHeadRequestId || '') === String(additionalHeadRequestId || '')
     ));
 
     if (!selectedOption) {
@@ -1196,6 +1336,7 @@ export async function submitCustomerPayment({
         reservation_id: reservation.reservation_id,
         reschedule_request_id: selectedOption.rescheduleRequestId || null,
         extension_id: selectedOption.extensionId || null,
+        additional_head_request_id: selectedOption.additionalHeadRequestId || null,
         payment_type: selectedOption.paymentType,
         payment_method: legacyModeKey,
         payment_method_id: selectedMethod.id,

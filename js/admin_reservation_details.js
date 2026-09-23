@@ -75,6 +75,20 @@ const approvalPromptAssignBtn = document.getElementById('approvalPromptAssignBtn
 
 const recordPaymentBtn = document.getElementById('recordPaymentBtn');
 const paymentHistoryBody = document.getElementById('paymentHistoryBody');
+const chargesHistoryBody = document.getElementById('chargesHistoryBody');
+
+const addChargeBtn = document.getElementById('addChargeBtn');
+const addChargeModal = document.getElementById('addChargeModal');
+const addChargeModalClose = document.getElementById('addChargeModalClose');
+const addChargeCancelBtn = document.getElementById('addChargeCancelBtn');
+const addChargeSaveBtn = document.getElementById('addChargeSaveBtn');
+const addChargeMessage = document.getElementById('addChargeMessage');
+const addChargeContextName = document.getElementById('addChargeContextName');
+const addChargeContextDate = document.getElementById('addChargeContextDate');
+const addChargeContextBalance = document.getElementById('addChargeContextBalance');
+const addChargeLabelInput = document.getElementById('addChargeLabelInput');
+const addChargeAmountInput = document.getElementById('addChargeAmountInput');
+const addChargeNoteInput = document.getElementById('addChargeNoteInput');
 
 const recordPaymentModal = document.getElementById('recordPaymentModal');
 const recordPaymentModalClose = document.getElementById('recordPaymentModalClose');
@@ -346,6 +360,10 @@ function getReservationPayments(reservation) {
   return reservation.payments || [];
 }
 
+function getReservationCharges(reservation) {
+  return reservation.charges || [];
+}
+
 function getReservationRescheduleRequests(reservation) {
   return reservation.reschedule_requests || [];
 }
@@ -570,7 +588,7 @@ async function fetchReservationDetail(idParam) {
 
   if (!data) return null;
 
-  const [contracts, paymentsRes, requestsRes] = await Promise.all([
+  const [contracts, paymentsRes, requestsRes, chargesRes] = await Promise.all([
     fetchReservationContracts([data.reservation_id]),
     supabase
       .from('payment')
@@ -581,17 +599,24 @@ async function fetchReservationDetail(idParam) {
       .from('reschedule_requests')
       .select('reschedule_request_id, reservation_id, original_date, original_time, requested_date, requested_time, status, requested_at, reviewed_at, rejection_reason')
       .eq('reservation_id', data.reservation_id)
-      .order('requested_at', { ascending: false })
+      .order('requested_at', { ascending: false }),
+    supabase
+      .from('reservation_charges')
+      .select('charge_id, reservation_id, label, amount, note, added_by, voided, voided_by, voided_at, void_reason, created_at')
+      .eq('reservation_id', data.reservation_id)
+      .order('created_at', { ascending: false })
   ]);
 
   if (paymentsRes.error) throw paymentsRes.error;
   if (requestsRes.error) throw requestsRes.error;
+  if (chargesRes.error) throw chargesRes.error;
 
   return {
     ...data,
     contracts: contracts.length ? [contracts[0]] : [],
     payments: paymentsRes.data || [],
-    reschedule_requests: requestsRes.data || []
+    reschedule_requests: requestsRes.data || [],
+    charges: chargesRes.data || []
   };
 }
 
@@ -869,7 +894,9 @@ function renderPayment() {
   paymentDetailsRows.innerHTML = extraRows.join('');
 
   renderPaymentHistory();
+  renderCharges();
   renderRecordPaymentAvailability();
+  renderAddChargeAvailability();
 }
 
 /* ---------------------------------------------------------------- */
@@ -917,6 +944,67 @@ function renderPaymentHistory() {
       </tr>
     `;
   }).join('');
+}
+
+/* ---------------------------------------------------------------- */
+/* Manual charges — Manual Charge for Special Requests                */
+/* ---------------------------------------------------------------- */
+
+function renderCharges() {
+  if (!chargesHistoryBody) return;
+  const reservation = currentReservation;
+  const rows = getReservationCharges(reservation)
+    .slice()
+    .sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0));
+
+  if (!rows.length) {
+    chargesHistoryBody.innerHTML = '<tr class="payment-history-empty-row"><td colspan="6">No manual charges added yet</td></tr>';
+    return;
+  }
+
+  chargesHistoryBody.innerHTML = rows.map((charge) => {
+    const dateLabel = formatReservationDate(charge.created_at);
+    const statusCell = charge.voided
+      ? `<span class="status-pill rejected" title="${escapeHtml(charge.void_reason || 'Voided')}">Voided</span>`
+      : '<span class="status-pill approved">Active</span>';
+    const voidAction = charge.voided
+      ? '<span class="payment-history-no-receipt">&mdash;</span>'
+      : `<button type="button" class="payment-history-view-link" data-action="void-charge" data-charge-id="${escapeHtml(charge.charge_id)}">Void</button>`;
+    const rowClass = charge.voided ? ' class="charge-row-voided"' : '';
+
+    return `
+      <tr${rowClass}>
+        <td class="payment-history-date">${escapeHtml(dateLabel)}</td>
+        <td>${escapeHtml(charge.label)}</td>
+        <td class="payment-history-amount">${escapeHtml(formatCurrency(charge.amount))}</td>
+        <td>${escapeHtml(charge.note || '—')}</td>
+        <td>${statusCell}</td>
+        <td>${voidAction}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function voidCharge(chargeId) {
+  const charge = getReservationCharges(currentReservation).find((c) => c.charge_id === chargeId);
+  if (!charge) return;
+  if (!window.confirm(`Void the charge "${charge.label}" (${formatCurrency(charge.amount)})? This cannot be undone.`)) return;
+
+  try {
+    const { error } = await supabase.rpc('void_reservation_charge', { p_charge_id: chargeId, p_reason: null });
+    if (error) throw error;
+
+    await logAudit({
+      action: 'Voided Manual Charge',
+      category: 'payments',
+      details: `Voided "${charge.label}" (${formatCurrency(charge.amount)})`,
+      entityId: currentReservation.reservation_id
+    });
+
+    await reloadPaymentSection('Charge voided.');
+  } catch (error) {
+    window.alert(`Failed to void charge: ${error.message}`);
+  }
 }
 
 /* ---------------------------------------------------------------- */
@@ -1012,6 +1100,24 @@ function renderRecordPaymentAvailability() {
   recordPaymentBtn.title = isTerminal
     ? `This reservation is ${status} — no payment can be recorded against it.`
     : (isSettled ? 'This reservation is already fully paid.' : '');
+}
+
+// A manual charge doesn't require an outstanding balance to exist (unlike
+// Record Payment) — it's fine to add one to an already-settled or
+// completed reservation. Only blocked when the reservation never happened
+// or was called off, same terminal set used for cancellation eligibility
+// elsewhere in this file.
+function renderAddChargeAvailability() {
+  if (!addChargeBtn) return;
+  if (currentRole === 'admin') {
+    addChargeBtn.classList.add('hidden');
+    return;
+  }
+  addChargeBtn.classList.remove('hidden');
+  const status = getEffectiveReservationStatus(currentReservation);
+  const isBlocked = ['cancelled', 'declined'].includes(status);
+  addChargeBtn.toggleAttribute('disabled', isBlocked);
+  addChargeBtn.title = isBlocked ? `This reservation is ${status} — no charge can be added.` : '';
 }
 
 function setRecordPaymentMessage(message, isError = false) {
@@ -1231,6 +1337,117 @@ function wireRecordPaymentModal() {
   recordPaymentFileRemoveBtn?.addEventListener('click', clearRecordPaymentFile);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !recordPaymentModal.classList.contains('hidden')) closeRecordPaymentModal();
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Add charge — Manual Charge for Special Requests. Manager adds a    */
+/* priced line directly, no approval step; increases the reservation's */
+/* effective total (get_reservation_effective_total(), 20261022_      */
+/* manual_reservation_charges.sql) so the balance shown above and on   */
+/* the customer's own payment page updates immediately.                */
+/* ---------------------------------------------------------------- */
+
+function setAddChargeMessage(message, isError = false) {
+  if (!addChargeMessage) return;
+  addChargeMessage.textContent = message || '';
+  addChargeMessage.classList.toggle('error', isError);
+}
+
+function openAddChargeModal() {
+  if (currentRole === 'admin') return;
+  if (['cancelled', 'declined'].includes(getEffectiveReservationStatus(currentReservation))) return;
+  const reservation = currentReservation;
+
+  if (addChargeLabelInput) addChargeLabelInput.value = '';
+  if (addChargeAmountInput) addChargeAmountInput.value = '';
+  if (addChargeNoteInput) addChargeNoteInput.value = '';
+  setAddChargeMessage('');
+
+  const outstanding = Number(currentPaymentSummary?.outstanding_balance ?? reservation.total_price ?? 0);
+  if (addChargeContextName) {
+    addChargeContextName.textContent = `${reservation.contact_name || 'Customer'} · ${reservation.package?.package_name || 'Reservation'}`;
+  }
+  if (addChargeContextDate) {
+    addChargeContextDate.textContent = `${formatReservationDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
+  }
+  if (addChargeContextBalance) {
+    addChargeContextBalance.textContent = formatCurrency(outstanding);
+  }
+
+  addChargeModal?.classList.remove('hidden');
+  addChargeModal?.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
+  addChargeLabelInput?.focus();
+}
+
+function closeAddChargeModal() {
+  addChargeModal?.classList.add('hidden');
+  addChargeModal?.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
+  addChargeSaveBtn?.removeAttribute('disabled');
+}
+
+async function saveAddCharge() {
+  if (currentRole === 'admin') return;
+  const reservation = currentReservation;
+
+  const label = addChargeLabelInput?.value.trim() || '';
+  const amount = Number(addChargeAmountInput?.value);
+  const note = addChargeNoteInput?.value.trim() || null;
+
+  if (!label) {
+    setAddChargeMessage('Enter a label for this charge.', true);
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    setAddChargeMessage('Enter an amount greater than zero.', true);
+    return;
+  }
+
+  addChargeSaveBtn?.setAttribute('disabled', 'true');
+  setAddChargeMessage('Adding charge...');
+
+  try {
+    const { error } = await supabase.from('reservation_charges').insert({
+      reservation_id: reservation.reservation_id,
+      label,
+      amount,
+      note,
+      added_by: adminSession?.user?.id
+    });
+    if (error) throw error;
+
+    await logAudit({
+      action: 'Added Manual Charge',
+      category: 'payments',
+      details: `Added "${label}" (${formatCurrency(amount)})${note ? ` — ${note}` : ''}`,
+      entityId: reservation.reservation_id
+    });
+
+    closeAddChargeModal();
+    await reloadPaymentSection('Charge added — the balance now reflects it.');
+  } catch (error) {
+    addChargeSaveBtn?.removeAttribute('disabled');
+    setAddChargeMessage(error.message || 'Failed to add charge.', true);
+  }
+}
+
+function wireAddChargeModal() {
+  addChargeBtn?.addEventListener('click', openAddChargeModal);
+  addChargeModalClose?.addEventListener('click', closeAddChargeModal);
+  addChargeCancelBtn?.addEventListener('click', closeAddChargeModal);
+  addChargeSaveBtn?.addEventListener('click', saveAddCharge);
+  addChargeModal?.addEventListener('click', (event) => {
+    if (event.target === addChargeModal) closeAddChargeModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !addChargeModal.classList.contains('hidden')) closeAddChargeModal();
+  });
+  chargesHistoryBody?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-action="void-charge"]');
+    if (!btn) return;
+    voidCharge(btn.dataset.chargeId);
   });
 }
 
@@ -1829,6 +2046,7 @@ wireAssignmentModal();
 wireApprovalPrompt();
 wireReceiptViewer();
 wireRecordPaymentModal();
+wireAddChargeModal();
 wireSignatureCheckPanel();
 wireStickyHeaderScroll();
 wireBreadcrumb();

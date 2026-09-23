@@ -7,6 +7,10 @@ import {
     fetchReceipts as fetchSharedReceipts,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     fetchExtensions as fetchSharedExtensions,
+    fetchAdditionalHeadRequests as fetchSharedAdditionalHeadRequests,
+    fetchReservationCharges as fetchSharedReservationCharges,
+    getReservationCharges as getSharedReservationCharges,
+    getActiveChargesTotal as getSharedActiveChargesTotal,
     getReservationBalanceDetails as getSharedReservationBalanceDetails,
     getPaymentSummary as getSharedPaymentSummary,
     isReservationPaymentEnabled as isSharedReservationPaymentEnabled,
@@ -54,6 +58,7 @@ import {
     isCancellationFeeOwed,
     isRescheduleFeeOwed,
     isExtensionFeeOwed,
+    isAdditionalHeadFeeOwed,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel
@@ -152,6 +157,7 @@ const state = {
     receiptsByPaymentId: {},
     reschedulesByReservationId: {},
     extensionsByReservationId: {},
+    additionalHeadRequestsByReservationId: {},
     reviewsByReservationId: {},
     profile: null,
     emailSecurityReady: true,
@@ -249,6 +255,10 @@ function getReservationRescheduleRequests(reservationId) {
 
 function getReservationExtensions(reservationId) {
     return state.extensionsByReservationId[reservationId] || [];
+}
+
+function getReservationAdditionalHeadRequests(reservationId) {
+    return state.additionalHeadRequestsByReservationId[reservationId] || [];
 }
 
 function getReservationReview(reservationId) {
@@ -378,7 +388,12 @@ function getReservationBalanceDueDate(reservation) {
 
 function getReservationBalanceDetails(reservation) {
     const reservationId = reservation?.reservation_id;
-    const totalPrice = roundCurrency(Number(reservation?.total_price || 0));
+    const basePackagePrice = roundCurrency(Number(reservation?.total_price || 0));
+    // Manual Charge for Special Requests — non-voided manager-added charges
+    // inflate the effective total, same as the shared getReservationBalanceDetails
+    // in customer_payments.js (this is account.js's own local mirror of it).
+    const manualChargesTotal = roundCurrency(getSharedActiveChargesTotal(state.chargesByReservationId, reservationId));
+    const totalPrice = roundCurrency(basePackagePrice + manualChargesTotal);
     const approvedBaseTotal = roundCurrency(getApprovedBasePaymentsTotal(reservationId));
     const remainingBalance = roundCurrency(Math.max(totalPrice - approvedBaseTotal, 0));
     const dueDate = getReservationBalanceDueDate(reservation);
@@ -414,6 +429,8 @@ function getReservationBalanceDetails(reservation) {
 
     return {
         totalPrice,
+        basePackagePrice,
+        manualChargesTotal,
         approvedBaseTotal,
         remainingBalance,
         dueDate,
@@ -451,7 +468,8 @@ function buildPaymentOption(reservation, paymentType, amount, overrides = {}) {
         description: baseDescription,
         displayDescription: overrides.displayDescription || baseDescription,
         rescheduleRequestId: overrides.rescheduleRequestId || '',
-        extensionId: overrides.extensionId || ''
+        extensionId: overrides.extensionId || '',
+        additionalHeadRequestId: overrides.additionalHeadRequestId || ''
     };
 }
 
@@ -577,6 +595,24 @@ function getAvailablePaymentOptions(reservation) {
             }
         });
 
+    // Additional Head Requests (post-booking) — mirrors the extension_fee
+    // block above.
+    getReservationAdditionalHeadRequests(reservationId)
+        .filter((request) => String(request.status || '').toLowerCase() === 'pending_payment')
+        .forEach((request) => {
+            const hasExistingFee = getReservationPayments(reservationId).some((payment) => (
+                String(payment.additional_head_request_id || '') === String(request.additional_head_request_id)
+                && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+            ));
+
+            if (!hasExistingFee) {
+                options.push(buildPaymentOption(reservation, 'additional_head_fee', Number(request.total_price || 0), {
+                    displayDescription: `Fee for your requested additional guests (${request.requested_heads} guest${Number(request.requested_heads) === 1 ? '' : 's'})`,
+                    additionalHeadRequestId: request.additional_head_request_id
+                }));
+            }
+        });
+
     return options.filter((option) => option.amount > 0);
 }
 
@@ -591,7 +627,8 @@ function getPaymentSummary(reservation) {
         formatDate,
         reservationRules: state.reservationRules,
         paymentRules: state.paymentRules,
-        extensionsByReservationId: state.extensionsByReservationId
+        extensionsByReservationId: state.extensionsByReservationId,
+        additionalHeadRequestsByReservationId: state.additionalHeadRequestsByReservationId
     });
 }
 
@@ -1322,7 +1359,7 @@ function getReservationCardTone(statusKey, isPaymentEnabled, remainingBalance, f
 }
 
 function buildReservationCard(reservation, view) {
-    const balance = getSharedReservationBalanceDetails(reservation, state.paymentsByReservationId, { formatDate });
+    const balance = getSharedReservationBalanceDetails(reservation, state.paymentsByReservationId, { formatDate, chargesByReservationId: state.chargesByReservationId });
     const reservationStatus = getReservationStatusMeta(getEffectiveReservationStatus(reservation, balance.remainingBalance));
     const packageName = getReservationPackageName(reservation);
     const location = getReservationLocationLabel(reservation);
@@ -1351,25 +1388,32 @@ function buildReservationCard(reservation, view) {
     const openExtension = isExtensionFeeOwed(getReservationExtensions(reservation.reservation_id), getReservationPayments(reservation.reservation_id))
         ? getReservationExtensions(reservation.reservation_id).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
         : null;
+    // Additional Head Requests (post-booking) — mirrors openExtension
+    // exactly, one priority tier below it (see paymentTarget below).
+    const openAdditionalHeadRequest = isAdditionalHeadFeeOwed(getReservationAdditionalHeadRequests(reservation.reservation_id), getReservationPayments(reservation.reservation_id))
+        ? getReservationAdditionalHeadRequests(reservation.reservation_id).find((request) => String(request.status || '').toLowerCase() === 'pending_payment')
+        : null;
     // Same priority order as js/customer_payments.js's getPaymentPageState
-    // (cancellation > reschedule > extension > base balance) — drives both
-    // the "Continue Payment" button's label and the explicit target it
-    // routes to, so the button never says one thing and pays for another.
-    // Deliberately only relevant while paymentIsActionable is true — this
-    // button is the "you have something to pay, act now" CTA specifically
-    // for My Reservations, not a general-purpose link to the payment page.
-    // Viewing settled payment history for a reservation with nothing owed
-    // belongs on the Reservation Details page ("View Payment History"),
-    // not here.
+    // (cancellation > reschedule > extension > additional_head > base
+    // balance) — drives both the "Continue Payment" button's label and the
+    // explicit target it routes to, so the button never says one thing and
+    // pays for another. Deliberately only relevant while paymentIsActionable
+    // is true — this button is the "you have something to pay, act now" CTA
+    // specifically for My Reservations, not a general-purpose link to the
+    // payment page. Viewing settled payment history for a reservation with
+    // nothing owed belongs on the Reservation Details page ("View Payment
+    // History"), not here.
     const paymentTarget = cancellationFeeOwed
         ? { type: 'cancellation', id: reservation.reservation_id, label: 'Pay Cancellation Fee' }
         : openReschedule
             ? { type: 'reschedule', id: openReschedule.reschedule_request_id, label: 'Pay Reschedule Fee' }
             : openExtension
                 ? { type: 'extension', id: openExtension.extension_id, label: 'Pay Extension Fee' }
-                : { type: 'reservation', id: reservation.reservation_id, label: 'Continue Payment' };
+                : openAdditionalHeadRequest
+                    ? { type: 'additional_head', id: openAdditionalHeadRequest.additional_head_request_id, label: 'Pay Additional Guests Fee' }
+                    : { type: 'reservation', id: reservation.reservation_id, label: 'Continue Payment' };
     const review = view === 'past' ? getReservationReview(reservation.reservation_id) : null;
-    const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed || Boolean(openExtension));
+    const cardTone = getReservationCardTone(reservationStatus.key, isSharedReservationPaymentEnabled(reservation), balance.remainingBalance, cancellationFeeOwed || rescheduleFeeOwed || Boolean(openExtension) || Boolean(openAdditionalHeadRequest));
     const statusIcon = getReservationStatusIcon(reservationStatus.key);
 
     const detailsUrl = `/reservation-details?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
@@ -1410,14 +1454,16 @@ function buildReservationCard(reservation, view) {
             </div>
 
             ${paymentIsActionable ? `
-                <div class="reservation-balance-line ${escapeHtml(cancellationFeeOwed || rescheduleFeeOwed || openExtension ? 'pending' : balance.toneKey)}">
+                <div class="reservation-balance-line ${escapeHtml(cancellationFeeOwed || rescheduleFeeOwed || openExtension || openAdditionalHeadRequest ? 'pending' : balance.toneKey)}">
                     ${cancellationFeeOwed
                         ? `<strong>${escapeHtml(formatCurrency(getCancellationFee(reservation, state.paymentRules)))}</strong> cancellation fee due`
                         : (rescheduleFeeOwed
                             ? `<strong>${escapeHtml(formatCurrency(getRescheduleFee(state.paymentRules)))}</strong> reschedule fee due`
                             : (openExtension
                                 ? `<strong>${escapeHtml(formatCurrency(openExtension.total_price))}</strong> extension fee due`
-                                : `<strong>${escapeHtml(formatCurrency(balance.remainingBalance))}</strong> due by ${escapeHtml(balance.dueDateLabel)}`))
+                                : (openAdditionalHeadRequest
+                                    ? `<strong>${escapeHtml(formatCurrency(openAdditionalHeadRequest.total_price))}</strong> additional guests fee due`
+                                    : `<strong>${escapeHtml(formatCurrency(balance.remainingBalance))}</strong> due by ${escapeHtml(balance.dueDateLabel)}`)))
                     }
                 </div>
             ` : ''}
@@ -1897,6 +1943,8 @@ async function loadReservations({ silent = false } = {}) {
         state.paymentsByReservationId = await fetchSharedPayments(supabase, reservationIds);
         state.reschedulesByReservationId = await fetchSharedRescheduleRequests(supabase, reservationIds);
         state.extensionsByReservationId = await fetchSharedExtensions(supabase, reservationIds);
+        state.additionalHeadRequestsByReservationId = await fetchSharedAdditionalHeadRequests(supabase, reservationIds);
+        state.chargesByReservationId = await fetchSharedReservationCharges(supabase, reservationIds);
         state.reviewsByReservationId = await fetchReviews(reservationIds);
 
         const paymentIds = Object.values(state.paymentsByReservationId)

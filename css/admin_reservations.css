@@ -1567,8 +1567,8 @@ body {
    converts to cards): same look as the Employees cards, i.e. a divider line
    under every field and a closing bottom border, instead of the shared
    reservation-card style, which draws no lines between fields. Mirrors
-   .table-responsive-cards in manager-theme.css and the Inquiries cards
-   (admin_inquiries.css). Desktop table mode (>=1451px) is unchanged. */
+   .table-responsive-cards in manager-theme.css. Desktop table mode
+   (>=1451px) is unchanged. */
 @media (max-width: 1450px) {
   .reservations-table tbody td {
     border-bottom: 0.5px solid #EFE8DD;

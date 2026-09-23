@@ -5,6 +5,8 @@ import {
     fetchPayments as fetchSharedPayments,
     fetchRescheduleRequests as fetchSharedRescheduleRequests,
     fetchExtensions as fetchSharedExtensions,
+    fetchAdditionalHeadRequests as fetchSharedAdditionalHeadRequests,
+    fetchReservationCharges as fetchSharedReservationCharges,
     getReservationBalanceDetails,
     isReservationPaymentEnabled,
     loadPaymentRules,
@@ -24,11 +26,14 @@ import {
     getReservationLocationLabel,
     getRescheduleStatusMeta,
     getExtensionStatusMeta,
+    getAdditionalHeadStatusMeta,
     computeContractMeta,
     computeCanReschedule,
     computeCanCancel,
     computeCanRequestExtension,
+    computeCanRequestAdditionalHeads,
     getOpenExtension,
+    getOpenAdditionalHeadRequest,
     getCancellationBlockReason,
     getRescheduleBlockReason,
     getCancellationFee,
@@ -36,9 +41,11 @@ import {
     getCancellationFeePayment,
     isCancellationFeeOwed,
     isRescheduleFeeOwed,
-    isExtensionFeeOwed
+    isExtensionFeeOwed,
+    isAdditionalHeadFeeOwed
 } from './reservation_shared.js';
 import { fetchMaxExtensionHours, requestExtension } from './reservation_extensions.js';
+import { fetchMaxAdditionalHeads, requestAdditionalHeads } from './reservation_additional_head_requests.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
@@ -74,6 +81,13 @@ const extensionModalDismiss    = document.getElementById('extension-modal-dismis
 const extensionModalConfirm    = document.getElementById('extension-modal-confirm');
 const extensionModalBody       = document.getElementById('extension-modal-body');
 const extensionModalMessage    = document.getElementById('extension-modal-message');
+
+const additionalHeadRequestBackdrop = document.getElementById('additional-head-request-backdrop');
+const additionalHeadModalClose      = document.getElementById('additional-head-modal-close');
+const additionalHeadModalDismiss    = document.getElementById('additional-head-modal-dismiss');
+const additionalHeadModalConfirm    = document.getElementById('additional-head-modal-confirm');
+const additionalHeadModalBody       = document.getElementById('additional-head-modal-body');
+const additionalHeadModalMessage    = document.getElementById('additional-head-modal-message');
 
 const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
 const submissionFeedbackClose    = document.getElementById('submission-feedback-close');
@@ -198,11 +212,13 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
-    const [contract, paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchSharedExtensions(supabase, [reservationId]),
+        fetchSharedAdditionalHeadRequests(supabase, [reservationId]),
+        fetchSharedReservationCharges(supabase, [reservationId]),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
         loadReservationRules(supabase),
@@ -216,7 +232,10 @@ async function loadPageData() {
         payments: paymentsByReservationId[reservationId] || [],
         rescheduleRequests: reschedulesByReservationId[reservationId] || [],
         extensions: extensionsByReservationId[reservationId] || [],
+        additionalHeadRequests: additionalHeadRequestsByReservationId[reservationId] || [],
+        charges: chargesByReservationId[reservationId] || [],
         paymentsByReservationId,
+        chargesByReservationId,
         cancellationInfo,
         review,
         reservationRules,
@@ -444,19 +463,19 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false, extensionFeeOwed = null) {
+function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false, extensionFeeOwed = null, additionalHeadFeeOwed = null, charges = []) {
     // balance.remainingBalance only tracks the base package price — it goes
     // to 0 the moment the package itself is paid off, regardless of whether
-    // a *cancellation*, *reschedule*, or *extension* fee is now separately
-    // owed on top of that. Without these checks, a fully-paid reservation
-    // that later gets one of those fees reads as paymentDone forever and
-    // the CTA below never renders, even though the customer still owes
-    // money. extensionFeeOwed is the open reservation_extensions row itself
-    // (or null) rather than a boolean, since its amount comes from that
-    // row's own snapshotted total_price, not a shared config value the way
-    // the cancellation/reschedule fee amounts do.
+    // a *cancellation*, *reschedule*, *extension*, or *additional guests*
+    // fee is now separately owed on top of that. Without these checks, a
+    // fully-paid reservation that later gets one of those fees reads as
+    // paymentDone forever and the CTA below never renders, even though the
+    // customer still owes money. extensionFeeOwed/additionalHeadFeeOwed are
+    // the open request row itself (or null) rather than a boolean, since
+    // their amount comes from that row's own snapshotted total_price, not a
+    // shared config value the way the cancellation/reschedule fee amounts do.
     const baseBalancePaid = balance.remainingBalance <= 0;
-    const paymentDone = baseBalancePaid && !cancellationFeeOwed && !rescheduleFeeOwed && !extensionFeeOwed;
+    const paymentDone = baseBalancePaid && !cancellationFeeOwed && !rescheduleFeeOwed && !extensionFeeOwed && !additionalHeadFeeOwed;
     const verificationDone = isReservationPaymentEnabled(reservation);
     const hideActions = ['cancelled', 'declined', 'completed'].includes(effectiveStatus);
     // The CTA itself is now always shown — js/payment.js renders a graceful
@@ -471,6 +490,26 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     const nothingOwed = hideActions || paymentDone;
     const locked = !verificationDone;
 
+    // Manual Charge for Special Requests — active (non-voided) charges only;
+    // a voided charge no longer affects this customer's balance, and its
+    // history lives on the manager-side reservation-details page instead.
+    // "Package total" now reads basePackagePrice, not the effective total
+    // (balance.totalPrice) — otherwise, once a charge exists, this row's
+    // label would silently stop matching what it shows.
+    const activeCharges = (charges || []).filter((charge) => !charge.voided);
+    const chargeLines = activeCharges.map((charge) => `
+                <div class="rd-receipt-row">
+                    <span>${escapeHtml(charge.label)}</span>
+                    <span>${escapeHtml(formatCurrency(charge.amount))}</span>
+                </div>
+    `).join('');
+    const chargesTotalRow = activeCharges.length ? `
+                <div class="rd-receipt-row">
+                    <span>Total</span>
+                    <span>${escapeHtml(formatCurrency(balance.totalPrice))}</span>
+                </div>
+    ` : '';
+
     return `
         <section class="rd-panel">
             <h2 class="rd-panel-title">Payment &amp; contract</h2>
@@ -478,8 +517,10 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
             <div class="rd-receipt-lines">
                 <div class="rd-receipt-row">
                     <span>Package total</span>
-                    <span>${escapeHtml(formatCurrency(balance.totalPrice))}</span>
+                    <span>${escapeHtml(formatCurrency(balance.basePackagePrice))}</span>
                 </div>
+                ${chargeLines}
+                ${chargesTotalRow}
                 <div class="rd-receipt-row">
                     <span>Paid &amp; approved</span>
                     <span>${escapeHtml(formatCurrency(balance.approvedBaseTotal))}</span>
@@ -506,6 +547,12 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                         <span>${escapeHtml(formatCurrency(extensionFeeOwed.total_price))}</span>
                     </div>
                 ` : ''}
+                ${additionalHeadFeeOwed ? `
+                    <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
+                        <span>Additional guests fee due (${escapeHtml(String(additionalHeadFeeOwed.requested_heads))} guest${Number(additionalHeadFeeOwed.requested_heads) === 1 ? '' : 's'})</span>
+                        <span>${escapeHtml(formatCurrency(additionalHeadFeeOwed.total_price))}</span>
+                    </div>
+                ` : ''}
             </div>
 
             <div class="rd-contract-inset">
@@ -530,7 +577,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     ${locked ? 'disabled aria-describedby="rd-pay-caption"' : ''}
                     data-payment-url="${escapeHtml(paymentUrl)}"
                 >
-                    ${locked ? '<i class="ti ti-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : (nothingOwed ? 'View payment history' : 'Continue payment')))}
+                    ${locked ? '<i class="ti ti-lock" aria-hidden="true"></i>' : ''} ${cancellationFeeOwed ? 'Pay cancellation fee' : (rescheduleFeeOwed ? 'Pay reschedule fee' : (extensionFeeOwed ? 'Pay extension fee' : (additionalHeadFeeOwed ? 'Pay additional guests fee' : (nothingOwed ? 'View payment history' : 'Continue payment'))))}
                 </button>
                 ${locked ? `<p class="rd-pay-caption" id="rd-pay-caption">Unlocks after your reservation is verified</p>` : ''}
             ` : ''}
@@ -748,6 +795,66 @@ function buildExtensionSection(reservation, extensions, effectiveStatus) {
     `;
 }
 
+// Additional Head Requests (post-booking) — mirrors buildExtensionSection
+// exactly, just for reservation_additional_head_requests instead of
+// reservation_extensions.
+function buildAdditionalHeadSection(reservation, additionalHeadRequests, effectiveStatus) {
+    if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return '';
+    if (['cancellation_requested', 'cancellation_approved'].includes(String(reservation.status || '').toLowerCase())) return '';
+
+    const canRequest = computeCanRequestAdditionalHeads(reservation.status, additionalHeadRequests);
+    const latestRequest = (additionalHeadRequests || [])[0] || null;
+    const isOpen = latestRequest && ['pending_payment', 'pending_verification'].includes(String(latestRequest.status || '').toLowerCase());
+
+    if (!isOpen) {
+        if (!canRequest) return '';
+        return `
+            <div class="rd-reschedule-row">
+                <div class="rd-reschedule-row-left">
+                    <i class="ti ti-users-plus" aria-hidden="true"></i>
+                    <span>Need to add more guests to your event?</span>
+                </div>
+                <div class="rd-reschedule-row-actions">
+                    <button type="button" class="rd-btn-outline" data-action="open-additional-head">Request additional guests</button>
+                </div>
+            </div>
+        `;
+    }
+
+    const statusMeta = getAdditionalHeadStatusMeta(latestRequest.status);
+    const isAwaitingPayment = String(latestRequest.status).toLowerCase() === 'pending_payment';
+    const pendingGuestCount = Number.isFinite(Number(reservation.guest_count))
+        ? Number(reservation.guest_count) + Number(latestRequest.requested_heads)
+        : null;
+
+    return `
+        <section class="rd-panel rd-reschedule-card">
+            <div class="rd-reschedule-card-head">
+                <h2 class="rd-panel-title">Additional guests request</h2>
+                <span class="res-status ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
+            </div>
+            <dl class="rd-dl">
+                <div class="rd-dl-row">
+                    <dt><i class="ti ti-users-plus" aria-hidden="true"></i> Requested guests</dt>
+                    <dd>${escapeHtml(String(latestRequest.requested_heads))} guest${Number(latestRequest.requested_heads) === 1 ? '' : 's'} &middot; ${escapeHtml(formatCurrency(latestRequest.total_price))}</dd>
+                </div>
+                ${pendingGuestCount !== null ? `
+                    <div class="rd-dl-row">
+                        <dt><i class="ti ti-info-circle" aria-hidden="true"></i> Pending guest count</dt>
+                        <dd>${escapeHtml(String(pendingGuestCount))} &mdash; not yet confirmed</dd>
+                    </div>
+                ` : ''}
+                ${isAwaitingPayment && latestRequest.hold_expires_at ? `
+                    <div class="rd-dl-row">
+                        <dt><i class="ti ti-hourglass" aria-hidden="true"></i> Hold expires</dt>
+                        <dd>${escapeHtml(formatDateTime(latestRequest.hold_expires_at))} &mdash; pay by then to keep this request</dd>
+                    </div>
+                ` : ''}
+            </dl>
+        </section>
+    `;
+}
+
 function buildReviewRow(effectiveStatus, review, reservationId) {
     if (effectiveStatus !== 'completed') return '';
 
@@ -777,8 +884,8 @@ function buildReviewRow(effectiveStatus, review, reservationId) {
 }
 
 function render() {
-    const { reservation, contract, payments, rescheduleRequests, extensions, paymentsByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
-    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules });
+    const { reservation, contract, payments, rescheduleRequests, extensions, additionalHeadRequests, charges, paymentsByReservationId, chargesByReservationId, cancellationInfo, review, reservationRules, paymentRules } = pageData;
+    const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules, chargesByReservationId });
     const effectiveStatus = getEffectiveReservationStatus(reservation, balance.remainingBalance);
     const reservationStatus = getReservationStatusMeta(effectiveStatus);
     const statusIcon = getReservationStatusIcon(effectiveStatus);
@@ -799,19 +906,26 @@ function render() {
     const openExtension = isExtensionFeeOwed(extensions, payments)
         ? (extensions || []).find((extension) => String(extension.status || '').toLowerCase() === 'pending_payment')
         : null;
+    // Additional Head Requests (post-booking) — mirrors openExtension
+    // exactly, one priority tier below it (see paymentUrl below).
+    const openAdditionalHeadRequest = isAdditionalHeadFeeOwed(additionalHeadRequests, payments)
+        ? (additionalHeadRequests || []).find((request) => String(request.status || '').toLowerCase() === 'pending_payment')
+        : null;
     // Same priority order as js/customer_payments.js's getPaymentPageState
-    // (cancellation > reschedule > extension > base balance) — the "View
-    // Payment" CTA below already picks its label this way; this makes the
-    // URL it routes to carry the matching explicit target instead of just
-    // the reservation id, so payment.js pre-selects the same fee this page
-    // told the customer they're about to pay.
+    // (cancellation > reschedule > extension > additional_head > base
+    // balance) — the "View Payment" CTA below already picks its label this
+    // way; this makes the URL it routes to carry the matching explicit
+    // target instead of just the reservation id, so payment.js pre-selects
+    // the same fee this page told the customer they're about to pay.
     const paymentUrl = cancellationFeeOwed
         ? buildCustomerPaymentUrl(reservationId, { type: 'cancellation', id: reservationId })
         : openReschedule
             ? buildCustomerPaymentUrl(reservationId, { type: 'reschedule', id: openReschedule.reschedule_request_id })
             : openExtension
                 ? buildCustomerPaymentUrl(reservationId, { type: 'extension', id: openExtension.extension_id })
-                : buildCustomerPaymentUrl(reservationId, { type: 'reservation', id: reservationId });
+                : openAdditionalHeadRequest
+                    ? buildCustomerPaymentUrl(reservationId, { type: 'additional_head', id: openAdditionalHeadRequest.additional_head_request_id })
+                    : buildCustomerPaymentUrl(reservationId, { type: 'reservation', id: reservationId });
     // The 4-step booking stepper (Submitted/Verification/Payment/Confirmed)
     // describes progress toward a *new* booking — showing it while a
     // cancellation fee is owed read as if the original reservation was
@@ -820,7 +934,7 @@ function render() {
     const isCancellationInProgress = cancellationFeeOwed;
 
     const showBalanceSummary = !isTerminalCancelled;
-    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed && !rescheduleFeeOwed && !openExtension;
+    const paymentDone = balance.remainingBalance <= 0 && !cancellationFeeOwed && !rescheduleFeeOwed && !openExtension && !openAdditionalHeadRequest;
 
     pageContainer.innerHTML = `
         <section class="rd-header-card">
@@ -834,7 +948,7 @@ function render() {
                 </div>
                 ${showBalanceSummary ? `
                     <div class="rd-header-right">
-                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (rescheduleFeeOwed ? 'Reschedule fee due' : (openExtension ? 'Extension fee due' : (paymentDone ? 'Paid in full' : 'Balance due')))}</span>
+                        <span class="rd-balance-label">${cancellationFeeOwed ? 'Cancellation fee due' : (rescheduleFeeOwed ? 'Reschedule fee due' : (openExtension ? 'Extension fee due' : (openAdditionalHeadRequest ? 'Additional guests fee due' : (paymentDone ? 'Paid in full' : 'Balance due'))))}</span>
                         <div class="rd-balance-amount-row">
                             <strong class="rd-balance-amount">${escapeHtml(
                                 cancellationFeeOwed
@@ -843,9 +957,11 @@ function render() {
                                         ? formatCurrency(getRescheduleFee(paymentRules))
                                         : (openExtension
                                             ? formatCurrency(openExtension.total_price)
-                                            : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance))))
+                                            : (openAdditionalHeadRequest
+                                                ? formatCurrency(openAdditionalHeadRequest.total_price)
+                                                : (paymentDone ? formatCurrency(balance.totalPrice) : formatCurrency(balance.remainingBalance)))))
                             )}</strong>
-                            ${(!paymentDone && !cancellationFeeOwed && !rescheduleFeeOwed && !openExtension) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
+                            ${(!paymentDone && !cancellationFeeOwed && !rescheduleFeeOwed && !openExtension && !openAdditionalHeadRequest) ? `<span class="rd-balance-due-date">by ${escapeHtml(formatShortDate(balance.dueDateKey))}</span>` : ''}
                         </div>
                     </div>
                 ` : ''}
@@ -869,11 +985,12 @@ function render() {
 
         <div class="rd-grid">
             ${buildEventDetailsPanel(reservation)}
-            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed, openExtension)}
+            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed, openExtension, openAdditionalHeadRequest, charges)}
         </div>
 
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules, rescheduleBlockReason)}
         ${buildExtensionSection(reservation, extensions, effectiveStatus)}
+        ${buildAdditionalHeadSection(reservation, additionalHeadRequests, effectiveStatus)}
         ${buildReviewRow(effectiveStatus, review, reservation.reservation_id)}
     `;
 }
@@ -1193,6 +1310,116 @@ async function submitExtensionRequest() {
     }
 }
 
+// ── Additional guests request modal ─────────────────────────────────────
+// Mirrors the extension request modal above exactly (see its own comment):
+// availability is re-fetched from get_max_additional_heads() every time the
+// modal opens, never cached across opens.
+let additionalHeadAvailability = null;
+let additionalHeadQuantity = 1;
+
+function setAdditionalHeadModalMessage(message, isError = false) {
+    if (!additionalHeadModalMessage) return;
+    additionalHeadModalMessage.textContent = message || '';
+    additionalHeadModalMessage.className = 'account-modal-message' + (isError ? ' error' : '');
+}
+
+function renderAdditionalHeadModalBody() {
+    if (!additionalHeadModalBody) return;
+
+    if (!additionalHeadAvailability) {
+        additionalHeadModalBody.innerHTML = '<p class="rd-inline-note">Checking availability…</p>';
+        additionalHeadModalConfirm?.setAttribute('disabled', 'true');
+        return;
+    }
+
+    if (!additionalHeadAvailability.extendable) {
+        additionalHeadModalBody.innerHTML = '<p class="rd-inline-note">No additional guests can be added to this reservation right now.</p>';
+        additionalHeadModalConfirm?.setAttribute('disabled', 'true');
+        return;
+    }
+
+    const maxAdditional = additionalHeadAvailability.maxAdditional;
+    const pricePerHead = additionalHeadAvailability.pricePerHead || 0;
+    const total = additionalHeadQuantity * pricePerHead;
+
+    additionalHeadModalBody.innerHTML = `
+        <p class="rd-inline-note">${escapeHtml(`You can add up to ${maxAdditional} more guest${maxAdditional === 1 ? '' : 's'}.`)}</p>
+        <div class="extension-qty-row">
+            <label class="cancel-reason-label" for="additional-head-qty-input">Guests to add</label>
+            <div class="extension-qty-stepper">
+                <button type="button" class="extension-qty-btn" id="additional-head-qty-minus" aria-label="Decrease guests" ${additionalHeadQuantity <= 1 ? 'disabled' : ''}>&minus;</button>
+                <input type="number" id="additional-head-qty-input" class="extension-qty-input" inputmode="numeric" min="1" max="${maxAdditional}" step="1" value="${additionalHeadQuantity}" aria-label="Guests to add">
+                <button type="button" class="extension-qty-btn" id="additional-head-qty-plus" aria-label="Increase guests" ${additionalHeadQuantity >= maxAdditional ? 'disabled' : ''}>&plus;</button>
+            </div>
+        </div>
+        <div class="cancel-fee-block">
+            <span class="cancel-fee-label">Total</span>
+            <strong class="cancel-fee-amount">${escapeHtml(formatCurrency(total))}</strong>
+            <p class="cancel-fee-note">${escapeHtml(formatCurrency(pricePerHead))} per guest &middot; ${additionalHeadQuantity} guest${additionalHeadQuantity === 1 ? '' : 's'}</p>
+        </div>
+    `;
+    additionalHeadModalConfirm?.removeAttribute('disabled');
+
+    const qtyInput = document.getElementById('additional-head-qty-input');
+    const minusBtn = document.getElementById('additional-head-qty-minus');
+    const plusBtn = document.getElementById('additional-head-qty-plus');
+
+    const setQuantity = (value) => {
+        additionalHeadQuantity = Math.max(1, Math.min(maxAdditional, Math.round(value) || 1));
+        renderAdditionalHeadModalBody();
+    };
+
+    qtyInput?.addEventListener('change', () => setQuantity(Number(qtyInput.value)));
+    minusBtn?.addEventListener('click', () => setQuantity(additionalHeadQuantity - 1));
+    plusBtn?.addEventListener('click', () => setQuantity(additionalHeadQuantity + 1));
+}
+
+async function openAdditionalHeadModal() {
+    if (!pageData?.reservation) return;
+    additionalHeadQuantity = 1;
+    additionalHeadAvailability = null;
+    setAdditionalHeadModalMessage('');
+    renderAdditionalHeadModalBody();
+    additionalHeadRequestBackdrop?.classList.remove('hidden');
+    additionalHeadRequestBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
+
+    try {
+        additionalHeadAvailability = await fetchMaxAdditionalHeads(supabase, reservationId);
+    } catch (error) {
+        additionalHeadAvailability = { maxAdditional: 0, pricePerHead: null, extendable: false };
+        setAdditionalHeadModalMessage(`Couldn't check availability: ${error.message}`, true);
+    }
+    renderAdditionalHeadModalBody();
+}
+
+function closeAdditionalHeadModal() {
+    additionalHeadRequestBackdrop?.classList.add('hidden');
+    additionalHeadRequestBackdrop?.setAttribute('aria-hidden', 'true');
+    additionalHeadModalConfirm?.removeAttribute('disabled');
+    setAdditionalHeadModalMessage('');
+    unlockBodyScroll();
+}
+
+async function submitAdditionalHeadRequest() {
+    if (!additionalHeadAvailability?.extendable) return;
+    additionalHeadModalConfirm?.setAttribute('disabled', 'true');
+    setAdditionalHeadModalMessage('Submitting your additional guests request…');
+
+    try {
+        await requestAdditionalHeads(supabase, reservationId, additionalHeadQuantity);
+        closeAdditionalHeadModal();
+        // Routes straight into the existing payment flow, same as the
+        // extension request above — the additional_head_fee option now
+        // exists for this reservation (getAvailablePaymentOptions picks it
+        // up automatically), so no separate payment UI is needed here.
+        window.location.href = buildCustomerPaymentUrl(reservationId);
+    } catch (error) {
+        additionalHeadModalConfirm?.removeAttribute('disabled');
+        setAdditionalHeadModalMessage(`Failed to submit request: ${error.message}`, true);
+    }
+}
+
 pageContainer?.addEventListener('click', async (event) => {
     const payBtn = event.target.closest('.rd-pay-cta');
     if (payBtn && !payBtn.disabled) {
@@ -1210,6 +1437,12 @@ pageContainer?.addEventListener('click', async (event) => {
     const extensionTriggerBtn = event.target.closest('[data-action="open-extension"]');
     if (extensionTriggerBtn) {
         openExtensionModal();
+        return;
+    }
+
+    const additionalHeadTriggerBtn = event.target.closest('[data-action="open-additional-head"]');
+    if (additionalHeadTriggerBtn) {
+        openAdditionalHeadModal();
         return;
     }
 
@@ -1234,6 +1467,7 @@ cancelReservationBackdrop?.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !cancelReservationBackdrop?.classList.contains('hidden')) closeCancelModal();
     if (event.key === 'Escape' && !extensionRequestBackdrop?.classList.contains('hidden')) closeExtensionModal();
+    if (event.key === 'Escape' && !additionalHeadRequestBackdrop?.classList.contains('hidden')) closeAdditionalHeadModal();
 });
 
 extensionModalClose?.addEventListener('click', closeExtensionModal);
@@ -1241,6 +1475,13 @@ extensionModalDismiss?.addEventListener('click', closeExtensionModal);
 extensionModalConfirm?.addEventListener('click', submitExtensionRequest);
 extensionRequestBackdrop?.addEventListener('click', (event) => {
     if (event.target === extensionRequestBackdrop) closeExtensionModal();
+});
+
+additionalHeadModalClose?.addEventListener('click', closeAdditionalHeadModal);
+additionalHeadModalDismiss?.addEventListener('click', closeAdditionalHeadModal);
+additionalHeadModalConfirm?.addEventListener('click', submitAdditionalHeadRequest);
+additionalHeadRequestBackdrop?.addEventListener('click', (event) => {
+    if (event.target === additionalHeadRequestBackdrop) closeAdditionalHeadModal();
 });
 
 submissionFeedbackClose?.addEventListener('click', closeSubmissionFeedbackModal);

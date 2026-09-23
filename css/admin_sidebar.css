@@ -41,8 +41,8 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
    that, not --nav-text. --nav-text isn't defined here at all: on most
    pages that left the var() fallback (#20150b, near-black) painting a
    dark icon on the dark-brown button — effectively invisible, reading as
-   a plain brown square. A couple of pages (admin_inquiries.css) patched
-   this locally with a cream icon; moved here so every admin page gets it,
+   a plain brown square. A couple of pages patched this locally with a
+   cream icon; moved here so every admin page gets it,
    this file being the icon's one shared home. Do not reintroduce a
    page-specific override — fix color/hover here instead. */
 .sidebar-hamburger {

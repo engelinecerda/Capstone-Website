@@ -35,6 +35,9 @@ export const TOKEN_INFO = {
   discount_percent: 'Discount percentage applied to this booking, frozen at booking time — blank if no discount applied',
   discount_amount: 'Discount amount (₱) applied to this booking, frozen at booking time — blank if no discount applied',
   discount_label: "The discount's customer-facing label (e.g. \"Holiday Promo\"), frozen at booking time — blank if no discount applied or none was set",
+  additional_heads: 'Number of additional guests booked beyond the package\'s Max Guests, frozen at booking time — blank if none',
+  additional_head_price: 'Per-head price (₱) charged for each additional guest, frozen at booking time — blank if none',
+  additional_head_charge: 'Total charge (₱) for additional guests, frozen at booking time — blank if none',
 };
 
 export const SAMPLE_RESERVATION = {
@@ -59,6 +62,9 @@ export const SAMPLE_RESERVATION = {
   discount_percent: '20',
   discount_amount: '₱5,600.00',
   discount_label: 'Holiday Promo',
+  additional_heads: '5',
+  additional_head_price: '₱200.00',
+  additional_head_charge: '₱1,000.00',
 };
 
 export const TOKEN_REGEX = /\{\{\s*(\w+)\s*\}\}/g;

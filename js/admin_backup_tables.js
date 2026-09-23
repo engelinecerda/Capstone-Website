@@ -47,7 +47,6 @@ export const BACKUP_TABLE_CONFIG = [
 
   // ── Configuration & site content ─────────────────────────────────────────
   { name: 'event_types',                   pk: 'id' },
-  { name: 'referral_sources',              pk: 'id' },
   { name: 'payment_type',                  pk: 'id',              conflict: 'code' },
   { name: 'payment_method',                pk: 'payment_method_id' },
   { name: 'system_settings',               pk: 'system_settings_id', conflict: 'setting_key' },
@@ -85,7 +84,6 @@ export const BACKUP_TABLE_CONFIG = [
   { name: 'receipts',                      pk: 'receipt_id' },
   { name: 'reservation_cancellations',     pk: 'cancellation_id' },
   { name: 'reviews',                       pk: 'review_id' },
-  { name: 'inquiries',                     pk: 'id' },
   { name: 'reservation_forecast',          pk: 'forecast_id' },
 
   // ── Logs (kept in the backup for the record, never written back) ─────────

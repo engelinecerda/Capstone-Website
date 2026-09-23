@@ -7,12 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=48">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=48">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=48">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=48">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=51">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=51">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=51">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=51">
 </head>
 <body>
 
@@ -515,6 +516,27 @@
           </div>
         </div>
         <p class="modal-hint" id="pkgGuestRangeHint"></p>
+
+        <!-- Additional Per-Head (Main packages only) -->
+        <div class="modal-field" id="pkgAdditionalHeadToggleField">
+          <label class="pkg-active-toggle-label">
+            <input type="checkbox" id="pkgAllowAdditionalHeadToggle">
+            <span>Allow additional guests beyond Max Guests</span>
+          </label>
+          <span class="modal-hint">Lets a customer add guests above the Max Guests cap at a per-person price — e.g. an All-In package for 50 pax, +&#8369;200 per extra guest.</span>
+        </div>
+        <div class="modal-row" id="pkgAdditionalHeadFields" style="display:none;">
+          <div class="modal-field">
+            <label class="modal-label" for="pkgPricePerAdditionalHead">Price per Additional Head (&#8369;) *</label>
+            <input type="number" id="pkgPricePerAdditionalHead" class="modal-input" placeholder="200" min="0" step="0.01">
+            <span class="field-error hidden" id="pkgPricePerAdditionalHeadError"></span>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="pkgMaxAdditionalHeads">Max Additional Heads</label>
+            <input type="number" id="pkgMaxAdditionalHeads" class="modal-input" placeholder="Leave blank for no extra cap" min="0">
+            <span class="modal-hint" id="pkgAdditionalHeadVenueHint"></span>
+          </div>
+        </div>
 
         <div class="modal-row">
           <div class="modal-field">

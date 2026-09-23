@@ -14,13 +14,24 @@ export const PAYMENT_TYPE_META = {
     partial_payment: { label: 'Custom Amount', description: 'Enter any amount you want to pay' },
     full_payment: { label: 'Full Payment', description: 'Settle the remaining balance in full' },
     reschedule_fee: { label: 'Reschedule Fee', description: 'Fixed fee for approved reschedule requests' },
-    extension_fee: { label: 'Extension Fee', description: 'Fee for your requested extension hours' }
+    extension_fee: { label: 'Extension Fee', description: 'Fee for your requested extension hours' },
+    additional_head_fee: { label: 'Additional Guests Fee', description: 'Fee for your requested additional guests' }
 };
 
 // Package Extension Hours — mirrors RESCHEDULE_STATUS_META's shape exactly,
 // but this feature has no update-v20-style "skip pending" history: every
 // extension request genuinely passes through pending_payment first.
 export const EXTENSION_STATUS_META = {
+    pending_payment: { label: 'Awaiting Payment', key: 'info' },
+    pending_verification: { label: 'Pending Verification', key: 'pending' },
+    approved: { label: 'Approved', key: 'approved' },
+    rejected: { label: 'Rejected', key: 'rejected' },
+    expired: { label: 'Expired', key: 'cancelled' }
+};
+
+// Additional Head Requests (post-booking) — identical shape/lifecycle to
+// EXTENSION_STATUS_META, see that constant's own comment.
+export const ADDITIONAL_HEAD_STATUS_META = {
     pending_payment: { label: 'Awaiting Payment', key: 'info' },
     pending_verification: { label: 'Pending Verification', key: 'pending' },
     approved: { label: 'Approved', key: 'approved' },
@@ -212,6 +223,10 @@ export function getExtensionStatusMeta(status) {
     return EXTENSION_STATUS_META[String(status || 'pending_payment').toLowerCase()] || EXTENSION_STATUS_META.pending_payment;
 }
 
+export function getAdditionalHeadStatusMeta(status) {
+    return ADDITIONAL_HEAD_STATUS_META[String(status || 'pending_payment').toLowerCase()] || ADDITIONAL_HEAD_STATUS_META.pending_payment;
+}
+
 export function getReservationPackageName(reservation) {
     return reservation.package?.package_name || reservation.package_id || 'No package selected';
 }
@@ -304,6 +319,31 @@ export function getOpenExtension(extensions) {
 export function computeCanRequestExtension(status, extensions) {
     const normalizedStatus = String(status || '').toLowerCase();
     return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !getOpenExtension(extensions);
+}
+
+// Additional Head Requests (post-booking) — mirrors isExtensionFeeOwed/
+// getOpenExtension/computeCanRequestExtension exactly, just for
+// reservation_additional_head_requests instead of reservation_extensions.
+export function isAdditionalHeadFeeOwed(additionalHeadRequests, payments) {
+    const openRequest = (additionalHeadRequests || [])
+        .find((request) => String(request.status || '').toLowerCase() === 'pending_payment');
+    if (!openRequest) return false;
+    const hasExistingFee = (payments || []).some((payment) => (
+        String(payment.additional_head_request_id || '') === String(openRequest.additional_head_request_id)
+        && ['pending_review', 'approved'].includes(String(payment.payment_status || '').toLowerCase())
+    ));
+    return !hasExistingFee;
+}
+
+export function getOpenAdditionalHeadRequest(additionalHeadRequests) {
+    return (additionalHeadRequests || []).find((request) => (
+        ['pending_payment', 'pending_verification'].includes(String(request.status || '').toLowerCase())
+    )) || null;
+}
+
+export function computeCanRequestAdditionalHeads(status, additionalHeadRequests) {
+    const normalizedStatus = String(status || '').toLowerCase();
+    return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !getOpenAdditionalHeadRequest(additionalHeadRequests);
 }
 
 export function getCancellationFee(reservation, paymentRules) {

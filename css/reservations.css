@@ -2233,6 +2233,67 @@
     border-top: 1px solid #f0ece8;
 }
 
+/* ── Additional Per-Head (extra guests beyond a package's Max Guests,
+   supabase/migrations/20261018_additional_per_head.sql) — only shown when
+   the selected package's allow_additional_head is true. ── */
+.additional-head-block {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f0ece8;
+}
+.additional-head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.additional-head-price-note {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #6B3A1F;
+    font-weight: 600;
+}
+.additional-head-stepper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.additional-head-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #fff;
+    color: #6B3A1F;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.additional-head-btn:hover { background: #f7f1ea; border-color: #6B3A1F; }
+.additional-head-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.additional-heads-input {
+    width: 64px;
+    padding: 8px 4px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    color: #2A1408;
+    font-family: inherit;
+}
+.additional-heads-input:focus { outline: none; border-color: #6B3A1F; }
+.additional-head-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #696969;
+    line-height: 1.55;
+}
+.additional-head-hint.additional-head-hint--limit { color: #b91c1c; }
+
 /* ── Venue map ──────────────────────────────────────────────────────────────── */
 .venue-search-row {
     display: flex;
