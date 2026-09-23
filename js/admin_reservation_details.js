@@ -1002,9 +1002,16 @@ function renderRecordPaymentAvailability() {
     return;
   }
   recordPaymentBtn.classList.remove('hidden');
+  // Only meaningful on a reservation that's still ongoing — a declined/
+  // cancelled booking never happened, and a completed one is already
+  // closed out, so there's nothing left to record a payment against.
+  const status = getEffectiveReservationStatus(currentReservation);
+  const isTerminal = ['completed', 'cancelled', 'declined'].includes(status);
   const isSettled = currentPaymentSummary && ['paid_in_full', 'overpaid'].includes(String(currentPaymentSummary.computed_status).toLowerCase());
-  recordPaymentBtn.toggleAttribute('disabled', Boolean(isSettled));
-  recordPaymentBtn.title = isSettled ? 'This reservation is already fully paid.' : '';
+  recordPaymentBtn.toggleAttribute('disabled', Boolean(isTerminal || isSettled));
+  recordPaymentBtn.title = isTerminal
+    ? `This reservation is ${status} — no payment can be recorded against it.`
+    : (isSettled ? 'This reservation is already fully paid.' : '');
 }
 
 function setRecordPaymentMessage(message, isError = false) {
@@ -1110,6 +1117,7 @@ function checkRecordPaymentAmountWarning() {
 // — preserving its original payment_type instead of masking it.
 async function openRecordPaymentModal() {
   if (currentRole === 'admin') return;
+  if (['completed', 'cancelled', 'declined'].includes(getEffectiveReservationStatus(currentReservation))) return;
   const reservation = currentReservation;
   recordPaymentTargetPayment = getPendingCafePayment(reservation);
 
