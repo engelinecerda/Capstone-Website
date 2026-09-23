@@ -13,6 +13,7 @@
 // module scope with that script, so extraction doesn't change behavior.
 import { customerSupabase as supabase } from '/js/supabase.js';
 import { lockBodyScroll, unlockBodyScroll } from '/js/modal_scroll_lock.js';
+import { CATERING_SECTION_META } from '/js/catering_section_hints.js';
 import {
     fetchAvailableStartTimes,
     fetchBlackoutDates,
@@ -100,7 +101,6 @@ const S = {
     venueOptions: [],
     venueId: null,
     snackAddon: null,
-    offsiteCategory: '',
     offsitePackage: null,
     cateringCart: [],
     cateringActiveMain: null,
@@ -180,12 +180,25 @@ function getCategoryIcon(name) {
     return 'ti-package';
 }
 
-// Catering packages have no fixed per-item price (the dish-builder cart
-// computes its own total), so this stays a name-based flag derived from
-// the *category* name, mirroring the same catering detection the
-// enforce_reservation_capacity() DB trigger uses on the package name.
-function deriveOffsiteCategoryFlag(categoryName) {
-    return /cater/i.test(categoryName || '') ? 'catering' : 'other';
+// Whether a package drives the customer-facing dish-builder wizard is a
+// standalone per-package flag (uses_catering_menu, set in Bookable
+// Inventory) — independent of the package's category name or location
+// type. This intentionally does NOT mirror the enforce_reservation_
+// capacity() DB trigger, which still detects catering by package *name*
+// server-side; that's a separate, unrelated concern this front-end fix
+// doesn't touch.
+function isCateringPackage(pkg) {
+    return !!pkg?.usesCateringMenu;
+}
+
+// The package currently selected for whichever location type is active —
+// S.miniPackage for onsite, S.offsitePackage for offsite. The catering
+// wizard is driven off this (not off S.offsitePackage alone) so a
+// catering-flagged package shows its dish builder regardless of whether
+// it's booked onsite or offsite, per isCateringPackage()'s own "location
+// type" independence above.
+function getActivePackage() {
+    return S.locationType === 'onsite' ? S.miniPackage : S.offsitePackage;
 }
 
 // ── Step order ─────────────────────────────────────────────────────────
@@ -257,7 +270,6 @@ function draftHasMeaningfulProgress(saved, step) {
         s.categoryId ||
         s.miniPackage ||
         s.snackAddon ||
-        s.offsiteCategory ||
         s.offsitePackage ||
         (Array.isArray(s.cateringCart) && s.cateringCart.length) ||
         s.guestCount ||
@@ -607,11 +619,11 @@ const FALLBACK_DISHES = [
     { cat:'Chicken',    icon:'&#127831;', tag:'main',    required:true,  items:['Chicken ala King','Chicken Fillet w/ White Sauce','Garlic Butter Chicken'] },
     { cat:'Pork',       icon:'&#129385;', tag:'main',    required:true,  items:['Pork with Mushroom','Crunchy Pork','Pork Caldereta'] },
     { cat:'Beef',       icon:'&#129385;', tag:'main',    required:true,  items:['Beef Teriyaki','Beef Salpicao','Beef and Broccoli'] },
-    { cat:'Fish',       icon:'&#128031;', tag:'main',    required:true,  items:['Fish Fillet with Tartar Sauce','Sweet and Sour Fish Fillet'] },
-    { cat:'Vegetables', icon:'&#129382;', tag:'main',    required:true,  items:['Mixed Vegetables in Butter Corn and Carrots','Potato Marble'] },
-    { cat:'Pasta',      icon:'&#127837;', tag:'pasta',   required:true,  items:['Spaghetti','Carbonara','Baked Macaroni','Tuna Pesto','Pancit Canton'] },
-    { cat:'Dessert',    icon:'&#127854;', tag:'dessert', required:true,  items:['Coffee Jelly','Buko Pandan','Mango Sago','Chocolate Mousse'] },
-    { cat:'Rice',       icon:'&#127834;', tag:'rice',    required:false, items:['Steamed Rice'] }
+    { cat:'Fish',       icon:'&#128031;', tag:'main',      required:true,  items:['Fish Fillet with Tartar Sauce','Sweet and Sour Fish Fillet'] },
+    { cat:'Vegetables', icon:'&#129382;', tag:'vegetable', required:true,  items:['Mixed Vegetables in Butter Corn and Carrots','Potato Marble'] },
+    { cat:'Pasta',      icon:'&#127837;', tag:'pasta',     required:true,  items:['Spaghetti','Carbonara','Baked Macaroni','Tuna Pesto','Pancit Canton'] },
+    { cat:'Dessert',    icon:'&#127854;', tag:'dessert',   required:true,  items:['Coffee Jelly','Buko Pandan','Mango Sago','Chocolate Mousse'] },
+    { cat:'Rice',       icon:'&#127834;', tag:'rice',      required:false, items:['Steamed Rice'] }
 ];
 
 const FALLBACK_PRICES = {
@@ -634,16 +646,57 @@ const FALLBACK_MAIN_DISH_MAX = 3;
 let DISHES = FALLBACK_DISHES;
 let PRICES = FALLBACK_PRICES;
 
+// Explicit per-section (tag) restrictions from public.catering_section_rule
+// for the currently loaded package — { [tag]: { min, max } }. A tag with no
+// row here (admin never added a restriction for it) falls back to the
+// legacy derivation in getCateringSectionRule() below, so packages from
+// before this table existed keep behaving exactly as they did.
+let CATERING_SECTION_RULES = {};
+
+// True when the currently-selected catering package has been checked
+// against the DB and genuinely has no dish categories configured yet
+// (Catering Menu admin shows "No categories yet" for it) — as opposed to
+// simply not having loaded anything yet. Drives the "no menu available"
+// notice in buildCateringDishBuilder() and blocks checkout in validate(),
+// instead of silently substituting the generic FALLBACK_DISHES/PRICES
+// menu for a package nobody actually configured.
+let cateringMenuUnavailable = false;
+
+// Tracks which package's menu is currently loaded into DISHES/PRICES so
+// ensureCateringMenuLoaded() below can skip refetching on every re-render
+// and only reload when the active catering package actually changes.
+let cateringMenuLoadedForPkgId = null;
+
 async function loadCateringMenu(packageId) {
+    cateringMenuUnavailable = false;
     if (!packageId) return; // no catering-flagged package found — keep the fallback
     try {
-        const [{ data: cats, error: catErr }, { data: dishRows, error: dishErr }] = await Promise.all([
+        const [{ data: cats, error: catErr }, { data: dishRows, error: dishErr }, { data: ruleRows, error: ruleErr }] = await Promise.all([
             supabase.from('catering_dish_category').select('*').eq('is_active', true).eq('package_id', packageId).order('sort_order', { ascending: true }),
             supabase.from('catering_dish').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+            supabase.from('catering_section_rule').select('*').eq('package_id', packageId),
         ]);
         if (catErr) throw catErr;
         if (dishErr) throw dishErr;
-        if (!cats || !cats.length) return; // empty menu — keep the fallback rather than showing nothing
+        if (ruleErr) throw ruleErr;
+
+        CATERING_SECTION_RULES = {};
+        (ruleRows || []).forEach(r => { CATERING_SECTION_RULES[r.tag] = { min: r.min_select, max: r.max_select }; });
+
+        if (!cats || !cats.length) {
+            // This package genuinely has no dish categories configured in
+            // Catering Menu admin yet — show it as unavailable rather than
+            // quietly substituting the generic hardcoded menu (which the
+            // admin never set up for this package and which would look
+            // like a real, bookable menu). This also clears whatever a
+            // *previously* selected catering package had loaded, so
+            // switching into an unconfigured package never keeps showing
+            // the old package's dishes and prices.
+            DISHES = [];
+            PRICES = {};
+            cateringMenuUnavailable = true;
+            return;
+        }
 
         const dishesByCategory = {};
         (dishRows || []).forEach(d => {
@@ -662,11 +715,33 @@ async function loadCateringMenu(packageId) {
 
         PRICES = {};
         cats.forEach(c => { PRICES[c.name] = { 20: Number(c.price_20), 30: Number(c.price_30), 40: Number(c.price_40), 50: Number(c.price_50) }; });
+
+        // Categories exist but every one of them filtered out above for
+        // having zero active dishes — functionally the same "nothing to
+        // show" case as no categories at all.
+        if (!DISHES.length) cateringMenuUnavailable = true;
     } catch (err) {
+        // A real fetch failure (DB hiccup), not "admin hasn't configured
+        // this package yet" — keep the old safety-net fallback here so a
+        // transient error doesn't strand every catering customer.
         console.warn('Failed to load catering menu from database, using fallback menu:', err);
         DISHES = FALLBACK_DISHES;
         PRICES = FALLBACK_PRICES;
+        CATERING_SECTION_RULES = {};
     }
+}
+
+// Loads a specific catering-flagged package's dish menu into DISHES/
+// PRICES, but only when it isn't already loaded — called every time a
+// catering package becomes the active selection (category auto-resolve,
+// package-card click, URL deep link, draft resume) so switching between
+// two catering packages in the same category (or across categories)
+// always shows that package's own menu, without refetching on every
+// unrelated re-render of the same package.
+async function ensureCateringMenuLoaded(pkg) {
+    if (!pkg?.id || cateringMenuLoadedForPkgId === pkg.id) return;
+    await loadCateringMenu(pkg.id);
+    cateringMenuLoadedForPkgId = pkg.id;
 }
 
 // ── Utility ────────────────────────────────────────────────────────────
@@ -795,6 +870,7 @@ async function applyUrlParams() {
         // buildMiniGrid()'s onclick does, so a multi-venue package still
         // shows its picker instead of silently booking with no venue at all.
         await resolveVenueOptionsForPackage(onsitePkg);
+        if (isCateringPackage(onsitePkg)) await ensureCateringMenuLoaded(onsitePkg);
         document.querySelectorAll('.location-card').forEach(c => {
             c.classList.toggle('active', c.dataset.val === 'onsite');
         });
@@ -805,8 +881,8 @@ async function applyUrlParams() {
     if (offsitePkg) {
         S.locationType    = 'offsite';
         S.categoryId      = offsitePkg.categoryId;
-        S.offsiteCategory = deriveOffsiteCategoryFlag(offsitePkg.categoryName);
         S.offsitePackage  = offsitePkg;
+        if (isCateringPackage(offsitePkg)) await ensureCateringMenuLoaded(offsitePkg);
         document.querySelectorAll('.location-card').forEach(c => {
             c.classList.toggle('active', c.dataset.val === 'offsite');
         });
@@ -1054,30 +1130,28 @@ function escapeHtml(value) {
 
 function getSelectedContractPackageId() {
     if (S.locationType === 'onsite') return S.miniPackage?.id || null;
-    if (S.offsiteCategory === 'catering') return OFFSITE_BY_CAT[S.categoryId]?.[0]?.id || null;
     return S.offsitePackage?.id || null;
 }
 
 function getSelectedContractPackageLabel() {
     if (S.locationType === 'onsite') return S.miniPackage?.label || null;
-    if (S.offsiteCategory === 'catering') return 'Catering Package';
     return S.offsitePackage?.label || null;
 }
 
 // Same package-only rule as buildSummary(): catering has no single
 // package.price to discount, add-ons are never discounted.
 function computeContractPreviewDiscount() {
+    if (isCateringPackage(getActivePackage())) return getPkgDiscount(null);
     if (S.locationType === 'onsite') return getPkgDiscount(S.miniPackage);
-    if (S.offsiteCategory === 'catering') return getPkgDiscount(null);
     return getPkgDiscount(S.offsitePackage);
 }
 
 function computeContractPreviewBase() {
     let base;
-    if (S.locationType === 'onsite') {
-        base = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
-    } else if (S.offsiteCategory === 'catering') {
+    if (isCateringPackage(getActivePackage())) {
         base = S.cateringCart.filter(i => i && i.pax).reduce((sum, i) => sum + i.price, 0);
+    } else if (S.locationType === 'onsite') {
+        base = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
     } else {
         base = S.offsitePackage ? S.offsitePackage.price : 0;
     }
@@ -1548,16 +1622,16 @@ function updateDateDisplayPlaceholder() {
 function getSelectedBookingScope() {
     if (!S.locationType) return null;
     if (S.locationType === 'offsite') {
-        if (!S.offsiteCategory) return null;
-        if (S.offsiteCategory !== 'catering' && !S.offsitePackage) return null;
+        if (!S.categoryId) return null;
+        if (!S.offsitePackage) return null;
         return ['offsite'];
     }
     return getSharedBookingScope(S.locationType, S.miniPackage?.label || '', S.miniPackage?.bookingScope || null);
 }
 
 function getSelectedDurationHours() {
+    if (isCateringPackage(getActivePackage())) return Number(getActivePackage().durationHours || 0) || 4;
     if (S.locationType === 'onsite') return Number(S.miniPackage?.durationHours || 0) || null;
-    if (S.offsiteCategory === 'catering') return Number(OFFSITE_BY_CAT[S.categoryId]?.[0]?.durationHours || 0) || 4;
     return Number(S.offsitePackage?.durationHours || 0) || null;
 }
 
@@ -1567,10 +1641,6 @@ function getSelectedDurationHours() {
 // "VIP" for any onsite scope) regardless of which package was chosen.
 function getSelectedPackageOrCategoryLabel() {
     if (S.locationType === 'onsite' && S.miniPackage) return S.miniPackage.label;
-    if (S.offsiteCategory === 'catering') {
-        const cat = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
-        return cat ? cat.name : 'Catering';
-    }
     if (S.offsitePackage) return S.offsitePackage.label;
     return null;
 }
@@ -1578,8 +1648,8 @@ function getSelectedPackageOrCategoryLabel() {
 function getScopeSelectionPrompt() {
     if (!S.locationType) return 'Choose your location type and package first to unlock dates for your booking.';
     if (S.locationType === 'onsite' && !S.miniPackage) return 'Choose an onsite package first to unlock VIP or Main Hall dates.';
-    if (S.locationType === 'offsite' && !S.offsiteCategory) return 'Choose your offsite service first to unlock dates.';
-    if (S.locationType === 'offsite' && S.offsiteCategory !== 'catering' && !S.offsitePackage) return 'Choose an offsite package first to unlock dates.';
+    if (S.locationType === 'offsite' && !S.categoryId) return 'Choose your offsite service first to unlock dates.';
+    if (S.locationType === 'offsite' && !S.offsitePackage) return 'Choose an offsite package first to unlock dates.';
     return 'Choose an available date for your booking.';
 }
 
@@ -1847,7 +1917,7 @@ async function loadPackages() {
     packagesLoadState = 'loading';
     const { data: pkgs, error } = await supabase
         .from('package')
-        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, catering_main_dish_max, package_category(category_name, is_active, sort_order, service_charge_percent)')
+        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, package_category(category_name, is_active, sort_order, service_charge_percent)')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -1968,6 +2038,10 @@ async function loadPackages() {
             // upload resolution into a small grid thumbnail.
             coverPhotoUrl: optimizedImageUrl(cover?.image_url || p.package_image, 600) || null,
             mainDishMax: p.catering_main_dish_max ?? null,
+            // Drives the customer-facing dish-builder wizard (see
+            // isCateringPackage()) — a standalone flag, independent of
+            // this package's category name or Service Mode.
+            usesCateringMenu: !!p.uses_catering_menu,
             // Raw rows (not a pre-resolved snapshot) so buildSummary() and
             // the submit handler can each re-evaluate against the current
             // clock — a promo could start or end mid-session.
@@ -2068,7 +2142,6 @@ function buildCategoryGrid() {
 async function selectCategory(cat) {
     const prev = S.categoryId;
     S.categoryId = cat.id;
-    S.offsiteCategory = S.locationType === 'offsite' ? deriveOffsiteCategoryFlag(cat.name) : '';
     if (prev !== cat.id) {
         S.miniPackage    = null;
         S.venueOptions   = [];
@@ -2082,6 +2155,17 @@ async function selectCategory(cat) {
         S.cateringPaxCustomizeOpen = {};
         S.time           = '';
         syncSelectedDate('');
+    }
+    // Auto-resolve when this offsite category has exactly one package and
+    // it's catering-flagged — there's nothing for the customer to pick,
+    // so treat it as selected immediately (mirrors clicking its card,
+    // minus the click) and preload its dish menu.
+    if (S.locationType === 'offsite') {
+        const list = OFFSITE_BY_CAT[cat.id] || [];
+        if (list.length === 1 && isCateringPackage(list[0])) {
+            S.offsitePackage = list[0];
+            await ensureCateringMenuLoaded(list[0]);
+        }
     }
     buildCategoryGrid();
     buildPackageStep();
@@ -2104,10 +2188,21 @@ function buildPackageStep() {
         if (!S.categoryId) {
             if (descEl) descEl.textContent = 'Choose a package category above to see available packages.';
             document.getElementById('mini-grid').innerHTML = '';
+            cateringEl.classList.add('hidden');
             return;
         }
         if (descEl) descEl.textContent = 'Select a package for your event at ELI Coffee.';
         buildMiniGrid();
+        // A catering-flagged onsite package (isCateringPackage()) drives
+        // the dish builder the same as an offsite one does — the flag is
+        // independent of location type, so no Service-Mode check here.
+        if (isCateringPackage(S.miniPackage)) {
+            cateringEl.classList.remove('hidden');
+            buildCateringInclusionsBlock();
+            buildCateringDishBuilder();
+        } else {
+            cateringEl.classList.add('hidden');
+        }
     } else if (S.locationType === 'offsite') {
         onEl.classList.add('hidden');
         offEl.classList.remove('hidden');
@@ -2118,16 +2213,32 @@ function buildPackageStep() {
             return;
         }
         if (descEl) descEl.textContent = 'Choose your offsite package.';
-        if (S.offsiteCategory === 'catering') {
+
+        const catList = OFFSITE_BY_CAT[S.categoryId] || [];
+        const soleCateringPkg = (catList.length === 1 && isCateringPackage(catList[0])) ? catList[0] : null;
+
+        if (soleCateringPkg) {
+            // Nothing to pick — this category's only package is the
+            // catering one, so skip the grid entirely.
             subEl.classList.add('hidden');
             cateringEl.classList.remove('hidden');
             buildCateringInclusionsBlock();
             buildCateringDishBuilder();
         } else {
-            cateringEl.classList.add('hidden');
-            subEl.classList.remove('hidden');
+            // Mixed or all-regular category: always show the picker grid
+            // (catering and regular packages can sit side by side), and
+            // additionally reveal the dish builder once the customer has
+            // actually picked a catering-flagged package from it.
             document.getElementById('offsite-sub-label').textContent = 'Choose a Package';
+            subEl.classList.remove('hidden');
             buildOffsiteSub(S.categoryId);
+            if (isCateringPackage(S.offsitePackage)) {
+                cateringEl.classList.remove('hidden');
+                buildCateringInclusionsBlock();
+                buildCateringDishBuilder();
+            } else {
+                cateringEl.classList.add('hidden');
+            }
         }
     } else {
         onEl.classList.add('hidden');
@@ -2192,13 +2303,34 @@ function buildMiniGrid() {
     list.forEach(p => {
         const c = card(buildPkgCardInner(p), !!S.miniPackage && S.miniPackage.id === p.id);
         c.onclick = async () => {
+            const switchingToCatering = isCateringPackage(p) && (!S.miniPackage || S.miniPackage.id !== p.id);
             S.miniPackage = p;
             S.snackAddon  = null;
             S.time        = '';
+            if (switchingToCatering) {
+                // A different catering package — don't carry another
+                // package's dish selections into this one (mirrors
+                // buildOffsiteSub()'s same handling for offsite).
+                S.cateringCart = [];
+                S.cateringActiveMain = null;
+                S.cateringOpenSection = null;
+                S.cateringGlobalPax = null;
+                S.cateringPaxCustomizeOpen = {};
+                await ensureCateringMenuLoaded(p);
+            }
             activate(g, c);
             updateSectionLocks();
             clampGuestCountToSelection();
             await resolveVenueOptionsForPackage(p);
+            const cateringEl = document.getElementById('catering-section');
+            if (isCateringPackage(p)) {
+                cateringEl?.classList.remove('hidden');
+                buildCateringInclusionsBlock();
+                buildCateringDishBuilder();
+                scrollToCateringMenu();
+            } else {
+                cateringEl?.classList.add('hidden');
+            }
             buildAddonOrVenueStep();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2239,10 +2371,30 @@ function buildOffsiteSub(categoryId) {
     list.forEach(p => {
         const c = card(buildPkgCardInner(p), !!S.offsitePackage && S.offsitePackage.id === p.id);
         c.onclick = async () => {
+            const switchingToCatering = isCateringPackage(p) && (!S.offsitePackage || S.offsitePackage.id !== p.id);
             S.offsitePackage = p; S.time = '';
+            if (switchingToCatering) {
+                // A different catering package — don't carry another
+                // package's dish selections into this one.
+                S.cateringCart = [];
+                S.cateringActiveMain = null;
+                S.cateringOpenSection = null;
+                S.cateringGlobalPax = null;
+                S.cateringPaxCustomizeOpen = {};
+                await ensureCateringMenuLoaded(p);
+            }
             activate(g, c);
             updateSectionLocks();
             clampGuestCountToSelection();
+            const cateringEl = document.getElementById('catering-section');
+            if (isCateringPackage(p)) {
+                cateringEl?.classList.remove('hidden');
+                buildCateringInclusionsBlock();
+                buildCateringDishBuilder();
+                scrollToCateringMenu();
+            } else {
+                cateringEl?.classList.add('hidden');
+            }
             buildAddonOrVenueStep();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2366,7 +2518,7 @@ function escHtml(str) {
 function buildCateringInclusionsBlock() {
     const block = document.getElementById('catering-inclusions-block');
     if (!block) return;
-    const pkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
+    const pkg = getCateringPackage();
     if (!pkg) { block.innerHTML = ''; return; }
 
     const items = Array.isArray(pkg.inclusions) ? pkg.inclusions.filter(i => i && i.trim()) : [];
@@ -2415,16 +2567,11 @@ function buildCateringInclusionsBlock() {
 // whichever category (or categories) under that tag has its is_required
 // flag set in the admin's Catering Menu screen, so toggling that checkbox
 // actually changes what checkout enforces here.
-const CATERING_TAG_ORDER = ['main', 'pasta', 'dessert', 'rice', 'drinks'];
+const CATERING_TAG_ORDER = ['main', 'vegetable', 'pasta', 'dessert', 'rice', 'drinks'];
 
-const CATERING_SECTION_META = {
-    pax:     { label: 'Pax Count', hint: () => 'Choose how many guests this catering order serves \u2014 this sets the default tray size for every dish. You can customize any individual dish\u2019s pax afterward.' },
-    main:    { label: 'Main Dish', hint: (required, max) => `Choose ${max} dish${max === 1 ? '' : 'es'} below for your main course \u2014 mix and match proteins until you reach ${max}.` },
-    pasta:   { label: 'Pasta',     hint: (required) => required ? 'Choose 1 pasta dish for your event.' : 'Optional add-on \u2014 include a pasta dish, or skip it.' },
-    dessert: { label: 'Dessert',   hint: (required) => required ? 'Choose 1 dessert for your event.' : 'Optional add-on \u2014 include a dessert, or skip it.' },
-    rice:    { label: 'Rice',      hint: (required) => required ? 'Included with your package \u2014 choose your rice.' : 'Optional add-on \u2014 include steamed rice, or skip it.' },
-    drinks:  { label: 'Drink',     hint: (required) => required ? 'Included with your package \u2014 choose your drink.' : 'Optional add-on \u2014 include a drink, or skip it.' }
-};
+// CATERING_SECTION_META now lives in catering_section_hints.js — the admin's
+// Section Restrictions preview (super_admin_packages.js) imports the same
+// copy so its "what the customer sees" preview can never drift from this.
 
 // Computed fresh each call (not cached) since it depends on DISHES, which
 // can change after loadCateringMenu() resolves. The "Pax Count" step is
@@ -2438,10 +2585,11 @@ function getCateringSections() {
     const dishSections = CATERING_TAG_ORDER
         .filter(tag => DISHES.some(g => g.tag === tag))
         .map(tag => {
-            const groups = DISHES.filter(g => g.tag === tag);
-            const required = groups.some(g => g.required);
+            const min = getCateringSectionMin(tag);
+            const max = getCateringSectionMax(tag);
+            const required = min > 0;
             const meta = CATERING_SECTION_META[tag] || { label: tag, hint: (r) => r ? 'Required for this package.' : 'Optional add-on.' };
-            return { tag, label: meta.label, optional: !required, hint: meta.hint(required, getCateringMainDishMax()) };
+            return { tag, label: meta.label, optional: !required, hint: meta.hint(required, max ?? min) };
         });
 
     return [paxSection, ...dishSections];
@@ -2452,7 +2600,8 @@ function getCateringSections() {
 // Menu, stored on the package row itself (a whole-section rule, not a
 // per-category one). Falls back to FALLBACK_MAIN_DISH_MAX if unset/invalid.
 function getCateringPackage() {
-    return (OFFSITE_BY_CAT[S.categoryId] || [])[0] || null;
+    const pkg = getActivePackage();
+    return isCateringPackage(pkg) ? pkg : null;
 }
 
 function getCateringMainDishMax() {
@@ -2460,17 +2609,36 @@ function getCateringMainDishMax() {
     return Number.isFinite(v) && v > 0 ? v : FALLBACK_MAIN_DISH_MAX;
 }
 
-// Counts straight from the live cart instead of walking DISHES' protein
-// groups. Walking the groups undercounts "remaining" (and can show a
+// Resolves the effective { min, max } for a section (tag). Prefers an
+// explicit catering_section_rule row (admin's "+ Add Restriction" on the
+// Catering Menu screen); falls back to the pre-restriction-table behavior
+// so packages nobody has touched since this feature shipped keep working
+// unchanged: 'main' derives from the package's legacy catering_main_dish_max
+// (required to reach exactly that many), every other tag derives from
+// whether any of its categories has the legacy is_required flag set
+// (required to pick just one, uncapped).
+function getCateringSectionRule(tag) {
+    const explicit = CATERING_SECTION_RULES[tag];
+    if (explicit) return explicit;
+    if (tag === 'main') { const max = getCateringMainDishMax(); return { min: max, max }; }
+    const required = DISHES.filter(g => g.tag === tag).some(g => g.required);
+    return { min: required ? 1 : 0, max: null };
+}
+
+function getCateringSectionMin(tag) { return getCateringSectionRule(tag).min || 0; }
+function getCateringSectionMax(tag) { return getCateringSectionRule(tag).max ?? null; } // null = unlimited
+
+// Counts straight from the live cart instead of walking DISHES' groups for
+// this tag. Walking the groups undercounts "remaining" (and can show a
 // smaller "Still needed" number than what's actually left to pick)
-// whenever a protein category is duplicated in the loaded menu, since the
-// same cart selection then gets matched — and counted — once per matching
-// group instead of once. Deduping against the *current* set of main-tag
+// whenever a category is duplicated in the loaded menu, since the same
+// cart selection then gets matched — and counted — once per matching
+// group instead of once. Deduping against the *current* set of tag
 // category names still keeps this accurate if the menu changes underneath
 // an existing cart (e.g. after switching packages).
-function getCateringMainDishSelectedCount() {
-    const mainCats = new Set(DISHES.filter(g => g.tag === 'main').map(g => g.cat));
-    return S.cateringCart.filter(i => i && i.pax && mainCats.has(i.cat)).length;
+function getCateringSectionSelectedCount(tag) {
+    const tagCats = new Set(DISHES.filter(g => g.tag === tag).map(g => g.cat));
+    return S.cateringCart.filter(i => i && i.pax && tagCats.has(i.cat)).length;
 }
 
 function hasCateringTag(tag) {
@@ -2481,15 +2649,15 @@ function isCateringSelectionValid() {
     return getCateringSections().every(section => isCateringSectionValid(section));
 }
 
-// Main Dish is the one section where "required" means reaching the full
-// configured count (e.g. 3 proteins), not just picking one — the customer
-// must fill out the whole tray before the builder auto-advances to Pasta.
-// Pax Count is required but isn't tag-driven at all, since it has no
-// DISHES group of its own.
+// A section with a configured minimum (e.g. Main Dish needing 3 proteins,
+// or any other section an admin has marked Required/Min N for) is valid
+// only once the cart reaches that count — not just "has one pick". A
+// section with no minimum is always optional. Pax Count is required but
+// isn't tag-driven at all, since it has no DISHES group of its own.
 function isCateringSectionValid(section) {
     if (section.tag === 'pax') return !!S.cateringGlobalPax;
-    if (section.tag === 'main') return getCateringMainDishSelectedCount() >= getCateringMainDishMax();
-    return section.optional || hasCateringTag(section.tag);
+    const min = getCateringSectionMin(section.tag);
+    return min <= 0 || getCateringSectionSelectedCount(section.tag) >= min;
 }
 
 function getFirstIncompleteCateringSection() {
@@ -2499,7 +2667,67 @@ function getFirstIncompleteCateringSection() {
 function openCateringSection(tag) {
     S.cateringOpenSection = tag;
     buildCateringDishBuilder();
-    document.getElementById('catering-section-' + tag)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    focusCateringSection(tag);
+}
+
+// Brings the clicked step's section into view (vertically centered — see
+// block: 'center' below) AND moves keyboard/screen-reader focus onto it,
+// instead of leaving a bare scrollIntoView() to land wherever it lands with
+// no offset for the sticky navbar. A hand-computed
+// `getBoundingClientRect().top + scrollY - 80` pixel target was tried here
+// first, but window.scrollTo() aims at a fixed absolute position — if
+// anything below (lazy-loaded dish images, etc.) changes the page's height
+// while that scroll is still animating, the target point drifts and the
+// scroll overshoots, in one case landing all the way down at "Guests &
+// event type". scrollIntoView() re-targets the element itself rather than a
+// frozen pixel offset, so it doesn't have that failure mode.
+//
+// block: 'center' rather than 'start': lands the opened section in the
+// middle of the screen instead of pinned under the sticky navbar, so there's
+// visible context both above (what's already answered) and below (what's
+// next) without an extra manual scroll either way. scroll-margin-top on
+// .catering-accordion-item (css/reservations.css, the same pattern
+// css/menu.css uses for its own sticky-nav offset) still guards the case
+// where a short trailing section can't fully center because there isn't
+// enough page left below it — 'center' clamps to 'start' then and the
+// margin keeps it clear of the navbar.
+//
+// focus() is still called first, not last. `preventScroll: true` isn't
+// honored by every engine (notably iOS Safari), and on those, focusing the
+// header fires its own implicit scroll-into-view the instant it runs. If
+// that happened *after* scrollIntoView() below, it would fire mid-animation
+// and hijack it, landing whatever distance short/past the target that
+// engine's own "bring focused element into view" heuristic picks — the
+// overshoot reported when tapping any step chip on a real device. Doing the
+// focus first means any implicit scroll it causes happens before the
+// animation starts, and the explicit scrollIntoView() immediately after is
+// the last word on scroll position, so it always settles exactly on target
+// regardless of that engine's preventScroll support.
+function focusCateringSection(tag) {
+    const sectionEl = document.getElementById('catering-section-' + tag);
+    if (!sectionEl) return;
+    sectionEl.querySelector('.catering-accordion-header')?.focus({ preventScroll: true });
+    sectionEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Carries the customer straight to the dish builder the moment they pick a
+// catering-flagged package (buildMiniGrid()/buildOffsiteSub() card clicks),
+// instead of leaving them at the package grid with the now-visible menu
+// further down the page. rAF-deferred one frame so the browser has actually
+// laid out #catering-section after its class="hidden" was just removed —
+// scrolling in the same tick can measure the pre-reveal (zero-height)
+// position and undershoot. block: 'start' (rather than focusCateringSection's
+// 'center') lands the section header — and its "Pax Count" first step —
+// right under the sticky navbar, matching how a customer would expect a
+// freshly-revealed section to open; #catering-section's own
+// scroll-margin-top (css/reservations.css) clears that navbar the same way
+// .catering-accordion-item's does.
+function scrollToCateringMenu() {
+    const sectionEl = document.getElementById('catering-section');
+    if (!sectionEl) return;
+    requestAnimationFrame(() => {
+        sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 }
 
 function scrollToCateringSection(tag) {
@@ -2511,7 +2739,14 @@ function scrollToCateringSection(tag) {
 
 function getCateringCartTotal()  { return S.cateringCart.reduce((s, i) => s + (i && i.pax ? i.price : 0), 0); }
 function getCateringCartCount()  { return S.cateringCart.filter(i => i && i.pax).length; }
-function getCateringSelection(cat) { return S.cateringCart.find(i => i.cat === cat); }
+// A category (protein tab, or a single-category section like Pasta) can
+// now hold more than one selected dish at once — e.g. Main Dish lets the
+// customer mix and match proteins until they reach the package's max, and
+// that max can be spread across categories however they like (2 chicken +
+// 1 pork, or 3 of the same protein). `getCateringSelection` returns every
+// dish currently picked under `cat`, not just one.
+function getCateringSelection(cat) { return S.cateringCart.filter(i => i.cat === cat); }
+function isDishSelected(cat, dish) { return S.cateringCart.some(i => i.cat === cat && i.dish === dish); }
 
 // `customPax`, when provided, overrides this dish's tray size independent
 // of the global serving size chosen in the Pax Count step. Omitting it
@@ -2519,8 +2754,12 @@ function getCateringSelection(cat) { return S.cateringCart.find(i => i.cat === c
 // automatically if the customer changes the global pax later (see
 // updateGlobalCateringPax) — that's what distinguishes a "default" pick
 // from a "customized" one (the `customized` flag).
+//
+// Only replaces the cart entry for this exact cat+dish pair (not every
+// entry under `cat`) — that's what lets a second, third, etc. dish be
+// added under the same category instead of bumping the previous pick.
 function setCateringSelection(cat, dish, customPax) {
-    S.cateringCart = S.cateringCart.filter(i => i.cat !== cat);
+    S.cateringCart = S.cateringCart.filter(i => !(i.cat === cat && i.dish === dish));
     if (!dish) return;
     const effectivePax = customPax || S.cateringGlobalPax || null;
     if (effectivePax && PRICES[cat] && PRICES[cat][effectivePax]) {
@@ -2531,11 +2770,11 @@ function setCateringSelection(cat, dish, customPax) {
 }
 
 // Reverts a dish that was customized away from the global pax back to
-// following it.
-function resetCateringPaxToDefault(cat) {
-    const selected = getCateringSelection(cat);
+// following it. Needs `dish` now that a category can hold several picks.
+function resetCateringPaxToDefault(cat, dish) {
+    const selected = S.cateringCart.find(i => i.cat === cat && i.dish === dish);
     if (!selected) return;
-    setCateringSelection(cat, selected.dish, null);
+    setCateringSelection(cat, dish, null);
     rebuildCateringUI();
 }
 
@@ -2545,11 +2784,16 @@ function resetCateringPaxToDefault(cat) {
 // pax:true (not a number) marks it complete for the truthy checks
 // elsewhere (cart count, hasCateringTag, etc.) without implying a bracket.
 function setCateringFlatSelection(cat, dish) {
-    S.cateringCart = S.cateringCart.filter(i => i.cat !== cat);
+    S.cateringCart = S.cateringCart.filter(i => !(i.cat === cat && i.dish === dish));
     if (dish) S.cateringCart.push({ cat, dish, pax: true, price: Number(PRICES[cat]?.[20]) || 0 });
 }
 
-function clearCateringSelection(cat) { S.cateringCart = S.cateringCart.filter(i => i.cat !== cat); }
+// `dish` removes just that one pick; omitting it clears every dish under
+// `cat` (used by "Clear all" style flows elsewhere).
+function clearCateringSelection(cat, dish) {
+    S.cateringCart = S.cateringCart.filter(i => !(i.cat === cat && (dish === undefined || i.dish === dish)));
+    if (dish !== undefined) delete S.cateringPaxCustomizeOpen[cat + '|' + dish];
+}
 
 async function clearAllCateringSelections() {
     if (!S.cateringCart.length) return;
@@ -2631,9 +2875,17 @@ function renderCateringProgress() {
     if (!tracker) return;
     tracker.innerHTML = '';
     const sections = getCateringSections();
+    // A grid of equal-width step chips, not a connected dot-and-dash line —
+    // a connecting line can't wrap cleanly when the item count (6 or 7,
+    // depending on the package's active sections) and each label's length
+    // both vary: whatever the line's length rule (stretch, fixed, hidden on
+    // mobile), the wrap point still falls somewhere different every time
+    // and looks broken there. Equal grid cells wrap the same way regardless
+    // of where the break falls, so there's no wrap point to get wrong.
     sections.forEach((section, idx) => {
         const done = isCateringSectionValid(section);
         const locked = section.tag !== 'pax' && !S.cateringGlobalPax;
+
         const item = document.createElement('div');
         item.className = 'pt-item' + (done ? ' done' : ' pending') + (S.cateringOpenSection === section.tag ? ' active' : '') + (locked ? ' locked' : '');
         item.innerHTML =
@@ -2641,15 +2893,30 @@ function renderCateringProgress() {
             '<span>' + section.label + (section.optional ? ' <em style="font-weight:400;font-style:normal;opacity:0.6">(optional)</em>' : '') + '</span>';
         item.onclick = () => scrollToCateringSection(section.tag);
         tracker.appendChild(item);
-        if (idx < sections.length - 1) {
-            const div = document.createElement('div'); div.className = 'pt-divider'; tracker.appendChild(div);
-        }
     });
 }
 
 function buildCateringDishBuilder() {
     const builder = document.getElementById('catering-tray-builder');
     if (!builder) return;
+
+    const trackerEl    = document.getElementById('catering-progress-tracker');
+    const cartSection  = document.getElementById('catering-tray-cart')?.closest('.cart-section');
+    if (cateringMenuUnavailable) {
+        if (trackerEl) trackerEl.innerHTML = '';
+        if (cartSection) cartSection.style.display = 'none';
+        const labelEl = document.getElementById('catering-builder-label');
+        if (labelEl) labelEl.innerHTML = '<i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes';
+        const hintEl = document.getElementById('catering-builder-hint');
+        if (hintEl) hintEl.textContent = '';
+        builder.innerHTML =
+            '<div class="catering-menu-unavailable">' +
+                '<i class="ti ti-tools-kitchen-off" aria-hidden="true"></i>' +
+                '<p>No catering menu is available for this package yet. Please choose a different package, or contact us directly to book it.</p>' +
+            '</div>';
+        return;
+    }
+    if (cartSection) cartSection.style.display = '';
 
     // First-ever render with nothing picked at all (no cart, no pax yet):
     // default to the first section open. Once anything is picked —
@@ -2720,12 +2987,12 @@ function buildCateringDishBuilder() {
 
                 const tabs = document.createElement('div'); tabs.className = 'pills-row catering-protein-tabs';
                 groups.forEach(group => {
-                    const groupSelected = getCateringSelection(group.cat);
-                    const groupDone = groupSelected && groupSelected.pax;
+                    const groupSelections = getCateringSelection(group.cat).filter(i => i.pax);
+                    const groupCheck = groupSelections.length > 1 ? '&#10003; ' + groupSelections.length : '&#10003;';
                     const tab = document.createElement('button');
                     tab.type = 'button';
                     tab.className = 'pill' + (group.cat === S.cateringActiveMain ? ' active' : '');
-                    tab.innerHTML = group.icon + ' ' + escHtml(group.cat) + (groupDone ? ' <span class="pill-check">&#10003;</span>' : '');
+                    tab.innerHTML = group.icon + ' ' + escHtml(group.cat) + (groupSelections.length ? ' <span class="pill-check">' + groupCheck + '</span>' : '');
                     tab.onclick = (e) => { e.stopPropagation(); S.cateringActiveMain = group.cat; buildCateringDishBuilder(); };
                     tabs.appendChild(tab);
                 });
@@ -2791,13 +3058,14 @@ function buildGlobalPaxRecap() {
 function buildCateringSectionRecap(groups) {
     const recap = document.createElement('div'); recap.className = 'catering-accordion-recap';
     groups.forEach(group => {
-        const selected = getCateringSelection(group.cat);
-        if (!selected || !selected.pax) return;
-        const row = document.createElement('div'); row.className = 'catering-recap-row';
-        row.innerHTML =
-            '<span class="catering-recap-dish">' + group.icon + ' ' + escHtml(selected.dish) + '</span>' +
-            '<span class="catering-recap-meta">' + (selected.pax === true ? '' : selected.pax + ' pax &middot; ') + escHtml(fmtPeso(selected.price)) + '</span>';
-        recap.appendChild(row);
+        const selections = getCateringSelection(group.cat).filter(i => i.pax);
+        selections.forEach(selected => {
+            const row = document.createElement('div'); row.className = 'catering-recap-row';
+            row.innerHTML =
+                '<span class="catering-recap-dish">' + group.icon + ' ' + escHtml(selected.dish) + '</span>' +
+                '<span class="catering-recap-meta">' + (selected.pax === true ? '' : selected.pax + ' pax &middot; ') + escHtml(fmtPeso(selected.price)) + '</span>';
+            recap.appendChild(row);
+        });
     });
     return recap;
 }
@@ -2806,39 +3074,48 @@ function buildCateringSectionRecap(groups) {
 // category sections like Pasta/Dessert/Rice, and for whichever protein
 // tab is active under Main Dish).
 function buildCateringCategoryBlock(group) {
-    const selected = getCateringSelection(group.cat);
+    // Every dish currently picked under this one category (e.g. every
+    // Chicken dish chosen so far) — a category can hold more than one now,
+    // so this is an array rather than a single selection.
+    const selections = getCateringSelection(group.cat);
     const wrap = document.createElement('div');
 
-    // Main Dish is the only section with a selection cap (the package's
-    // configured "3 dishes" inclusion) — a protein category that isn't
-    // already in the cart gets disabled once the cap is reached, but a
-    // category already picked can still be changed or removed freely.
-    const mainMax = group.tag === 'main' ? getCateringMainDishMax() : null;
-    const atMainCap = mainMax !== null && !selected && getCateringMainDishSelectedCount() >= mainMax;
+    // Any section with a configured max (the package's configured cap for
+    // that tag — e.g. Main Dish's "3 dishes" inclusion, or any other
+    // section an admin has set a Max select restriction for) disables
+    // *unpicked* cards, across every category in the section, once the cap
+    // is reached — a dish already in the cart can still be unpicked to
+    // free up room for a different one.
+    const sectionMax = getCateringSectionMax(group.tag);
+    const atSectionCap = sectionMax !== null && getCateringSectionSelectedCount(group.tag) >= sectionMax;
 
-    if (atMainCap) {
+    if (atSectionCap && !selections.length) {
+        const sectionLabel = CATERING_SECTION_META[group.tag]?.label || group.tag;
         const capNote = document.createElement('p'); capNote.className = 'pax-hint';
-        capNote.textContent = `You\u2019ve reached the ${mainMax}-dish limit for Main Dish. Remove one to pick a different protein.`;
+        capNote.textContent = `You\u2019ve reached the ${sectionMax}-dish limit for ${sectionLabel}. Remove one to pick a different option.`;
         wrap.appendChild(capNote);
     }
 
     const grid = document.createElement('div'); grid.className = 'dish-grid';
     group.items.forEach(item => {
-        const isSelected = selected && selected.dish === item;
+        const isSelected = isDishSelected(group.cat, item);
+        // Only unpicked cards get locked out at the cap — a selected card
+        // stays clickable so it can always be removed.
+        const disableAdd = atSectionCap && !isSelected;
         const dc = document.createElement('div');
-        dc.className = 'dish-card' + (isSelected ? ' selected' : '') + (atMainCap ? ' disabled' : '');
+        dc.className = 'dish-card' + (isSelected ? ' selected' : '') + (disableAdd ? ' disabled' : '');
         dc.innerHTML =
             '<div class="dish-name">' + item + '</div>' +
             '<div class="dish-status checked">&#10003; Selected</div>' +
             '<div class="dish-status remove">&#10005; Click to remove</div>';
-        if (atMainCap) {
+        if (disableAdd) {
             dc.onclick = null;
         } else if (group.tag === 'drinks') {
             // No pax bracket for drinks — picking the card finalizes it
             // immediately instead of opening the pax-wrapper below.
-            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat); else handleCateringFlatSelected(group.cat, item); rebuildCateringUI(); };
+            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat, item); else handleCateringFlatSelected(group.cat, item); rebuildCateringUI(); };
         } else {
-            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat); else setCateringSelection(group.cat, item, null); rebuildCateringUI(); };
+            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat, item); else setCateringSelection(group.cat, item, null); rebuildCateringUI(); };
         }
         grid.appendChild(dc);
     });
@@ -2848,63 +3125,70 @@ function buildCateringCategoryBlock(group) {
     // inherits the global pax from the Pax Count step. "Customize pax"
     // only needs to appear (per-dish, optional) for the customer to
     // override that default; Drinks never gets it since drinks are always
-    // flat-priced regardless of headcount.
-    if (selected && selected.dish && group.tag !== 'drinks') {
-        const isCustomizing = !!S.cateringPaxCustomizeOpen[group.cat];
+    // flat-priced regardless of headcount. One summary row (with its own
+    // optional pax picker) is rendered per selected dish, since each pick
+    // under this category can be customized independently.
+    if (selections.length && group.tag !== 'drinks') {
+        selections.forEach(selected => {
+            const dishKey = group.cat + '|' + selected.dish;
+            const isCustomizing = !!S.cateringPaxCustomizeOpen[dishKey];
 
-        const summary = document.createElement('div'); summary.className = 'pax-summary-row';
-        summary.innerHTML =
-            '<span class="pax-summary-text">' + (selected.pax === true ? '' : selected.pax + ' pax per tray \u00b7 ') +
-            '<b>' + escHtml(fmtPeso(selected.price)) + '</b>' +
-            (selected.customized ? ' <span class="pax-custom-badge">Customized</span>' : '') + '</span>';
+            const summary = document.createElement('div'); summary.className = 'pax-summary-row';
+            summary.innerHTML =
+                (selections.length > 1 ? '<span class="pax-summary-dish">' + escHtml(selected.dish) + '</span>' : '') +
+                '<span class="pax-summary-text">' + (selected.pax === true ? '' : selected.pax + ' pax per tray \u00b7 ') +
+                '<b>' + escHtml(fmtPeso(selected.price)) + '</b>' +
+                (selected.customized ? ' <span class="pax-custom-badge">Customized</span>' : '') + '</span>';
 
-        if (!isCustomizing) {
-            const actions = document.createElement('div'); actions.className = 'pax-summary-actions';
-            const custBtn = document.createElement('button');
-            custBtn.type = 'button'; custBtn.className = 'pax-link-btn';
-            custBtn.textContent = 'Customize pax';
-            custBtn.onclick = () => { S.cateringPaxCustomizeOpen[group.cat] = true; rebuildCateringUI(); };
-            actions.appendChild(custBtn);
+            if (!isCustomizing) {
+                const actions = document.createElement('div'); actions.className = 'pax-summary-actions';
+                const custBtn = document.createElement('button');
+                custBtn.type = 'button'; custBtn.className = 'pax-link-btn';
+                custBtn.textContent = 'Customize pax';
+                custBtn.onclick = () => { S.cateringPaxCustomizeOpen[dishKey] = true; rebuildCateringUI(); };
+                actions.appendChild(custBtn);
 
-            if (selected.customized) {
-                const resetBtn = document.createElement('button');
-                resetBtn.type = 'button'; resetBtn.className = 'pax-link-btn';
-                resetBtn.textContent = 'Reset to default';
-                resetBtn.onclick = () => resetCateringPaxToDefault(group.cat);
-                actions.appendChild(resetBtn);
+                if (selected.customized) {
+                    const resetBtn = document.createElement('button');
+                    resetBtn.type = 'button'; resetBtn.className = 'pax-link-btn';
+                    resetBtn.textContent = 'Reset to default';
+                    resetBtn.onclick = () => resetCateringPaxToDefault(group.cat, selected.dish);
+                    actions.appendChild(resetBtn);
+                }
+                summary.appendChild(actions);
             }
-            summary.appendChild(actions);
-        }
-        wrap.appendChild(summary);
+            wrap.appendChild(summary);
 
-        // The pax-per-tray picker only shows up while actively customizing
-        // — not on every dish, all the time.
-        if (isCustomizing) {
-            const paxWrap = document.createElement('div'); paxWrap.className = 'pax-wrapper visible';
-            const paxTop  = document.createElement('div'); paxTop.className = 'pax-top';
-            paxTop.innerHTML = '<span class="pax-top-label">Pax per tray</span>';
-            const cancelBtn = document.createElement('button');
-            cancelBtn.type = 'button'; cancelBtn.className = 'pax-link-btn';
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.onclick = () => { S.cateringPaxCustomizeOpen[group.cat] = false; rebuildCateringUI(); };
-            paxTop.appendChild(cancelBtn);
-            paxWrap.appendChild(paxTop);
+            // The pax-per-tray picker only shows up while actively
+            // customizing this particular dish — not on every dish, all
+            // the time.
+            if (isCustomizing) {
+                const paxWrap = document.createElement('div'); paxWrap.className = 'pax-wrapper visible';
+                const paxTop  = document.createElement('div'); paxTop.className = 'pax-top';
+                paxTop.innerHTML = '<span class="pax-top-label">Pax per tray' + (selections.length > 1 ? ' \u2014 ' + escHtml(selected.dish) : '') + '</span>';
+                const cancelBtn = document.createElement('button');
+                cancelBtn.type = 'button'; cancelBtn.className = 'pax-link-btn';
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.onclick = () => { S.cateringPaxCustomizeOpen[dishKey] = false; rebuildCateringUI(); };
+                paxTop.appendChild(cancelBtn);
+                paxWrap.appendChild(paxTop);
 
-            const paxBtns = document.createElement('div'); paxBtns.className = 'pax-buttons';
-            [20, 30, 40, 50].forEach(n => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'pax-btn' + (selected.pax === n ? ' selected' : '');
-                btn.textContent = n + ' pax';
-                btn.onclick = () => {
-                    S.cateringPaxCustomizeOpen[group.cat] = false;
-                    handleCateringPaxSelected(group.cat, selected.dish, n);
-                };
-                paxBtns.appendChild(btn);
-            });
-            paxWrap.appendChild(paxBtns);
-            wrap.appendChild(paxWrap);
-        }
+                const paxBtns = document.createElement('div'); paxBtns.className = 'pax-buttons';
+                [20, 30, 40, 50].forEach(n => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'pax-btn' + (selected.pax === n ? ' selected' : '');
+                    btn.textContent = n + ' pax';
+                    btn.onclick = () => {
+                        S.cateringPaxCustomizeOpen[dishKey] = false;
+                        handleCateringPaxSelected(group.cat, selected.dish, n);
+                    };
+                    paxBtns.appendChild(btn);
+                });
+                paxWrap.appendChild(paxBtns);
+                wrap.appendChild(paxWrap);
+            }
+        });
     }
 
     return wrap;
@@ -2946,12 +3230,12 @@ function renderCateringCart() {
                 '<div class="ci-dish">' + item.dish + '</div>' +
                 (item.pax === true ? '' : '<div class="ci-pax">' + item.pax + ' pax</div>') + '</div>' +
                 '<div class="ci-right"><span class="ci-price">' + fmtPeso(item.price) + '</span>' +
-                '<button type="button" class="ci-remove-btn" data-cat="' + item.cat + '">Remove</button></div>';
+                '<button type="button" class="ci-remove-btn" data-cat="' + escHtml(item.cat) + '" data-dish="' + escHtml(item.dish) + '">Remove</button></div>';
             rows.appendChild(row);
         });
 
         rows.querySelectorAll('.ci-remove-btn').forEach(btn => {
-            btn.onclick = () => { clearCateringSelection(btn.dataset.cat); rebuildCateringUI(); };
+            btn.onclick = () => { clearCateringSelection(btn.dataset.cat, btn.dataset.dish); rebuildCateringUI(); };
         });
     }
 
@@ -2970,9 +3254,10 @@ function renderCateringCart() {
                     .filter(section => !isCateringSectionValid(section))
                     .map(section => {
                         if (section.tag === 'pax') return 'your pax count';
-                        if (section.tag === 'main') {
-                            const remaining = getCateringMainDishMax() - getCateringMainDishSelectedCount();
-                            return remaining + ' main dish' + (remaining === 1 ? '' : 'es');
+                        const min = getCateringSectionMin(section.tag);
+                        if (min > 1) {
+                            const remaining = min - getCateringSectionSelectedCount(section.tag);
+                            return remaining + ' ' + section.label.toLowerCase() + ' dish' + (remaining === 1 ? '' : 'es');
                         }
                         return '1 ' + section.label.toLowerCase();
                     });
@@ -3121,20 +3406,11 @@ function buildSummary() {
     // S.offsitePackage, never S.snackAddon or the catering cart.
     let discount = { active: false, discountAmount: 0, label: '' };
 
-    if (S.locationType === 'onsite') {
-        if (S.miniPackage) {
-            total += S.miniPackage.price;
-            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price), 'package');
-            discount = getPkgDiscount(S.miniPackage);
-        }
-        if (S.snackAddon) {
-            total += S.snackAddon.price;
-            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; ' + fmtPeso(S.snackAddon.price), 'plus');
-        }
-    } else if (S.offsiteCategory === 'catering') {
-        const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
-        const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
+    if (isCateringPackage(getActivePackage())) {
+        const catObj = (S.locationType === 'onsite' ? ONSITE_CATEGORIES : OFFSITE_CATEGORIES).find(c => c.id === S.categoryId);
+        const cateringPkg = getActivePackage();
         pkgRows += sr('Service', catObj ? catObj.name : 'Catering', 'tools-kitchen-2');
+        pkgRows += sr('Package', cateringPkg.label, 'package');
         const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
         const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
         const cateringPlainItems = cateringItems.filter(i => i !== cateringOffer);
@@ -3146,6 +3422,16 @@ function buildSummary() {
             pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; ' + fmtPeso(i.price), 'users');
         });
         if (total === 0) pkgRows += sr('Price', 'Contact for quote', 'tag');
+    } else if (S.locationType === 'onsite') {
+        if (S.miniPackage) {
+            total += S.miniPackage.price;
+            pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price), 'package');
+            discount = getPkgDiscount(S.miniPackage);
+        }
+        if (S.snackAddon) {
+            total += S.snackAddon.price;
+            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; ' + fmtPeso(S.snackAddon.price), 'plus');
+        }
     } else if (S.offsitePackage) {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
         total = S.offsitePackage.price;
@@ -3315,22 +3601,31 @@ function validate(n) {
                 scrollToSection('sub-pkg'); return false;
             }
         } else {
-            if (!S.offsiteCategory) {
+            if (!S.categoryId) {
                 showWarningModal('Please select an offsite service category.');
                 scrollToSection('sub-pkg'); return false;
             }
-            if (S.offsiteCategory === 'catering') {
-                if (!isCateringSelectionValid()) {
-                    const firstInvalidSection = getFirstIncompleteCateringSection();
-                    if (firstInvalidSection) scrollToCateringSection(firstInvalidSection.tag);
-                    const missing = getCateringSections()
-                        .filter(section => !isCateringSectionValid(section))
-                        .map(section => section.tag === 'main' ? 'at least 1 main dish' : '1 ' + section.label.toLowerCase());
-                    showWarningModal('Please select ' + missing.join(', ') + ' for your catering package.');
-                    scrollToSection('sub-pkg'); return false;
-                }
-            } else if (!S.offsitePackage) {
+            if (!S.offsitePackage) {
                 showWarningModal('Please select a specific package before continuing.');
+                scrollToSection('sub-pkg'); return false;
+            }
+        }
+
+        // 1B — Catering dish builder — checked for either location type,
+        // since a catering-flagged package (isCateringPackage()) drives
+        // this wizard regardless of onsite/offsite.
+        if (isCateringPackage(getActivePackage())) {
+            if (cateringMenuUnavailable) {
+                showWarningModal('This package doesn\u2019t have a catering menu available yet. Please choose a different package, or contact us directly to book it.');
+                scrollToSection('sub-pkg'); return false;
+            }
+            if (!isCateringSelectionValid()) {
+                const firstInvalidSection = getFirstIncompleteCateringSection();
+                if (firstInvalidSection) scrollToCateringSection(firstInvalidSection.tag);
+                const missing = getCateringSections()
+                    .filter(section => !isCateringSectionValid(section))
+                    .map(section => section.tag === 'main' ? 'at least 1 main dish' : '1 ' + section.label.toLowerCase());
+                showWarningModal('Please select ' + missing.join(', ') + ' for your catering package.');
                 scrollToSection('sub-pkg'); return false;
             }
         }
@@ -3453,7 +3748,7 @@ function isGuestsTypeUnlocked() {
     if (!S.locationType) return false;
     if (S.locationType === 'onsite') return !!S.miniPackage;
     // Offsite: unlock once a category is chosen (catering dish validation happens at submit)
-    return !!S.offsiteCategory;
+    return !!S.categoryId;
 }
 
 function updateSectionLocks() {
@@ -3624,7 +3919,6 @@ document.querySelectorAll('.location-card').forEach(c => {
             S.venueOptions    = [];
             S.venueId         = null;
             S.snackAddon      = null;
-            S.offsiteCategory = '';
             S.offsitePackage  = null;
             S.cateringCart    = [];
             S.cateringActiveMain = null;
@@ -3771,15 +4065,14 @@ async function submitDone() {
         // promo's window opened or closed since the customer picked it.
         let discount = { active: false, discountAmount: 0, percentOff: 0, label: '' };
 
-        if (S.locationType === 'onsite') {
+        if (isCateringPackage(getActivePackage())) {
+            packageId  = getActivePackage().id;
+            totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
+        } else if (S.locationType === 'onsite') {
             packageId  = S.miniPackage ? S.miniPackage.id : null;
             addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
             totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
             discount = getPkgDiscount(S.miniPackage);
-        } else if (S.offsiteCategory === 'catering') {
-            const cateringPkg = (OFFSITE_BY_CAT[S.categoryId] || [])[0];
-            packageId  = cateringPkg ? cateringPkg.id : null;
-            totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
         } else {
             packageId  = S.offsitePackage ? S.offsitePackage.id    : null;
             totalPrice = S.offsitePackage ? S.offsitePackage.price : 0;
@@ -3891,17 +4184,6 @@ await loadServiceChargeSettings();
 await loadEventTypes();
 await loadPackages();
 
-// Resolve which package backs the catering flow the same way the rest of
-// this file already does (first active package under the category whose
-// name matches "cater"), then load that package's own menu — keeps the
-// dish builder, the inclusions block, and the contract summary always
-// pointed at the exact same package.
-{
-    const cateringCatObj = OFFSITE_CATEGORIES.find(c => deriveOffsiteCategoryFlag(c.name) === 'catering');
-    const cateringPkg = cateringCatObj ? (OFFSITE_BY_CAT[cateringCatObj.id] || [])[0] : null;
-    await loadCateringMenu(cateringPkg?.id || null);
-}
-
 // Safety net: Step 1 alone covers several sub-sections (location →
 // category → package → guests/type → add-ons/venue → date → time)
 // without calling saveDraft() until "Next" is clicked — so an accidental
@@ -3992,8 +4274,9 @@ if (hasUrlPackage) {
         draftResumeModalBackdrop?.classList.remove('hidden');
         draftResumeModalBackdrop?.setAttribute('aria-hidden', 'false');
 
-        draftResumeContinueBtn?.addEventListener('click', () => {
+        draftResumeContinueBtn?.addEventListener('click', async () => {
             restoreDraft();
+            if (isCateringPackage(getActivePackage())) await ensureCateringMenuLoaded(getActivePackage());
             hideDraftResumeModal();
             showStep(cur);
             finishInit();

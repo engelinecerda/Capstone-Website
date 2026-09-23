@@ -10,11 +10,23 @@
    ============================================================ */
 
 /* ── PAGE HEADER EXTRAS (no shared equivalent) ── */
+/* The five header actions are laid out as a grid of equal columns rather than
+   a flex row. With grid-auto-columns: 1fr every button takes the width of the
+   widest label ("New category"), so "Venues" is no longer a small pill next to
+   a wide "Catering Menu" — the row reads as one balanced set. */
 .header-btn-group {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
+.header-btn-group > .btn-cancel,
+.header-btn-group > .btn-primary {
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .btn-cancel {
@@ -36,23 +48,63 @@
 .btn-cancel:hover { background: var(--btn-secondary-hover); }
 .btn-cancel:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* Once .page-header stacks (<=1050px, from manager-theme.css) the button group
-   used to shrink to its content and wrap ragged, leaving uneven rows and a
-   lone orphan button. Fill the full width instead: every button shares its
-   row equally, and a short last row stretches edge to edge rather than
-   sitting left-aligned with empty space beside it. */
-@media (max-width: 1050px) {
+/* Tablet (<= 1280px): title + five buttons no longer fit side by side, so the
+   buttons used to wrap and strand "New package" alone on a second row. Stack
+   the header (title on top) and give the button group the full width as five
+   equal columns, so all of them stay on a single row. The Inventory header is
+   scoped by id because sub-views (Venues, Badge Types, Catering Menu) reuse
+   .page-header with a single button and should keep the shared layout. */
+@media (max-width: 1280px) {
+  #inventoryView > .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .header-btn-group {
     width: 100%;
-    align-self: stretch;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+/* Narrow tablet (sidebar still visible, ~769-900px): only ~510-650px of
+   content width is left for five buttons, so tighten padding and gap; the
+   "+" icons drop out so the labels always fit without wrapping. */
+@media (max-width: 900px) {
+  .header-btn-group { gap: 6px; }
+  .header-btn-group > .btn-cancel,
+  .header-btn-group > .btn-primary {
+    padding: 0 6px;
+    font-size: 12px;
+  }
+  .header-btn-group > .btn-cancel svg,
+  .header-btn-group > .btn-primary svg { display: none; }
+}
+
+/* Phone / small tablet (<= 768px): admin_sidebar.css raises .btn-primary to a
+   44px touch target here but not .btn-cancel, which left "New package" taller
+   than its neighbours. Give the whole group the same 44px floor so every
+   button matches. */
+@media (max-width: 768px) {
+  .header-btn-group > .btn-cancel { min-height: 44px; }
+}
+
+/* Phone (<= 720px): five in a row would be unreadably small. Two equal
+   columns instead, with the primary "New package" action spanning the last
+   row full-width. */
+@media (max-width: 720px) {
+  .header-btn-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
   .header-btn-group > .btn-cancel,
   .header-btn-group > .btn-primary {
-    flex: 1 1 130px;
-    justify-content: center;
-    white-space: nowrap;
+    padding: 0 12px;
+    font-size: 12.5px;
   }
+  .header-btn-group > .btn-cancel svg,
+  .header-btn-group > .btn-primary svg { display: inline-block; }
+  .header-btn-group > .btn-primary { grid-column: 1 / -1; }
 }
 
 .btn-danger {
@@ -215,12 +267,28 @@
 .stat-top { margin-bottom: 8px; }
 .stat-caption { font-size: 11.5px; color: var(--muted); }
 
+/* flex-wrap (not a media-query breakpoint) so this reflows at whatever
+   width it stops fitting on — the title block and any header controls
+   (e.g. .restriction-copy) wrap to their own row instead of squeezing
+   into one line and overlapping, which is what happened on tablet/phone
+   widths before this. */
 .section-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 16px;
   gap: 12px;
+  flex-wrap: wrap;
+}
+/* Always the title(+subtitle) block — .restriction-copy, the only other
+   possible child, is never first — so this can target it without a
+   dedicated class on every .section-head across the page. min-width
+   lets the block wrap its own text onto a second line instead of
+   flex's default min-width:auto forcing the row wider than its
+   container. */
+.section-head > div:first-child {
+  min-width: 200px;
+  flex: 1 1 260px;
 }
 
 .section-title {
@@ -418,6 +486,126 @@
 .action-btn.edit:hover,
 .action-btn.view:hover,
 .action-btn.dishes:hover { background: var(--btn-secondary-hover); }
+
+/* ── Section Restrictions (Catering Menu > click summary to edit Min/Max) ── */
+.restriction-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--btn-secondary-border);
+}
+.restriction-row:last-child { border-bottom: none; }
+
+.restriction-row-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 110px;
+  padding-top: 4px;
+}
+
+.restriction-main {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.restriction-control { display: flex; }
+
+/* Summary "chip" that doubles as the edit trigger — a single click swaps
+   it for the Min/Max form in place (was: remove chip → "+ Add Restriction"
+   → pick a dropdown type → type a number → Add = 5 interactions). */
+.restriction-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--approved);
+  color: var(--approved-txt);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.restriction-chip-btn:hover { filter: brightness(0.96); }
+
+.restriction-chip-btn--empty {
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--btn-secondary-border);
+}
+.restriction-chip-btn--empty:hover { color: var(--text); border-color: var(--active-bg, #4A2C17); }
+
+.restriction-none {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Inline Min + Max editor — replaces the old two-step "Required / Min
+   select… / Max select…" dropdown, since in practice both are set together. */
+.restriction-editor {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.restriction-editor label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.restriction-editor input {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 0.5px solid var(--btn-secondary-border);
+  background: var(--input-bg);
+  color: var(--text);
+  width: 60px;
+}
+
+/* Preview of what reservations.js actually shows the customer for this
+   row's current (or fallback-derived) rule — same hint copy, pulled from
+   catering_section_hints.js, so it can't say something different. */
+.restriction-preview {
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--muted);
+  margin: 0;
+}
+.restriction-preview em { font-style: italic; }
+
+/* "Copy restrictions from…" — sits in the Section Restrictions card header.
+   Wraps internally too: on a narrow row the select shrinks down to its
+   min-width before the button drops to its own line beneath it, rather
+   than either control overflowing the card or getting clipped. */
+.restriction-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.restriction-copy .modal-select {
+  font-size: 12px;
+  padding: 6px 8px;
+  max-width: 220px;
+  min-width: 160px;
+  flex: 1 1 160px;
+}
+.restriction-copy .action-btn { flex: 0 0 auto; }
+.restriction-copy .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── MODAL ── */
 .modal-overlay {

@@ -124,6 +124,15 @@ body.is-super-admin .view-only-pill { display: inline-flex; }
 
   body.sidebar-open .sidebar-overlay { display: block; }
 
+  /* Lock scroll behind the drawer — same fix as html.nav-open/body.nav-open
+     in styles.css for the public-site nav drawer. Only body needs it here:
+     unlike the public site, no admin layout sets `html { overflow-y: scroll }`,
+     so locking body alone is enough and avoids touching every admin page's
+     html element unnecessarily. */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
   /* Main content fills full width.
      margin-left alone isn't enough — manager-theme.css's base .main rule
      also sets width/flex to calc(100% - var(--sidebar-w)), which still

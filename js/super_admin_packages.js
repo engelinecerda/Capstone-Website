@@ -17,6 +17,8 @@ import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { computeDiscountStatus, pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { showToast } from './admin_toast.js';
+import { cateringSectionHint } from './catering_section_hints.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -30,6 +32,7 @@ const PACKAGE_BADGE_TABLE = 'package_badge';
 const PACKAGE_DISCOUNT_TABLE = 'package_discount';
 const CATERING_CATEGORY_TABLE = 'catering_dish_category';
 const CATERING_DISH_TABLE = 'catering_dish';
+const CATERING_SECTION_RULE_TABLE = 'catering_section_rule';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allCategories         = [];
@@ -71,6 +74,8 @@ let allCateringCategories   = [];        // catering_dish_category rows (for the
 let cateringMenuPackages    = [];        // package rows where uses_catering_menu = true
 let cateringMenuActivePackageId = null;  // currently selected package_id being managed
 let allCateringDishes       = [];        // catering_dish rows (flat, all categories)
+let allCateringSectionRules = [];        // catering_section_rule rows (for the currently selected package)
+let restrictionEditTag      = null;      // tag currently showing its inline Min/Max edit form, null = none
 let editingCateringCategoryId = null;    // category_id being edited, null = add mode
 let cateringDishDrawerCategoryId = null;
 let cateringDishDrawerCategoryName = '';
@@ -287,11 +292,15 @@ const addCateringCategoryBtn              = document.getElementById('addCatering
 const cateringPageMessage                 = document.getElementById('cateringPageMessage');
 const cateringPackagePickerCard           = document.getElementById('cateringPackagePickerCard');
 const cateringPackageSelect               = document.getElementById('cateringPackageSelect');
-const cateringMainDishMax                 = document.getElementById('cateringMainDishMax');
+const cateringRestrictionsSection         = document.getElementById('cateringRestrictionsSection');
+const cateringRestrictionsBody            = document.getElementById('cateringRestrictionsBody');
 const activeCateringSection               = document.getElementById('activeCateringSection');
 const archivedCateringSection             = document.getElementById('archivedCateringSection');
 const activeCateringBody                  = document.getElementById('activeCateringBody');
 const archivedCateringBody                = document.getElementById('archivedCateringBody');
+const copyCategoriesWrap                  = document.getElementById('copyCategoriesWrap');
+const copyCategoriesSelect                = document.getElementById('copyCategoriesSelect');
+const copyCategoriesBtn                   = document.getElementById('copyCategoriesBtn');
 
 const cateringCategoryModal          = document.getElementById('cateringCategoryModal');
 const cateringCategoryModalTitle     = document.getElementById('cateringCategoryModalTitle');
@@ -2221,6 +2230,7 @@ deleteModalOk.addEventListener('click', async () => {
       allCateringDishes = allCateringDishes.filter(d => d.category_id !== id);
       await logAudit({ action: 'Deleted Catering Category', category: 'package', details: `Deleted catering category: ${cat?.name}`, entityId: id });
       renderCateringTables();
+      renderCateringRestrictions();
       setMessage(cateringPageMessage, 'Category deleted.', 'success');
     }
 
@@ -2367,7 +2377,106 @@ confirmOk.addEventListener('click', async () => {
         entityId: id
       });
       renderCateringTables();
+      renderCateringRestrictions();
       setMessage(cateringPageMessage, type === 'archive' ? 'Category archived.' : 'Category restored.', 'success');
+    }
+
+    if (scope === 'copy-catering-restrictions') {
+      const { sourcePackageId, sourcePackageName, targetPackageName } = payload;
+      const { data: sourceRules, error: fetchErr } = await supabase
+        .from(CATERING_SECTION_RULE_TABLE).select('*').eq('package_id', sourcePackageId);
+      if (fetchErr) throw fetchErr;
+
+      // Only copy rules for tags this package actually has a section for —
+      // no point creating a "Rice" restriction on a package with no rice.
+      const presentTags = new Set(tagsInActivePackage());
+      const toCopy = (sourceRules || []).filter(r => presentTags.has(r.tag));
+
+      if (!toCopy.length) {
+        setModalMsg(confirmMessage, `"${sourcePackageName}" has no restrictions on sections this package has.`);
+        confirmOk.disabled = false;
+        return;
+      }
+
+      const payloadRows = toCopy.map(r => ({ package_id: id, tag: r.tag, min_select: r.min_select, max_select: r.max_select }));
+      const { data: upserted, error: upsertErr } = await supabase.from(CATERING_SECTION_RULE_TABLE)
+        .upsert(payloadRows, { onConflict: 'package_id,tag' }).select();
+      if (upsertErr) throw upsertErr;
+
+      (upserted || []).forEach(row => {
+        const idx = allCateringSectionRules.findIndex(r => r.tag === row.tag);
+        if (idx !== -1) allCateringSectionRules[idx] = row; else allCateringSectionRules.push(row);
+      });
+      await logAudit({
+        action: 'Copied Catering Section Restrictions',
+        category: 'package',
+        details: `Copied ${toCopy.length} section restriction(s) from "${sourcePackageName}" into "${targetPackageName}"`,
+        entityId: id
+      });
+      restrictionEditTag = null;
+      renderCateringRestrictions();
+      showToast(`Copied ${toCopy.length} restriction${toCopy.length === 1 ? '' : 's'} from "${sourcePackageName}".`, 'success');
+    }
+
+    if (scope === 'copy-catering-categories') {
+      const { sourcePackageId, sourcePackageName, targetPackageName } = payload;
+      const { data: sourceCats, error: catFetchErr } = await supabase
+        .from(CATERING_CATEGORY_TABLE).select('*').eq('package_id', sourcePackageId).eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      if (catFetchErr) throw catFetchErr;
+
+      if (!sourceCats || !sourceCats.length) {
+        setModalMsg(confirmMessage, `"${sourcePackageName}" has no active categories to copy.`);
+        confirmOk.disabled = false;
+        return;
+      }
+
+      const { data: sourceDishes, error: dishFetchErr } = await supabase
+        .from(CATERING_DISH_TABLE).select('*')
+        .in('category_id', sourceCats.map(c => c.category_id)).eq('is_active', true);
+      if (dishFetchErr) throw dishFetchErr;
+
+      // Insert categories one at a time (not a single batch insert) so each
+      // new category_id can be tied back to the source category it came
+      // from — needed to re-point that source category's dishes at the
+      // right copy below. Category counts per package are small, so the
+      // extra round trips are cheap.
+      const idMap = new Map();
+      const insertedCats = [];
+      for (const c of sourceCats) {
+        const { data, error } = await supabase.from(CATERING_CATEGORY_TABLE).insert({
+          package_id: id, name: c.name, icon: c.icon, tag: c.tag, sort_order: c.sort_order,
+          is_required: c.is_required, price_20: c.price_20, price_30: c.price_30,
+          price_40: c.price_40, price_50: c.price_50, is_active: true
+        }).select().single();
+        if (error) throw error;
+        idMap.set(c.category_id, data.category_id);
+        insertedCats.push(data);
+      }
+
+      const dishRows = (sourceDishes || []).map(d => ({
+        category_id: idMap.get(d.category_id), name: d.name, sort_order: d.sort_order, is_active: true
+      })).filter(d => d.category_id);
+
+      let insertedDishes = [];
+      if (dishRows.length) {
+        const { data: dishData, error: dishInsertErr } = await supabase.from(CATERING_DISH_TABLE).insert(dishRows).select();
+        if (dishInsertErr) throw dishInsertErr;
+        insertedDishes = dishData || [];
+      }
+
+      allCateringCategories.push(...insertedCats);
+      allCateringDishes.push(...insertedDishes);
+
+      await logAudit({
+        action: 'Copied Catering Categories',
+        category: 'package',
+        details: `Copied ${insertedCats.length} categor${insertedCats.length === 1 ? 'y' : 'ies'} (${insertedDishes.length} dish${insertedDishes.length === 1 ? '' : 'es'}) from "${sourcePackageName}" into "${targetPackageName}"`,
+        entityId: id
+      });
+      renderCateringTables();
+      renderCateringRestrictions(); // a copied category can introduce a tag this package didn't have a row for yet
+      showToast(`Copied ${insertedCats.length} categor${insertedCats.length === 1 ? 'y' : 'ies'} from "${sourcePackageName}".`, 'success');
     }
 
     if (scope === 'badge-move') {
@@ -3330,7 +3439,7 @@ function openConfirmDeleteBadgeType(badgeId) {
 // builder on reservations.html. Categories are the selectable groups
 // (Chicken, Pasta, Drinks...); dishes are the items inside each.
 // ═══════════════════════════════════════════════════════════════════════════════
-const CATERING_TAG_LABELS = { main: 'Main dish', pasta: 'Pasta', dessert: 'Dessert', rice: 'Rice', drinks: 'Drinks', addon: 'Add-on' };
+const CATERING_TAG_LABELS = { main: 'Main dish', vegetable: 'Vegetable', pasta: 'Pasta', dessert: 'Dessert', rice: 'Rice', drinks: 'Drinks', addon: 'Add-on' };
 
 async function loadCateringMenuPackages() {
   setMessage(cateringPageMessage, 'Loading catering packages…');
@@ -3348,6 +3457,7 @@ async function loadCateringMenuPackages() {
       cateringMenuActivePackageId = null;
       cateringPackageSelect.innerHTML = '';
       cateringPackagePickerCard.style.display = 'none';
+      cateringRestrictionsSection.style.display = 'none';
       activeCateringSection.style.display = 'none';
       archivedCateringSection.style.display = 'none';
       addCateringCategoryBtn.disabled = true;
@@ -3359,6 +3469,7 @@ async function loadCateringMenuPackages() {
 
     addCateringCategoryBtn.disabled = false;
     cateringPackagePickerCard.style.display = '';
+    cateringRestrictionsSection.style.display = '';
     activeCateringSection.style.display = '';
 
     // Keep the previous selection if it's still a valid catering package, else default to the first.
@@ -3369,7 +3480,6 @@ async function loadCateringMenuPackages() {
     cateringPackageSelect.innerHTML = cateringMenuPackages
       .map(p => `<option value="${p.package_id}" ${p.package_id === cateringMenuActivePackageId ? 'selected' : ''}>${escapeHtml(p.package_name)}${p.is_active ? '' : ' (Archived package)'}</option>`)
       .join('');
-    updateCateringMainDishMaxInput();
 
     setMessage(cateringPageMessage, '');
     await loadCateringMenu();
@@ -3380,55 +3490,27 @@ async function loadCateringMenuPackages() {
 
 cateringPackageSelect.addEventListener('change', async () => {
   cateringMenuActivePackageId = cateringPackageSelect.value || null;
-  updateCateringMainDishMaxInput();
+  restrictionEditTag = null;
   await loadCateringMenu();
 });
 
-// Reflects the active package's saved cap in the input — kept separate
-// from loadCateringMenu() since it only needs the already-fetched
-// cateringMenuPackages list, not a fresh round trip.
-function updateCateringMainDishMaxInput() {
-  const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
-  cateringMainDishMax.value = pkg?.catering_main_dish_max ?? 3;
-}
-
-// Saved on blur (not on every keystroke) so a half-typed number never hits
-// the database — mirrors how other scalar package fields on this page are
-// only written once the admin is done editing.
-cateringMainDishMax.addEventListener('change', async () => {
-  if (!cateringMenuActivePackageId) return;
-  const value = parseInt(cateringMainDishMax.value, 10);
-  if (!Number.isFinite(value) || value < 1) {
-    setMessage(cateringPageMessage, 'Max main dishes must be a whole number of 1 or more.', 'error');
-    updateCateringMainDishMaxInput();
-    return;
-  }
-  try {
-    const { error } = await supabase.from('package').update({ catering_main_dish_max: value }).eq('package_id', cateringMenuActivePackageId);
-    if (error) throw error;
-    const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
-    if (pkg) pkg.catering_main_dish_max = value;
-    await logAudit({ action: 'Updated Catering Main Dish Max', category: 'package', details: `Max main dishes set to ${value}`, entityId: cateringMenuActivePackageId });
-    setMessage(cateringPageMessage, 'Max main dishes updated.', 'success');
-  } catch (err) {
-    setMessage(cateringPageMessage, `Failed to save: ${err.message}`, 'error');
-    updateCateringMainDishMaxInput();
-  }
-});
-
 async function loadCateringMenu() {
-  if (!cateringMenuActivePackageId) { allCateringCategories = []; allCateringDishes = []; renderCateringTables(); return; }
+  if (!cateringMenuActivePackageId) { allCateringCategories = []; allCateringDishes = []; allCateringSectionRules = []; renderCateringTables(); renderCateringRestrictions(); return; }
   setMessage(cateringPageMessage, 'Loading catering menu…');
   try {
-    const [{ data: cats, error: catErr }, { data: dishes, error: dishErr }] = await Promise.all([
+    const [{ data: cats, error: catErr }, { data: dishes, error: dishErr }, { data: rules, error: ruleErr }] = await Promise.all([
       supabase.from(CATERING_CATEGORY_TABLE).select('*').eq('package_id', cateringMenuActivePackageId).order('sort_order', { ascending: true }),
       supabase.from(CATERING_DISH_TABLE).select('*').order('sort_order', { ascending: true }),
+      supabase.from(CATERING_SECTION_RULE_TABLE).select('*').eq('package_id', cateringMenuActivePackageId),
     ]);
     if (catErr) throw catErr;
     if (dishErr) throw dishErr;
+    if (ruleErr) throw ruleErr;
     allCateringCategories = cats || [];
     allCateringDishes = dishes || [];
+    allCateringSectionRules = rules || [];
     renderCateringTables();
+    renderCateringRestrictions();
     setMessage(cateringPageMessage, '');
   } catch (err) {
     setMessage(cateringPageMessage, `Failed to load catering menu: ${err.message}`, 'error');
@@ -3489,7 +3571,314 @@ function renderCateringTables() {
 
   archivedCateringSection.style.display = archived.length ? '' : 'none';
   archivedCateringBody.innerHTML = archived.length ? archived.map(buildCateringCategoryRow).join('') : '';
+
+  renderCopyCategoriesControl();
 }
+
+// ─── Section Restrictions ("click the summary to edit Min/Max" pattern) ───
+// One row per tag present in the active package's categories (active or
+// archived — a restriction can be configured ahead of restoring/adding
+// dishes). Each tag carries at most one catering_section_rule row holding
+// both a min-select count and a max-select count together (they're almost
+// always set together in practice — "pick between X and Y dishes" — so the
+// UI edits them as one pair instead of two independent add/remove flows).
+// A tag with no row has no explicit restriction — see
+// 20261019_catering_section_rules.sql / 20261020_vegetable_own_catering_section.sql.
+const CATERING_TAG_ORDER = ['main', 'vegetable', 'pasta', 'dessert', 'rice', 'drinks', 'addon'];
+
+function getSectionRule(tag) {
+  return allCateringSectionRules.find(r => r.tag === tag) || null;
+}
+
+function tagsInActivePackage() {
+  const present = new Set(allCateringCategories.map(c => c.tag));
+  return CATERING_TAG_ORDER.filter(t => present.has(t));
+}
+
+// Mirrors getCateringSectionRule() in reservations.js: prefer an explicit
+// catering_section_rule row; otherwise fall back to the pre-restriction-table
+// behavior so the preview (below) shows exactly what a customer would see
+// even for a section nobody has explicitly configured yet — 'main' derives
+// from the package's legacy catering_main_dish_max, everything else derives
+// from whether any of its categories has the legacy is_required flag set.
+function effectiveSectionRule(tag) {
+  const explicit = getSectionRule(tag);
+  if (explicit) return { min: explicit.min_select ?? 0, max: explicit.max_select ?? null };
+  if (tag === 'main') {
+    const pkg = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+    const v = Number(pkg?.catering_main_dish_max);
+    const max = Number.isFinite(v) && v > 0 ? v : 3;
+    return { min: max, max };
+  }
+  const required = allCateringCategories.some(c => c.tag === tag && c.is_required);
+  return { min: required ? 1 : 0, max: null };
+}
+
+// "Min 3 · Max 3" makes the admin do the math themselves — collapse an
+// equal min/max pair into one "Exactly N" summary instead.
+function restrictionSummaryText(rule) {
+  const hasMin = rule?.min_select > 0;
+  const hasMax = rule?.max_select != null;
+  if (!hasMin && !hasMax) return 'No restriction — optional, unlimited.';
+  if (hasMin && hasMax && rule.min_select === rule.max_select) return `Exactly ${rule.min_select}`;
+  if (hasMin && hasMax) return `Min ${rule.min_select} · Max ${rule.max_select}`;
+  if (hasMin) return rule.min_select === 1 ? 'Required' : `Min ${rule.min_select}`;
+  return `Max ${rule.max_select}`;
+}
+
+function restrictionPreviewHtml(tag) {
+  const eff = effectiveSectionRule(tag);
+  return `<p class="restriction-preview">Customer sees: <em>\u201c${escapeHtml(cateringSectionHint(tag, eff.min, eff.max))}\u201d</em></p>`;
+}
+
+function restrictionRowHtml(tag) {
+  const rule = getSectionRule(tag);
+  const hasRule = !!(rule?.min_select > 0 || rule?.max_select != null);
+
+  if (restrictionEditTag === tag) {
+    return `<div class="restriction-editor">
+      <label>Min <input type="number" min="0" step="1" class="restriction-min-input" value="${rule?.min_select || ''}"></label>
+      <label>Max <input type="number" min="1" step="1" class="restriction-max-input" value="${rule?.max_select ?? ''}"></label>
+      <button type="button" class="action-btn" data-restriction-required="${tag}">Required</button>
+      <button type="button" class="action-btn edit" data-save-restriction="${tag}">Save</button>
+      <button type="button" class="action-btn" data-cancel-restriction="${tag}">Cancel</button>
+      ${hasRule ? `<button type="button" class="action-btn danger" data-clear-restriction="${tag}">Clear</button>` : ''}
+    </div>`;
+  }
+
+  const cls = hasRule ? 'restriction-chip-btn' : 'restriction-chip-btn restriction-chip-btn--empty';
+  return `<button type="button" class="${cls}" data-edit-restriction="${tag}">${restrictionSummaryText(rule)}</button>`;
+}
+
+function renderCateringRestrictions() {
+  const tags = tagsInActivePackage();
+  if (!tags.length) {
+    cateringRestrictionsBody.innerHTML = '<p class="restriction-none">Add a category below to configure restrictions for its section.</p>';
+    if (copyRestrictionsWrap) copyRestrictionsWrap.style.display = 'none';
+    return;
+  }
+  cateringRestrictionsBody.innerHTML = tags.map(tag => `<div class="restriction-row" data-tag="${tag}">
+      <div class="restriction-row-label">${CATERING_TAG_LABELS[tag] || tag}</div>
+      <div class="restriction-main">
+        <div class="restriction-control">${restrictionRowHtml(tag)}</div>
+        ${restrictionPreviewHtml(tag)}
+      </div>
+    </div>`).join('');
+  renderCopyRestrictionsControl();
+}
+
+cateringRestrictionsBody.addEventListener('click', (e) => {
+  // Editing an existing value directly: click the summary, get an inline
+  // Min/Max form in place — no separate "+ Add Restriction" dropdown detour.
+  const editBtn = e.target.closest('[data-edit-restriction]');
+  if (editBtn) { restrictionEditTag = editBtn.dataset.editRestriction; renderCateringRestrictions(); focusRestrictionInput(restrictionEditTag); return; }
+
+  const cancelBtn = e.target.closest('[data-cancel-restriction]');
+  if (cancelBtn) { restrictionEditTag = null; renderCateringRestrictions(); return; }
+
+  const requiredBtn = e.target.closest('[data-restriction-required]');
+  if (requiredBtn) {
+    const tag = requiredBtn.dataset.restrictionRequired;
+    const minInput = cateringRestrictionsBody.querySelector(`[data-tag="${tag}"] .restriction-min-input`);
+    if (minInput) { minInput.value = '1'; minInput.focus(); }
+    return;
+  }
+
+  const saveBtn = e.target.closest('[data-save-restriction]');
+  if (saveBtn) { saveRestriction(saveBtn.dataset.saveRestriction); return; }
+
+  const clearBtn = e.target.closest('[data-clear-restriction]');
+  if (clearBtn) { clearRestriction(clearBtn.dataset.clearRestriction); return; }
+});
+
+// Enter in either field saves (matches the Save button); Escape cancels —
+// keeps a one-number tweak to two interactions: click to open, Enter to confirm.
+cateringRestrictionsBody.addEventListener('keydown', (e) => {
+  if (!e.target.matches('.restriction-min-input, .restriction-max-input')) return;
+  const row = e.target.closest('.restriction-row');
+  const tag = row?.dataset.tag;
+  if (!tag) return;
+  if (e.key === 'Enter') { e.preventDefault(); saveRestriction(tag); }
+  else if (e.key === 'Escape') { e.preventDefault(); restrictionEditTag = null; renderCateringRestrictions(); }
+});
+
+function focusRestrictionInput(tag) {
+  const input = cateringRestrictionsBody.querySelector(`[data-tag="${tag}"] .restriction-min-input`);
+  if (input) { input.focus(); input.select(); }
+}
+
+async function saveRestriction(tag) {
+  const row = cateringRestrictionsBody.querySelector(`.restriction-row[data-tag="${tag}"]`);
+  const minRaw = row?.querySelector('.restriction-min-input')?.value?.trim() ?? '';
+  const maxRaw = row?.querySelector('.restriction-max-input')?.value?.trim() ?? '';
+
+  const min = minRaw === '' ? 0 : parseInt(minRaw, 10);
+  const max = maxRaw === '' ? null : parseInt(maxRaw, 10);
+
+  if (!Number.isFinite(min) || min < 0) { setMessage(cateringPageMessage, 'Min must be a whole number of 0 or more.', 'error'); return; }
+  if (max !== null && (!Number.isFinite(max) || max < 1)) { setMessage(cateringPageMessage, 'Max must be a whole number of 1 or more.', 'error'); return; }
+  if (max !== null && min > max) { setMessage(cateringPageMessage, 'Min can\u2019t be greater than Max.', 'error'); return; }
+
+  // Both blank/zero is the same as no restriction — treat it as a clear
+  // instead of writing a no-op row.
+  if (min === 0 && max === null) { await clearRestriction(tag); return; }
+
+  const payload = { package_id: cateringMenuActivePackageId, tag, min_select: min, max_select: max };
+
+  try {
+    const { data, error } = await supabase.from(CATERING_SECTION_RULE_TABLE)
+      .upsert(payload, { onConflict: 'package_id,tag' }).select().single();
+    if (error) throw error;
+    const idx = allCateringSectionRules.findIndex(r => r.tag === tag);
+    if (idx !== -1) allCateringSectionRules[idx] = data; else allCateringSectionRules.push(data);
+    await logAudit({ action: 'Updated Catering Section Restriction', category: 'package', details: `${CATERING_TAG_LABELS[tag] || tag}: min ${min}, max ${max ?? 'unlimited'}`, entityId: cateringMenuActivePackageId });
+    restrictionEditTag = null;
+    renderCateringRestrictions();
+    setMessage(cateringPageMessage, '', '');
+    showToast('Restriction saved.', 'success');
+  } catch (err) {
+    setMessage(cateringPageMessage, `Failed to save restriction: ${err.message}`, 'error');
+  }
+}
+
+// Removing is instant but not silent: an Undo toast re-upserts the exact
+// row that was just deleted, so a misclick is cheap to fix.
+async function clearRestriction(tag) {
+  const existing = getSectionRule(tag);
+  if (!existing) { restrictionEditTag = null; renderCateringRestrictions(); return; }
+  const previous = { min_select: existing.min_select, max_select: existing.max_select };
+
+  try {
+    const { error } = await supabase.from(CATERING_SECTION_RULE_TABLE)
+      .delete().eq('package_id', cateringMenuActivePackageId).eq('tag', tag);
+    if (error) throw error;
+    allCateringSectionRules = allCateringSectionRules.filter(r => r.tag !== tag);
+    await logAudit({ action: 'Removed Catering Section Restriction', category: 'package', details: `${CATERING_TAG_LABELS[tag] || tag}: restriction removed`, entityId: cateringMenuActivePackageId });
+    restrictionEditTag = null;
+    renderCateringRestrictions();
+    showToast('Restriction removed.', 'success', 6000, {
+      label: 'Undo',
+      onClick: () => undoClearRestriction(tag, previous),
+    });
+  } catch (err) {
+    setMessage(cateringPageMessage, `Failed to remove restriction: ${err.message}`, 'error');
+  }
+}
+
+async function undoClearRestriction(tag, previous) {
+  // The admin may have switched packages (or edited this same tag again)
+  // since the toast appeared — only restore into the package it came from,
+  // and only if nothing has been saved for this tag since.
+  if (cateringMenuActivePackageId == null || getSectionRule(tag)) return;
+  const payload = { package_id: cateringMenuActivePackageId, tag, min_select: previous.min_select, max_select: previous.max_select };
+  try {
+    const { data, error } = await supabase.from(CATERING_SECTION_RULE_TABLE)
+      .upsert(payload, { onConflict: 'package_id,tag' }).select().single();
+    if (error) throw error;
+    const idx = allCateringSectionRules.findIndex(r => r.tag === tag);
+    if (idx !== -1) allCateringSectionRules[idx] = data; else allCateringSectionRules.push(data);
+    await logAudit({ action: 'Updated Catering Section Restriction', category: 'package', details: `${CATERING_TAG_LABELS[tag] || tag}: restored after undo`, entityId: cateringMenuActivePackageId });
+    renderCateringRestrictions();
+    showToast('Restriction restored.', 'success');
+  } catch (err) {
+    showToast(`Couldn\u2019t undo: ${err.message}`, 'error');
+  }
+}
+
+// ─── Copy restrictions from another package ────────────────────────────────
+// Most catering packages share a pattern ("3 main / 1 each of everything
+// else") — this copies another catering-enabled package's
+// catering_section_rule rows onto the active package's currently-present
+// tags, so setting that pattern up for a new package is one pick instead of
+// re-entering every row by hand.
+const copyRestrictionsWrap = document.getElementById('copyRestrictionsWrap');
+const copyRestrictionsSelect = document.getElementById('copyRestrictionsSelect');
+const copyRestrictionsBtn = document.getElementById('copyRestrictionsBtn');
+
+function renderCopyRestrictionsControl() {
+  if (!copyRestrictionsWrap) return;
+  const others = cateringMenuPackages.filter(p => p.package_id !== cateringMenuActivePackageId);
+  if (!others.length) { copyRestrictionsWrap.style.display = 'none'; return; }
+  copyRestrictionsWrap.style.display = '';
+  const prevValue = copyRestrictionsSelect.value;
+  copyRestrictionsSelect.innerHTML = ['<option value="">Select a package…</option>']
+    .concat(others.map(p => `<option value="${p.package_id}">${escapeHtml(p.package_name)}</option>`))
+    .join('');
+  // Default to nothing selected rather than auto-picking the first package —
+  // "Copy from" is a deliberate, one-off action, not a value that should
+  // already look chosen. Keep the admin's own pick if it's still valid
+  // (e.g. after a re-render from an unrelated save).
+  copyRestrictionsSelect.value = others.some(p => p.package_id === prevValue) ? prevValue : '';
+  updateCopyRestrictionsBtnState();
+}
+
+function updateCopyRestrictionsBtnState() {
+  if (copyRestrictionsBtn) copyRestrictionsBtn.disabled = !copyRestrictionsSelect.value;
+}
+
+copyRestrictionsSelect?.addEventListener('change', updateCopyRestrictionsBtnState);
+
+copyRestrictionsBtn?.addEventListener('click', async () => {
+  const sourceId = copyRestrictionsSelect?.value;
+  const source = cateringMenuPackages.find(p => p.package_id === sourceId);
+  if (!source || !cateringMenuActivePackageId) return;
+
+  const target = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+  pendingAction = { scope: 'copy-catering-restrictions', id: cateringMenuActivePackageId, payload: { sourcePackageId: source.package_id, sourcePackageName: source.package_name, targetPackageName: target?.package_name || 'this package' } };
+  confirmTitle.textContent = 'Copy Section Restrictions';
+  confirmCopy.textContent  = `Copy restrictions from "${source.package_name}" into "${target?.package_name || 'this package'}"? This replaces any restriction already set on a matching section here.`;
+  confirmOk.textContent    = 'Copy';
+  confirmOk.className      = 'btn-primary';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+});
+
+// ─── Copy categories (menu) from another package ───────────────────────────
+// Same one-pick idea as "Copy restrictions from…" above, but for the menu
+// itself: duplicates another catering-enabled package's active categories
+// (and their active dishes) onto the active package. Unlike restrictions,
+// categories have no natural conflict key to upsert against (several
+// categories can share one tag, e.g. Chicken/Pork/Beef/Fish are all
+// "main") — so this always adds new rows rather than replacing existing
+// ones, and running it twice will duplicate. That's an accepted trade-off:
+// the admin can archive/delete a stray duplicate afterward.
+function renderCopyCategoriesControl() {
+  if (!copyCategoriesWrap) return;
+  if (!cateringMenuActivePackageId) { copyCategoriesWrap.style.display = 'none'; return; }
+  const others = cateringMenuPackages.filter(p => p.package_id !== cateringMenuActivePackageId);
+  if (!others.length) { copyCategoriesWrap.style.display = 'none'; return; }
+  copyCategoriesWrap.style.display = '';
+  const prevValue = copyCategoriesSelect.value;
+  copyCategoriesSelect.innerHTML = ['<option value="">Select a package…</option>']
+    .concat(others.map(p => `<option value="${p.package_id}">${escapeHtml(p.package_name)}</option>`))
+    .join('');
+  // Same reasoning as restrictions: default to nothing selected, but keep
+  // the admin's own pick if a re-render (e.g. after an unrelated save)
+  // still lists it.
+  copyCategoriesSelect.value = others.some(p => p.package_id === prevValue) ? prevValue : '';
+  updateCopyCategoriesBtnState();
+}
+
+function updateCopyCategoriesBtnState() {
+  if (copyCategoriesBtn) copyCategoriesBtn.disabled = !copyCategoriesSelect.value;
+}
+
+copyCategoriesSelect?.addEventListener('change', updateCopyCategoriesBtnState);
+
+copyCategoriesBtn?.addEventListener('click', async () => {
+  const sourceId = copyCategoriesSelect?.value;
+  const source = cateringMenuPackages.find(p => p.package_id === sourceId);
+  if (!source || !cateringMenuActivePackageId) return;
+
+  const target = cateringMenuPackages.find(p => p.package_id === cateringMenuActivePackageId);
+  pendingAction = { scope: 'copy-catering-categories', id: cateringMenuActivePackageId, payload: { sourcePackageId: source.package_id, sourcePackageName: source.package_name, targetPackageName: target?.package_name || 'this package' } };
+  confirmTitle.textContent = 'Copy Menu';
+  confirmCopy.textContent  = `Copy the menu from "${source.package_name}" into "${target?.package_name || 'this package'}"? This adds a new copy of each active category (and its active dishes) — it won\u2019t remove or replace anything already here.`;
+  confirmOk.textContent    = 'Copy';
+  confirmOk.className      = 'btn-primary';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+});
 
 function handleCateringCategoryTableAction(e) {
   const btn = e.target.closest('[data-catering-action]');
@@ -3591,6 +3980,7 @@ cateringCategoryModalSave.addEventListener('click', async () => {
 
     allCateringCategories.sort((a, b) => a.sort_order - b.sort_order);
     renderCateringTables();
+    renderCateringRestrictions();
     closeModal(cateringCategoryModal);
   } catch (err) {
     setModalMsg(cateringCategoryModalMessage, `Failed to save: ${err.message}`);

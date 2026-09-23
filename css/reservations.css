@@ -676,35 +676,56 @@
             opacity: 0.9;
         }
 
+        /* A grid of equal-width step chips rather than a connected
+           dot-and-dash line. A connecting line looks fine on one row, but
+           this tracker can hold 6 or 7 items (depending on which sections
+           the active package has) of very different label lengths, and it
+           wraps at every screen width — there's no line-length rule
+           (stretch to fill, fixed length, hidden on mobile) that wraps
+           cleanly for every combination of item count, label length and
+           container width; something always looks broken at the wrap
+           point. Equal grid cells sidestep that: every row lines up the
+           same way no matter where a row happens to break. */
         .progress-tracker {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+            gap: 8px 12px;
             background: #FFF8F0;
             border: 1px solid #e8d8cc;
             border-radius: 12px;
             padding: 14px 20px;
             margin: 20px 0 28px;
-            flex-wrap: wrap;
-            gap: 10px;
-            position: sticky;
-            top: 70px;
-            z-index: 20;
             box-shadow: 0 6px 16px rgba(61,26,10,0.08);
         }
+        /* Each step reads as its own light chip (border/background on
+           .active, matching how the currently-open section is called out)
+           instead of relying on a connecting line to show it belongs to
+           the sequence. */
         .pt-item {
             display: flex;
             align-items: center;
             gap: 8px;
+            min-width: 0;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid transparent;
             font-size: 13px;
-            color: #aaa;
-            cursor: pointer;
-            transition: transform 0.15s ease;
             color: #686868;
+            cursor: pointer;
+            transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+        }
+        .pt-item span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .pt-item:hover { transform: translateY(-1px); }
         .pt-item.done { color: #0F6E56; }
         .pt-item.pending { color: #2A1408; font-weight: 600; }
+        .pt-item.active {
+            background: #fff;
+            border-color: #e8d8cc;
+        }
         .pt-item.active .pt-dot {
             box-shadow: 0 0 0 3px rgba(107,58,31,0.22);
         }
@@ -735,12 +756,6 @@
             border-color: #ddd;
             color: #aaa;
         }
-        .pt-divider {
-            flex: 1;
-            height: 1px;
-            background: #e8d8cc;
-            min-width: 16px;
-        }
 
         .builder-label {
             font-size: 12px;
@@ -755,6 +770,32 @@
             color: #696969;
             margin-bottom: 20px;
             line-height: 1.6;
+        }
+
+        /* Shown instead of the dish-builder accordion when a catering-
+           flagged package has no dish categories configured yet — see
+           buildCateringDishBuilder()'s cateringMenuUnavailable branch. */
+        .catering-menu-unavailable {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 10px;
+            padding: 32px 20px;
+            border: 1px dashed #d9b98c;
+            border-radius: 10px;
+            background: #FBFAF7;
+            color: #696969;
+        }
+        .catering-menu-unavailable i {
+            font-size: 26px;
+            color: #b08a5f;
+        }
+        .catering-menu-unavailable p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 420px;
         }
 
         /* Pills */
@@ -925,6 +966,17 @@
             font-size: 12.5px;
             color: #5a5148;
         }
+        /* Shown per row only when a category has more than one dish
+           selected (e.g. two Chicken picks), so each row's pax/price
+           reads as belonging to that specific dish. */
+        .pax-summary-dish {
+            display: block;
+            width: 100%;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #3a332c;
+            margin-bottom: 2px;
+        }
         .pax-summary-text b { color: #0F6E56; }
         .pax-custom-badge {
             font-size: 10.5px;
@@ -959,6 +1011,13 @@
             margin: 16px 0 20px;
         }
 
+        /* Clears the sticky navbar when picking a catering-flagged package
+           scrolls the whole builder into view (scrollToCateringMenu() in
+           reservations.js) — same value as .catering-accordion-item below. */
+        #catering-section {
+            scroll-margin-top: 88px;
+        }
+
         .catering-accordion-item {
             border: 1px solid #ead9ca;
             border-radius: 12px;
@@ -966,6 +1025,11 @@
             overflow: hidden;
             background: #fff;
             transition: border-color 0.15s ease;
+            /* Clears the sticky navbar when a step chip scrolls this
+               section into view (focusCateringSection() in
+               reservations.js) — same value css/menu.css already uses for
+               the same navbar. */
+            scroll-margin-top: 88px;
         }
         .catering-accordion-item.open { border-color: #d9b98c; }
         .catering-accordion-item.done:not(.open) { background: #FBFAF7; }
@@ -983,6 +1047,13 @@
             cursor: pointer;
             text-align: left;
             font-family: inherit;
+        }
+        /* Shown when a step chip's click hands focus to this header (see
+           focusCateringSection() in reservations.js), so it's visually
+           obvious which section the click landed on. */
+        .catering-accordion-header:focus-visible {
+            outline: 2px solid var(--acc-terracotta, #A34F2E);
+            outline-offset: -2px;
         }
         .accordion-status-dot {
             width: 22px; height: 22px;
@@ -1024,7 +1095,23 @@
             flex-wrap: wrap;
             gap: 8px;
         }
-        .catering-protein-tabs { margin-bottom: 16px; }
+        /* Overrides .pills-row's flex-wrap for this one pill row: five
+           protein names of very different lengths (Chicken/Pork/Beef/Fish/
+           Vegetables) wrapped raggedly — 2 on one line, 2 on the next, 1
+           orphaned alone — because flex-wrap just breaks wherever pills
+           stop fitting. A grid keeps every pill the same width so they
+           line up in even rows instead. */
+        .catering-protein-tabs {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .catering-protein-tabs .pill {
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
         .pill-check {
             color: #0F6E56;
             font-weight: 700;
@@ -1080,10 +1167,21 @@
             min-width: 22px;
             text-align: center;
         }
+        /* Was undefined — the "Remove all" button and the running total
+           inherited no spacing of their own and sat jammed against each
+           other. Stacked (button above price, both right-aligned) per
+           request, instead of side by side. */
+        .cart-header-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
         .cart-running-total {
             font-size: 15px;
             font-weight: 700;
             color: #6B3A1F;
+            white-space: nowrap;
         }
         .cart-empty-state {
             padding: 24px 18px;
@@ -2005,10 +2103,6 @@
 
         .hidden { display: none !important; }
 
-        @media (max-width: 960px) {
-            .progress-tracker { top: 64px; }
-        }
-
         @media (max-width: 600px) {
             .page-hero { height: 320px; }
             .page-hero-title { font-size: 36px; }
@@ -2046,8 +2140,12 @@
             .input-row        { grid-template-columns: 1fr; }
             .time-grid        { grid-template-columns: repeat(2, 1fr); }
             .dish-grid { grid-template-columns: 1fr 1fr; }
-            .progress-tracker { gap: 6px; }
-            .pt-divider { display: none; }
+            .progress-tracker { gap: 6px; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); }
+            /* With the button now stacked above the price (see
+               .cart-header-right), the header row is narrower on its own,
+               but keep this as a safety net for very narrow phones. */
+            .cart-header { flex-wrap: wrap; row-gap: 8px; }
+            .catering-protein-tabs { grid-template-columns: repeat(2, 1fr); }
             .availability-panel { padding: 18px 14px; }
             .availability-head { flex-direction: column; }
             .availability-nav { width: 100%; justify-content: space-between; }

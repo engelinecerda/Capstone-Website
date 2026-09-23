@@ -148,46 +148,49 @@
                         <div class="cards-grid" id="mini-grid"></div>
                     </div>
 
-                    <!-- Offsite sub-packages + catering builder (category already chosen above) -->
+                    <!-- Offsite sub-packages (category already chosen above) -->
                     <div id="offsite-section" class="hidden">
                         <div id="offsite-sub" class="hidden">
                             <div class="section-label" id="offsite-sub-label">Choose a Package</div>
                             <div class="cards-grid" id="offsite-sub-grid"></div>
                         </div>
+                    </div>
 
-                        <div id="catering-section" class="hidden">
-                            <div class="catering-inclusions" id="catering-inclusions-block"></div>
+                    <!-- Catering builder — shown for ANY selected package (onsite or
+                         offsite) that's catering-flagged, independent of location type,
+                         so it lives outside both onsite-section/offsite-section. -->
+                    <div id="catering-section" class="hidden">
+                        <div class="catering-inclusions" id="catering-inclusions-block"></div>
 
-                            <div class="progress-tracker" id="catering-progress-tracker"></div>
+                        <div class="progress-tracker" id="catering-progress-tracker"></div>
 
-                            <div class="builder-label" id="catering-builder-label"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes</div>
-                            <p class="builder-hint" id="catering-builder-hint">Start by choosing your pax count, then work through each section below — use the checklist above to jump to any unlocked section.</p>
+                        <div class="builder-label" id="catering-builder-label"><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Choose Your Dishes</div>
+                        <p class="builder-hint" id="catering-builder-hint">Start by choosing your pax count, then work through each section below — use the checklist above to jump to any unlocked section.</p>
 
-                            <div id="catering-tray-builder"></div>
+                        <div id="catering-tray-builder"></div>
 
-                            <div class="cart-section">
-                                <div class="cart-box" id="catering-tray-cart">
-                                    <div class="cart-header">
-                                        <div class="cart-header-left">
-                                            <i class="ti ti-shopping-cart" aria-hidden="true"></i> Your Selections
-                                            <span class="cart-count-badge" id="catering-cart-badge">0</span>
-                                        </div>
-                                        <div class="cart-header-right">
-                                            <button type="button" class="cart-clear-all-btn" id="catering-cart-clear-all" style="display:none">Remove all</button>
-                                            <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
-                                        </div>
+                        <div class="cart-section">
+                            <div class="cart-box" id="catering-tray-cart">
+                                <div class="cart-header">
+                                    <div class="cart-header-left">
+                                        <i class="ti ti-shopping-cart" aria-hidden="true"></i> Your Selections
+                                        <span class="cart-count-badge" id="catering-cart-badge">0</span>
                                     </div>
-                                    <div class="cart-empty-state" id="catering-cart-empty">No dishes selected yet</div>
-                                    <div id="catering-tray-rows"></div>
-                                    <div class="cart-footer" id="catering-cart-footer" style="display:none">
-                                        <span class="cart-footer-left" id="catering-cart-footer-count">0 dishes selected</span>
-                                        <span class="cart-footer-right" id="catering-tray-total">&#8369;0</span>
+                                    <div class="cart-header-right">
+                                        <button type="button" class="cart-clear-all-btn" id="catering-cart-clear-all" style="display:none">Remove all</button>
+                                        <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
                                     </div>
                                 </div>
-                                <div class="validation-notice" id="catering-validation-notice">
-                                    <span class="vn-icon"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>
-                                    <span id="catering-validation-text">Select at least 1 main dish, 1 pasta, and 1 dessert to continue.</span>
+                                <div class="cart-empty-state" id="catering-cart-empty">No dishes selected yet</div>
+                                <div id="catering-tray-rows"></div>
+                                <div class="cart-footer" id="catering-cart-footer" style="display:none">
+                                    <span class="cart-footer-left" id="catering-cart-footer-count">0 dishes selected</span>
+                                    <span class="cart-footer-right" id="catering-tray-total">&#8369;0</span>
                                 </div>
+                            </div>
+                            <div class="validation-notice" id="catering-validation-notice">
+                                <span class="vn-icon"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>
+                                <span id="catering-validation-text">Select at least 1 main dish, 1 pasta, and 1 dessert to continue.</span>
                             </div>
                         </div>
                     </div>
