@@ -2,7 +2,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const INACTIVITY_LIMIT = 2 * 60 * 60 * 1000;
-//const INACTIVITY_LIMIT = 1 * 60 * 1000; // 60,000 milliseconds
+//const INACTIVITY_LIMIT = 20 * 1000; // 20 seconds for testing
 
 // Injects scoped styles once. This is self-contained (not relying on
 // css/modals.css or any page-specific stylesheet) because
@@ -117,7 +117,7 @@ export function setupInactivityLogout(role) {
             // avoids a double-redirect race — signOut() fires SIGNED_OUT
             // almost immediately, so two separate navigation calls back
             // to back is what was making this redirect feel slow.
-            window.__nextSignOutRedirect = './index.html';
+            window.__nextSignOutRedirect = '/admin';
             await supabase.auth.signOut();
         }, INACTIVITY_LIMIT);
     }
