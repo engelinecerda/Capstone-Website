@@ -19,6 +19,7 @@ import { computeDiscountStatus, pickActiveDiscount, applyDiscount } from './pack
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { showToast } from './admin_toast.js';
 import { cateringSectionHint } from './catering_section_hints.js';
+import { clampNumberInput } from './numeric_input.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -147,6 +148,13 @@ const pkgMinGuests       = document.getElementById('pkgMinGuests');
 const pkgMaxGuests       = document.getElementById('pkgMaxGuests');
 const pkgMaxGuestsError  = document.getElementById('pkgMaxGuestsError');
 const pkgGuestRangeHint  = document.getElementById('pkgGuestRangeHint');
+const pkgAdditionalHeadToggleField   = document.getElementById('pkgAdditionalHeadToggleField');
+const pkgAllowAdditionalHeadToggle   = document.getElementById('pkgAllowAdditionalHeadToggle');
+const pkgAdditionalHeadFields        = document.getElementById('pkgAdditionalHeadFields');
+const pkgPricePerAdditionalHead      = document.getElementById('pkgPricePerAdditionalHead');
+const pkgPricePerAdditionalHeadError = document.getElementById('pkgPricePerAdditionalHeadError');
+const pkgMaxAdditionalHeads          = document.getElementById('pkgMaxAdditionalHeads');
+const pkgAdditionalHeadVenueHint     = document.getElementById('pkgAdditionalHeadVenueHint');
 const pkgExtensionPrice  = document.getElementById('pkgExtensionPrice');
 const pkgLocationField   = document.getElementById('pkgLocationField');
 const pkgLocationType    = document.getElementById('pkgLocationType');
@@ -328,6 +336,29 @@ const cateringDishDrawerDone  = document.getElementById('cateringDishDrawerDone'
 const cateringDishDrawerMessage = document.getElementById('cateringDishDrawerMessage');
 const cateringNewDishInput    = document.getElementById('cateringNewDishInput');
 const cateringAddDishBtn      = document.getElementById('cateringAddDishBtn');
+
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value (e.g. "99.99999999999999999999" into a
+// percent-off field) — see js/numeric_input.js for why this is needed on
+// every numeric field below, not just the ones with their own extra
+// validation (like discPercentOff's 0-100 check).
+clampNumberInput(pkgPrice, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(pkgDuration, { min: 1, max: 24, decimals: 0 });
+clampNumberInput(pkgMaxQuantity, { min: 1, max: 9999, decimals: 0 });
+clampNumberInput(pkgMinGuests, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(pkgMaxGuests, { min: 1, max: 9999, decimals: 0 });
+clampNumberInput(pkgPricePerAdditionalHead, { min: 0, max: 100000, decimals: 2 });
+clampNumberInput(pkgMaxAdditionalHeads, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(pkgExtensionPrice, { min: 0, max: 100000, decimals: 2 });
+clampNumberInput(discPercentOffInput, { min: 0.01, max: 100, decimals: 2 });
+clampNumberInput(venueCapacity, { min: 1, max: 9999, decimals: 0 });
+clampNumberInput(venueSortOrder, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(badgeTypeSortOrder, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(cateringCatSortOrder, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(cateringPrice20, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(cateringPrice30, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(cateringPrice40, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(cateringPrice50, { min: 0, max: 1000000, decimals: 2 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -1596,6 +1627,7 @@ pkgVenuesList.addEventListener('change', (e) => {
   if (cb.checked) pkgVenueIds.add(cb.dataset.venueId);
   else pkgVenueIds.delete(cb.dataset.venueId);
   updateVenueCapacityHint();
+  updatePkgAdditionalHeadVenueHint();
   renderActivationChecklist();
   updateUnsavedBanner();
 });
@@ -1628,6 +1660,41 @@ function updatePkgLocationVisibility() {
   pkgCategoryHint.textContent = isAddon
     ? 'Packages must have a category. Add-ons may leave this unset.'
     : 'Required for packages.';
+
+  // Additional Per-Head: a Main-package-only concept — an add-on has no
+  // guest capacity of its own to extend. Switching to Add-on hides the
+  // whole toggle AND turns it off, same "don't leave a stale setting the
+  // UI no longer shows" rule pkgVenueIds.clear() above follows for venues.
+  pkgAdditionalHeadToggleField.style.display = isAddon ? 'none' : '';
+  if (isAddon) pkgAllowAdditionalHeadToggle.checked = false;
+  updatePkgAdditionalHeadFieldsVisibility();
+}
+
+function updatePkgAdditionalHeadFieldsVisibility() {
+  pkgAdditionalHeadFields.style.display = pkgAllowAdditionalHeadToggle.checked ? '' : 'none';
+  updatePkgAdditionalHeadVenueHint();
+}
+
+// Mirrors updateVenueCapacityHint()'s reasoning, one layer further: shows
+// how many additional heads a selected venue can actually absorb above
+// this package's Max Guests, so the admin doesn't have to do the
+// (venue capacity − max guests) math by hand while setting Max Additional
+// Heads. Informational only — the real enforcement is server-side
+// (enforce_reservation_capacity(), supabase/migrations/20261018_
+// additional_per_head.sql), same division of labor as the rest of this form.
+function updatePkgAdditionalHeadVenueHint() {
+  if (!pkgAllowAdditionalHeadToggle.checked || !pkgVenueIds.size) {
+    pkgAdditionalHeadVenueHint.textContent = '';
+    return;
+  }
+  const maxGuests = Number(pkgMaxGuests.value) || 0;
+  const rooms = Array.from(pkgVenueIds)
+    .map(id => allVenues.find(v => v.venue_id === id))
+    .filter(Boolean)
+    .map(v => `${v.name} can take ${Math.max(v.capacity - maxGuests, 0)} more`);
+  pkgAdditionalHeadVenueHint.textContent = rooms.length
+    ? `Onsite cap by room: ${rooms.join('; ')}.`
+    : '';
 }
 
 let pkgLocationPrevValue = '';
@@ -1654,6 +1721,11 @@ pkgMaxGuests.addEventListener('input', () => {
     pkgGuestRangeHint.textContent = '';
   }
   updateVenueCapacityHint();
+  updatePkgAdditionalHeadVenueHint();
+});
+pkgAllowAdditionalHeadToggle.addEventListener('change', () => {
+  updatePkgAdditionalHeadFieldsVisibility();
+  setFieldError(pkgPricePerAdditionalHead, pkgPricePerAdditionalHeadError, '');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1677,7 +1749,15 @@ function clearFieldErrors() {
   setFieldError(pkgDuration, pkgDurationError, '');
   setFieldError(pkgMaxGuests, pkgMaxGuestsError, '');
   setFieldError(pkgCategorySelect, pkgCategoryError, '');
+  setFieldError(pkgPricePerAdditionalHead, pkgPricePerAdditionalHeadError, '');
 }
+
+pkgPricePerAdditionalHead.addEventListener('blur', () => {
+  if (!pkgAllowAdditionalHeadToggle.checked) return;
+  const v = pkgPricePerAdditionalHead.value;
+  setFieldError(pkgPricePerAdditionalHead, pkgPricePerAdditionalHeadError,
+    (v === '' || isNaN(Number(v)) || Number(v) < 0) ? 'A valid price per additional head is required.' : '');
+});
 
 pkgName.addEventListener('blur', () => {
   setFieldError(pkgName, pkgNameError, pkgName.value.trim() ? '' : 'Package name is required.');
@@ -1721,6 +1801,8 @@ function getPkgFormState() {
     name: pkgName.value, type: pkgType.value, category: pkgCategorySelect.value,
     description: pkgDescription.value, price: pkgPrice.value, duration: pkgDuration.value,
     maxQty: pkgMaxQuantity.value, minGuests: pkgMinGuests.value, maxGuests: pkgMaxGuests.value,
+    allowAdditionalHead: pkgAllowAdditionalHeadToggle.checked,
+    pricePerAdditionalHead: pkgPricePerAdditionalHead.value, maxAdditionalHeads: pkgMaxAdditionalHeads.value,
     extPrice: pkgExtensionPrice.value, location: pkgLocationType.value, bookingScope: getPkgBookingScopeValue().sort().join(','),
     active: pkgActiveToggle.checked,
     usesCateringMenu: pkgUsesCateringMenuToggle.checked,
@@ -1853,6 +1935,9 @@ async function openEditPackageModal(packageId) {
   pkgPrice.value          = pkg.price ?? '';
   pkgMinGuests.value      = pkg.min_guests ?? '';
   pkgMaxGuests.value      = pkg.max_guests ?? pkg.guest_capacity ?? '';
+  pkgAllowAdditionalHeadToggle.checked = !!pkg.allow_additional_head;
+  pkgPricePerAdditionalHead.value = pkg.price_per_additional_head ?? '';
+  pkgMaxAdditionalHeads.value     = pkg.max_additional_heads ?? '';
   pkgMaxQuantity.value    = pkg.max_quantity ?? 1;
   pkgDuration.value       = pkg.duration_hours ?? '';
   pkgExtensionPrice.value = pkg.extension_price ?? '';
@@ -1891,10 +1976,11 @@ async function openEditPackageModal(packageId) {
 }
 
 function clearPackageForm() {
-  [pkgName, pkgDescription, pkgPrice, pkgDuration, pkgExtensionPrice, pkgMinGuests, pkgMaxGuests].forEach(el => el.value = '');
+  [pkgName, pkgDescription, pkgPrice, pkgDuration, pkgExtensionPrice, pkgMinGuests, pkgMaxGuests, pkgPricePerAdditionalHead, pkgMaxAdditionalHeads].forEach(el => el.value = '');
   pkgType.value         = '';
   pkgLocationType.value = '';
   setPkgBookingScopeValue([]);
+  pkgAllowAdditionalHeadToggle.checked = false;
   pkgMaxQuantity.value  = '1';
   // New packages default to Active — you'd otherwise have to remember to
   // manually check this on every single new package, and forgetting means
@@ -1922,6 +2008,9 @@ function validatePackageForm() {
     return 'A valid max guest count is required.';
   if (pkgMinGuests.value !== '' && Number(pkgMinGuests.value) > Number(pkgMaxGuests.value))
     return 'Min guests must be less than or equal to max guests.';
+  if (pkgAllowAdditionalHeadToggle.checked && (
+    pkgPricePerAdditionalHead.value === '' || isNaN(Number(pkgPricePerAdditionalHead.value)) || Number(pkgPricePerAdditionalHead.value) < 0
+  )) return 'A valid price per additional head is required when additional guests are allowed.';
   if (!pkgDuration.value || isNaN(parseInt(pkgDuration.value)) || parseInt(pkgDuration.value) < 1)
     return 'A valid duration in hours is required.';
   if (pkgType.value === 'main' && !getPkgBookingScopeValue().length)
@@ -1967,6 +2056,11 @@ pkgModalSave.addEventListener('click', async () => {
       extension_price:    pkgExtensionPrice.value !== '' ? Number(pkgExtensionPrice.value) : null,
       location_type:      pkgLocationType.value || null,
       booking_scope:      getPkgBookingScopeValue().length ? getPkgBookingScopeValue() : null,
+      allow_additional_head:     !!pkgAllowAdditionalHeadToggle.checked,
+      price_per_additional_head: pkgAllowAdditionalHeadToggle.checked && pkgPricePerAdditionalHead.value !== ''
+        ? Number(pkgPricePerAdditionalHead.value) : null,
+      max_additional_heads:      pkgAllowAdditionalHeadToggle.checked && pkgMaxAdditionalHeads.value !== ''
+        ? parseInt(pkgMaxAdditionalHeads.value, 10) : null,
       package_category_id: pkgCategorySelect.value || null,
       is_active:          !!pkgActiveToggle.checked,
       uses_catering_menu: !!pkgUsesCateringMenuToggle.checked,

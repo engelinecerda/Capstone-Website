@@ -7,12 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=48">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=48">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=48">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=48">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=53">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=53">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=53">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=53">
 </head>
 <body>
 
@@ -503,37 +504,58 @@
         <div class="modal-row modal-row-three">
           <div class="modal-field">
             <label class="modal-label" for="pkgPrice">Price (₱) *</label>
-            <input type="number" id="pkgPrice" class="modal-input" placeholder="3999" min="0" step="0.01">
+            <input type="number" id="pkgPrice" class="modal-input" placeholder="3999" min="0" max="1000000" step="0.01">
             <span class="field-error hidden" id="pkgPriceError"></span>
           </div>
           <div class="modal-field">
             <label class="modal-label" for="pkgDuration">Duration (hours) *</label>
-            <input type="number" id="pkgDuration" class="modal-input" placeholder="3" min="1">
+            <input type="number" id="pkgDuration" class="modal-input" placeholder="3" min="1" max="24">
             <span class="field-error hidden" id="pkgDurationError"></span>
           </div>
           <div class="modal-field" id="pkgMaxQuantityField" style="display:none;">
             <label class="modal-label" for="pkgMaxQuantity">Max quantity per booking</label>
-            <input type="number" id="pkgMaxQuantity" class="modal-input" placeholder="1" min="1" value="1">
+            <input type="number" id="pkgMaxQuantity" class="modal-input" placeholder="1" min="1" max="9999" value="1">
           </div>
         </div>
 
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="pkgMinGuests">Min Guests</label>
-            <input type="number" id="pkgMinGuests" class="modal-input" placeholder="20" min="0">
+            <input type="number" id="pkgMinGuests" class="modal-input" placeholder="20" min="0" max="9999">
           </div>
           <div class="modal-field">
             <label class="modal-label" for="pkgMaxGuests">Max Guests *</label>
-            <input type="number" id="pkgMaxGuests" class="modal-input" placeholder="30" min="1">
+            <input type="number" id="pkgMaxGuests" class="modal-input" placeholder="30" min="1" max="9999">
             <span class="field-error hidden" id="pkgMaxGuestsError"></span>
           </div>
         </div>
         <p class="modal-hint" id="pkgGuestRangeHint"></p>
 
+        <!-- Additional Per-Head (Main packages only) -->
+        <div class="modal-field" id="pkgAdditionalHeadToggleField">
+          <label class="pkg-active-toggle-label">
+            <input type="checkbox" id="pkgAllowAdditionalHeadToggle">
+            <span>Allow additional guests beyond Max Guests</span>
+          </label>
+          <span class="modal-hint">Lets a customer add guests above the Max Guests cap at a per-person price — e.g. an All-In package for 50 pax, +&#8369;200 per extra guest.</span>
+        </div>
+        <div class="modal-row" id="pkgAdditionalHeadFields" style="display:none;">
+          <div class="modal-field">
+            <label class="modal-label" for="pkgPricePerAdditionalHead">Price per Additional Head (&#8369;) *</label>
+            <input type="number" id="pkgPricePerAdditionalHead" class="modal-input" placeholder="200" min="0" max="100000" step="0.01">
+            <span class="field-error hidden" id="pkgPricePerAdditionalHeadError"></span>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="pkgMaxAdditionalHeads">Max Additional Heads</label>
+            <input type="number" id="pkgMaxAdditionalHeads" class="modal-input" placeholder="Leave blank for no extra cap" min="0" max="9999">
+            <span class="modal-hint" id="pkgAdditionalHeadVenueHint"></span>
+          </div>
+        </div>
+
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="pkgExtensionPrice">Extension Price (₱/hr)</label>
-            <input type="number" id="pkgExtensionPrice" class="modal-input" placeholder="800" min="0" step="0.01">
+            <input type="number" id="pkgExtensionPrice" class="modal-input" placeholder="800" min="0" max="100000" step="0.01">
             <span class="modal-hint">Leave blank if no extension rate applies.</span>
           </div>
           <div class="modal-field" id="pkgLocationField">
@@ -748,7 +770,7 @@
           </div>
           <div class="modal-field">
             <label class="modal-label" for="venueCapacity">Capacity (guests) *</label>
-            <input type="number" id="venueCapacity" class="modal-input" placeholder="50" min="1">
+            <input type="number" id="venueCapacity" class="modal-input" placeholder="50" min="1" max="9999">
           </div>
         </div>
         <div class="modal-field">
@@ -757,7 +779,7 @@
         </div>
         <div class="modal-field">
           <label class="modal-label" for="venueSortOrder">Sort Order</label>
-          <input type="number" id="venueSortOrder" class="modal-input" value="0" min="0">
+          <input type="number" id="venueSortOrder" class="modal-input" value="0" min="0" max="9999">
         </div>
         <div class="modal-field" id="venueMappedPackagesField" style="display:none;">
           <label class="modal-label">Packages mapped to this venue</label>
@@ -806,7 +828,7 @@
           </div>
           <div class="modal-field">
             <label class="modal-label" for="badgeTypeSortOrder">Sort Order</label>
-            <input type="number" id="badgeTypeSortOrder" class="modal-input" value="0" min="0">
+            <input type="number" id="badgeTypeSortOrder" class="modal-input" value="0" min="0" max="9999">
           </div>
         </div>
         <div class="modal-field">
@@ -870,7 +892,7 @@
           </div>
           <div class="modal-field">
             <label class="modal-label" for="cateringCatSortOrder">Sort Order</label>
-            <input type="number" id="cateringCatSortOrder" class="modal-input" value="0" min="0">
+            <input type="number" id="cateringCatSortOrder" class="modal-input" value="0" min="0" max="9999">
           </div>
         </div>
         <div class="modal-field">
@@ -882,10 +904,10 @@
         <div class="modal-field">
           <label class="modal-label">Price per pax bracket *</label>
           <div class="modal-row modal-row-four">
-            <input type="number" id="cateringPrice20" class="modal-input" placeholder="20 pax" min="0">
-            <input type="number" id="cateringPrice30" class="modal-input" placeholder="30 pax" min="0">
-            <input type="number" id="cateringPrice40" class="modal-input" placeholder="40 pax" min="0">
-            <input type="number" id="cateringPrice50" class="modal-input" placeholder="50 pax" min="0">
+            <input type="number" id="cateringPrice20" class="modal-input" placeholder="20 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice30" class="modal-input" placeholder="30 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice40" class="modal-input" placeholder="40 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice50" class="modal-input" placeholder="50 pax" min="0" max="1000000" step="0.01">
           </div>
         </div>
       </div>

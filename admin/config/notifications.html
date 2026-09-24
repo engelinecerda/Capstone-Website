@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <title>Notifications - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=48">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=48">
-  <link rel="stylesheet" href="/css/admin_notifications_config.css?v=48">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=48">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=53">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=53">
+  <link rel="stylesheet" href="/css/admin_notifications_config.css?v=53">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=53">
 </head>
 <body>
 
@@ -117,7 +118,7 @@
       <div class="modal-body">
         <div class="modal-field" id="editorLeadDaysField">
           <label class="modal-label" for="editorLeadDaysInput">Send this many days before</label>
-          <input type="number" id="editorLeadDaysInput" class="modal-input" min="0" step="1" style="max-width:120px;">
+          <input type="number" id="editorLeadDaysInput" class="modal-input" min="0" max="365" step="1" style="max-width:120px;">
           <p class="modal-hint">Reminders fire once, on the day that's exactly this many days before the deadline — checked daily.</p>
         </div>
         <div class="modal-field">
@@ -157,6 +158,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="/js/admin_notifications_config.js?v=47"></script>
+  <script type="module" src="/js/admin_notifications_config.js?v=53"></script>
 </body>
 </html>

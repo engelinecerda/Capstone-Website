@@ -7,12 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=48">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=48">
-  <link rel="stylesheet" href="/css/super_admin_settings.css?v=48">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=48">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=53">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=53">
+  <link rel="stylesheet" href="/css/super_admin_settings.css?v=53">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=53">
 </head>
 <body>
 
@@ -94,7 +95,7 @@
             <p class="pr-row-desc">Used for any event type with no override, and for "Other."</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="field-min-advance-days" min="0" step="1">
+            <input type="number" class="pr-input-inline" id="field-min-advance-days" min="0" max="365" step="1">
           </div>
         </div>
 
@@ -104,7 +105,7 @@
             <p class="pr-row-desc">How far into the future the calendar opens up. Also caps every per-event-type override below — e.g. set to 180 to allow the 5-month lead time weddings need.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="field-max-advance-days" min="1" step="1">
+            <input type="number" class="pr-input-inline" id="field-max-advance-days" min="1" max="730" step="1">
           </div>
         </div>
 
@@ -147,7 +148,7 @@
             <p class="pr-row-desc">A cancellation request holds the reservation's date until the fee is paid and verified. If the deadline passes unpaid, the reservation is automatically finalized as cancelled and the date is released — the fee still stays owed.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-cancellation-hold-hours" min="1">
+            <input type="number" class="pr-input-inline" id="pr-cancellation-hold-hours" min="1" max="720">
             <span class="field-note" style="margin:0;">hours</span>
           </div>
         </div>
@@ -162,7 +163,7 @@
               <input type="checkbox" id="pr-cancellation-min-notice-enabled">
               <span class="pm2-toggle-track"></span>
             </label>
-            <input type="number" class="pr-input-inline" id="pr-cancellation-min-notice-days" min="0" disabled>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-min-notice-days" min="0" max="365" disabled>
             <span class="field-note" style="margin:0;">days</span>
           </div>
         </div>
@@ -177,7 +178,7 @@
               <input type="checkbox" id="pr-cancellation-request-window-enabled">
               <span class="pm2-toggle-track"></span>
             </label>
-            <input type="number" class="pr-input-inline" id="pr-cancellation-request-window-days" min="1" disabled>
+            <input type="number" class="pr-input-inline" id="pr-cancellation-request-window-days" min="1" max="365" disabled>
             <span class="field-note" style="margin:0;">days</span>
           </div>
         </div>
@@ -188,7 +189,7 @@
             <p class="pr-row-desc">How long an unpaid cancellation fee sits before it's flagged to managers as overdue. This only affects when you're notified — the fee blocks the customer's next booking immediately either way.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-cancellation-balance-grace-days" min="1">
+            <input type="number" class="pr-input-inline" id="pr-cancellation-balance-grace-days" min="1" max="365">
             <span class="field-note" style="margin:0;">days</span>
           </div>
         </div>
@@ -211,7 +212,7 @@
             <p class="pr-row-desc">How long the newly requested date stays reserved for this customer while they pay the reschedule fee, before it auto-releases back to the calendar.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-reschedule-hold-hours" min="1">
+            <input type="number" class="pr-input-inline" id="pr-reschedule-hold-hours" min="1" max="720">
             <span class="field-note" style="margin:0;">hours</span>
           </div>
         </div>
@@ -226,7 +227,7 @@
               <input type="checkbox" id="pr-reschedule-min-notice-enabled">
               <span class="pm2-toggle-track"></span>
             </label>
-            <input type="number" class="pr-input-inline" id="pr-reschedule-min-notice-days" min="0" disabled>
+            <input type="number" class="pr-input-inline" id="pr-reschedule-min-notice-days" min="0" max="365" disabled>
             <span class="field-note" style="margin:0;">days</span>
           </div>
         </div>
@@ -237,7 +238,7 @@
             <p class="pr-row-desc">Caps how many times a single reservation can be rescheduled. A hold that expires unpaid doesn't count against this.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-max-reschedule-count" min="1">
+            <input type="number" class="pr-input-inline" id="pr-max-reschedule-count" min="1" max="20">
           </div>
         </div>
 
@@ -259,7 +260,7 @@
             <p class="pr-row-desc">How long the requested extra time stays reserved while the customer pays the extension fee, before it auto-releases back to the calendar. Extension holds are meant to be short — this is in minutes, not hours.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-extension-hold-minutes" min="1">
+            <input type="number" class="pr-input-inline" id="pr-extension-hold-minutes" min="1" max="10080">
             <span class="field-note" style="margin:0;">minutes</span>
           </div>
         </div>
@@ -282,7 +283,7 @@
             <p class="pr-row-desc">Turnaround between events in the same scope.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="field-buffer-minutes" min="0" step="5">
+            <input type="number" class="pr-input-inline" id="field-buffer-minutes" min="0" max="240" step="5">
           </div>
         </div>
         <div class="pr-row">
@@ -291,7 +292,7 @@
             <p class="pr-row-desc">How many separate events a scope can host across one day, unless overridden below. A booked time is always exclusive — this only limits how many different times in the same day a scope can be booked, not how many can overlap.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="field-default-capacity" min="1" step="1">
+            <input type="number" class="pr-input-inline" id="field-default-capacity" min="1" max="100" step="1">
           </div>
         </div>
 

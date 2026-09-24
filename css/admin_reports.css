@@ -1,4 +1,4 @@
-@import url('./admin_homepage.css?v=48');
+@import url('./admin_homepage.css?v=53');
 
 /* .page-shell--wide is defined in manager-theme.css, but this stylesheet loads after it and
    its plain .page-shell { max-width } rule used to win, pinning the page at a fixed width

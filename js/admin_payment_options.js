@@ -11,6 +11,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { attachPhoneMask } from './phone_format.js';
+import { clampNumberInput } from './numeric_input.js';
 
 attachPhoneMask(document.getElementById('pm2PhoneNumber'));
 
@@ -941,6 +942,22 @@ async function saveCategoryOverride(row) {
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value — see js/numeric_input.js.
+function wireNumericInputClamps() {
+  clampNumberInput(document.getElementById('pt-reservation_fee-flat'), { min: 0, max: 1000000, decimals: 2 });
+  clampNumberInput(document.getElementById('pt-down_payment-percent'), { min: 0, max: 100, decimals: 0 });
+  clampNumberInput(document.getElementById('pt-partial_payment-percent'), { min: 0, max: 100, decimals: 0 });
+  clampNumberInput(document.getElementById('pt-partial_payment-floor'), { min: 0, max: 1000000, decimals: 2 });
+  clampNumberInput(document.getElementById('pr-max-installments'), { min: 1, max: 20, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-proof-window'), { min: 0, max: 365, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-cancellation-fee-onsite'), { min: 0, max: 1000000, decimals: 2 });
+  clampNumberInput(document.getElementById('pr-cancellation-fee-offsite'), { min: 0, max: 1000000, decimals: 2 });
+  clampNumberInput(document.getElementById('pr-reschedule-fee'), { min: 0, max: 1000000, decimals: 2 });
+  clampNumberInput(document.getElementById('sc-global-percent'), { min: 0, max: 100, decimals: 1 });
+  clampNumberInput(document.getElementById('pm2CashWindowDays'), { min: 0, max: 365, decimals: 0 });
+}
+
 async function init() {
   const result = await validateAdminSession({ fallbackLabel: 'Admin' });
   if (!result) return;
@@ -963,6 +980,7 @@ async function init() {
   initAdminSidebarBadges(supabase);
   initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
+  wireNumericInputClamps();
 
   await loadPaymentMethods();
   await loadPaymentTypes();

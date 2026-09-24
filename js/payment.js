@@ -13,6 +13,7 @@ import {
     getPaymentStatusMeta,
     getPaymentPageState,
     getReservationBalanceDetails,
+    getReservationCharges,
     getReservationPayments,
     getReservationReceipts,
     isCompletedPaymentOverview,
@@ -65,7 +66,8 @@ const state = {
         paymentsByReservationId: {},
         receiptsByPaymentId: {},
         reschedulesByReservationId: {},
-        extensionsByReservationId: {}
+        extensionsByReservationId: {},
+        additionalHeadRequestsByReservationId: {}
     },
     reservationId: new URLSearchParams(window.location.search).get('reservation_id') || '',
     // Routing hint only, from buildCustomerPaymentUrl's target param — used
@@ -310,7 +312,9 @@ function getActivePaymentPageState(reservation) {
             formatDate,
             reservationRules: state.reservationRules,
             paymentRules: state.paymentRules,
-            extensionsByReservationId: state.bundle.extensionsByReservationId
+            extensionsByReservationId: state.bundle.extensionsByReservationId,
+            additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId,
+            chargesByReservationId: state.bundle.chargesByReservationId
         }
     );
 }
@@ -318,7 +322,8 @@ function getActivePaymentPageState(reservation) {
 function getActiveBalance(reservation) {
     return getReservationBalanceDetails(reservation, state.bundle.paymentsByReservationId, {
         formatDate,
-        reservationRules: state.reservationRules
+        reservationRules: state.reservationRules,
+        chargesByReservationId: state.bundle.chargesByReservationId
     });
 }
 
@@ -332,7 +337,9 @@ function getActivePaymentOptions(reservation) {
             reservationRules: state.reservationRules,
             paymentTypes: state.paymentTypes,
             paymentRules: state.paymentRules,
-            extensionsByReservationId: state.bundle.extensionsByReservationId
+            extensionsByReservationId: state.bundle.extensionsByReservationId,
+            additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId,
+            chargesByReservationId: state.bundle.chargesByReservationId
         }
     );
 }
@@ -342,7 +349,7 @@ function getSelectedMethodObject() {
 }
 
 function getPaymentOptionKey(option) {
-    return `${option.paymentType}:${option.rescheduleRequestId || ''}:${option.extensionId || ''}`;
+    return `${option.paymentType}:${option.rescheduleRequestId || ''}:${option.extensionId || ''}:${option.additionalHeadRequestId || ''}`;
 }
 
 function getVisibleOptions(reservation) {
@@ -381,12 +388,14 @@ function syncSelections(reservation) {
     // something an entry point should dictate.
     if (!state.selectedOptionKey && state.targetType) {
         const wantedPaymentType = state.targetType === 'extension' ? 'extension_fee'
+            : state.targetType === 'additional_head' ? 'additional_head_fee'
             : state.targetType === 'reschedule' ? 'reschedule_fee'
             : state.targetType === 'cancellation' ? 'cancellation_fee'
             : null;
         const matched = wantedPaymentType && visibleOptions.find((option) => {
             if (option.paymentType !== wantedPaymentType) return false;
             if (state.targetType === 'extension') return String(option.extensionId || '') === String(state.targetId || '');
+            if (state.targetType === 'additional_head') return String(option.additionalHeadRequestId || '') === String(state.targetId || '');
             if (state.targetType === 'reschedule') return String(option.rescheduleRequestId || '') === String(state.targetId || '');
             return true;
         });
@@ -932,12 +941,39 @@ function renderActionableCard(reservation) {
         ? `${escapeHtml(reservation.event_type || 'Event')} — ${escapeHtml(selectedOption.displayLabel || selectedOption.label)}`
         : `${escapeHtml(reservation.event_type || 'Event')} — choose a payment type below`;
 
+    // Manual Charge for Special Requests — only shown when the reservation
+    // actually has one, so the common case (no charges) stays exactly as
+    // it already was. Answers "why is my balance higher than the package
+    // price" right where the customer is about to choose what to pay.
+    const balance = getActiveBalance(reservation);
+    const activeCharges = getReservationCharges(state.bundle.chargesByReservationId, reservation.reservation_id)
+        .filter((charge) => !charge.voided);
+    const chargesBreakdown = activeCharges.length ? `
+        <div class="payment-dl">
+            <div class="payment-dl-row">
+                <span>Package total</span>
+                <strong>${escapeHtml(formatCurrency(balance.basePackagePrice))}</strong>
+            </div>
+            ${activeCharges.map((charge) => `
+                <div class="payment-dl-row">
+                    <span>${escapeHtml(charge.label)}</span>
+                    <strong>${escapeHtml(formatCurrency(charge.amount))}</strong>
+                </div>
+            `).join('')}
+            <div class="payment-dl-row">
+                <span>Total</span>
+                <strong>${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
+            </div>
+        </div>
+    ` : '';
+
     return `
         <section class="payment-focus-card">
             <div class="payment-target-summary">
                 <p class="payment-target-summary-label">Paying: <strong>${payingSummary}</strong></p>
                 ${selectedOption?.displayDescription ? `<p class="payment-target-summary-desc">${escapeHtml(selectedOption.displayDescription)}</p>` : ''}
             </div>
+            ${chargesBreakdown}
 
             <section class="payment-step-section">
                 <div>
@@ -1009,6 +1045,23 @@ function renderPendingCard(reservation) {
     `;
 }
 
+// Manual Charge for Special Requests — itemized, active (non-voided) lines
+// only; a voided charge no longer affects this customer's balance, so it's
+// left off their view (voided/active history is a manager-side concern,
+// shown on the reservation-details admin page instead).
+function renderChargesBreakdown(reservation) {
+    const charges = getReservationCharges(state.bundle.chargesByReservationId, reservation.reservation_id)
+        .filter((charge) => !charge.voided);
+    if (!charges.length) return '';
+
+    return charges.map((charge) => `
+        <div class="payment-dl-row">
+            <span>${escapeHtml(charge.label)}</span>
+            <strong>${escapeHtml(formatCurrency(charge.amount))}</strong>
+        </div>
+    `).join('');
+}
+
 function renderCompleteCard(reservation) {
     const balance = getActiveBalance(reservation);
     const latestReceiptEntry = getReservationReceipts(
@@ -1024,6 +1077,11 @@ function renderCompleteCard(reservation) {
                 <h2 class="payment-readonly-title">This reservation is already fully paid</h2>
                 <p class="payment-readonly-copy">All required payments for this reservation have been approved and recorded. You can still review your payment history and receipts below.</p>
                 <div class="payment-dl">
+                    <div class="payment-dl-row">
+                        <span>Package price</span>
+                        <strong>${escapeHtml(formatCurrency(balance.basePackagePrice))}</strong>
+                    </div>
+                    ${renderChargesBreakdown(reservation)}
                     <div class="payment-dl-row">
                         <span>Total amount</span>
                         <strong>${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
@@ -1222,7 +1280,7 @@ function isReservationActionable(reservation) {
         reservation,
         state.bundle.paymentsByReservationId,
         state.bundle.reschedulesByReservationId,
-        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId }
+        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId, chargesByReservationId: state.bundle.chargesByReservationId }
     ];
     if (isCompletedPaymentOverview(...overviewArgs)) return false;
     if (isPendingPaymentOverview(...overviewArgs)) return false;
@@ -1261,14 +1319,14 @@ function renderReservationPaymentPage() {
             reservation,
             state.bundle.paymentsByReservationId,
             state.bundle.reschedulesByReservationId,
-            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId }
+            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId, chargesByReservationId: state.bundle.chargesByReservationId }
         )
             ? renderCompleteCard(reservation)
             : isPendingPaymentOverview(
                 reservation,
                 state.bundle.paymentsByReservationId,
                 state.bundle.reschedulesByReservationId,
-                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId }
+                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId, chargesByReservationId: state.bundle.chargesByReservationId }
             )
                 ? renderPendingCard(reservation)
                 : renderActionableCard(reservation);
@@ -1438,11 +1496,14 @@ async function handleSubmitPayment() {
             paymentsByReservationId: state.bundle.paymentsByReservationId,
             reschedulesByReservationId: state.bundle.reschedulesByReservationId,
             extensionsByReservationId: state.bundle.extensionsByReservationId,
+            additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId,
+            chargesByReservationId: state.bundle.chargesByReservationId,
             reservationId: reservation.reservation_id,
             selectedMethod: selectedMethodObj,
             paymentType: selectedOption.paymentType,
             rescheduleRequestId: selectedOption.rescheduleRequestId || null,
             extensionId: selectedOption.extensionId || null,
+            additionalHeadRequestId: selectedOption.additionalHeadRequestId || null,
             customAmount: selectedOption.paymentType === 'partial_payment' ? Number(state.form.customAmount) : null,
             referenceNumber: state.form.referenceNumber.trim(),
             paymentDate: state.form.paymentDate || null,
@@ -1477,8 +1538,46 @@ async function handleSubmitPayment() {
         clearPaymentDraft();
         await loadPaymentPage();
     } catch (error) {
-        state.flashMessage = error?.message || 'Failed to submit payment.';
+        const rawMessage = error?.message || 'Failed to submit payment.';
+        const isStaleFeeMismatch = /must equal the (cancellation|reschedule|extension|additional guests) fee of/i.test(rawMessage);
+        state.flashMessage = isStaleFeeMismatch
+            ? `${rawMessage} This fee changed after the page loaded — we've refreshed the amount below, please review and try again.`
+            : rawMessage;
         state.flashType = 'error';
+        // The server (validate_payment_submission trigger) is the source of
+        // truth for fee amounts, computed fresh from system_settings at
+        // INSERT time. The client's copy of that same data (state.paymentRules,
+        // state.bundle, state.reservationRules) is only refetched by
+        // initAutoRefresh below — which deliberately SKIPS refreshing while
+        // the customer is typing/has a receipt attached/is submitting, i.e.
+        // for the entire time they're filling out this form. If an admin
+        // changes a fee (or the reservation's own state moves) during that
+        // window, the amount shown here goes stale but keeps rendering as
+        // "correct" against itself, so the trigger rejects the mismatch and,
+        // without this refetch, every retry would fail the exact same way
+        // forever — the amount is read-only, so the customer has no way to
+        // self-correct it. Refresh just the fee-relevant state (not
+        // state.form, so an attached receipt/reference number/notes survive)
+        // so the displayed amount — and the next submit attempt — both catch
+        // up to the live value.
+        try {
+            const [paymentRules, reservationRules, bundle] = await Promise.all([
+                loadPaymentRules(supabase),
+                loadReservationRules(supabase),
+                loadCustomerPaymentBundle(supabase, user.id)
+            ]);
+            state.paymentRules = paymentRules;
+            state.reservationRules = reservationRules;
+            state.bundle = bundle;
+            state.cancellationInfo = state.reservationId ? await fetchCancellationInfo(state.reservationId) : null;
+            // selectedOptionKey is keyed by paymentType/rescheduleRequestId/
+            // extensionId only (not amount), so the customer's selection
+            // survives this refresh automatically — getSelectedOption() will
+            // just resolve it against the now-current amount.
+        } catch (_) {
+            // Best-effort — if this refetch also fails, the customer still
+            // sees the original error above and can retry manually.
+        }
     } finally {
         state.isSubmitting = false;
         renderReservationPaymentPage();

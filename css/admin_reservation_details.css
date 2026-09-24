@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=48');
+@import url('./admin_reservations.css?v=53');
 
 /* ============================================================
    Hidden-state overrides.
@@ -362,9 +362,17 @@
    ============================================================ */
 .details-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
+  /* Was `stretch` (grid's default) paired with .details-card-flex's
+     flex:1 below, deliberately forcing the short Staff assignment card
+     to grow and match Payment's height, bottoming both columns out
+     together. That's exactly what created the large dead space under
+     the staff pills once a reservation only has a few people assigned —
+     Staff assignment should read as a compact card, not an
+     artificially-elongated one. `start` lets each column size to its
+     own content instead. */
+  align-items: start;
 }
 
 .details-col-main {
@@ -380,12 +388,11 @@
   gap: 12px;
 }
 
-/* Last card in each column absorbs leftover height so both columns
-   bottom out together (Payment on the left, Staff assignment on the
-   right). Only meaningful while .details-columns is stretched side by
-   side — neutralized below the stacking breakpoint. */
+/* No longer stretches anything now that .details-columns uses
+   align-items: start (see above) — kept as a harmless no-op rather than
+   pulled from the markup, in case a future card in one of these columns
+   ever needs its own internal flex layout. */
 .details-card-flex {
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -588,7 +595,7 @@
    everything else here is scoped to this modal only.
    ============================================================ */
 .assignment-modal-card {
-  width: min(100%, 420px);
+  width: min(100%, 560px);
   background: #FFFFFF;
   border: 0.5px solid #E8DFD3;
   border-radius: 12px;
@@ -601,20 +608,20 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 20px 24px;
   border-bottom: 0.5px solid #E8DFD3;
 }
 
 .assignment-modal-title {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 19px;
+  font-weight: 600;
   color: var(--text);
 }
 
 .assignment-modal-subtitle {
-  margin: 2px 0 0;
-  font-size: 11px;
+  margin: 4px 0 0;
+  font-size: 13px;
   color: var(--muted-2);
 }
 
@@ -622,9 +629,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   border: 0.5px solid var(--btn-secondary-border);
   background: #FFFFFF;
   color: #4A2C17;
@@ -633,35 +640,50 @@
   transition: background 0.15s ease;
 }
 
+.assignment-modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
 .assignment-modal-close:hover {
   background: #F5EEE4;
 }
 
 .assignment-modal-body {
-  padding: 16px;
-  max-height: 60vh;
+  padding: 22px;
+  max-height: 65vh;
   overflow-y: auto;
+}
+
+.assignment-modal-body .modal-message {
+  font-size: 13.5px;
 }
 
 .assignment-modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 18px 24px;
   border-top: 0.5px solid #E8DFD3;
+}
+
+.assignment-modal-footer .header-action-btn {
+  height: 42px;
+  padding: 0 22px;
+  font-size: 14px;
 }
 
 .assignment-context-block {
   background: #FAF6F0;
   border: 0.5px solid #E8DFD3;
-  border-radius: 8px;
-  padding: 9px 11px;
-  margin-bottom: 12px;
+  border-radius: 9px;
+  padding: 13px 16px;
+  margin-bottom: 16px;
 }
 
 .assignment-context-label {
   display: block;
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -669,42 +691,44 @@
 }
 
 .assignment-context-main {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 5px 0 0;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--text);
 }
 
 .assignment-context-sub {
-  margin: 2px 0 0;
-  font-size: 11px;
+  margin: 3px 0 0;
+  font-size: 13px;
   color: var(--muted-2);
 }
 
 .assignment-search-field {
   position: relative;
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .assignment-search-icon {
   position: absolute;
-  left: 10px;
+  left: 13px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--muted-2);
   pointer-events: none;
+  width: 16px;
+  height: 16px;
 }
 
 .assignment-search-input {
   width: 100%;
-  height: 34px;
-  padding: 0 12px 0 32px;
-  border-radius: 8px;
+  height: 44px;
+  padding: 0 14px 0 40px;
+  border-radius: 9px;
   border: 0.5px solid #E8DFD3;
   background: #FBF8F3;
   font: inherit;
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--text);
   outline: none;
   transition: border-color 0.15s ease;
@@ -718,13 +742,13 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-  min-height: 20px;
+  gap: 8px;
+  margin-bottom: 14px;
+  min-height: 24px;
 }
 
 .assignment-selection-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted-2);
   flex-shrink: 0;
 }
@@ -732,13 +756,13 @@
 .assignment-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 20px;
-  padding: 0 6px 0 8px;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 10px;
   border-radius: 999px;
   background: #EFE8DD;
   color: #4A2C17;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -746,8 +770,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 17px;
+  height: 17px;
   border: none;
   background: transparent;
   color: #4A2C17;
@@ -761,24 +785,24 @@
 }
 
 .assignment-staff-list {
-  max-height: 260px;
+  max-height: 340px;
   overflow-y: auto;
   border: 0.5px solid #E8DFD3;
-  border-radius: 8px;
+  border-radius: 9px;
 }
 
 .assignment-staff-empty {
-  padding: 20px 12px;
+  padding: 28px 16px;
   text-align: center;
   color: var(--muted-2);
-  font-size: 11px;
+  font-size: 13.5px;
 }
 
 .assignment-staff-option {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
+  gap: 13px;
+  padding: 13px 16px;
   cursor: pointer;
   transition: background 0.15s ease;
   border-bottom: 0.5px solid #E8DFD3;
@@ -799,9 +823,9 @@
 .assignment-staff-option input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   border: 0.5px solid #D8CCBD;
   background: #FFFFFF;
   flex-shrink: 0;
@@ -819,12 +843,12 @@
 .assignment-staff-option input[type="checkbox"]:checked::after {
   content: '';
   position: absolute;
-  left: 5px;
-  top: 2px;
-  width: 3px;
-  height: 7px;
+  left: 6px;
+  top: 3px;
+  width: 4px;
+  height: 9px;
   border: solid #FDF6EE;
-  border-width: 0 1.5px 1.5px 0;
+  border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
@@ -834,15 +858,15 @@
 
 .assignment-staff-name {
   display: block;
-  font-size: 12px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--text);
 }
 
 .assignment-staff-role {
   display: block;
-  margin-top: 1px;
-  font-size: 11px;
+  margin-top: 2px;
+  font-size: 13px;
   color: var(--muted-2);
 }
 
@@ -852,10 +876,10 @@
    for the footer buttons — only the card chrome is new here.
    ============================================================ */
 .approval-prompt-card {
-  width: min(100%, 380px);
+  width: min(100%, 460px);
   background: #FFFFFF;
   border: 0.5px solid #E8DFD3;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 20px 48px rgba(58, 34, 17, 0.16);
   padding: 0;
 }
@@ -865,43 +889,48 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 18px;
+  padding: 28px 24px 24px;
 }
 
 .approval-prompt-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 52px;
+  height: 52px;
   border-radius: 999px;
   background: #EAF3DE;
   color: #3B6D11;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.approval-prompt-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .approval-prompt-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 19px;
   font-weight: 500;
   color: var(--text);
 }
 
 .approval-prompt-meta {
-  margin: 4px 0 0;
-  font-size: 11px;
+  margin: 6px 0 0;
+  font-size: 13px;
   color: var(--muted-2);
 }
 
 .approval-prompt-note {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin: 0 18px 18px;
+  gap: 10px;
+  margin: 0 24px 24px;
   background: #FAF6F0;
   border: 0.5px solid #E8DFD3;
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 14px 16px;
 }
 
 .approval-prompt-note-icon {
@@ -909,40 +938,47 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   margin-top: 1px;
   color: #6B3F23;
+}
+
+.approval-prompt-note-icon svg {
+  width: 17px;
+  height: 17px;
 }
 
 .approval-prompt-note-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
 .approval-prompt-note-title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text);
 }
 
 .approval-prompt-note-sub {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted-2);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .approval-prompt-footer {
   display: flex;
-  gap: 8px;
-  padding: 12px 18px;
+  gap: 10px;
+  padding: 16px 24px;
   border-top: 0.5px solid #E8DFD3;
 }
 
 .approval-prompt-footer .header-action-btn {
   flex: 1;
+  height: 40px;
+  font-size: 13px;
 }
 
 /* ============================================================
@@ -1031,6 +1067,32 @@
 
 .payment-history-no-receipt {
   color: var(--muted-2);
+}
+
+/* Manual charge "Void" — was reusing .payment-history-view-link (a bare
+   text link with no border/background/padding), which left it rendering
+   as an unstyled default <button> next to the Active/Voided status pill.
+   Destructive action, compact enough to sit inline in the charges table. */
+.charge-void-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 0.5px solid var(--declined-border);
+  background: var(--declined);
+  color: var(--declined-text);
+  transition: filter 0.15s ease;
+}
+
+.charge-void-btn:hover {
+  filter: brightness(0.97);
 }
 
 .payment-history-empty-row td {

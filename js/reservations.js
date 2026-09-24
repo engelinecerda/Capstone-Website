@@ -100,6 +100,12 @@ const S = {
     // option) or by the customer via the picker (more than one option).
     venueOptions: [],
     venueId: null,
+    // Additional Per-Head (supabase/migrations/20261018_additional_per_head.sql)
+    // — guests booked beyond the selected package's Max Guests, at that
+    // package's configured per-head price. Only ever nonzero when the
+    // package allows it; reset to 0 whenever the package/venue selection
+    // changes (see resetAdditionalHeads()).
+    additionalHeads: 0,
     snackAddon: null,
     offsitePackage: null,
     cateringCart: [],
@@ -1159,6 +1165,15 @@ function computeContractPreviewDiscount() {
     return getPkgDiscount(S.offsitePackage);
 }
 
+// Additional Per-Head (supabase/migrations/20261018_additional_per_head.sql)
+// — same package-only rule as computeContractPreviewDiscount(): catering
+// has no single package to attach this to.
+function computeContractPreviewAdditionalHeadCharge() {
+    const pkg = getSelectedPackageForAdditionalHead();
+    if (!pkg?.allowAdditionalHead || isCateringPackage(getActivePackage())) return 0;
+    return (S.additionalHeads || 0) * Number(pkg.pricePerAdditionalHead || 0);
+}
+
 function computeContractPreviewBase() {
     let base;
     if (isCateringPackage(getActivePackage())) {
@@ -1168,6 +1183,7 @@ function computeContractPreviewBase() {
     } else {
         base = S.offsitePackage ? S.offsitePackage.price : 0;
     }
+    base += computeContractPreviewAdditionalHeadCharge();
     // Discount reduces the base before the service charge, same ordering
     // as buildSummary() — so the pre-submit contract preview matches the
     // final breakdown the customer sees on the Review step.
@@ -1244,6 +1260,7 @@ function renderContractBody(templateBody, contractData = {}) {
     const { clauses = [], lockedClauses = {}, fields = [], feeTerms = {} } = contractData;
     const charge = computeContractPreviewCharge();
     const discount = computeContractPreviewDiscount();
+    const previewAdditionalHeadCharge = computeContractPreviewAdditionalHeadCharge();
     const isOffsite = S.locationType === 'offsite';
     const data = {
         customer_name: S.name || 'Customer',
@@ -1259,7 +1276,12 @@ function renderContractBody(templateBody, contractData = {}) {
         discount_percent: discount.active ? String(discount.percentOff) : '',
         discount_amount: discount.active ? fmtPeso(discount.discountAmount) : '',
         discount_label: discount.active ? (discount.label || '') : '',
-        guest_count: S.guestCount || '',
+        additional_heads: previewAdditionalHeadCharge > 0 ? String(S.additionalHeads) : '',
+        additional_head_price: previewAdditionalHeadCharge > 0 ? fmtPeso(getSelectedPackageForAdditionalHead()?.pricePerAdditionalHead || 0) : '',
+        additional_head_charge: previewAdditionalHeadCharge > 0 ? fmtPeso(previewAdditionalHeadCharge) : '',
+        guest_count: previewAdditionalHeadCharge > 0
+            ? String(Number(getSelectedPackageForAdditionalHead()?.max_guests || S.guestCount) + S.additionalHeads)
+            : (S.guestCount || ''),
         // Same live system_settings/payment_type sources the admin's own
         // preview and the final signed PDF use — previously missing here
         // entirely, so any clause referencing one of these five tokens
@@ -1740,7 +1762,21 @@ function getDateAvailability(dateKey) {
 function isDateUnavailableForScope(dateKey, scope) {
     if (!dateKey) return false;
     if (availabilityState.closedDates.has(dateKey)) return true;
-    return getDateAvailability(dateKey).isFullyBooked;
+    const { occupiedScopes, isFullyBooked } = getDateAvailability(dateKey);
+    // get_booking_calendar_availability()'s own is_fully_booked only goes
+    // true once ALL THREE scopes (onsite_vip/onsite_main_hall/offsite) are
+    // exhausted for that date — correct for a "nothing at all is bookable
+    // here" signal, but wrong for THIS customer's specific scope, which can
+    // be full on its own while the other two scopes still have room. The
+    // RPC already computes and ships the finer occupied_scopes array for
+    // exactly this reason; it just wasn't being read here before, which let
+    // the month-view calendar show a date as open when the customer's own
+    // scope (e.g. VIP) was actually already at its daily cap — confirmed
+    // live: the time-slot step correctly rejected it as fully booked while
+    // the calendar month grid kept showing it as available.
+    const scopes = (Array.isArray(scope) ? scope : [scope]).filter(Boolean);
+    if (!scopes.length) return isFullyBooked;
+    return isFullyBooked || scopes.some((s) => occupiedScopes.includes(s));
 }
 
 function isUnavailableDate(dateKey) {
@@ -1995,7 +2031,7 @@ async function loadPackages() {
     packagesLoadState = 'loading';
     const { data: pkgs, error } = await supabase
         .from('package')
-        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, package_category(category_name, is_active, sort_order, service_charge_percent)')
+        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, allow_additional_head, price_per_additional_head, max_additional_heads, package_category(category_name, is_active, sort_order, service_charge_percent)')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -2108,6 +2144,9 @@ async function loadPackages() {
             min_guests: p.min_guests ?? null,
             max_guests: p.max_guests ?? null,
             guestCapacity: p.guest_capacity ?? null,
+            allowAdditionalHead: !!p.allow_additional_head,
+            pricePerAdditionalHead: p.price_per_additional_head ?? null,
+            maxAdditionalHeads: p.max_additional_heads ?? null,
             categoryId,
             categoryName,
             // Package cards render at ~300-370px (`.cards-grid`, `.reservation-
@@ -2224,6 +2263,7 @@ async function selectCategory(cat) {
         S.miniPackage    = null;
         S.venueOptions   = [];
         S.venueId        = null;
+        S.additionalHeads = 0;
         S.offsitePackage = null;
         S.snackAddon     = null;
         S.cateringCart   = [];
@@ -2249,6 +2289,7 @@ async function selectCategory(cat) {
     buildPackageStep();
     updateSectionLocks();
     buildAddonOrVenueStep();
+    buildAdditionalHeadBlock();
     await refreshAvailabilityForSelectedScope();
 }
 
@@ -2399,6 +2440,7 @@ function buildMiniGrid() {
             activate(g, c);
             updateSectionLocks();
             clampGuestCountToSelection();
+            resetAdditionalHeads();
             await resolveVenueOptionsForPackage(p);
             const cateringEl = document.getElementById('catering-section');
             if (isCateringPackage(p)) {
@@ -2410,6 +2452,7 @@ function buildMiniGrid() {
                 cateringEl?.classList.add('hidden');
             }
             buildAddonOrVenueStep();
+            buildAdditionalHeadBlock();
             await refreshAvailabilityForSelectedScope();
         };
         g.appendChild(c);
@@ -2464,6 +2507,7 @@ function buildOffsiteSub(categoryId) {
             activate(g, c);
             updateSectionLocks();
             clampGuestCountToSelection();
+            resetAdditionalHeads();
             const cateringEl = document.getElementById('catering-section');
             if (isCateringPackage(p)) {
                 cateringEl?.classList.remove('hidden');
@@ -2473,6 +2517,7 @@ function buildOffsiteSub(categoryId) {
             } else {
                 cateringEl?.classList.add('hidden');
             }
+            buildAdditionalHeadBlock();
             buildAddonOrVenueStep();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2498,7 +2543,7 @@ async function resolveVenueOptionsForPackage(pkg) {
     try {
         const { data, error } = await supabase
             .from('package_venue')
-            .select('venue_id, venue:venue_id(venue_id, name, description, is_active)')
+            .select('venue_id, venue:venue_id(venue_id, name, description, capacity, is_active)')
             .eq('package_id', pkg.id);
         if (error) throw error;
 
@@ -2541,11 +2586,105 @@ function buildRoomPickerBlock() {
             S.venueId = v.venue_id;
             S.time = '';
             buildRoomPickerBlock();
+            buildAdditionalHeadBlock();
             await refreshAvailabilityForSelectedScope();
         };
         g.appendChild(c);
     });
 }
+
+// ── Additional Per-Head (supabase/migrations/20261018_additional_per_head.sql)
+// — guests booked beyond the selected package's Max Guests, at that
+// package's own configured per-head price. Mirrors the server trigger's
+// exact cap rule so the UI never lets a customer pick a count the server
+// would reject: onsite is capped at (resolved venue's capacity − package's
+// Max Guests), further capped by the package's own Max Additional Heads if
+// set; offsite has no venue check, capped only by the package's own max
+// (or uncapped if the package leaves it blank). ─────────────────────────
+// Catering-flagged packages are cart-priced (no single package.price to
+// attach a per-head charge to), so they never get an additional-head
+// block — returning null here keeps every caller (block, preview, summary,
+// submit) consistent without each one re-checking.
+function getSelectedPackageForAdditionalHead() {
+    const pkg = getActivePackage();
+    return isCateringPackage(pkg) ? null : pkg;
+}
+
+function getAdditionalHeadEffectiveMax() {
+    const pkg = getSelectedPackageForAdditionalHead();
+    if (!pkg?.allowAdditionalHead) return 0;
+
+    let max = Number.isFinite(pkg.maxAdditionalHeads) ? pkg.maxAdditionalHeads : Infinity;
+
+    if (S.locationType === 'onsite') {
+        const venue = S.venueOptions.find(v => v.venue_id === S.venueId);
+        if (!venue || !Number.isFinite(venue.capacity)) return 0; // can't verify capacity yet — no room picked
+        const venueRoom = Math.max(venue.capacity - Number(pkg.max_guests || 0), 0);
+        max = Math.min(max, venueRoom);
+    }
+
+    return Math.max(max, 0);
+}
+
+function resetAdditionalHeads() {
+    S.additionalHeads = 0;
+    const input = document.getElementById('additional-heads-input');
+    if (input) input.value = '0';
+}
+
+function setAdditionalHeads(next) {
+    const effectiveMax = getAdditionalHeadEffectiveMax();
+    S.additionalHeads = Math.min(Math.max(Math.round(next) || 0, 0), effectiveMax);
+    buildAdditionalHeadBlock();
+}
+
+function buildAdditionalHeadBlock() {
+    const block = document.getElementById('additional-head-block');
+    const priceNote = document.getElementById('additional-head-price-note');
+    const hint = document.getElementById('additional-head-hint');
+    const input = document.getElementById('additional-heads-input');
+    const minusBtn = document.getElementById('additional-head-minus');
+    const plusBtn = document.getElementById('additional-head-plus');
+    if (!block) return;
+
+    const pkg = getSelectedPackageForAdditionalHead();
+    if (!pkg?.allowAdditionalHead) {
+        block.classList.add('hidden');
+        return;
+    }
+
+    const effectiveMax = getAdditionalHeadEffectiveMax();
+    if (S.additionalHeads > effectiveMax) S.additionalHeads = effectiveMax;
+
+    block.classList.remove('hidden');
+    const perHead = Number(pkg.pricePerAdditionalHead || 0);
+    if (priceNote) priceNote.textContent = `${fmtPeso(perHead)} per extra guest, on top of this package's ${pkg.max_guests ?? '—'}-guest limit.`;
+    if (input) {
+        input.value = String(S.additionalHeads);
+        input.max = String(effectiveMax);
+    }
+    if (minusBtn) minusBtn.disabled = S.additionalHeads <= 0;
+    if (plusBtn) plusBtn.disabled = effectiveMax <= 0 || S.additionalHeads >= effectiveMax;
+
+    if (hint) {
+        if (effectiveMax <= 0) {
+            hint.textContent = S.locationType === 'onsite' && !S.venueOptions.find(v => v.venue_id === S.venueId)
+                ? 'Choose your room above to see how many extra guests it can hold.'
+                : 'No extra guests can be added for this package.';
+            hint.classList.add('additional-head-hint--limit');
+        } else if (S.additionalHeads > 0) {
+            hint.textContent = `+${S.additionalHeads} guest${S.additionalHeads === 1 ? '' : 's'} × ${fmtPeso(perHead)} = +${fmtPeso(S.additionalHeads * perHead)} (up to ${effectiveMax} extra allowed).`;
+            hint.classList.remove('additional-head-hint--limit');
+        } else {
+            hint.textContent = `Up to ${effectiveMax} extra guest${effectiveMax === 1 ? '' : 's'} allowed.`;
+            hint.classList.remove('additional-head-hint--limit');
+        }
+    }
+}
+
+document.getElementById('additional-head-minus')?.addEventListener('click', () => setAdditionalHeads(S.additionalHeads - 1));
+document.getElementById('additional-head-plus')?.addEventListener('click', () => setAdditionalHeads(S.additionalHeads + 1));
+document.getElementById('additional-heads-input')?.addEventListener('input', (e) => setAdditionalHeads(Number(e.target.value)));
 
 function buildAddonOrVenueStep() {
     const title      = document.getElementById('rs-addon-or-venue-title');
@@ -3484,6 +3623,21 @@ function buildSummary() {
     // S.offsitePackage, never S.snackAddon or the catering cart.
     let discount = { active: false, discountAmount: 0, label: '' };
 
+    // Additional Per-Head — added into `total` alongside the package price
+    // so it flows through the same discount/service-charge math below
+    // exactly like an add-on does; itemised as its own row rather than
+    // folded into the Package line (supabase/migrations/20261018_
+    // additional_per_head.sql — subtotal = base − discount + additional
+    // charge + add-ons, discount only ever applies to the package portion).
+    // Null for catering-flagged packages (see getSelectedPackageForAdditionalHead()).
+    const additionalHeadPkg = getSelectedPackageForAdditionalHead();
+    const additionalHeadCharge = (additionalHeadPkg?.allowAdditionalHead && S.additionalHeads > 0)
+        ? S.additionalHeads * Number(additionalHeadPkg.pricePerAdditionalHead || 0)
+        : 0;
+    const additionalHeadRowHtml = additionalHeadCharge > 0
+        ? sr('Additional Guests', '+' + S.additionalHeads + ' &times; ' + fmtPeso(additionalHeadPkg.pricePerAdditionalHead) + ' = +' + fmtPeso(additionalHeadCharge), 'users-plus')
+        : '';
+
     if (isCateringPackage(getActivePackage())) {
         const catObj = (S.locationType === 'onsite' ? ONSITE_CATEGORIES : OFFSITE_CATEGORIES).find(c => c.id === S.categoryId);
         const cateringPkg = getActivePackage();
@@ -3504,6 +3658,8 @@ function buildSummary() {
         if (S.miniPackage) {
             total += S.miniPackage.price;
             pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price), 'package');
+            pkgRows += additionalHeadRowHtml;
+            total += additionalHeadCharge;
             discount = getPkgDiscount(S.miniPackage);
         }
         if (S.snackAddon) {
@@ -3512,10 +3668,11 @@ function buildSummary() {
         }
     } else if (S.offsitePackage) {
         const catObj = OFFSITE_CATEGORIES.find(c => c.id === S.categoryId);
-        total = S.offsitePackage.price;
+        total = S.offsitePackage.price + additionalHeadCharge;
         pkgRows += sr('Service', catObj ? catObj.name : '', 'tools-kitchen-2');
         pkgRows += sr('Package', S.offsitePackage.label, 'package');
         if (S.offsitePackage.price > 0) pkgRows += sr('Price', fmtPeso(S.offsitePackage.price), 'tag');
+        pkgRows += additionalHeadRowHtml;
         discount = getPkgDiscount(S.offsitePackage);
     }
 
@@ -3541,10 +3698,19 @@ function buildSummary() {
     const locStr   = S.locationType === 'onsite' ? 'Onsite &mdash; ELI Coffee' : 'Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
     const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
+    // Effective final guest count — base pax (Max Guests) + additional
+    // heads once any are added, same formula the server recomputes
+    // guest_count to (enforce_reservation_capacity(), 20261018_additional_
+    // per_head.sql). Unaffected (stays exactly what the customer typed)
+    // when no additional heads are involved.
+    const effectiveGuestCount = additionalHeadCharge > 0
+        ? Number(additionalHeadPkg.max_guests || S.guestCount) + S.additionalHeads
+        : S.guestCount;
+
     const eventRows =
         sr('Location',   locStr, 'building-store') +
         pkgRows +
-        sr('Guests',     S.guestCount, 'users') +
+        sr('Guests',     effectiveGuestCount, 'users') +
         sr('Event Type', displayEventType, 'confetti') +
         sr('Date',       formatDisplayDate(S.eventDate) || S.eventDate, 'calendar') +
         sr('Time',       S.time, 'clock');
@@ -3651,6 +3817,9 @@ function populate(id) {
         updateSectionLocks();
         // Build add-ons / venue section
         buildAddonOrVenueStep();
+        // Additional Per-Head — reflects S.additionalHeads (e.g. restored
+        // from a saved draft) against the now-rendered DOM controls.
+        buildAdditionalHeadBlock();
         // Calendar and time
         updateDateDisplayPlaceholder();
         loadAvailabilityCalendar();
@@ -3996,6 +4165,7 @@ document.querySelectorAll('.location-card').forEach(c => {
             S.miniPackage     = null;
             S.venueOptions    = [];
             S.venueId         = null;
+            S.additionalHeads = 0;
             S.snackAddon      = null;
             S.offsitePackage  = null;
             S.cateringCart    = [];
@@ -4010,6 +4180,7 @@ document.querySelectorAll('.location-card').forEach(c => {
         buildPackageStep();
         updateSectionLocks();
         buildAddonOrVenueStep();
+        buildAdditionalHeadBlock();
         refreshAvailabilityForSelectedScope();
     };
 });
@@ -4154,17 +4325,28 @@ async function submitDone() {
         // promo's window opened or closed since the customer picked it.
         let discount = { active: false, discountAmount: 0, percentOff: 0, label: '' };
 
+        // Additional Per-Head (supabase/migrations/20261018_additional_per_
+        // head.sql) — re-evaluated here the same as discount above, not
+        // trusted from Step 1's cached value. The server trigger is the
+        // real authority (recomputes/validates all of this independently),
+        // but sending the correct figures avoids relying on its fallback.
+        // Null for catering-flagged packages (see getSelectedPackageForAdditionalHead()).
+        const additionalHeadPkg = getSelectedPackageForAdditionalHead();
+        const additionalHeads = additionalHeadPkg?.allowAdditionalHead ? (S.additionalHeads || 0) : 0;
+        const additionalHeadPrice = additionalHeadPkg?.allowAdditionalHead ? Number(additionalHeadPkg.pricePerAdditionalHead || 0) : null;
+        const additionalHeadCharge = additionalHeads > 0 ? additionalHeads * additionalHeadPrice : 0;
+
         if (isCateringPackage(getActivePackage())) {
             packageId  = getActivePackage().id;
             totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
         } else if (S.locationType === 'onsite') {
             packageId  = S.miniPackage ? S.miniPackage.id : null;
             addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
-            totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
+            totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0) + additionalHeadCharge;
             discount = getPkgDiscount(S.miniPackage);
         } else {
             packageId  = S.offsitePackage ? S.offsitePackage.id    : null;
-            totalPrice = S.offsitePackage ? S.offsitePackage.price : 0;
+            totalPrice = (S.offsitePackage ? S.offsitePackage.price : 0) + additionalHeadCharge;
             discount = getPkgDiscount(S.offsitePackage);
         }
 
@@ -4185,6 +4367,15 @@ async function submitDone() {
 
         const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
+        // Final guest count = base pax (this package's Max Guests) +
+        // additional heads, same formula the server trigger recomputes
+        // guest_count to when additional_heads > 0 — sent proactively so
+        // the summary/contract line up with what's about to be inserted,
+        // but the server's own recompute is what's actually authoritative.
+        const finalGuestCount = additionalHeads > 0
+            ? Number(additionalHeadPkg.max_guests || S.guestCount) + additionalHeads
+            : parseInt(S.guestCount);
+
         const { data: reservation, error: insertError } = await supabase
             .from('reservations')
             .insert({
@@ -4192,12 +4383,15 @@ async function submitDone() {
                 event_type:       displayEventType,
                 event_date:       S.eventDate,
                 event_time:       S.time,
-                guest_count:      parseInt(S.guestCount),
+                guest_count:      finalGuestCount,
                 location_type:    S.locationType,
                 venue_location:   S.venueLocation || null,
                 venue_id:         S.locationType === 'onsite' ? (S.venueId || null) : null,
                 package_id:       packageId,
                 add_on_id:        addOnId,
+                additional_heads:        additionalHeads,
+                additional_head_price:   additionalHeads > 0 ? additionalHeadPrice : null,
+                additional_head_charge:  additionalHeadCharge,
                 total_price:      totalPrice,
                 service_charge_percent: serviceCharge.pct,
                 service_charge_amount:  serviceCharge.amount,
@@ -4345,6 +4539,7 @@ if (hasUrlPackage) {
         // call — never ran. Without this, the hint stayed blank until the
         // customer manually reselected a package card.
         clampGuestCountToSelection();
+        buildAdditionalHeadBlock();
         setTimeout(() => scrollToSection('sub-guests-type'), 120);
     }
     finishInit();

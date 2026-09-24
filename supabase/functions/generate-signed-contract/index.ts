@@ -761,6 +761,7 @@ Deno.serve(async (req: Request) => {
         venue_location, contact_name, contact_email, contact_phone, total_price,
         service_charge_percent, service_charge_amount,
         discount_percent, discount_amount, discount_label,
+        additional_heads, additional_head_price, additional_head_charge,
         package_id, package:package_id ( package_name )
       `)
       .eq('reservation_id', reservation_id)
@@ -853,6 +854,12 @@ Deno.serve(async (req: Request) => {
       discount_percent: reservation.discount_percent != null ? String(reservation.discount_percent) : '',
       discount_amount: reservation.discount_amount != null ? formatCurrency(reservation.discount_amount) : '',
       discount_label: reservation.discount_label || '',
+      // Same frozen-at-booking, blank-when-not-applicable treatment as
+      // discount_* above — additional_heads is 0 (not null) when unused, so
+      // check for > 0 rather than != null.
+      additional_heads: reservation.additional_heads > 0 ? String(reservation.additional_heads) : '',
+      additional_head_price: reservation.additional_heads > 0 ? formatCurrency(reservation.additional_head_price || 0) : '',
+      additional_head_charge: reservation.additional_heads > 0 ? formatCurrency(reservation.additional_head_charge || 0) : '',
       guest_count: String(reservation.guest_count || ''),
       contact_email: reservation.contact_email || '',
       contact_phone: reservation.contact_phone || '',

@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=48');
+@import url('./admin_reservations.css?v=53');
 
 /* admin_payments.css */
 
@@ -527,8 +527,8 @@
     border-right: 1px solid var(--border);
     border-top: none;
     /* Divider under every field, like the Employees cards (see
-       .table-responsive-cards in manager-theme.css) and the Inquiries /
-       Contracts / Reservations cards. The last field swaps this for the
+       .table-responsive-cards in manager-theme.css) and the Contracts /
+       Reservations cards. The last field swaps this for the
        card's closing 1px border below. */
     border-bottom: 0.5px solid #EFE8DD;
     border-radius: 0;

@@ -212,7 +212,6 @@ const PRESENTATION_BY_TRIGGER_CODE: Record<string, Presentation> = {
   payment_due:            { eyebrow: 'Reminder',     ctaLabel: 'Continue payment' },
   balance_due:            { eyebrow: 'Reminder',     ctaLabel: 'Continue payment' },
   event_reminder:         { eyebrow: 'Reminder',     ctaLabel: 'View reservation' },
-  inquiry_received:       { eyebrow: 'Inquiry',      ctaLabel: 'View account' },
 }
 
 const PRESENTATION_BY_TITLE: Record<string, Presentation> = {

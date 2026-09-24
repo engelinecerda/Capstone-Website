@@ -7,12 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=48">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=48">
-  <link rel="stylesheet" href="/css/admin_payments.css?v=48">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=48">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=53">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=53">
+  <link rel="stylesheet" href="/css/admin_payments.css?v=53">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=53">
 </head>
 <body>
   <aside class="sidebar">
@@ -207,7 +208,7 @@
         <p class="record-payment-helper">Only methods where the café issues the receipt are listed here.</p>
 
         <label class="record-payment-field-label" for="recordPaymentAmountInput">Amount received</label>
-        <input id="recordPaymentAmountInput" class="record-payment-input" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+        <input id="recordPaymentAmountInput" class="record-payment-input" type="number" min="0.01" max="1000000" step="0.01" placeholder="0.00" required />
         <p class="record-payment-inline-warning hidden" id="recordPaymentAmountWarning"></p>
 
         <label class="record-payment-field-label" for="recordPaymentDateInput">Actual payment date</label>

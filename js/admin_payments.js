@@ -13,6 +13,7 @@ import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { clampNumberInput } from './numeric_input.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -50,6 +51,9 @@ const recordPaymentContextBalance = document.getElementById('recordPaymentContex
 const recordPaymentMethodSelect = document.getElementById('recordPaymentMethodSelect');
 const recordPaymentMethodIcon = document.getElementById('recordPaymentMethodIcon');
 const recordPaymentAmountInput = document.getElementById('recordPaymentAmountInput');
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value — see js/numeric_input.js.
+clampNumberInput(recordPaymentAmountInput, { min: 0.01, max: 1000000, decimals: 2 });
 const recordPaymentAmountWarning = document.getElementById('recordPaymentAmountWarning');
 const recordPaymentDateInput = document.getElementById('recordPaymentDateInput');
 const recordPaymentPlannedNote = document.getElementById('recordPaymentPlannedNote');
@@ -95,7 +99,8 @@ const PAYMENT_TYPE_LABELS = {
   partial_payment: 'Custom Amount',
   reschedule_fee: 'Reschedule Fee',
   cancellation_fee: 'Cancellation Fee',
-  extension_fee: 'Extension Fee'
+  extension_fee: 'Extension Fee',
+  additional_head_fee: 'Additional Guests Fee'
 };
 const PAYMENT_BALANCE_DUE_DAYS = 7;
 
@@ -109,6 +114,7 @@ let reservationMap = {};
 let receiptMap = {};
 let rescheduleRequestMap = {};
 let extensionRequestMap = {};
+let additionalHeadRequestMap = {};
 let paymentSummaryMap = {};
 let paymentMethodMap = {};
 let recordPaymentTargetPayment = null;
@@ -334,6 +340,10 @@ function getRescheduleRequest(requestId) {
 
 function getExtensionRequest(extensionId) {
   return extensionRequestMap[extensionId] || null;
+}
+
+function getAdditionalHeadRequest(requestId) {
+  return additionalHeadRequestMap[requestId] || null;
 }
 
 function getReservationDurationHours(reservation) {
@@ -654,6 +664,28 @@ async function fetchExtensionRequests(extensionIds) {
   }, {});
 }
 
+async function fetchAdditionalHeadRequests(requestIds) {
+  if (!requestIds.length) return {};
+  const { data, error } = await supabase
+    .from('reservation_additional_head_requests')
+    .select(`
+      additional_head_request_id,
+      reservation_id,
+      requested_heads,
+      price_per_head,
+      total_price,
+      status,
+      rejection_reason
+    `)
+    .in('additional_head_request_id', requestIds);
+
+  if (error) throw error;
+  return (data || []).reduce((map, request) => {
+    map[request.additional_head_request_id] = request;
+    return map;
+  }, {});
+}
+
 async function fetchPayments() {
   const { data, error } = await supabase
     .from('payment')
@@ -662,6 +694,7 @@ async function fetchPayments() {
       reservation_id,
       reschedule_request_id,
       extension_id,
+      additional_head_request_id,
       payment_type,
       payment_method,
       payment_method_id,
@@ -928,10 +961,25 @@ function closeReceiptModal() {
 // extensions row's own snapshotted total_price (extensionRequestMap, same
 // lookup the queue row's own detail line already uses), so an extension
 // payment gets the same mismatch-detection coverage the other two fee
-// types always had instead of silently skipping it. Everything else
-// (reservation_fee/down_payment/full_payment/partial_payment) is a
-// variable amount negotiated per booking — there's no fixed figure to
-// compare against, so this returns null rather than fabricating one.
+// types always had instead of silently skipping it.
+//
+// full_payment ALSO has a well-defined expected amount — it's misleading
+// to show "No fixed amount" for it, since "pay everything owed" is exactly
+// the reservation's outstanding balance, not a negotiated figure. Read
+// from paymentSummaryMap (reservation_payment_summary — the same view
+// get_reservation_effective_total()/20261022_manual_reservation_charges.sql
+// keeps correct, so this already accounts for any manual charges), same
+// as this file's own Record Payment modal already does. This is a
+// reasonable approximation of "what it was when submitted": a still-
+// pending_review payment is excluded from the view's own total_paid sum,
+// so the current outstanding_balance only differs from the submission-time
+// figure if some OTHER payment was separately approved in between.
+//
+// reservation_fee/down_payment/partial_payment stay null — reservation_fee
+// (a configured flat amount) and down_payment (a configured percentage)
+// do have their own formulas too, but computing them needs payment_type/
+// deposit_pct config this page doesn't load; partial_payment is genuinely
+// customer-chosen within a min/max range, with no single fixed figure.
 function getExpectedPaymentAmount(payment, reservation, paymentRules) {
   if (payment.payment_type === 'cancellation_fee') {
     return { amount: getCancellationFee(reservation, paymentRules), label: 'Cancellation fee' };
@@ -944,6 +992,26 @@ function getExpectedPaymentAmount(payment, reservation, paymentRules) {
     return {
       amount: extensionRequest ? Number(extensionRequest.total_price) : null,
       label: 'Extension fee'
+    };
+  }
+  if (payment.payment_type === 'additional_head_fee') {
+    const additionalHeadRequest = payment.additional_head_request_id ? getAdditionalHeadRequest(payment.additional_head_request_id) : null;
+    return {
+      amount: additionalHeadRequest ? Number(additionalHeadRequest.total_price) : null,
+      label: 'Additional guests fee'
+    };
+  }
+  if (payment.payment_type === 'full_payment') {
+    const summary = paymentSummaryMap[payment.reservation_id];
+    // formatCurrency()'s `Number(value || 0)` treats NaN as falsy and
+    // silently renders it as "₱0" — indistinguishable from a genuine zero
+    // balance. Guard against that here so a missing/malformed
+    // outstanding_balance reads as "No fixed amount" instead of a
+    // misleadingly confident ₱0.
+    const rawBalance = summary ? Number(summary.outstanding_balance) : NaN;
+    return {
+      amount: Number.isFinite(rawBalance) ? rawBalance : null,
+      label: 'Full payment (outstanding balance)'
     };
   }
   return { amount: null, label: 'No fixed amount for this payment type' };
@@ -1013,11 +1081,14 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   const balance = getReservationBalanceSummary(payment.reservation_id);
   const paymentInfo = getPaymentInfoSummary(payment);
   const extensionRequest = payment.extension_id ? getExtensionRequest(payment.extension_id) : null;
+  const additionalHeadRequest = payment.additional_head_request_id ? getAdditionalHeadRequest(payment.additional_head_request_id) : null;
   const paymentTypeSub = payment.reschedule_request_id
     ? 'Linked to reschedule fee'
     : (extensionRequest
       ? `+${extensionRequest.requested_hours} hour${Number(extensionRequest.requested_hours) === 1 ? '' : 's'} at ${formatCurrency(extensionRequest.price_per_hour)}/hr`
-      : 'Reservation payment');
+      : (additionalHeadRequest
+        ? `+${additionalHeadRequest.requested_heads} guest${Number(additionalHeadRequest.requested_heads) === 1 ? '' : 's'} at ${formatCurrency(additionalHeadRequest.price_per_head)}/guest`
+        : 'Reservation payment'));
   const proofExists = Boolean(payment.proof_url);
   const isCafeIssued = resolvePaymentEvidenceSource(payment, paymentMethodMap) === 'cafe_issued';
   const reviewActions = [];
@@ -1112,8 +1183,28 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   }
 }
 
-function openDetailsModal(paymentId) {
+async function openDetailsModal(paymentId) {
   paymentProofZoomPercent = 100;
+
+  // paymentSummaryMap is only ever bulk-loaded on the general page
+  // load/refresh cycle (loadData()) — if a manager adds a Manual Charge on
+  // the Reservation Details page and then opens this same reservation's
+  // pending payment for review without an intervening page refresh, the
+  // cached outstanding_balance here is stale (from before the charge
+  // existed) and "Expected this payment" understates what's actually owed.
+  // Refetch just this one reservation's summary fresh at review time —
+  // this drives a manager's approve/reject decision on real money, so it
+  // must never be shown stale.
+  const payment = getPaymentById(paymentId);
+  if (payment?.reservation_id) {
+    try {
+      const fresh = await fetchPaymentSummaries([payment.reservation_id]);
+      Object.assign(paymentSummaryMap, fresh);
+    } catch (error) {
+      console.error('[admin_payments] failed to refresh payment summary before review:', error);
+    }
+  }
+
   renderPaymentReviewModal(paymentId);
   paymentDetailsModal?.classList.remove('hidden');
   paymentDetailsModal?.setAttribute('aria-hidden', 'false');
@@ -1387,6 +1478,9 @@ async function loadData({ silent = false } = {}) {
     extensionRequestMap = await fetchExtensionRequests(
       Array.from(new Set(paymentsCache.map((payment) => payment.extension_id).filter(Boolean)))
     );
+    additionalHeadRequestMap = await fetchAdditionalHeadRequests(
+      Array.from(new Set(paymentsCache.map((payment) => payment.additional_head_request_id).filter(Boolean)))
+    );
     paymentSummaryMap = await fetchPaymentSummaries(
       Array.from(new Set(paymentsCache.map((payment) => payment.reservation_id).filter(Boolean)))
     );
@@ -1429,7 +1523,7 @@ function wireTableActions() {
     if (!action || !paymentId) return;
 
     if (action === 'review-payment') {
-      openDetailsModal(paymentId);
+      await openDetailsModal(paymentId);
     } else if (action === 'record-payment') {
       openRecordPaymentModalForPayment(paymentId);
     }

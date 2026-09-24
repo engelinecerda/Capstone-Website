@@ -7,12 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=48">
-  <link rel="stylesheet" href="/css/styles.css?v=48">
-  <link rel="stylesheet" href="/css/account.css?v=48">
-  <link rel="stylesheet" href="/css/reservation_details.css?v=48">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=53">
+  <link rel="stylesheet" href="/css/styles.css?v=53">
+  <link rel="stylesheet" href="/css/account.css?v=53">
+  <link rel="stylesheet" href="/css/reservation_details.css?v=53">
 </head>
 <body>
 
@@ -103,6 +104,23 @@
       <div class="account-modal-actions">
         <button type="button" class="account-modal-btn secondary" id="extension-modal-dismiss">Go Back</button>
         <button type="button" class="account-modal-btn primary" id="extension-modal-confirm">Request Extension</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-modal-backdrop hidden" id="additional-head-request-backdrop" aria-hidden="true">
+    <div class="account-modal-card" role="dialog" aria-modal="true" aria-labelledby="additional-head-modal-title">
+      <button type="button" class="account-modal-close" id="additional-head-modal-close" aria-label="Close additional guests request dialog">&times;</button>
+      <p class="account-modal-eyebrow">Add More Guests</p>
+      <h2 class="account-modal-title" id="additional-head-modal-title">Request Additional Guests</h2>
+
+      <div id="additional-head-modal-body"></div>
+
+      <p class="account-modal-message" id="additional-head-modal-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="additional-head-modal-dismiss">Go Back</button>
+        <button type="button" class="account-modal-btn primary" id="additional-head-modal-confirm">Request Additional Guests</button>
       </div>
     </div>
   </div>
