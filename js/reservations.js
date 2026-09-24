@@ -1614,7 +1614,21 @@ function getDateAvailability(dateKey) {
 function isDateUnavailableForScope(dateKey, scope) {
     if (!dateKey) return false;
     if (availabilityState.closedDates.has(dateKey)) return true;
-    return getDateAvailability(dateKey).isFullyBooked;
+    const { occupiedScopes, isFullyBooked } = getDateAvailability(dateKey);
+    // get_booking_calendar_availability()'s own is_fully_booked only goes
+    // true once ALL THREE scopes (onsite_vip/onsite_main_hall/offsite) are
+    // exhausted for that date — correct for a "nothing at all is bookable
+    // here" signal, but wrong for THIS customer's specific scope, which can
+    // be full on its own while the other two scopes still have room. The
+    // RPC already computes and ships the finer occupied_scopes array for
+    // exactly this reason; it just wasn't being read here before, which let
+    // the month-view calendar show a date as open when the customer's own
+    // scope (e.g. VIP) was actually already at its daily cap — confirmed
+    // live: the time-slot step correctly rejected it as fully booked while
+    // the calendar month grid kept showing it as available.
+    const scopes = (Array.isArray(scope) ? scope : [scope]).filter(Boolean);
+    if (!scopes.length) return isFullyBooked;
+    return isFullyBooked || scopes.some((s) => occupiedScopes.includes(s));
 }
 
 function isUnavailableDate(dateKey) {
