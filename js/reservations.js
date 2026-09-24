@@ -2669,7 +2669,7 @@ function buildAdditionalHeadBlock() {
     if (hint) {
         if (effectiveMax <= 0) {
             hint.textContent = S.locationType === 'onsite' && !S.venueOptions.find(v => v.venue_id === S.venueId)
-                ? 'Choose your room above to see how many extra guests it can hold.'
+                ? 'Choose your room below to see how many extra guests it can hold.'
                 : 'No extra guests can be added for this package.';
             hint.classList.add('additional-head-hint--limit');
         } else if (S.additionalHeads > 0) {
