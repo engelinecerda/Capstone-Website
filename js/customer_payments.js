@@ -1265,11 +1265,19 @@ export async function submitCustomerPayment({
     }
 
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, { formatDate, reservationRules, chargesByReservationId });
+    // paymentRules must be included here — without it, getCancellationFee()/
+    // getRescheduleFee() silently fall back to their hardcoded defaults
+    // (500/2000) instead of the admin-configured amount, so whatever this
+    // function submits can permanently disagree with what
+    // validate_payment_submission() expects server-side, no matter how many
+    // times the customer retries. The page's own display code (payment.js's
+    // getActivePaymentOptions) already passes this correctly — only this
+    // submit-time recomputation was missing it.
     const availableOptions = getAvailablePaymentOptions(
         reservation,
         paymentsByReservationId,
         reschedulesByReservationId,
-        { formatDate, reservationRules, paymentTypes, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId }
+        { formatDate, reservationRules, paymentTypes, paymentRules, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId }
     );
     const selectedOption = availableOptions.find((option) => (
         option.paymentType === paymentType
