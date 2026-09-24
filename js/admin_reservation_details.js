@@ -57,6 +57,13 @@ const staffAssignedList = document.getElementById('staffAssignedList');
 const assignStaffBtn = document.getElementById('assignStaffBtn');
 const staffAssignHelper = document.getElementById('staffAssignHelper');
 
+// Staff assignment card is now sized to its own content (no longer
+// stretched to match the Payment column's height — css/admin_reservation_
+// details.css's .details-columns), so a reservation with many staff
+// assigned needs its own cap rather than relying on that leftover space.
+const STAFF_PILLS_VISIBLE_LIMIT = 6;
+let staffListExpanded = false;
+
 const assignmentModal = document.getElementById('assignmentModal');
 const assignmentModalClose = document.getElementById('assignmentModalClose');
 const assignmentCancelBtn = document.getElementById('assignmentCancelBtn');
@@ -969,7 +976,7 @@ function renderCharges() {
       : '<span class="status-pill approved">Active</span>';
     const voidAction = charge.voided
       ? '<span class="payment-history-no-receipt">&mdash;</span>'
-      : `<button type="button" class="payment-history-view-link" data-action="void-charge" data-charge-id="${escapeHtml(charge.charge_id)}">Void</button>`;
+      : `<button type="button" class="charge-void-btn" data-action="void-charge" data-charge-id="${escapeHtml(charge.charge_id)}">Void</button>`;
     const rowClass = charge.voided ? ' class="charge-row-voided"' : '';
 
     return `
@@ -1449,6 +1456,12 @@ function wireAddChargeModal() {
     if (!btn) return;
     voidCharge(btn.dataset.chargeId);
   });
+  staffAssignedList?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-action="view-all-staff"]');
+    if (!btn) return;
+    staffListExpanded = true;
+    renderStaffAssignment();
+  });
 }
 
 function renderSignatureCheckPanel(contract) {
@@ -1583,8 +1596,14 @@ function renderStaffAssignment() {
   const status = getEffectiveReservationStatus(reservation);
   const canAssign = status === 'approved';
 
+  const visibleStaff = (staffListExpanded || assignedStaffForReservation.length <= STAFF_PILLS_VISIBLE_LIMIT)
+    ? assignedStaffForReservation
+    : assignedStaffForReservation.slice(0, STAFF_PILLS_VISIBLE_LIMIT);
+  const hiddenStaffCount = assignedStaffForReservation.length - visibleStaff.length;
+
   staffAssignedList.innerHTML = assignedStaffForReservation.length
-    ? assignedStaffForReservation.map((staff) => `<span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))} · ${escapeHtml(formatStaffRole(staff.staff_role))}</span>`).join('')
+    ? visibleStaff.map((staff) => `<span class="staff-pill">${escapeHtml(getStaffDisplayName(staff))} · ${escapeHtml(formatStaffRole(staff.staff_role))}</span>`).join('')
+      + (hiddenStaffCount > 0 ? `<button type="button" class="staff-pill staff-pill-view-all" data-action="view-all-staff">+${hiddenStaffCount} more &middot; View all</button>` : '')
     : '<span class="staff-pill unassigned">Not assigned yet</span>';
 
   if (currentRole === 'admin') {

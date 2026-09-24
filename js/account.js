@@ -480,6 +480,20 @@ function hasPendingOrApprovedPayment(reservationId, paymentType) {
     ));
 }
 
+// full_payment specifically must NOT be blocked by a past APPROVED one —
+// see the identical helper/comment in customer_payments.js. Without this,
+// a reservation that was already fully paid off once, then got a Manual
+// Charge added afterward, permanently lost its "Continue Payment" entry
+// point on this page: the branch below only ever offers 'full_payment' once
+// any base payment has been approved, so blocking it on a stale approved
+// record left paymentIsActionable false and hid the balance line entirely.
+function hasPendingFullPayment(reservationId) {
+    return getNormalPayments(reservationId).some((payment) => (
+        payment.payment_type === 'full_payment'
+        && String(payment.payment_status || '').toLowerCase() === 'pending_review'
+    ));
+}
+
 function getReservationFeeAmount(reservation, remainingBalance) {
     const locationType = String(reservation?.location_type || '').toLowerCase();
 
@@ -519,7 +533,7 @@ function getAvailablePaymentOptions(reservation) {
 
     if (!pendingBasePayment && remainingBalance > 0) {
         if (approvedBasePayments > 0) {
-            if (!hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
+            if (!hasPendingFullPayment(reservationId)) {
                 options.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, {
                     displayLabel: 'Remaining Balance',
                     displayDescription: balance.dueDateKey
@@ -553,7 +567,7 @@ function getAvailablePaymentOptions(reservation) {
                 displayDescription: 'Enter any amount you want to pay toward this reservation.'
             }));
 
-            if (!hasPendingOrApprovedPayment(reservationId, 'full_payment')) {
+            if (!hasPendingFullPayment(reservationId)) {
                 options.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, {
                     displayDescription: 'Settle the reservation in one payment.'
                 }));

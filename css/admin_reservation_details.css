@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=51');
+@import url('./admin_reservations.css?v=53');
 
 /* ============================================================
    Hidden-state overrides.
@@ -362,9 +362,17 @@
    ============================================================ */
 .details-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
+  /* Was `stretch` (grid's default) paired with .details-card-flex's
+     flex:1 below, deliberately forcing the short Staff assignment card
+     to grow and match Payment's height, bottoming both columns out
+     together. That's exactly what created the large dead space under
+     the staff pills once a reservation only has a few people assigned —
+     Staff assignment should read as a compact card, not an
+     artificially-elongated one. `start` lets each column size to its
+     own content instead. */
+  align-items: start;
 }
 
 .details-col-main {
@@ -380,12 +388,11 @@
   gap: 12px;
 }
 
-/* Last card in each column absorbs leftover height so both columns
-   bottom out together (Payment on the left, Staff assignment on the
-   right). Only meaningful while .details-columns is stretched side by
-   side — neutralized below the stacking breakpoint. */
+/* No longer stretches anything now that .details-columns uses
+   align-items: start (see above) — kept as a harmless no-op rather than
+   pulled from the markup, in case a future card in one of these columns
+   ever needs its own internal flex layout. */
 .details-card-flex {
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -869,10 +876,10 @@
    for the footer buttons — only the card chrome is new here.
    ============================================================ */
 .approval-prompt-card {
-  width: min(100%, 380px);
+  width: min(100%, 460px);
   background: #FFFFFF;
   border: 0.5px solid #E8DFD3;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 20px 48px rgba(58, 34, 17, 0.16);
   padding: 0;
 }
@@ -882,43 +889,48 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 18px;
+  padding: 28px 24px 24px;
 }
 
 .approval-prompt-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 52px;
+  height: 52px;
   border-radius: 999px;
   background: #EAF3DE;
   color: #3B6D11;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.approval-prompt-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .approval-prompt-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 19px;
   font-weight: 500;
   color: var(--text);
 }
 
 .approval-prompt-meta {
-  margin: 4px 0 0;
-  font-size: 11px;
+  margin: 6px 0 0;
+  font-size: 13px;
   color: var(--muted-2);
 }
 
 .approval-prompt-note {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin: 0 18px 18px;
+  gap: 10px;
+  margin: 0 24px 24px;
   background: #FAF6F0;
   border: 0.5px solid #E8DFD3;
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 14px 16px;
 }
 
 .approval-prompt-note-icon {
@@ -926,40 +938,47 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   margin-top: 1px;
   color: #6B3F23;
+}
+
+.approval-prompt-note-icon svg {
+  width: 17px;
+  height: 17px;
 }
 
 .approval-prompt-note-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
 .approval-prompt-note-title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text);
 }
 
 .approval-prompt-note-sub {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted-2);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .approval-prompt-footer {
   display: flex;
-  gap: 8px;
-  padding: 12px 18px;
+  gap: 10px;
+  padding: 16px 24px;
   border-top: 0.5px solid #E8DFD3;
 }
 
 .approval-prompt-footer .header-action-btn {
   flex: 1;
+  height: 40px;
+  font-size: 13px;
 }
 
 /* ============================================================
@@ -1048,6 +1067,32 @@
 
 .payment-history-no-receipt {
   color: var(--muted-2);
+}
+
+/* Manual charge "Void" — was reusing .payment-history-view-link (a bare
+   text link with no border/background/padding), which left it rendering
+   as an unstyled default <button> next to the Active/Voided status pill.
+   Destructive action, compact enough to sit inline in the charges table. */
+.charge-void-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 0.5px solid var(--declined-border);
+  background: var(--declined);
+  color: var(--declined-text);
+  transition: filter 0.15s ease;
+}
+
+.charge-void-btn:hover {
+  filter: brightness(0.97);
 }
 
 .payment-history-empty-row td {

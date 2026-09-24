@@ -957,10 +957,25 @@ function closeReceiptModal() {
 // extensions row's own snapshotted total_price (extensionRequestMap, same
 // lookup the queue row's own detail line already uses), so an extension
 // payment gets the same mismatch-detection coverage the other two fee
-// types always had instead of silently skipping it. Everything else
-// (reservation_fee/down_payment/full_payment/partial_payment) is a
-// variable amount negotiated per booking — there's no fixed figure to
-// compare against, so this returns null rather than fabricating one.
+// types always had instead of silently skipping it.
+//
+// full_payment ALSO has a well-defined expected amount — it's misleading
+// to show "No fixed amount" for it, since "pay everything owed" is exactly
+// the reservation's outstanding balance, not a negotiated figure. Read
+// from paymentSummaryMap (reservation_payment_summary — the same view
+// get_reservation_effective_total()/20261022_manual_reservation_charges.sql
+// keeps correct, so this already accounts for any manual charges), same
+// as this file's own Record Payment modal already does. This is a
+// reasonable approximation of "what it was when submitted": a still-
+// pending_review payment is excluded from the view's own total_paid sum,
+// so the current outstanding_balance only differs from the submission-time
+// figure if some OTHER payment was separately approved in between.
+//
+// reservation_fee/down_payment/partial_payment stay null — reservation_fee
+// (a configured flat amount) and down_payment (a configured percentage)
+// do have their own formulas too, but computing them needs payment_type/
+// deposit_pct config this page doesn't load; partial_payment is genuinely
+// customer-chosen within a min/max range, with no single fixed figure.
 function getExpectedPaymentAmount(payment, reservation, paymentRules) {
   if (payment.payment_type === 'cancellation_fee') {
     return { amount: getCancellationFee(reservation, paymentRules), label: 'Cancellation fee' };
@@ -980,6 +995,13 @@ function getExpectedPaymentAmount(payment, reservation, paymentRules) {
     return {
       amount: additionalHeadRequest ? Number(additionalHeadRequest.total_price) : null,
       label: 'Additional guests fee'
+    };
+  }
+  if (payment.payment_type === 'full_payment') {
+    const summary = paymentSummaryMap[payment.reservation_id];
+    return {
+      amount: summary ? Number(summary.outstanding_balance) : null,
+      label: 'Full payment (outstanding balance)'
     };
   }
   return { amount: null, label: 'No fixed amount for this payment type' };

@@ -511,6 +511,21 @@ function hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, pay
     ));
 }
 
+// full_payment specifically must NOT be blocked by a past APPROVED one —
+// Manual Charge for Special Requests (20261022_manual_reservation_charges.sql)
+// can reopen a positive remainingBalance on a reservation that was already
+// fully paid off once, and by the time this is checked remainingBalance > 0
+// has already been confirmed by the caller, so any prior approved
+// full_payment is, by definition, stale — it didn't cover what's actually
+// owed today. Still blocks on a CURRENTLY pending_review one, to prevent a
+// duplicate concurrent submission for the same balance.
+function hasPendingFullPayment(paymentsByReservationId, reservationId) {
+    return getNormalPayments(paymentsByReservationId, reservationId).some((payment) => (
+        payment.payment_type === 'full_payment'
+        && String(payment.payment_status || '').toLowerCase() === 'pending_review'
+    ));
+}
+
 // Onsite fee is admin-configurable (payment_type.flat_amount, code =
 // 'reservation_fee'). Offsite stays a separate fixed ₱5,000 — the
 // payment_type table only has one flat_amount per code, no onsite/offsite
@@ -596,7 +611,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
 
         if (
             paymentTypes.full_payment?.is_active !== false
-            && !hasPendingOrApprovedPayment(paymentsByReservationId, reservationId, 'full_payment')
+            && !hasPendingFullPayment(paymentsByReservationId, reservationId)
         ) {
             optionsList.push(buildPaymentOption(reservation, 'full_payment', remainingBalance, paymentsByReservationId, {
                 ...options,
