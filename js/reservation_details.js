@@ -200,7 +200,7 @@ async function loadPageData() {
             pre_cancellation_status,
             reschedule_count,
             created_at,
-            package:package_id ( package_name, package_type, duration_hours ),
+            package:package_id ( package_name, package_type, duration_hours, allow_additional_head ),
             add_on:add_on_id ( package_name, package_type )
         `)
         .eq('reservation_id', reservationId)
@@ -812,6 +812,13 @@ function buildExtensionSection(reservation, extensions, effectiveStatus) {
 function buildAdditionalHeadSection(reservation, additionalHeadRequests, effectiveStatus) {
     if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return '';
     if (['cancellation_requested', 'cancellation_approved'].includes(String(reservation.status || '').toLowerCase())) return '';
+    // This entire feature is opt-in per package (Bookable Inventory's "Allow
+    // additional guests beyond Max Guests") — a package that doesn't allow it
+    // can never have a request against it, so don't even surface the entry
+    // point. get_additional_head_availability() already fails closed for
+    // this server-side; this just keeps the button from appearing at all
+    // instead of only failing once the customer opens the modal.
+    if (!reservation.package?.allow_additional_head) return '';
 
     const canRequest = computeCanRequestAdditionalHeads(reservation.status, additionalHeadRequests);
     const latestRequest = (additionalHeadRequests || [])[0] || null;
