@@ -114,9 +114,15 @@ grant execute on function public.get_reservation_effective_total(uuid) to authen
 create or replace view public.reservation_payment_summary as
 select
   r.reservation_id,
-  (r.total_price + coalesce(c.total_charged, 0)) as reservation_total,
+  -- Explicit numeric(10,2) cast: plain numeric arithmetic (a + b) drops the
+  -- source columns' typmod, so without this cast reservation_total resolves
+  -- to unconstrained numeric — which CREATE OR REPLACE VIEW refuses as a
+  -- column type change from the existing numeric(10,2) (confirmed via the
+  -- actual error this migration threw: "cannot change data type of view
+  -- column reservation_total from numeric(10,2) to numeric").
+  (r.total_price + coalesce(c.total_charged, 0))::numeric(10,2) as reservation_total,
   coalesce(p.total_paid, 0) as total_paid,
-  greatest((r.total_price + coalesce(c.total_charged, 0)) - coalesce(p.total_paid, 0), 0) as outstanding_balance,
+  greatest((r.total_price + coalesce(c.total_charged, 0))::numeric(10,2) - coalesce(p.total_paid, 0), 0) as outstanding_balance,
   p.latest_payment_date,
   case
     when coalesce(p.total_paid, 0) = 0 then 'unpaid'

@@ -1199,12 +1199,23 @@ export async function fetchCustomerReservations(supabase, userId, options = {}) 
 export async function loadCustomerPaymentBundle(supabase, userId, options = {}) {
     const reservations = await fetchCustomerReservations(supabase, userId, options);
     const reservationIds = reservations.map((reservation) => reservation.reservation_id).filter(Boolean);
+    // additionalHeadRequests/charges are best-effort: they're the two
+    // newest tables this bundle queries, and a missing migration or
+    // temporary unavailability on either must never take down every other
+    // payment-page caller of this bundle (payment.js, account.js) via a
+    // single rejected Promise.all.
     const [paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId] = await Promise.all([
         fetchPayments(supabase, reservationIds),
         fetchRescheduleRequests(supabase, reservationIds),
         fetchExtensions(supabase, reservationIds),
-        fetchAdditionalHeadRequests(supabase, reservationIds),
-        fetchReservationCharges(supabase, reservationIds)
+        fetchAdditionalHeadRequests(supabase, reservationIds).catch((error) => {
+            console.error('[customer_payments] failed to load additional guests requests:', error);
+            return {};
+        }),
+        fetchReservationCharges(supabase, reservationIds).catch((error) => {
+            console.error('[customer_payments] failed to load manual reservation charges:', error);
+            return {};
+        })
     ]);
     const paymentIds = Object.values(paymentsByReservationId)
         .flat()

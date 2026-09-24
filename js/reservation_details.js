@@ -212,13 +212,24 @@ async function loadPageData() {
         throw new Error('This reservation could not be found.');
     }
 
+    // additionalHeadRequests/charges are best-effort, same reasoning as
+    // paymentRules/policyBodies below: they're the two newest tables this
+    // page queries, and either being unavailable (migration not yet
+    // applied, temporary outage) must never take down the whole
+    // reservation details page.
     const [contract, paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
         fetchSharedExtensions(supabase, [reservationId]),
-        fetchSharedAdditionalHeadRequests(supabase, [reservationId]),
-        fetchSharedReservationCharges(supabase, [reservationId]),
+        fetchSharedAdditionalHeadRequests(supabase, [reservationId]).catch((error) => {
+            console.error('[reservation_details] failed to load additional guests requests:', error);
+            return {};
+        }),
+        fetchSharedReservationCharges(supabase, [reservationId]).catch((error) => {
+            console.error('[reservation_details] failed to load manual reservation charges:', error);
+            return {};
+        }),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
         loadReservationRules(supabase),

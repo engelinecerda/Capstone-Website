@@ -1943,8 +1943,21 @@ async function loadReservations({ silent = false } = {}) {
         state.paymentsByReservationId = await fetchSharedPayments(supabase, reservationIds);
         state.reschedulesByReservationId = await fetchSharedRescheduleRequests(supabase, reservationIds);
         state.extensionsByReservationId = await fetchSharedExtensions(supabase, reservationIds);
-        state.additionalHeadRequestsByReservationId = await fetchSharedAdditionalHeadRequests(supabase, reservationIds);
-        state.chargesByReservationId = await fetchSharedReservationCharges(supabase, reservationIds);
+        // Best-effort: these two tables are the newest additions to this
+        // query set (Additional Guests requests, Manual Charges) — a
+        // migration not yet applied, or either feature being temporarily
+        // unavailable, must never take down the entire reservations list.
+        // Degrades to "no data for this feature" instead of failing the
+        // whole page, same convention as paymentRules/reservationRules/
+        // policyBodies just above.
+        state.additionalHeadRequestsByReservationId = await fetchSharedAdditionalHeadRequests(supabase, reservationIds).catch((error) => {
+            console.error('[account] failed to load additional guests requests:', error);
+            return {};
+        });
+        state.chargesByReservationId = await fetchSharedReservationCharges(supabase, reservationIds).catch((error) => {
+            console.error('[account] failed to load manual reservation charges:', error);
+            return {};
+        });
         state.reviewsByReservationId = await fetchReviews(reservationIds);
 
         const paymentIds = Object.values(state.paymentsByReservationId)
