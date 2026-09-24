@@ -642,7 +642,8 @@ function getPaymentSummary(reservation) {
         reservationRules: state.reservationRules,
         paymentRules: state.paymentRules,
         extensionsByReservationId: state.extensionsByReservationId,
-        additionalHeadRequestsByReservationId: state.additionalHeadRequestsByReservationId
+        additionalHeadRequestsByReservationId: state.additionalHeadRequestsByReservationId,
+        chargesByReservationId: state.chargesByReservationId
     });
 }
 

@@ -1280,7 +1280,7 @@ function isReservationActionable(reservation) {
         reservation,
         state.bundle.paymentsByReservationId,
         state.bundle.reschedulesByReservationId,
-        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId }
+        { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId, chargesByReservationId: state.bundle.chargesByReservationId }
     ];
     if (isCompletedPaymentOverview(...overviewArgs)) return false;
     if (isPendingPaymentOverview(...overviewArgs)) return false;
@@ -1319,14 +1319,14 @@ function renderReservationPaymentPage() {
             reservation,
             state.bundle.paymentsByReservationId,
             state.bundle.reschedulesByReservationId,
-            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId }
+            { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId, chargesByReservationId: state.bundle.chargesByReservationId }
         )
             ? renderCompleteCard(reservation)
             : isPendingPaymentOverview(
                 reservation,
                 state.bundle.paymentsByReservationId,
                 state.bundle.reschedulesByReservationId,
-                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId }
+                { formatDate, reservationRules: state.reservationRules, paymentRules: state.paymentRules, extensionsByReservationId: state.bundle.extensionsByReservationId, additionalHeadRequestsByReservationId: state.bundle.additionalHeadRequestsByReservationId, chargesByReservationId: state.bundle.chargesByReservationId }
             )
                 ? renderPendingCard(reservation)
                 : renderActionableCard(reservation);
