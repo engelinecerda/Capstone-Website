@@ -13,6 +13,7 @@ import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { clampNumberInput } from './numeric_input.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -50,6 +51,9 @@ const recordPaymentContextBalance = document.getElementById('recordPaymentContex
 const recordPaymentMethodSelect = document.getElementById('recordPaymentMethodSelect');
 const recordPaymentMethodIcon = document.getElementById('recordPaymentMethodIcon');
 const recordPaymentAmountInput = document.getElementById('recordPaymentAmountInput');
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value — see js/numeric_input.js.
+clampNumberInput(recordPaymentAmountInput, { min: 0.01, max: 1000000, decimals: 2 });
 const recordPaymentAmountWarning = document.getElementById('recordPaymentAmountWarning');
 const recordPaymentDateInput = document.getElementById('recordPaymentDateInput');
 const recordPaymentPlannedNote = document.getElementById('recordPaymentPlannedNote');
@@ -999,8 +1003,14 @@ function getExpectedPaymentAmount(payment, reservation, paymentRules) {
   }
   if (payment.payment_type === 'full_payment') {
     const summary = paymentSummaryMap[payment.reservation_id];
+    // formatCurrency()'s `Number(value || 0)` treats NaN as falsy and
+    // silently renders it as "₱0" — indistinguishable from a genuine zero
+    // balance. Guard against that here so a missing/malformed
+    // outstanding_balance reads as "No fixed amount" instead of a
+    // misleadingly confident ₱0.
+    const rawBalance = summary ? Number(summary.outstanding_balance) : NaN;
     return {
-      amount: summary ? Number(summary.outstanding_balance) : null,
+      amount: Number.isFinite(rawBalance) ? rawBalance : null,
       label: 'Full payment (outstanding balance)'
     };
   }
@@ -1173,8 +1183,28 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   }
 }
 
-function openDetailsModal(paymentId) {
+async function openDetailsModal(paymentId) {
   paymentProofZoomPercent = 100;
+
+  // paymentSummaryMap is only ever bulk-loaded on the general page
+  // load/refresh cycle (loadData()) — if a manager adds a Manual Charge on
+  // the Reservation Details page and then opens this same reservation's
+  // pending payment for review without an intervening page refresh, the
+  // cached outstanding_balance here is stale (from before the charge
+  // existed) and "Expected this payment" understates what's actually owed.
+  // Refetch just this one reservation's summary fresh at review time —
+  // this drives a manager's approve/reject decision on real money, so it
+  // must never be shown stale.
+  const payment = getPaymentById(paymentId);
+  if (payment?.reservation_id) {
+    try {
+      const fresh = await fetchPaymentSummaries([payment.reservation_id]);
+      Object.assign(paymentSummaryMap, fresh);
+    } catch (error) {
+      console.error('[admin_payments] failed to refresh payment summary before review:', error);
+    }
+  }
+
   renderPaymentReviewModal(paymentId);
   paymentDetailsModal?.classList.remove('hidden');
   paymentDetailsModal?.setAttribute('aria-hidden', 'false');
@@ -1493,7 +1523,7 @@ function wireTableActions() {
     if (!action || !paymentId) return;
 
     if (action === 'review-payment') {
-      openDetailsModal(paymentId);
+      await openDetailsModal(paymentId);
     } else if (action === 'record-payment') {
       openRecordPaymentModalForPayment(paymentId);
     }

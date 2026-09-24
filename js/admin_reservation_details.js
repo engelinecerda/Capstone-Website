@@ -14,6 +14,7 @@ import { loadPaymentRules } from './customer_payments.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { clampNumberInput } from './numeric_input.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -95,6 +96,9 @@ const addChargeContextDate = document.getElementById('addChargeContextDate');
 const addChargeContextBalance = document.getElementById('addChargeContextBalance');
 const addChargeLabelInput = document.getElementById('addChargeLabelInput');
 const addChargeAmountInput = document.getElementById('addChargeAmountInput');
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value — see js/numeric_input.js.
+clampNumberInput(addChargeAmountInput, { min: 0.01, max: 1000000, decimals: 2 });
 const addChargeNoteInput = document.getElementById('addChargeNoteInput');
 
 const recordPaymentModal = document.getElementById('recordPaymentModal');
@@ -108,6 +112,7 @@ const recordPaymentContextBalance = document.getElementById('recordPaymentContex
 const recordPaymentMethodSelect = document.getElementById('recordPaymentMethodSelect');
 const recordPaymentMethodIcon = document.getElementById('recordPaymentMethodIcon');
 const recordPaymentAmountInput = document.getElementById('recordPaymentAmountInput');
+clampNumberInput(recordPaymentAmountInput, { min: 0.01, max: 1000000, decimals: 2 });
 const recordPaymentAmountWarning = document.getElementById('recordPaymentAmountWarning');
 const recordPaymentDateInput = document.getElementById('recordPaymentDateInput');
 const recordPaymentPlannedNote = document.getElementById('recordPaymentPlannedNote');

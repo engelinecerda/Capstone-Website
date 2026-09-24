@@ -10,6 +10,7 @@ import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
 import { renderPagination } from './pagination.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { clampNumberInput } from './numeric_input.js';
 
 // Own page size, not the shared pagination.js default (10) — that constant
 // is also used by other pages' client-side-sliced lists; this log pages at
@@ -380,6 +381,9 @@ async function init() {
   initAdminSidebarBadges(supabase);
   initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
+  // Native min/max/step never stop someone from typing/pasting an out-of-
+  // range or absurdly precise value — see js/numeric_input.js.
+  clampNumberInput(editorLeadDaysInput, { min: 0, max: 365, decimals: 0 });
   loadAll();
 }
 

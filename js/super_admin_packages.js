@@ -17,6 +17,7 @@ import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { computeDiscountStatus, pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { clampNumberInput } from './numeric_input.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -326,6 +327,30 @@ const cateringDishDrawerDone  = document.getElementById('cateringDishDrawerDone'
 const cateringDishDrawerMessage = document.getElementById('cateringDishDrawerMessage');
 const cateringNewDishInput    = document.getElementById('cateringNewDishInput');
 const cateringAddDishBtn      = document.getElementById('cateringAddDishBtn');
+
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value (e.g. "99.99999999999999999999" into a
+// percent-off field) — see js/numeric_input.js for why this is needed on
+// every numeric field below, not just the ones with their own extra
+// validation (like discPercentOff's 0-100 check).
+clampNumberInput(pkgPrice, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(pkgDuration, { min: 1, max: 24, decimals: 0 });
+clampNumberInput(pkgMaxQuantity, { min: 1, max: 9999, decimals: 0 });
+clampNumberInput(pkgMinGuests, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(pkgMaxGuests, { min: 1, max: 9999, decimals: 0 });
+clampNumberInput(pkgPricePerAdditionalHead, { min: 0, max: 100000, decimals: 2 });
+clampNumberInput(pkgMaxAdditionalHeads, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(pkgExtensionPrice, { min: 0, max: 100000, decimals: 2 });
+clampNumberInput(discPercentOffInput, { min: 0.01, max: 100, decimals: 2 });
+clampNumberInput(venueCapacity, { min: 1, max: 9999, decimals: 0 });
+clampNumberInput(venueSortOrder, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(badgeTypeSortOrder, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(cateringMainDishMax, { min: 1, max: 50, decimals: 0 });
+clampNumberInput(cateringCatSortOrder, { min: 0, max: 9999, decimals: 0 });
+clampNumberInput(cateringPrice20, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(cateringPrice30, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(cateringPrice40, { min: 0, max: 1000000, decimals: 2 });
+clampNumberInput(cateringPrice50, { min: 0, max: 1000000, decimals: 2 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES

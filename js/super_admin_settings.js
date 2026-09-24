@@ -20,6 +20,28 @@ import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { clampNumberInput, clampNumberValue } from './numeric_input.js';
+
+// Native min/max/step never stop someone from typing/pasting an out-of-
+// range or absurdly precise value — see js/numeric_input.js. field-min-
+// advance-days omits max deliberately: its bound is set at runtime to
+// track field-max-advance-days (see loadMinAdvanceDays/saveMinAdvanceDays
+// below), so the clamp reads whatever that live max currently is instead
+// of a value fixed at wire time.
+function wireNumericInputClamps() {
+  clampNumberInput(document.getElementById('field-min-advance-days'), { min: 0, decimals: 0 });
+  clampNumberInput(document.getElementById('field-max-advance-days'), { min: 1, max: 730, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-cancellation-hold-hours'), { min: 1, max: 720, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-cancellation-min-notice-days'), { min: 0, max: 365, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-cancellation-request-window-days'), { min: 1, max: 365, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-cancellation-balance-grace-days'), { min: 1, max: 365, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-reschedule-hold-hours'), { min: 1, max: 720, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-reschedule-min-notice-days'), { min: 0, max: 365, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-max-reschedule-count'), { min: 1, max: 20, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-extension-hold-minutes'), { min: 1, max: 10080, decimals: 0 });
+  clampNumberInput(document.getElementById('field-buffer-minutes'), { min: 0, max: 240, decimals: 0 });
+  clampNumberInput(document.getElementById('field-default-capacity'), { min: 1, max: 100, decimals: 0 });
+}
 
 // ── Confirm modal (Operating Hours) ───────────────────────────────────────
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
@@ -514,7 +536,11 @@ document.addEventListener('input', (e) => {
     if (!row) return;
     const id = row.dataset.eventTypeId;
     const raw = e.target.value.trim();
-    eventTypeAdvanceCache[id] = raw === '' ? null : Number(raw);
+    // No max here deliberately — saveEventTypeAdvanceOverrides()'s own
+    // check against the site-wide max gives a specific, actionable error
+    // message ("raise the maximum above first"); clamping it away here
+    // would silently swallow that guidance.
+    eventTypeAdvanceCache[id] = raw === '' ? null : clampNumberValue(raw, { min: 0, decimals: 0 });
     // Update just the "Effective" cell in place — rebuilding the whole table
     // (via renderEventTypeAdvanceTable) on every keystroke replaces this
     // input with a new DOM node, which drops the caret back to position 0.
@@ -646,7 +672,7 @@ function renderScopeCapacityTable() {
     return `
       <tr data-scope="${scope}">
         <td>${label}</td>
-        <td><input type="number" min="1" step="1" data-scope-capacity value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
+        <td><input type="number" min="1" max="100" step="1" data-scope-capacity value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
         <td>${effective}</td>
       </tr>
     `;
@@ -659,7 +685,7 @@ document.addEventListener('input', (e) => {
     if (!row) return;
     const scope = row.dataset.scope;
     const raw = e.target.value.trim();
-    scopeCapacityCache[scope] = raw === '' ? null : Number(raw);
+    scopeCapacityCache[scope] = raw === '' ? null : clampNumberValue(raw, { min: 1, max: 100, decimals: 0 });
     renderScopeCapacityTable();
     // Re-render moves focus off the input that triggered it — restore it.
     document.querySelector(`tr[data-scope="${scope}"] [data-scope-capacity]`)?.focus();
@@ -726,7 +752,7 @@ function renderVenueCapacityTable() {
     return `
       <tr data-venue="${venue_id}">
         <td>${escapeHtmlSettings(name)}</td>
-        <td><input type="number" min="1" step="1" data-venue-capacity value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
+        <td><input type="number" min="1" max="9999" step="1" data-venue-capacity value="${override ?? ''}" placeholder="Default (${globalDefault})"></td>
         <td>${effective}</td>
       </tr>
     `;
@@ -744,7 +770,7 @@ document.addEventListener('input', (e) => {
     if (!row) return;
     const venueId = row.dataset.venue;
     const raw = e.target.value.trim();
-    venueCapacityCache[venueId] = raw === '' ? null : Number(raw);
+    venueCapacityCache[venueId] = raw === '' ? null : clampNumberValue(raw, { min: 1, max: 9999, decimals: 0 });
     renderVenueCapacityTable();
     document.querySelector(`tr[data-venue="${venueId}"] [data-venue-capacity]`)?.focus();
   }
@@ -806,6 +832,7 @@ async function init() {
   initAdminSidebarBadges(supabase);
   initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
+  wireNumericInputClamps();
 
   await loadOperatingHours();
   await loadMinAdvanceDays();

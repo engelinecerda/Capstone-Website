@@ -108,7 +108,7 @@
           <div class="pr-row-control pt-row-control">
             <input type="text" class="field-input pt-label-input" id="pt-reservation_fee-label" placeholder="Label" maxlength="60">
             <span class="field-note">₱</span>
-            <input type="number" class="pr-input-inline" id="pt-reservation_fee-flat" min="0" step="1">
+            <input type="number" class="pr-input-inline" id="pt-reservation_fee-flat" min="0" max="1000000" step="1">
             <label class="pm2-toggle">
               <input type="checkbox" id="pt-reservation_fee-active">
               <span class="pm2-toggle-track"></span>
@@ -156,7 +156,7 @@
             <input type="number" class="pr-input-inline" id="pt-partial_payment-percent" min="0" max="100" step="1">
             <span class="field-note">% min,</span>
             <span class="field-note">₱</span>
-            <input type="number" class="pr-input-inline" id="pt-partial_payment-floor" min="0" step="1" placeholder="0">
+            <input type="number" class="pr-input-inline" id="pt-partial_payment-floor" min="0" max="1000000" step="1" placeholder="0">
             <span class="field-note">floor</span>
             <label class="pm2-toggle">
               <input type="checkbox" id="pt-partial_payment-active">
@@ -178,7 +178,7 @@
             <p class="pr-row-desc">How many separate payments a customer may split the balance into.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-max-installments" min="1" value="2">
+            <input type="number" class="pr-input-inline" id="pr-max-installments" min="1" max="20" value="2">
           </div>
         </div>
 
@@ -201,7 +201,7 @@
             <p class="pr-row-desc">How many days back a customer may select for "Date paid" — proof of payment must be submitted within this window of the actual payment.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="pr-proof-window" min="0" value="3">
+            <input type="number" class="pr-input-inline" id="pr-proof-window" min="0" max="365" value="3">
             <span class="field-note" style="margin:0;">days</span>
           </div>
         </div>
@@ -213,7 +213,7 @@
           </div>
           <div class="pr-row-control">
             <span class="field-note" style="margin:0;">₱</span>
-            <input type="number" class="pr-input-inline" id="pr-cancellation-fee-onsite" min="0" value="500">
+            <input type="number" class="pr-input-inline" id="pr-cancellation-fee-onsite" min="0" max="1000000" value="500">
           </div>
         </div>
 
@@ -224,7 +224,7 @@
           </div>
           <div class="pr-row-control">
             <span class="field-note" style="margin:0;">₱</span>
-            <input type="number" class="pr-input-inline" id="pr-cancellation-fee-offsite" min="0" value="2000">
+            <input type="number" class="pr-input-inline" id="pr-cancellation-fee-offsite" min="0" max="1000000" value="2000">
           </div>
         </div>
 
@@ -235,7 +235,7 @@
           </div>
           <div class="pr-row-control">
             <span class="field-note" style="margin:0;">₱</span>
-            <input type="number" class="pr-input-inline" id="pr-reschedule-fee" min="0" value="3000">
+            <input type="number" class="pr-input-inline" id="pr-reschedule-fee" min="0" max="1000000" value="3000">
           </div>
         </div>
 
@@ -399,7 +399,7 @@
         </div>
         <div class="field pm2-fields-cash">
           <label class="field-label">Latest pay-by (days before event)</label>
-          <input type="number" class="field-input" id="pm2CashWindowDays" min="0" value="1">
+          <input type="number" class="field-input" id="pm2CashWindowDays" min="0" max="365" value="1">
         </div>
         <div class="field pm2-fields-cash">
           <label class="field-label">Pay-in location <span class="field-label-opt">(optional)</span></label>
