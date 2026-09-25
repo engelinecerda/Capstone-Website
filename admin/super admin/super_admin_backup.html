@@ -85,6 +85,9 @@
             </svg>
             Connect Google Drive
           </button>
+          <button type="button" class="btn-outline-sm btn-disconnect hidden" id="googleDisconnectBtn">
+            Disconnect
+          </button>
         </div>
       </div>
 
@@ -228,6 +231,32 @@
         <button type="button" class="btn-primary" id="confirmBackupOk">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           Start Backup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DISCONNECT GOOGLE DRIVE MODAL ── -->
+  <div class="modal-overlay hidden" id="disconnectModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Disconnect Google Drive</h2>
+          <p class="modal-sub">Backups will stop until you reconnect</p>
+        </div>
+        <button type="button" class="modal-close" id="disconnectClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="confirm-copy">This account will no longer be used to save or restore backups. No existing backup files on the Drive are deleted — you can reconnect the same or a different account at any time.</p>
+        <p class="modal-message hidden" id="disconnectMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" id="disconnectCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="disconnectOk">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17.92z"/></svg>
+          Disconnect
         </button>
       </div>
     </div>

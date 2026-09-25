@@ -45,9 +45,17 @@ const historyList           = document.getElementById('historyList');
 const emptyHistory          = document.getElementById('emptyHistory');
 const configureRetentionBtn = document.getElementById('configureRetentionBtn');
 const googleAuthBtn         = document.getElementById('googleAuthBtn');
+const googleDisconnectBtn   = document.getElementById('googleDisconnectBtn');
 const googleAuthStatus      = document.getElementById('googleAuthStatus');
 const uploadBackupBtn       = document.getElementById('uploadBackupBtn');
 const localBackupInput      = document.getElementById('localBackupInput');
+
+// Disconnect Google Drive modal
+const disconnectModal   = document.getElementById('disconnectModal');
+const disconnectClose   = document.getElementById('disconnectClose');
+const disconnectCancel  = document.getElementById('disconnectCancel');
+const disconnectOk      = document.getElementById('disconnectOk');
+const disconnectMessage = document.getElementById('disconnectMessage');
 
 // Confirm backup modal
 const confirmBackupModal   = document.getElementById('confirmBackupModal');
@@ -202,16 +210,44 @@ function clearSavedToken() {
 function resetAuthUI() {
   googleAuthBtn.textContent    = 'Connect Google Drive';
   googleAuthBtn.disabled       = false;
+  googleDisconnectBtn.classList.add('hidden');
   googleAuthStatus.textContent = 'Session expired — please reconnect';
   googleAuthStatus.className   = 'auth-status error';
   createBackupBtn.disabled     = true;
   restoreSystemBtn.disabled    = true;
+  clearBackupHistoryUI();
+}
+
+// Deliberate admin action, not an expired/failed session — same end state as
+// resetAuthUI but without the alarming "error" styling or wording.
+function showDisconnectedUI() {
+  googleAuthBtn.textContent    = 'Connect Google Drive';
+  googleAuthBtn.disabled       = false;
+  googleDisconnectBtn.classList.add('hidden');
+  googleAuthStatus.textContent = 'Not connected';
+  googleAuthStatus.className   = 'auth-status';
+  createBackupBtn.disabled     = true;
+  restoreSystemBtn.disabled    = true;
+  clearBackupHistoryUI();
+}
+
+// Status card + history list read Drive data that's no longer valid once
+// disconnected — without this they kept showing the last-fetched backups
+// (and their still-clickable Download/Restore/Delete buttons) until a full
+// page reload, even though every action on them would now fail.
+function clearBackupHistoryUI() {
+  backupHistory = [];
+  updateStatusCard();
+  renderHistory();
 }
 
 // Called whenever we have a fresh, valid token ready to use
 async function onTokenReady() {
   googleAuthBtn.textContent    = 'Google Drive Connected';
   googleAuthBtn.disabled       = true;
+  googleDisconnectBtn.classList.remove('hidden');
+  googleDisconnectBtn.disabled = false;
+  googleDisconnectBtn.textContent = 'Disconnect';
   googleAuthStatus.textContent = 'Connected — backups will be saved to your Drive';
   googleAuthStatus.className   = 'auth-status success';
   createBackupBtn.disabled     = false;
@@ -220,6 +256,54 @@ async function onTokenReady() {
   await resolveDriveFolder();
   await loadBackupHistory();
 }
+
+// ─── Disconnect ────────────────────────────────────────────────────────────
+// Revokes the token with Google (so it's actually invalidated, not just
+// forgotten locally) before clearing local state. Revocation is best-effort:
+// if Google's endpoint is unreachable we still disconnect locally, since the
+// admin's intent was to stop this browser from using the token either way.
+function revokeGoogleToken(token) {
+  return new Promise(resolve => {
+    if (!token || !window.google?.accounts?.oauth2?.revoke) {
+      resolve();
+      return;
+    }
+    try {
+      google.accounts.oauth2.revoke(token, resolve);
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function disconnectGoogleDrive() {
+  setModalMsg(disconnectMessage, '');
+  openModal(disconnectModal);
+}
+
+async function confirmDisconnectGoogleDrive() {
+  disconnectOk.disabled     = true;
+  disconnectCancel.disabled = true;
+  disconnectOk.textContent  = 'Disconnecting…';
+
+  const token = driveAccessToken || localStorage.getItem('drive_token');
+  await revokeGoogleToken(token);
+
+  clearSavedToken();
+  showDisconnectedUI();
+  closeModal(disconnectModal);
+  setPageMessage('Google Drive disconnected.', 'success');
+
+  disconnectOk.disabled     = false;
+  disconnectCancel.disabled = false;
+  disconnectOk.innerHTML    = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17.92z"/></svg> Disconnect`;
+}
+
+googleDisconnectBtn?.addEventListener('click', disconnectGoogleDrive);
+disconnectClose?.addEventListener('click',  () => closeModal(disconnectModal));
+disconnectCancel?.addEventListener('click', () => closeModal(disconnectModal));
+disconnectOk?.addEventListener('click', confirmDisconnectGoogleDrive);
+disconnectModal?.addEventListener('click', e => { if (e.target === disconnectModal) closeModal(disconnectModal); });
 
 // ─── Google OAuth (GIS token flow) ───────────────────────────────────────────
 function initGoogleAuth() {
@@ -777,8 +861,8 @@ function renderHistory() {
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
           </svg>
         </div>
-        <div>
-          <div class="history-name">${escapeHtml(b.name)}</div>
+        <div class="history-text">
+          <div class="history-name" title="${escapeHtml(b.name)}">${escapeHtml(b.name)}</div>
           <div class="history-meta">
             ${escapeHtml(formatDriveDate(b.createdTime))} · 
             ${escapeHtml(formatBytes(parseInt(b.size)))} · 
@@ -793,30 +877,30 @@ function renderHistory() {
           </svg>
           completed
         </span>
-        <button class="history-btn" data-action="download" data-id="${escapeHtml(b.id)}" data-name="${escapeHtml(b.name)}">
+        <button class="history-btn" data-action="download" data-id="${escapeHtml(b.id)}" data-name="${escapeHtml(b.name)}" title="Download" aria-label="Download">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="7 10 12 15 17 10"/>
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
-          Download
+          <span class="history-btn-label">Download</span>
         </button>
-        <button class="history-btn restore-btn" data-action="restore" data-id="${escapeHtml(b.id)}" data-name="${escapeHtml(b.name)}" data-date="${escapeHtml(b.createdTime)}">
+        <button class="history-btn restore-btn" data-action="restore" data-id="${escapeHtml(b.id)}" data-name="${escapeHtml(b.name)}" data-date="${escapeHtml(b.createdTime)}" title="Restore" aria-label="Restore">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="16 16 12 12 8 16"/>
             <line x1="12" y1="12" x2="12" y2="21"/>
             <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
           </svg>
-          Restore
+          <span class="history-btn-label">Restore</span>
         </button>
-        <button class="history-btn delete-btn" data-action="delete" data-id="${escapeHtml(b.id)}" data-name="${escapeHtml(b.name)}">
+        <button class="history-btn delete-btn" data-action="delete" data-id="${escapeHtml(b.id)}" data-name="${escapeHtml(b.name)}" title="Delete" aria-label="Delete">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="3 6 5 6 21 6"/>
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
             <path d="M10 11v6"/><path d="M14 11v6"/>
             <path d="M9 6V4h6v2"/>
           </svg>
-          Delete
+          <span class="history-btn-label">Delete</span>
         </button>
       </div>
     </div>
@@ -895,6 +979,7 @@ settingsModal?.addEventListener('click',      e => { if (e.target === settingsMo
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!confirmBackupModal?.classList.contains('hidden')) closeModal(confirmBackupModal);
+  if (!disconnectModal?.classList.contains('hidden'))    closeModal(disconnectModal);
   if (!restoreModal?.classList.contains('hidden'))       closeRestoreModal();
   if (!settingsModal?.classList.contains('hidden'))      closeModal(settingsModal);
 });
