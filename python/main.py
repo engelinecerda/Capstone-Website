@@ -235,31 +235,22 @@ def monthly_reservations():
 # =========================
 @app.get("/analytics/package-distribution")
 def package_distribution():
-
+    # Was: an unfiltered select of every `reservations` row with a
+    # two-level join (package -> package_category), counted by hand in
+    # Python. No WHERE clause meant a full table scan on every call, and
+    # reservations.package_id has no index (one wouldn't meaningfully
+    # help a 100%-of-the-table aggregate anyway). Now reads a pg_cron-
+    # refreshed summary table instead — see
+    # 20261025_package_distribution_materialized_cache.sql. The chart can
+    # be up to ~30 minutes stale as a result.
     try:
         res = (
-            supabase.table("reservations")
-            .select("""
-                reservation_id,
-                package:package_id (
-                    package_category:package_category_id (
-                        category_name
-                    )
-                )
-            """)
+            supabase.table("package_category_distribution_cache")
+            .select("category_name, reservation_count")
+            .order("reservation_count", desc=True)
             .execute()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load package distribution: {e}")
 
-    counts = {}
-
-    for r in res.data:
-        pkg = r.get("package") or {}
-        category = pkg.get("package_category") or {}
-
-        name = category.get("category_name", "Unknown")
-
-        counts[name] = counts.get(name, 0) + 1
-
-    return [{"package": k, "count": v} for k, v in counts.items()]
+    return [{"package": row["category_name"], "count": row["reservation_count"]} for row in res.data]
