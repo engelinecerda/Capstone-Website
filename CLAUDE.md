@@ -140,3 +140,7 @@ The login flow reads `is_locked` from `profiles`. If this column is missing, ALL
 ```sql
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_locked boolean NOT NULL DEFAULT false;
 ```
+
+## Temporary testing-phase notice (remove after testing)
+
+`js/system_notice.js` shows a closable "System Notice" popup once per browser session plus a small bottom-left pill, on every root-level public page. It is hardcoded, self-contained (styles injected by the script), and intentionally not admin-configurable. To remove it: delete `js/system_notice.js` and the two lines tagged `SYSTEM-NOTICE` (a comment + a `<script>`) near the end of `<body>` in each root `.html` file (`grep -rl "SYSTEM-NOTICE" --include=*.html .`).
