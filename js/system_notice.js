@@ -1,8 +1,11 @@
 // system_notice.js — TEMPORARY "testing phase" notice for the customer site.
 //
-// Shows a closable popup once per browser session (on whichever public page
-// the visitor lands on first), then leaves a small bottom-left pill that
-// reopens the notice. Deliberately hardcoded and NOT admin-configurable: it
+// Shows a closable popup, then stays quiet for SEEN_TTL_MS across the tabs and
+// windows of the same browser, so opening a link in a new tab does not
+// re-trigger it. It shows again when (a) that window passes, or (b) the visitor
+// comes back after closing every tab of the site (a brand-new tab that finds no
+// other open tab of the site counts as a new visit). A small bottom-left pill
+// always remains to reopen the notice. Deliberately hardcoded and NOT admin-configurable: it
 // is not a system feature, only a disclosure for the academic testing period.
 //
 // TO REMOVE once testing is over (self-contained, nothing else depends on it):
@@ -16,6 +19,7 @@
   window.__eliSystemNoticeLoaded = true;
 
   var SEEN_KEY = 'eliSystemNoticeSeen';
+  var SEEN_TTL_MS = 3 * 60 * 60 * 1000; // how long "I Understand" is remembered (3 hours)
 
   var CSS = [
     '.sn-backdrop{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(30,12,3,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .25s ease}',
@@ -60,8 +64,70 @@
     '</div>' +
     '<button type="button" class="sn-pill" hidden aria-label="Testing version notice. Click to read.">' + ICON + '<span class="sn-long">Testing version &middot; Academic project</span><span class="sn-short">Testing version</span></button>';
 
-  function storageGet() { try { return sessionStorage.getItem(SEEN_KEY); } catch (e) { return null; } }
-  function storageSet() { try { sessionStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* private mode: popup may reappear, harmless */ } }
+  // Stores the time the notice was acknowledged. localStorage is shared across
+  // tabs; if it is unavailable (some private modes) fall back to sessionStorage,
+  // where the popup may reappear in new tabs, which is harmless.
+  function storageGet() {
+    var raw = null;
+    try { raw = localStorage.getItem(SEEN_KEY); } catch (e) { /* unavailable */ }
+    if (raw === null) { try { raw = sessionStorage.getItem(SEEN_KEY); } catch (e) { /* unavailable */ } }
+    var ts = parseInt(raw, 10);
+    return !isNaN(ts) && ts > 0 && Date.now() - ts < SEEN_TTL_MS && ts <= Date.now() + 60000;
+  }
+  function storageSet() {
+    var now = String(Date.now());
+    try { localStorage.setItem(SEEN_KEY, now); } catch (e) { /* unavailable */ }
+    try { sessionStorage.setItem(SEEN_KEY, now); } catch (e) { /* unavailable */ }
+  }
+
+  // ── "Is this a new visit?" detection ───────────────────────────────────
+  // Every open tab answers a ping on a BroadcastChannel. A tab with no
+  // per-tab flag (a new tab/window, or a new browser session) pings; if some
+  // other tab of the site answers it is a continuing visit, if nobody answers
+  // every tab was closed and this is a new visit. The per-tab flag lives in
+  // sessionStorage, so it survives reloads and same-tab page navigation.
+  var CHANNEL_NAME = 'eli-system-notice';
+  var TAB_KEY = 'eliSystemNoticeTab';
+  var PING_WAIT_MS = 400;
+
+  function tabHasVisited() { try { return sessionStorage.getItem(TAB_KEY) === '1'; } catch (e) { return false; } }
+  function markTabVisited() { try { sessionStorage.setItem(TAB_KEY, '1'); } catch (e) { /* unavailable */ } }
+
+  function startResponder() {
+    if (typeof BroadcastChannel === 'undefined') return null;
+    try {
+      var ch = new BroadcastChannel(CHANNEL_NAME);
+      ch.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'ping') ch.postMessage({ type: 'alive' });
+      });
+      return ch;
+    } catch (e) { return null; }
+  }
+
+  function askOtherTabs(ch, cb) {
+    var done = false;
+    function finish(alive) {
+      if (done) return;
+      done = true;
+      ch.removeEventListener('message', onMsg);
+      cb(alive);
+    }
+    function onMsg(e) { if (e.data && e.data.type === 'alive') finish(true); }
+    ch.addEventListener('message', onMsg);
+    ch.postMessage({ type: 'ping' });
+    setTimeout(function () { finish(false); }, PING_WAIT_MS);
+  }
+
+  // hooks: { open(), showPill() }
+  function decideNotice(ch, hooks) {
+    if (!storageGet()) { markTabVisited(); hooks.open(); return; }   // never acknowledged, or expired
+    if (tabHasVisited()) { hooks.showPill(); return; }                // same tab, still within the window
+    if (!ch) { markTabVisited(); hooks.showPill(); return; }          // no BroadcastChannel: time window only
+    askOtherTabs(ch, function (alive) {
+      markTabVisited();
+      if (alive) hooks.showPill(); else hooks.open();                 // nobody else open = new visit
+    });
+  }
 
   function init() {
     var style = document.createElement('style');
@@ -145,7 +211,7 @@
     var liftBar = document.querySelector('.reservation-buttons');
     if (liftBar && window.ResizeObserver) new ResizeObserver(updateLift).observe(liftBar);
 
-    if (storageGet()) { pill.hidden = false; } else { open(); }
+    decideNotice(startResponder(), { open: open, showPill: function () { pill.hidden = false; } });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
