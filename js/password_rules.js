@@ -24,6 +24,7 @@ export function getPasswordChecks(password) {
 export function validatePassword(password) {
   const checks = getPasswordChecks(password);
   if (!checks.length) return 'Password must be at least 8 characters long.';
+  if ((password || '').length > 72) return 'Password must be 72 characters or fewer.';
   if (!checks.lowercase) return 'Password must include at least one lowercase letter.';
   if (!checks.uppercase) return 'Password must include at least one uppercase letter.';
   if (!checks.special) return 'Password must include at least one special character.';

@@ -1,5 +1,6 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
+import { attachEmailGuard } from './input_validation.js';
 
 initPasswordToggles();
 
@@ -8,6 +9,7 @@ const btn        = document.getElementById('login-btn');
 const msg        = document.getElementById('login-message');
 const emailInput = document.getElementById('login-email');
 const pwInput    = document.getElementById('login-password');
+attachEmailGuard(emailInput);
 
 const MAX_ATTEMPTS = 5;
 const LOCK_MS      = 10 * 60 * 1000; // 10 minutes

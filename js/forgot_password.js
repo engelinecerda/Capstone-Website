@@ -1,7 +1,9 @@
 import { customerSupabase as supabase } from './supabase.js';
+import { attachEmailGuard } from './input_validation.js';
 
 const form = document.getElementById('forgot-password-form');
 const message = document.getElementById('forgot-password-msg');
+attachEmailGuard(document.getElementById('reset-email'));
 
 form?.addEventListener('submit', async function (e) {
     e.preventDefault();

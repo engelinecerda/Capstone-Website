@@ -34,11 +34,13 @@
     '.sn-x{position:absolute;top:10px;right:12px;width:34px;height:34px;border:0;background:transparent;color:#6B3820;font-size:24px;line-height:1;cursor:pointer}',
     '.sn-x:hover{color:#1E0C03}',
     '.sn-btn:focus-visible,.sn-x:focus-visible,.sn-pill:focus-visible{outline:2px solid #B07D5A;outline-offset:2px}',
-    '.sn-pill{position:fixed;left:16px;bottom:16px;z-index:1000;display:inline-flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:8px 14px 8px 11px;border:1px solid rgba(61,26,10,.18);border-radius:999px;background:#F5E6C8;color:#5C4210;font:500 12px/1.2 "Inter",system-ui,sans-serif;box-shadow:0 4px 14px rgba(30,12,3,.18);cursor:pointer;transition:background .2s ease,transform .2s ease}',
+    '.sn-pill{position:fixed;left:16px;bottom:calc(16px + var(--sn-lift,0px));z-index:1000;display:inline-flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:8px 14px 8px 11px;border:1px solid rgba(61,26,10,.18);border-radius:999px;background:#F5E6C8;color:#5C4210;font:500 12px/1.2 "Inter",system-ui,sans-serif;box-shadow:0 4px 14px rgba(30,12,3,.18);cursor:pointer;transition:background .2s ease,transform .2s ease}',
     '.sn-pill:hover{background:#F2EBE0;transform:translateY(-1px)}',
     '.sn-pill[hidden]{display:none}',
     '.sn-pill svg{flex:none}',
-    '@media (max-width:480px){.sn-dialog{padding:30px 22px 22px}.sn-title{font-size:27px}.sn-pill{left:10px;bottom:10px;font-size:11px}}',
+    '.sn-pill .sn-short{display:none}',
+    '@media (max-width:480px){.sn-dialog{padding:30px 22px 22px}.sn-title{font-size:27px}.sn-pill{left:10px;bottom:calc(10px + var(--sn-lift,0px));gap:6px;padding:7px 11px 7px 9px;font-size:11px}.sn-pill .sn-long{display:none}.sn-pill .sn-short{display:inline}}',
+    '@media (max-width:340px){.sn-pill{padding:8px}.sn-pill .sn-short{display:none}}',
     '@media (prefers-reduced-motion:reduce){.sn-backdrop,.sn-dialog,.sn-pill{transition:none}}'
   ].join('\n');
 
@@ -56,7 +58,7 @@
         '<button type="button" class="sn-btn">I Understand</button>' +
       '</div>' +
     '</div>' +
-    '<button type="button" class="sn-pill" hidden aria-label="Testing version notice. Click to read.">' + ICON + '<span>Testing version &middot; Academic project</span></button>';
+    '<button type="button" class="sn-pill" hidden aria-label="Testing version notice. Click to read.">' + ICON + '<span class="sn-long">Testing version &middot; Academic project</span><span class="sn-short">Testing version</span></button>';
 
   function storageGet() { try { return sessionStorage.getItem(SEEN_KEY); } catch (e) { return null; } }
   function storageSet() { try { sessionStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* private mode: popup may reappear, harmless */ } }
@@ -124,6 +126,24 @@
     okBtn.addEventListener('click', close);
     backdrop.addEventListener('click', function (e) { if (!dialog.contains(e.target)) close(); });
     pill.addEventListener('click', open);
+
+    // Pages with a fixed bottom action bar on small screens (e.g. the
+    // reservation form's Back/Next bar) would otherwise be covered by the
+    // pill, so lift the pill by that bar's height.
+    function updateLift() {
+      var bar = document.querySelector('.reservation-buttons');
+      var lift = 0;
+      if (bar) {
+        var cs = window.getComputedStyle(bar);
+        if (cs.position === 'fixed' && cs.display !== 'none') lift = bar.offsetHeight;
+      }
+      pill.style.setProperty('--sn-lift', lift + 'px');
+    }
+    updateLift();
+    window.addEventListener('resize', updateLift);
+    window.addEventListener('orientationchange', updateLift);
+    var liftBar = document.querySelector('.reservation-buttons');
+    if (liftBar && window.ResizeObserver) new ResizeObserver(updateLift).observe(liftBar);
 
     if (storageGet()) { pill.hidden = false; } else { open(); }
   }

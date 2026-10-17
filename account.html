@@ -135,15 +135,15 @@
               <div class="form-row">
                 <div class="form-group">
                   <label>First Name</label>
-                  <input type="text" id="profile-first-name" placeholder="First Name" readonly required>
+                  <input type="text" id="profile-first-name" placeholder="e.g., Juan" readonly required>
                 </div>
                 <div class="form-group">
                   <label>Middle Name <span class="label-optional">(optional)</span></label>
-                  <input type="text" id="profile-middle-name" placeholder="Middle Name" readonly>
+                  <input type="text" id="profile-middle-name" placeholder="e.g., Santos" readonly>
                 </div>
                 <div class="form-group">
                   <label>Last Name</label>
-                  <input type="text" id="profile-last-name" placeholder="Last Name" readonly required>
+                  <input type="text" id="profile-last-name" placeholder="e.g., Dela Cruz" readonly required>
                 </div>
               </div>
 
@@ -151,7 +151,7 @@
 
               <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" id="profile-email" placeholder="Email" required maxlength="254">
+                <input type="email" id="profile-email" placeholder="e.g., juan@example.com" required maxlength="254">
                 <p class="field-note">If you change your email, confirm the link sent to both addresses before the new login email becomes active.</p>
                 <p class="field-note pending-email-note" id="pending-email-note" hidden></p>
               </div>
@@ -159,7 +159,7 @@
               <div class="form-row form-row-two">
                 <div class="form-group">
                   <label>Phone Number</label>
-                  <input type="tel" id="profile-phone" placeholder="Phone Number">
+                  <input type="tel" id="profile-phone" placeholder="e.g., 0917 562 0306">
                 </div>
                 <div class="form-group">
                   <label>Date Registered</label>
@@ -189,16 +189,16 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Current Password</label>
-                <input type="password" id="current-password" placeholder="Current password" required>
+                <input type="password" id="current-password" placeholder="Current password" required maxlength="72">
               </div>
               <div class="form-group">
                 <label>New Password</label>
-                <input type="password" id="new-password" placeholder="Min. 8 characters" required>
+                <input type="password" id="new-password" placeholder="Min. 8 characters" required maxlength="72">
                 <p class="field-note">Must be at least 8 characters and include an uppercase letter, a lowercase letter, and a special character.</p>
               </div>
               <div class="form-group">
                 <label>Confirm New Password</label>
-                <input type="password" id="confirm-new-password" placeholder="Confirm new password" required>
+                <input type="password" id="confirm-new-password" placeholder="Confirm new password" required maxlength="72">
               </div>
             </div>
             <div class="edit-form-actions">

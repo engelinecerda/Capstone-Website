@@ -67,7 +67,10 @@ import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { attachPhoneMask } from './phone_format.js';
+import { attachEmailGuard, attachPhonePasteNormalizer, validateEmailAddress, validatePhoneNumber } from './input_validation.js';
 
+attachEmailGuard(document.getElementById('profile-email'));
+attachPhonePasteNormalizer(document.getElementById('profile-phone'));
 attachPhoneMask(document.getElementById('profile-phone'));
 
 const PAYMENT_METHODS = {
@@ -2983,6 +2986,14 @@ function wireProfileForm() {
 
         if (!payload.first_name || !payload.last_name || !requestedEmail) {
             setFormMessage(profileMessage, 'First name, last name, and email are required.', 'error');
+            return;
+        }
+
+        const profileInputError =
+            validateEmailAddress(requestedEmail) ||
+            validatePhoneNumber(payload.phone_number || '');
+        if (profileInputError) {
+            setFormMessage(profileMessage, profileInputError, 'error');
             return;
         }
 

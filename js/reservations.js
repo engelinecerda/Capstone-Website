@@ -33,6 +33,7 @@ import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 import { attachPhoneMask } from '/js/phone_format.js';
+import { attachNameGuard, attachEmailGuard, attachIntegerGuard, attachPhonePasteNormalizer, validatePersonName, validateEmailAddress, validatePhoneNumber } from '/js/input_validation.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const isLoggedIn = !!session;
@@ -361,7 +362,10 @@ const eventDateInput          = document.getElementById('event-date');
 const eventDateDisplayInput   = document.getElementById('event-date-display');
 const nameInput               = document.getElementById('name');
 const phoneInput              = document.getElementById('phone');
+attachPhonePasteNormalizer(phoneInput);
 attachPhoneMask(phoneInput);
+attachNameGuard(nameInput);
+attachEmailGuard(document.getElementById('email'));
 const emailInput              = document.getElementById('email');
 const availabilityGrid        = document.getElementById('availabilityGrid');
 const availabilityMonthLabel  = document.getElementById('availabilityMonthLabel');
@@ -616,12 +620,16 @@ if (FORM_CONFIG.policyOverrides.terms) POLICY_CONTENT.terms = FORM_CONFIG.policy
 if (FORM_CONFIG.policyOverrides.privacy) POLICY_CONTENT.privacy = FORM_CONFIG.policyOverrides.privacy;
 
 if (!FORM_CONFIG.fieldRules.contact_phone_required) {
-    const phoneEl = document.getElementById('phone');
-    if (phoneEl) phoneEl.placeholder = 'Phone Number (Optional)';
+    // The placeholder now shows the number format, so the optional marker
+    // moves to the label (same pattern as Notes & Special Requests).
+    const phoneLabelEl = document.querySelector('label[for="phone"]');
+    if (phoneLabelEl && !phoneLabelEl.querySelector('.res-field-optional')) {
+        phoneLabelEl.insertAdjacentHTML('beforeend', ' <span class="res-field-optional">(Optional)</span>');
+    }
 }
 if (FORM_CONFIG.fieldRules.special_requests_required) {
     const requestsEl = document.getElementById('requests');
-    if (requestsEl) requestsEl.placeholder = 'Notes & Special Requests';
+    if (requestsEl) requestsEl.placeholder = 'e.g., Dietary needs, preferred setup, special occasion details';
 }
 
 let activePolicyKey = 'terms';
@@ -848,6 +856,9 @@ function clampGuestCountToSelection() {
         showGuestCountAdjustedNotice();
     }
 }
+
+attachIntegerGuard(document.getElementById('guest-count'), { maxDigits: 4 });
+attachIntegerGuard(document.getElementById('additional-heads-input'), { maxDigits: 3 });
 
 document.getElementById('guest-count')?.addEventListener('input', function () {
     S.guestCount = this.value.trim();
@@ -3881,7 +3892,11 @@ function validate(n) {
         const raw = document.getElementById('guest-count')?.value.trim();
         const gc  = parseInt(raw, 10);
         if (!raw || isNaN(gc) || gc < 1) {
-            showWarningModal('Please enter a valid number of guests (at least 1).');
+            const gMin = getSelectedPackageMinGuests();
+            const gMax = getSelectedPackageMaxGuests();
+            showWarningModal(gMin != null && gMax != null
+                ? `Please enter the number of guests (${gMin}–${gMax} for this package).`
+                : 'Please enter a valid number of guests.');
             scrollToSection('sub-guests-type'); return false;
         }
         if (!validateGuestCountRange(gc)) {
@@ -3957,7 +3972,11 @@ function validate(n) {
         if (!name || !email) { showWarningModal('Please fill in all contact details.'); return false; }
         if (FORM_CONFIG.fieldRules.contact_phone_required && !phone) { showWarningModal('Please fill in all contact details.'); return false; }
         if (FORM_CONFIG.fieldRules.special_requests_required && !requests) { showWarningModal('Please let us know your special requests before continuing.'); return false; }
-        if (!/^\S+@\S+\.\S+$/.test(email)) { showWarningModal('Please enter a valid email address.'); return false; }
+        const contactError =
+            validatePersonName(name, { label: 'Full name', max: 150 }) ||
+            validateEmailAddress(email) ||
+            validatePhoneNumber(phone, { required: !!FORM_CONFIG.fieldRules.contact_phone_required });
+        if (contactError) { showWarningModal(contactError); return false; }
         S.name = name; S.phone = phone; S.email = email;
         S.requests = requests;
         return true;

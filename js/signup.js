@@ -1,8 +1,12 @@
 import { customerSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
 import { validatePassword } from './password_rules.js';
+import { attachNameGuard, attachEmailGuard, validatePersonName, validateEmailAddress } from './input_validation.js';
 
 initPasswordToggles();
+
+['first-name', 'middle-name', 'last-name'].forEach((id) => attachNameGuard(document.getElementById(id)));
+attachEmailGuard(document.getElementById('signup-email'));
 
 const form = document.getElementById('signup-form');
 const btn  = document.getElementById('signup-btn');
@@ -44,13 +48,18 @@ form.addEventListener('submit', async function (e) {
     const terms      = document.getElementById('terms').checked;
 
     // Client-side validation
-    if (!firstName || !lastName) {
-        setMessage('Please enter your first and last name.', 'error');
+    const nameError =
+        validatePersonName(firstName, { label: 'First name' }) ||
+        validatePersonName(middleName, { label: 'Middle name', required: false }) ||
+        validatePersonName(lastName, { label: 'Last name' });
+    if (nameError) {
+        setMessage(nameError, 'error');
         return;
     }
 
-    if (!email) {
-        setMessage('Please enter your email address.', 'error');
+    const emailError = validateEmailAddress(email);
+    if (emailError) {
+        setMessage(emailError, 'error');
         return;
     }
 
