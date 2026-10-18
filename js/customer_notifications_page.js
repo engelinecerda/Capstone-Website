@@ -44,6 +44,17 @@ function fullTimestamp(iso) {
   return `${datePart}, ${timePart}`;
 }
 
+// True when `link` points at the page the customer is already on (legacy
+// rows still link to /notifications), so a click doesn't reload the page.
+function isCurrentPage(link) {
+  try {
+    const target = new URL(link, window.location.origin);
+    const strip = (p) => p.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+    return strip(target.pathname) === strip(window.location.pathname)
+      && target.search === window.location.search;
+  } catch { return false; }
+}
+
 const EMPTY_SVG = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
 
 // ── Rendering ────────────────────────────────────────────────────────────
@@ -157,7 +168,7 @@ async function handleRowActivate(target) {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     await loadNotifs();
   }
-  if (link) window.location.href = link;
+  if (link && !isCurrentPage(link)) window.location.href = link;
 }
 
 listEl.addEventListener('click', (e) => handleRowActivate(e.target));

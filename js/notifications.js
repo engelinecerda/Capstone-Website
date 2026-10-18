@@ -72,6 +72,18 @@ function notifTypeIcon(type) {
   return `<span class="notif-type-icon" style="background:${cfg.bg};color:${cfg.color}">${cfg.svg}</span>`;
 }
 
+// True when `link` points at the page the customer is already on, so a click
+// doesn't trigger a pointless reload. Compares path (ignoring ".html", since
+// Vercel serves clean URLs) and query string.
+function isCurrentPage(link) {
+  try {
+    const target = new URL(link, window.location.origin);
+    const strip = p => p.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+    return strip(target.pathname) === strip(window.location.pathname)
+      && target.search === window.location.search;
+  } catch { return false; }
+}
+
 // ── Shared notification logic ──────────────────────────────────────────────────
 function renderList(listEl, notifications) {
   if (!notifications.length) {
@@ -219,7 +231,7 @@ function wirePanelEvents({ supabase, userId, bellBtn, panel, listEl, badgeEl, ma
     }
     if (link) {
       panel.hidden = true;
-      window.location.href = link;
+      if (!isCurrentPage(link)) window.location.href = link;
     }
   });
 
