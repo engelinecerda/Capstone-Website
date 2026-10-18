@@ -4520,6 +4520,19 @@ async function submitDone() {
             ? Number(additionalHeadPkg.max_guests || S.guestCount) + additionalHeads
             : parseInt(S.guestCount);
 
+        // Persist the dish builder's picks so the customer's and admin's
+        // reservation-details pages can show what was ordered. Only for a
+        // catering-flagged package (same condition the summary uses to list
+        // the cart); pax:true is the flat-priced (Drinks) completion marker,
+        // so it is resolved to the chosen Pax Count like the summary does.
+        const menuSelections = isCateringPackage(getActivePackage())
+            ? S.cateringCart.filter(i => i && i.pax).map(i => ({
+                category: i.cat,
+                dish: i.dish,
+                pax: i.pax === true ? (S.cateringGlobalPax || null) : i.pax
+            }))
+            : [];
+
         const { data: reservation, error: insertError } = await supabase
             .from('reservations')
             .insert({
@@ -4546,6 +4559,7 @@ async function submitDone() {
                 contact_email:    S.email,
                 contact_phone:    S.phone,
                 special_requests: S.requests || null,
+                menu_selections:  menuSelections.length ? menuSelections : null,
                 status:           'pending'
             })
             .select('reservation_id')

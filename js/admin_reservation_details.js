@@ -584,6 +584,7 @@ async function fetchReservationDetail(idParam) {
     venue_id,
     venue:venue_id ( name ),
     special_requests,
+    menu_selections,
     total_price,
     created_at,
     booking_scope,
@@ -844,6 +845,23 @@ function renderCancellationReviewPanel(reservation, status) {
   cancellationReviewPanel.classList.remove('hidden');
 }
 
+// Groups the stored dish-builder picks by category for display. Returns ''
+// when none were saved (reservations made before menu_selections existed, or
+// packages without a dish builder).
+function buildMenuSelectionsHtml(selections) {
+  if (!Array.isArray(selections) || !selections.length) return '';
+  const groups = new Map();
+  selections.forEach(item => {
+    if (!item || !item.dish) return;
+    const cat = item.category || 'Menu';
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push(item.pax ? `${item.dish} (${item.pax} pax)` : item.dish);
+  });
+  return Array.from(groups, ([cat, dishes]) =>
+    `<div><strong>${escapeHtml(cat)}:</strong> ${escapeHtml(dishes.join(', '))}</div>`
+  ).join('');
+}
+
 function renderBookingDetails() {
   const reservation = currentReservation;
   bookingDetailsGrid.innerHTML = [
@@ -868,6 +886,9 @@ function renderBookingDetails() {
 
   bookingDetailsRows.innerHTML = [
     dlRow('Address', reservation.venue_location || 'No address provided', { full: true, muted: !reservation.venue_location }),
+    ...(buildMenuSelectionsHtml(reservation.menu_selections)
+      ? [dlRow('Menu selections', buildMenuSelectionsHtml(reservation.menu_selections), { full: true, raw: true })]
+      : []),
     dlRow('Special requests', reservation.special_requests || 'None provided', { full: true, muted: !reservation.special_requests }),
     dlRow('Created', formatDateTime(reservation.created_at))
   ].join('');

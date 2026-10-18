@@ -194,6 +194,7 @@ async function loadPageData() {
             add_on_id,
             total_price,
             special_requests,
+            menu_selections,
             status,
             cancellation_reason,
             cancellation_hold_expires_at,
@@ -419,10 +420,28 @@ function contractBadgeClass(contractMeta) {
     return 'pending';
 }
 
+// Groups the stored dish-builder picks by category for display
+// ("Main Dish: A (20 pax), B (20 pax)"). Returns '' when none were saved
+// (older reservations, or packages without a dish builder).
+function buildMenuSelectionsHtml(selections) {
+    if (!Array.isArray(selections) || !selections.length) return '';
+    const groups = new Map();
+    selections.forEach(item => {
+        if (!item || !item.dish) return;
+        const cat = item.category || 'Menu';
+        if (!groups.has(cat)) groups.set(cat, []);
+        groups.get(cat).push(item.pax ? `${item.dish} (${item.pax} pax)` : item.dish);
+    });
+    return Array.from(groups, ([cat, dishes]) =>
+        `<div><strong>${escapeHtml(cat)}:</strong> ${escapeHtml(dishes.join(', '))}</div>`
+    ).join('');
+}
+
 function buildEventDetailsPanel(reservation) {
     const addOnName = getReservationAddOnName(reservation);
     const specialRequests = String(reservation.special_requests || '').trim();
-    const hasOptionalContent = Boolean(addOnName) || Boolean(specialRequests);
+    const menuHtml = buildMenuSelectionsHtml(reservation.menu_selections);
+    const hasOptionalContent = Boolean(addOnName) || Boolean(specialRequests) || Boolean(menuHtml);
 
     return `
         <section class="rd-panel">
@@ -458,6 +477,12 @@ function buildEventDetailsPanel(reservation) {
                     <div class="rd-dl-row">
                         <dt><i class="ti ti-gift" aria-hidden="true"></i> Add-on</dt>
                         <dd>${escapeHtml(addOnName)}</dd>
+                    </div>
+                ` : ''}
+                ${menuHtml ? `
+                    <div class="rd-dl-row rd-dl-row-wrap">
+                        <dt><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Menu selections</dt>
+                        <dd>${menuHtml}</dd>
                     </div>
                 ` : ''}
                 ${specialRequests ? `
