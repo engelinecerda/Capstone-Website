@@ -101,6 +101,10 @@ const S = {
     // option) or by the customer via the picker (more than one option).
     venueOptions: [],
     venueId: null,
+    // Combo (multi-scope) packages occupy several rooms at once, so they never
+    // resolve to one venueId — this is the combined capacity of their mapped
+    // active rooms instead, used only to size Additional Per-Head guests.
+    comboVenueCapacity: null,
     // Additional Per-Head (supabase/migrations/20261018_additional_per_head.sql)
     // — guests booked beyond the selected package's Max Guests, at that
     // package's configured per-head price. Only ever nonzero when the
@@ -208,6 +212,30 @@ function isCateringPackage(pkg) {
     return !!pkg?.usesCateringMenu;
 }
 
+// Which packages are PRICED by the dish cart (price = sum of the dishes) —
+// mirrors the DB price-floor trigger's own definition (v_is_catering in
+// supabase/migrations/20261018_additional_per_head.sql): an OFFSITE package
+// whose name contains "catering". Any other package carrying the
+// uses_catering_menu flag (e.g. an onsite All-In wedding) still shows the
+// dish builder, but keeps its normal package price — the cart must not
+// replace it, or the total falls below package.price and the server rejects
+// the booking ("Total price cannot be less than the selected package price").
+function isMenuPricedPackage(pkg) {
+    return isCateringPackage(pkg) && S.locationType === 'offsite' && /catering/i.test(pkg?.label || '');
+}
+
+// For a flagged package that is NOT menu-priced: is the chosen menu already
+// covered by the package price (true), or charged on top of it (false)?
+// Current assumption: included — the package description says it comes with
+// "full catering", and the dish builder is only where the customer picks
+// dishes. Flip to false to bill the cart ON TOP of the package price.
+const MENU_INCLUDED_IN_PACKAGE_PRICE = true;
+
+function getIncludedMenuExtraCharge(pkg) {
+    if (!isCateringPackage(pkg) || isMenuPricedPackage(pkg) || MENU_INCLUDED_IN_PACKAGE_PRICE) return 0;
+    return S.cateringCart.filter(i => i && i.pax).reduce((sum, i) => sum + i.price, 0);
+}
+
 // The package currently selected for whichever location type is active —
 // S.miniPackage for onsite, S.offsitePackage for offsite. The catering
 // wizard is driven off this (not off S.offsitePackage alone) so a
@@ -263,6 +291,54 @@ function saveDraft() {
 function clearDraft() {
     if (!DRAFT_KEY) return;
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
+// ── Guest → account handoff ────────────────────────────────────────────
+// Guests have no DRAFT_KEY (see above), so their form used to vanish when
+// they registered. Instead of saving continuously (which would leak a
+// stranger's contact details to the next person on a shared device), a
+// guest's form is saved ONCE, only at the moment they click Sign In /
+// Create Account at the gate, under a single short-lived key:
+//   • unbound: expires in 1 hour (covers "I already have an account").
+//   • bound:   signup.js binds it to the email being registered and extends
+//              it to 24 hours (covers the confirm-your-email detour).
+// claimGuestHandoff() moves it into the normal per-user draft the first time
+// a matching account opens /reservations, then deletes it. A bound handoff is
+// never claimed by a different email. The existing "Continue your
+// reservation?" prompt then restores it (and the slot is re-validated at
+// submit, so a date taken in the meantime is still caught).
+const HANDOFF_KEY = 'eli_reservation_handoff';
+const HANDOFF_UNBOUND_TTL_MS = 60 * 60 * 1000;
+
+function saveGuestHandoff() {
+    if (isLoggedIn || submissionLocked) return;
+    if (!draftHasMeaningfulProgress(S, cur)) return;
+    try {
+        localStorage.setItem(HANDOFF_KEY, JSON.stringify({
+            state: S,
+            step: cur,
+            savedAt: Date.now(),
+            expiresAt: Date.now() + HANDOFF_UNBOUND_TTL_MS,
+            boundEmail: null
+        }));
+    } catch { /* storage full / blocked — the guest simply re-enters the form */ }
+}
+
+function claimGuestHandoff() {
+    if (!DRAFT_KEY || !session?.user) return;
+    try {
+        const raw = localStorage.getItem(HANDOFF_KEY);
+        if (!raw) return;
+        const h = JSON.parse(raw);
+        if (!h?.state || typeof h.step !== 'number' || !(h.expiresAt > Date.now())) {
+            localStorage.removeItem(HANDOFF_KEY);
+            return;
+        }
+        const userEmail = String(session.user.email || '').trim().toLowerCase();
+        if (h.boundEmail && h.boundEmail !== userEmail) return; // someone else's — leave it until it expires
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ state: h.state, step: h.step, savedAt: Date.now() }));
+        localStorage.removeItem(HANDOFF_KEY);
+    } catch { /* ignore */ }
 }
 
 // A draft is only worth offering to "resume" if the customer actually made
@@ -1171,29 +1247,30 @@ function getSelectedContractPackageLabel() {
 // Same package-only rule as buildSummary(): catering has no single
 // package.price to discount, add-ons are never discounted.
 function computeContractPreviewDiscount() {
-    if (isCateringPackage(getActivePackage())) return getPkgDiscount(null);
+    if (isMenuPricedPackage(getActivePackage())) return getPkgDiscount(null);
     if (S.locationType === 'onsite') return getPkgDiscount(S.miniPackage);
     return getPkgDiscount(S.offsitePackage);
 }
 
 // Additional Per-Head (supabase/migrations/20261018_additional_per_head.sql)
-// — same package-only rule as computeContractPreviewDiscount(): catering
-// has no single package to attach this to.
+// — same package-only rule as computeContractPreviewDiscount(): a
+// menu-priced package has no single package to attach this to.
 function computeContractPreviewAdditionalHeadCharge() {
     const pkg = getSelectedPackageForAdditionalHead();
-    if (!pkg?.allowAdditionalHead || isCateringPackage(getActivePackage())) return 0;
+    if (!pkg?.allowAdditionalHead || isMenuPricedPackage(getActivePackage())) return 0;
     return (S.additionalHeads || 0) * Number(pkg.pricePerAdditionalHead || 0);
 }
 
 function computeContractPreviewBase() {
     let base;
-    if (isCateringPackage(getActivePackage())) {
+    if (isMenuPricedPackage(getActivePackage())) {
         base = S.cateringCart.filter(i => i && i.pax).reduce((sum, i) => sum + i.price, 0);
     } else if (S.locationType === 'onsite') {
         base = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0);
     } else {
         base = S.offsitePackage ? S.offsitePackage.price : 0;
     }
+    base += getIncludedMenuExtraCharge(getActivePackage());
     base += computeContractPreviewAdditionalHeadCharge();
     // Discount reduces the base before the service charge, same ordering
     // as buildSummary() — so the pre-submit contract preview matches the
@@ -2274,6 +2351,7 @@ async function selectCategory(cat) {
         S.miniPackage    = null;
         S.venueOptions   = [];
         S.venueId        = null;
+        S.comboVenueCapacity = null;
         S.additionalHeads = 0;
         S.offsitePackage = null;
         S.snackAddon     = null;
@@ -2548,8 +2626,9 @@ function buildOffsiteSub(categoryId) {
 async function resolveVenueOptionsForPackage(pkg) {
     S.venueOptions = [];
     S.venueId = null;
-    const isComboPackage = Array.isArray(pkg?.bookingScope) && pkg.bookingScope.length > 1;
-    if (!pkg?.id || isComboPackage) return;
+    S.comboVenueCapacity = null;
+    const isComboPackage = isComboScopePackage(pkg);
+    if (!pkg?.id) return;
 
     try {
         const { data, error } = await supabase
@@ -2561,6 +2640,17 @@ async function resolveVenueOptionsForPackage(pkg) {
         const options = (data || [])
             .map(row => row.venue)
             .filter(v => v && v.is_active);
+
+        if (isComboPackage) {
+            // No single room to pick or auto-resolve — the package takes
+            // all of its rooms at once. Keep only their combined capacity
+            // (rooms with no capacity set are skipped, same as the server's
+            // sum) so Additional Per-Head can be sized against it.
+            const capacities = options.filter(v => v.capacity != null).map(v => Number(v.capacity)).filter(Number.isFinite);
+            S.comboVenueCapacity = capacities.length ? capacities.reduce((sum, c) => sum + c, 0) : null;
+            return;
+        }
+
         S.venueOptions = options;
         if (options.length === 1) S.venueId = options[0].venue_id;
     } catch {
@@ -2568,6 +2658,7 @@ async function resolveVenueOptionsForPackage(pkg) {
         // package with zero mapped venues.
         S.venueOptions = [];
         S.venueId = null;
+        S.comboVenueCapacity = null;
     }
 }
 
@@ -2612,13 +2703,23 @@ function buildRoomPickerBlock() {
 // Max Guests), further capped by the package's own Max Additional Heads if
 // set; offsite has no venue check, capped only by the package's own max
 // (or uncapped if the package leaves it blank). ─────────────────────────
-// Catering-flagged packages are cart-priced (no single package.price to
-// attach a per-head charge to), so they never get an additional-head
-// block — returning null here keeps every caller (block, preview, summary,
-// submit) consistent without each one re-checking.
+// Only MENU-PRICED packages (see isMenuPricedPackage() — an offsite
+// "catering" package whose price is the dish cart) are cart-priced with no
+// single package.price to attach a per-head charge to, so they never get an
+// additional-head block — returning null here keeps every caller (block,
+// preview, summary, submit) consistent without each one re-checking. A
+// menu-flagged package that keeps its own price (e.g. an onsite All-In
+// wedding) supports additional heads like any other package; its per-head
+// rate covers the extra guest's food and venue inclusions together.
 function getSelectedPackageForAdditionalHead() {
     const pkg = getActivePackage();
-    return isCateringPackage(pkg) ? null : pkg;
+    return isMenuPricedPackage(pkg) ? null : pkg;
+}
+
+// A combo package checks 2+ booking scopes (e.g. VIP + Main Hall) and so
+// occupies several rooms at once — it never resolves to a single venueId.
+function isComboScopePackage(pkg) {
+    return Array.isArray(pkg?.bookingScope) && pkg.bookingScope.length > 1;
 }
 
 function getAdditionalHeadEffectiveMax() {
@@ -2628,9 +2729,12 @@ function getAdditionalHeadEffectiveMax() {
     let max = Number.isFinite(pkg.maxAdditionalHeads) ? pkg.maxAdditionalHeads : Infinity;
 
     if (S.locationType === 'onsite') {
-        const venue = S.venueOptions.find(v => v.venue_id === S.venueId);
-        if (!venue || !Number.isFinite(venue.capacity)) return 0; // can't verify capacity yet — no room picked
-        const venueRoom = Math.max(venue.capacity - Number(pkg.max_guests || 0), 0);
+        // Single-room package: the picked room's capacity. Combo package:
+        // the combined capacity of all its rooms (mirrors the server trigger).
+        const venue = isComboScopePackage(pkg) ? null : S.venueOptions.find(v => v.venue_id === S.venueId);
+        const capacity = isComboScopePackage(pkg) ? S.comboVenueCapacity : venue?.capacity;
+        if (!Number.isFinite(capacity)) return 0; // can't verify capacity yet — no room picked
+        const venueRoom = Math.max(capacity - Number(pkg.max_guests || 0), 0);
         max = Math.min(max, venueRoom);
     }
 
@@ -2679,7 +2783,7 @@ function buildAdditionalHeadBlock() {
 
     if (hint) {
         if (effectiveMax <= 0) {
-            hint.textContent = S.locationType === 'onsite' && !S.venueOptions.find(v => v.venue_id === S.venueId)
+            hint.textContent = S.locationType === 'onsite' && !isComboScopePackage(pkg) && !S.venueOptions.find(v => v.venue_id === S.venueId)
                 ? 'Choose your room below to see how many extra guests it can hold.'
                 : 'No extra guests can be added for this package.';
             hint.classList.add('additional-head-hint--limit');
@@ -3640,7 +3744,7 @@ function buildSummary() {
     // folded into the Package line (supabase/migrations/20261018_
     // additional_per_head.sql — subtotal = base − discount + additional
     // charge + add-ons, discount only ever applies to the package portion).
-    // Null for catering-flagged packages (see getSelectedPackageForAdditionalHead()).
+    // Null for menu-priced packages (see getSelectedPackageForAdditionalHead()).
     const additionalHeadPkg = getSelectedPackageForAdditionalHead();
     const additionalHeadCharge = (additionalHeadPkg?.allowAdditionalHead && S.additionalHeads > 0)
         ? S.additionalHeads * Number(additionalHeadPkg.pricePerAdditionalHead || 0)
@@ -3652,8 +3756,19 @@ function buildSummary() {
     if (isCateringPackage(getActivePackage())) {
         const catObj = (S.locationType === 'onsite' ? ONSITE_CATEGORIES : OFFSITE_CATEGORIES).find(c => c.id === S.categoryId);
         const cateringPkg = getActivePackage();
+        const menuPriced = isMenuPricedPackage(cateringPkg);
         pkgRows += sr('Service', catObj ? catObj.name : 'Catering', 'tools-kitchen-2');
-        pkgRows += sr('Package', cateringPkg.label, 'package');
+        if (menuPriced) {
+            pkgRows += sr('Package', cateringPkg.label, 'package');
+        } else {
+            // Menu-flagged package that keeps its own price: the package
+            // price is the base, exactly like any other onsite/offsite package.
+            total += Number(cateringPkg.price || 0);
+            pkgRows += sr('Package', cateringPkg.label + ' &mdash; ' + fmtPeso(cateringPkg.price), 'package');
+            pkgRows += additionalHeadRowHtml;
+            total += additionalHeadCharge;
+            discount = getPkgDiscount(cateringPkg);
+        }
         const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
         const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
         const cateringPlainItems = cateringItems.filter(i => i !== cateringOffer);
@@ -3661,10 +3776,19 @@ function buildSummary() {
         else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc, 'list-check');
         if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''), 'gift');
         S.cateringCart.filter(i => i && i.pax).forEach(i => {
-            total += i.price;
-            pkgRows += sr(i.cat + ' (' + i.pax + ' pax)', i.dish + ' &mdash; ' + fmtPeso(i.price), 'users');
+            const billedSeparately = menuPriced || !MENU_INCLUDED_IN_PACKAGE_PRICE;
+            if (billedSeparately) total += i.price;
+            // Flat-priced categories (Drinks) are stored with pax:true as a
+            // completion marker, not a headcount — label them with the
+            // chosen Pax Count instead, like every other dish.
+            const paxLabel = i.pax === true ? S.cateringGlobalPax : i.pax;
+            pkgRows += sr(paxLabel ? i.cat + ' (' + paxLabel + ' pax)' : i.cat, billedSeparately ? (i.dish + ' &mdash; ' + fmtPeso(i.price)) : (i.dish + ' &mdash; included'), 'users');
         });
-        if (total === 0) pkgRows += sr('Price', 'Contact for quote', 'tag');
+        if (!menuPriced && S.locationType === 'onsite' && S.snackAddon) {
+            total += S.snackAddon.price;
+            pkgRows += sr('Add-on', S.snackAddon.label + ' &mdash; ' + fmtPeso(S.snackAddon.price), 'plus');
+        }
+        if (menuPriced && total === 0) pkgRows += sr('Price', 'Contact for quote', 'tag');
     } else if (S.locationType === 'onsite') {
         if (S.miniPackage) {
             total += S.miniPackage.price;
@@ -4082,12 +4206,12 @@ function activate(container, el) {
 // in-progress booking is guaranteed to be there when Sign In/Create
 // Account bring the customer back.
 async function showGuestSubmitGateModal() {
-    saveDraft();
+    saveGuestHandoff();
     const result = await showFeedbackModal({
         type: 'info',
         icon: 'ti-lock',
         title: 'Sign in to complete your booking',
-        message: "You're almost done — an account is required to submit a reservation. Your progress on this form is saved and won't be lost.",
+        message: "You're almost done — an account is required to submit a reservation. Your selections will be kept while you sign in or create your account, and restored when you come back.",
         confirmText: 'Sign In',
         tertiaryText: 'Create Account',
         dismissText: 'Continue browsing'
@@ -4116,14 +4240,14 @@ async function showGuestStep1GateModal() {
     // back on Step 1 — the customer never has to reselect anything.
     const stepBeforeGate = cur;
     cur = Math.min(cur + 1, total());
-    saveDraft();
+    saveGuestHandoff();
     cur = stepBeforeGate;
 
     const result = await showFeedbackModal({
         type: 'warning',
         icon: 'ti-lock',
         title: 'Sign in to continue your booking',
-        message: "Create an account or sign in to continue — your selections so far will be saved.",
+        message: "Create an account or sign in to continue — your selections will be kept and restored when you come back.",
         confirmText: 'Sign In',
         tertiaryText: 'Create Account',
         dismissText: 'Continue Browsing'
@@ -4184,6 +4308,7 @@ document.querySelectorAll('.location-card').forEach(c => {
             S.miniPackage     = null;
             S.venueOptions    = [];
             S.venueId         = null;
+            S.comboVenueCapacity = null;
             S.additionalHeads = 0;
             S.snackAddon      = null;
             S.offsitePackage  = null;
@@ -4349,23 +4474,23 @@ async function submitDone() {
         // trusted from Step 1's cached value. The server trigger is the
         // real authority (recomputes/validates all of this independently),
         // but sending the correct figures avoids relying on its fallback.
-        // Null for catering-flagged packages (see getSelectedPackageForAdditionalHead()).
+        // Null for menu-priced packages (see getSelectedPackageForAdditionalHead()).
         const additionalHeadPkg = getSelectedPackageForAdditionalHead();
         const additionalHeads = additionalHeadPkg?.allowAdditionalHead ? (S.additionalHeads || 0) : 0;
         const additionalHeadPrice = additionalHeadPkg?.allowAdditionalHead ? Number(additionalHeadPkg.pricePerAdditionalHead || 0) : null;
         const additionalHeadCharge = additionalHeads > 0 ? additionalHeads * additionalHeadPrice : 0;
 
-        if (isCateringPackage(getActivePackage())) {
+        if (isMenuPricedPackage(getActivePackage())) {
             packageId  = getActivePackage().id;
             totalPrice = S.cateringCart.reduce((sum, i) => sum + i.price, 0);
         } else if (S.locationType === 'onsite') {
             packageId  = S.miniPackage ? S.miniPackage.id : null;
             addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
-            totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0) + additionalHeadCharge;
+            totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0) + additionalHeadCharge + getIncludedMenuExtraCharge(S.miniPackage);
             discount = getPkgDiscount(S.miniPackage);
         } else {
             packageId  = S.offsitePackage ? S.offsitePackage.id    : null;
-            totalPrice = (S.offsitePackage ? S.offsitePackage.price : 0) + additionalHeadCharge;
+            totalPrice = (S.offsitePackage ? S.offsitePackage.price : 0) + additionalHeadCharge + getIncludedMenuExtraCharge(S.offsitePackage);
             discount = getPkgDiscount(S.offsitePackage);
         }
 
@@ -4426,7 +4551,13 @@ async function submitDone() {
             .select('reservation_id')
             .single();
 
-        if (insertError) throw new Error('Reservation save failed: ' + insertError.message);
+        if (insertError) {
+            // The price-floor trigger's raw wording means nothing to a customer.
+            if (/total price cannot be less/i.test(insertError.message || '')) {
+                throw new Error('We couldn\u2019t confirm the price for this package. Please review your selections and try again, or contact us if it keeps happening.');
+            }
+            throw new Error('Reservation save failed: ' + insertError.message);
+        }
 
         const { data: contractResult, error: contractError } = await supabase.functions.invoke('generate-signed-contract', {
             body: {
@@ -4563,6 +4694,7 @@ if (hasUrlPackage) {
     }
     finishInit();
 } else {
+    claimGuestHandoff();
     const draft = peekDraft();
     if (draft && await wasDraftAlreadySubmitted(draft)) {
         // The draft's own reservation already exists server-side — it was

@@ -174,13 +174,14 @@ const pkgBookingScopeInputs = () => Array.from(pkgBookingScopeChecks.querySelect
 pkgBookingScopeChecks.addEventListener('change', (e) => {
   const target = e.target;
   if (!target.classList.contains('pkg-scope-check')) return;
-  if (!target.checked) return;
+  if (!target.checked) { updatePkgAdditionalHeadVenueHint(); return; }
   const isOffsite = target.value === 'offsite';
   pkgBookingScopeInputs().forEach((input) => {
     if (input === target) return;
     const otherIsOffsite = input.value === 'offsite';
     if (isOffsite || otherIsOffsite) input.checked = false;
   });
+  updatePkgAdditionalHeadVenueHint();
 });
 
 function getPkgBookingScopeValue() {
@@ -1688,10 +1689,19 @@ function updatePkgAdditionalHeadVenueHint() {
     return;
   }
   const maxGuests = Number(pkgMaxGuests.value) || 0;
-  const rooms = Array.from(pkgVenueIds)
+  const venues = Array.from(pkgVenueIds)
     .map(id => allVenues.find(v => v.venue_id === id))
-    .filter(Boolean)
-    .map(v => `${v.name} can take ${Math.max(v.capacity - maxGuests, 0)} more`);
+    .filter(Boolean);
+  // A combo package (2+ booking scopes) occupies all its rooms at once, so
+  // it's sized against their combined capacity, not room by room.
+  if (getPkgBookingScopeValue().length > 1) {
+    const combined = venues.reduce((sum, v) => sum + (Number(v.capacity) || 0), 0);
+    pkgAdditionalHeadVenueHint.textContent = venues.length
+      ? `Combo package: its rooms hold ${combined} together, so it can take ${Math.max(combined - maxGuests, 0)} more.`
+      : '';
+    return;
+  }
+  const rooms = venues.map(v => `${v.name} can take ${Math.max(v.capacity - maxGuests, 0)} more`);
   pkgAdditionalHeadVenueHint.textContent = rooms.length
     ? `Onsite cap by room: ${rooms.join('; ')}.`
     : '';

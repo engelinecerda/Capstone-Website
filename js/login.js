@@ -23,10 +23,28 @@ let   countdownId  = null;
 // path is ever honored — anything else (a bare protocol, a "//host" value,
 // or an absolute URL) falls back to "/" so this can't be used as an open
 // redirect.
-function getSafeRedirectTarget() {
+function getSafeRedirectTarget(email) {
     const raw = new URLSearchParams(window.location.search).get('redirect');
     if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
-    return '/';
+    // No ?redirect= (e.g. the customer came back through the email
+    // confirmation link, which can't carry one): if a guest booking is still
+    // waiting for this account, send them back to /reservations to resume it.
+    return getPendingBookingRedirect(email) || '/';
+}
+
+// A guest's in-progress booking is parked in localStorage by /reservations
+// (see saveGuestHandoff()) and bound to the signup email by signup.js. Only
+// honored while unexpired, and — when bound — only for that same email.
+function getPendingBookingRedirect(email) {
+    try {
+        const raw = localStorage.getItem('eli_reservation_handoff');
+        if (!raw) return null;
+        const h = JSON.parse(raw);
+        if (!h || !(h.expiresAt > Date.now())) return null;
+        const loginEmail = String(email || '').trim().toLowerCase();
+        if (h.boundEmail && h.boundEmail !== loginEmail) return null;
+        return '/reservations';
+    } catch { return null; }
 }
 
 /* ─── Storage helpers ─────────────────────────────────────────────────── */
@@ -237,5 +255,5 @@ form.addEventListener('submit', async function (e) {
 
     // Success — clear attempt history and redirect
     clearRecord(email);
-    window.location.href = getSafeRedirectTarget();
+    window.location.href = getSafeRedirectTarget(email);
 });

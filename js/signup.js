@@ -27,6 +27,23 @@ function setLoading(loading) {
 // gate on /reservations) forward to /login, so it survives the "confirm
 // your email, then log in" detour and the customer still lands back where
 // they started once they actually sign in.
+// If a guest left /reservations through the "Create Account" gate, their
+// in-progress booking is parked in localStorage (see saveGuestHandoff() in
+// reservations.js). Tie it to the email being registered and keep it for 24h
+// so it survives the confirm-your-email detour — and so only this email's
+// login can pick it up on a shared device.
+function bindPendingBookingToEmail(email) {
+    try {
+        const raw = localStorage.getItem('eli_reservation_handoff');
+        if (!raw) return;
+        const h = JSON.parse(raw);
+        if (!h || !(h.expiresAt > Date.now()) || h.boundEmail) return;
+        h.boundEmail = String(email || '').trim().toLowerCase();
+        h.expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+        localStorage.setItem('eli_reservation_handoff', JSON.stringify(h));
+    } catch { /* ignore */ }
+}
+
 function getLoginRedirectSuffix() {
     const raw = new URLSearchParams(window.location.search).get('redirect');
     if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
@@ -128,6 +145,8 @@ form.addEventListener('submit', async function (e) {
     // Success — show message then redirect
     setMessage('Account created! Please check your email and click the confirmation link before logging in.', 'success');
     form.reset();
+
+    bindPendingBookingToEmail(email);
 
     setTimeout(() => {
         window.location.href = '/login' + getLoginRedirectSuffix();
