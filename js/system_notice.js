@@ -6,8 +6,9 @@
 // comes back after closing every tab of the site (a brand-new tab that finds no
 // other open tab of the site counts as a new visit). A small bottom-left pill
 // always remains to reopen the notice. A second pill opens the
-// "Beta Testing Guide" (a step-by-step walkthrough for testers); the guide also pops up right
-// after the notice is closed, at most once per GUIDE_TTL_MS (24 hours). Deliberately hardcoded and NOT
+// "Beta Testing Guide" (a step-by-step walkthrough for testers); the guide follows the notice
+// every time the notice pops up on its own (same timing as the notice, no separate timer), and
+// the notice itself has a "Beta Testing Guide" button next to "I Understand". Deliberately hardcoded and NOT
 // admin-configurable: it is not a system feature, only a disclosure and a guide for the academic
 // testing period.
 //
@@ -23,8 +24,6 @@
 
   var SEEN_KEY = 'eliSystemNoticeSeen';
   var SEEN_TTL_MS = 3 * 60 * 60 * 1000; // how long "I Understand" is remembered (3 hours)
-  var GUIDE_KEY = 'eliBetaGuideSeen';
-  var GUIDE_TTL_MS = 24 * 60 * 60 * 1000; // how long before the guide pops up again after the notice (24 hours)
 
   var CSS = [
     '.sn-backdrop{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(30,12,3,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .25s ease}',
@@ -40,6 +39,8 @@
     '.sn-dialog p.sn-ack{margin-bottom:22px;font-weight:500;color:#3D1A0A}',
     '.sn-btn{display:inline-block;padding:12px 26px;border:0;background:#3D1A0A;color:#fff;font:600 12px "Inter",system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:background .2s ease}',
     '.sn-btn:hover{background:#6B3820}',
+    '.sn-btn.sn-btn-alt{padding:11px 25px;border:1px solid #3D1A0A;background:#fff;color:#3D1A0A}',
+    '.sn-btn.sn-btn-alt:hover{background:#F5E6C8}',
     '.sn-x{position:absolute;top:10px;right:12px;width:34px;height:34px;border:0;background:transparent;color:#6B3820;font-size:24px;line-height:1;cursor:pointer}',
     '.sn-x:hover{color:#1E0C03}',
     '.sn-btn:focus-visible,.sn-x:focus-visible,.sn-pill:focus-visible{outline:2px solid #B07D5A;outline-offset:2px}',
@@ -114,7 +115,7 @@
         '<p>This website is currently being used for academic project and system testing purposes by 4th-year Information Technology students from STI Ortigas-Cainta.</p>' +
         '<p>Please be advised that the system has not yet been officially turned over to ELI Coffee and is not yet under ELI Coffee\u2019s official operation or management. The features and information presented are intended for testing, evaluation, and demonstration purposes only.</p>' +
         '<p class="sn-ack">By proceeding, you acknowledge that you are accessing a testing version of the system. Thank you for your understanding and cooperation.</p>' +
-        '<div class="sn-actions"><button type="button" class="sn-btn sn-ok">I Understand</button></div>' +
+        '<div class="sn-actions"><button type="button" class="sn-btn sn-ok">I Understand</button><button type="button" class="sn-btn sn-btn-alt sn-open-guide">Beta Testing Guide</button></div>' +
       '</div>' +
     '</div>' +
     '<div class="sn-backdrop" id="sn-guide" hidden>' +
@@ -212,6 +213,7 @@
     var pills = wrap.querySelector('.sn-pills');
     var lastFocus = null;
     var current = null; // the modal currently open, if any
+    var autoChain = false; // true while the notice that popped up on its own is open
 
     // Two modals share one scroll lock, key handler and pill stack.
     function makeModal(id) {
@@ -269,9 +271,10 @@
     function closeModal(m) {
       if (m === notice) {
         storageSet(SEEN_KEY);
-        // The guide follows the notice automatically, but only if it has not
-        // been shown in the last 24 hours (opening it from a pill never counts).
-        if (!storageGet(GUIDE_KEY, GUIDE_TTL_MS)) { storageSet(GUIDE_KEY); openModal(guide); return; }
+        // The guide follows every notice that popped up on its own, so it
+        // behaves exactly like the notice (same timing, no separate timer).
+        // A notice reopened from its pill does not chain into the guide.
+        if (autoChain) { autoChain = false; openModal(guide); return; }
       }
       hideBackdrop(m);
       current = null;
@@ -286,6 +289,14 @@
       m.backdrop.addEventListener('click', function (e) { if (!m.dialog.contains(e.target)) closeModal(m); });
     });
     notice.dialog.querySelector('.sn-ok').addEventListener('click', function () { closeModal(notice); });
+    // "Beta Testing Guide" button inside the notice: counts as acknowledging the
+    // notice (the visitor has read it and is moving on) and opens the guide
+    // right away, so the guide does not pop up a second time afterwards.
+    notice.dialog.querySelector('.sn-open-guide').addEventListener('click', function () {
+      storageSet(SEEN_KEY);
+      autoChain = false;
+      openModal(guide);
+    });
     guide.dialog.querySelector('.sn-guide-ok').addEventListener('click', function () { closeModal(guide); });
     wrap.querySelector('.sn-pill-notice').addEventListener('click', function () { openModal(notice); });
     wrap.querySelector('.sn-pill-guide').addEventListener('click', function () { openModal(guide); });
@@ -308,7 +319,7 @@
     var liftBar = document.querySelector('.reservation-buttons');
     if (liftBar && window.ResizeObserver) new ResizeObserver(updateLift).observe(liftBar);
 
-    decideNotice(startResponder(), { open: function () { openModal(notice); }, showPill: function () { pills.hidden = false; } });
+    decideNotice(startResponder(), { open: function () { autoChain = true; openModal(notice); }, showPill: function () { pills.hidden = false; } });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

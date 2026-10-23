@@ -30,8 +30,9 @@ document.addEventListener('keydown', function (e) {
 });
 
 // Close drawer and clear scroll lock when viewport widens past the mobile breakpoint
+// (keep in sync with the 1180px hamburger breakpoint in css/styles.css)
 window.addEventListener('resize', function () {
-    if (window.innerWidth > 960 && menu && menu.classList.contains('active')) {
+    if (window.innerWidth > 1180 && menu && menu.classList.contains('active')) {
         closeDrawer();
     }
 });

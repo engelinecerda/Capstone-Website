@@ -15,7 +15,7 @@ html {
    browser contexts still count toward scrollable width despite the
    off-canvas transform. Narrowing the viewport (a docked sidebar panel,
    not just a phone) is exactly when this became visible, since it crosses
-   into the sub-960px mobile-nav breakpoint where that drawer exists.
+   into the sub-1180px mobile-nav breakpoint where that drawer exists.
    Deliberately on html only, not body — several customer pages
    (account.css/packages.css/package_details.css/reservations.css) rely on
    position:sticky, and overflow-x:hidden on body specifically is a known
@@ -126,7 +126,7 @@ img, svg, video, canvas, iframe {
 }
 
 /* Desktop: show bell next to the account button */
-@media screen and (min-width: 961px) {
+@media screen and (min-width: 1181px) {
     .navbar__topbar-right {
         display: flex;
         align-items: center;
@@ -221,7 +221,7 @@ img, svg, video, canvas, iframe {
 }
 
 /* Mobile-only equivalent of the dropdown above — shown instead of it at
-   ≤960px (css/styles.css mobile block), styled by .navbar__btn .button
+   ≤1180px (css/styles.css mobile block), styled by .navbar__btn .button
    there exactly like the logged-out Login button. Hidden here by default
    so it never appears alongside the dropdown on desktop. */
 .navbar__mobile-account-btn {
@@ -355,8 +355,10 @@ img, svg, video, canvas, iframe {
 .nav-drawer-header { display: none; }
 .nav-drawer-logo   { display: none; }
 
-/* ── Mobile & Tablet Navigation ── */
-@media screen and (max-width: 960px) {
+/* ── Mobile & Tablet Navigation ──
+   Hamburger below 1181px: the full desktop nav (logo + 7 links + Account) needs
+   ~1125px, so a 960px breakpoint overflowed on tablets (e.g. 1024px landscape). */
+@media screen and (max-width: 1180px) {
     /* Fix: position:fixed keeps the hamburger in the viewport regardless of scroll.
        position:sticky was breaking because html{overflow-y:scroll} makes html
        the scroll container, causing the navbar to scroll out of view on mobile. */
@@ -623,7 +625,7 @@ img, svg, video, canvas, iframe {
     transition: opacity 0.28s ease;
 }
 /* Scoped to mobile only so a stale .active class on desktop doesn't show the backdrop */
-@media screen and (max-width: 960px) {
+@media screen and (max-width: 1180px) {
     .nav-overlay.active {
         opacity: 1;
         pointer-events: auto;

@@ -55,7 +55,7 @@
   width: 360px;
 }
 
-@media screen and (max-width: 960px) {
+@media screen and (max-width: 1180px) {
   .notif-navbar-wrapper .notif-panel {
     position: fixed;
     top: 70px;

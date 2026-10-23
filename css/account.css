@@ -3031,19 +3031,22 @@ body {
 /* ========================
    Responsive
 ======================== */
-@media (max-width: 960px) {
+/* Navbar offset follows the hamburger breakpoint (css/styles.css, 1180px) */
+@media (max-width: 1180px) {
     /* account.css sets navbar to 72px globally, so body offset must match */
     body {
         padding-top: 72px;
     }
+    .navbar__container {
+        padding: 0 24px;
+    }
+}
+@media (max-width: 960px) {
     .account-hero-inner,
     .account-tabs-inner,
     .account-content-inner {
         padding-left: 24px;
         padding-right: 24px;
-    }
-    .navbar__container {
-        padding: 0 24px;
     }
     .info-grid {
         grid-template-columns: 1fr 1fr;
