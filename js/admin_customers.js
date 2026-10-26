@@ -211,7 +211,7 @@ function renderCustomersView(customers) {
   });
 
   if (customersTotal) {
-    setCustomersMessage(`Showing ${customersTotal} of ${totalRegisteredCustomers} registered customer(s).`);
+    setCustomersMessage(`Showing ${customers.length} of ${totalRegisteredCustomers} registered customer(s).`);
   } else if (activeSearch) {
     setCustomersMessage(`No registered customers matched "${activeSearch}".`);
   } else {
@@ -381,4 +381,4 @@ validateAdminSession({
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-initAutoRefresh(() => loadCustomers({ silent: true })); 
+initAutoRefresh(() => loadCustomers({ silent: true }));
