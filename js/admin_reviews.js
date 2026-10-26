@@ -5,7 +5,7 @@ import { markAdminReviewsSeen, refreshAdminSidebarCounts } from './admin_sidebar
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 
 const sidebarName = document.getElementById('sidebarName');
@@ -26,9 +26,21 @@ const statAverageRating = document.getElementById('statAverageRating');
 const statFiveStarReviews = document.getElementById('statFiveStarReviews');
 const statCommentedReviews = document.getElementById('statCommentedReviews');
 
-let allReviews = [];
-let reviewsFiltered = [];
+// Server-side pagination: the database returns one page of reviews at a time
+// (get_admin_reviews_page), already joined with the customer, reservation and
+// package details and filtered by the search term. The browser never holds the
+// full review list.
+// 15 rows is about a screen and a half at these row heights: enough to scan
+// recent reviews without constant page-clicking, short enough to stay quick.
+const REVIEWS_PAGE_SIZE = 15;
+const SEARCH_DEBOUNCE_MS = 300;
+
 let reviewsCurrentPage = 1;
+let reviewsTotal = 0;        // reviews matching the active search
+let totalReviewCount = 0;    // all reviews, ignoring the search
+let activeSearch = '';       // the search term currently applied
+let latestRequestId = 0;     // lets a newer request supersede an older one
+let searchDebounceTimer = null;
 let adminSession = null;
 
 function redirectToAdminLogin() {
@@ -167,211 +179,209 @@ function renderReviews(reviews) {
   }).join('');
 }
 
-function updateStats(reviews) {
-  const totalReviews = reviews.length;
-  const totalRating = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
-  const fiveStarReviews = reviews.filter((review) => Number(review.rating || 0) === 5).length;
-  const commentedReviews = reviews.filter((review) => Boolean(String(review.comment || '').trim())).length;
-  const averageRating = totalReviews ? (totalRating / totalReviews).toFixed(1) : '0.0';
+// The four stat cards. They describe ALL reviews, never the current search.
+function updateStats(stats) {
+  const safe = stats || {};
+  const totalReviews = Number(safe.total) || 0;
+  const averageRating = totalReviews ? Number(safe.average_rating || 0).toFixed(1) : '0.0';
 
   if (statTotalReviews) statTotalReviews.textContent = String(totalReviews);
   if (statAverageRating) statAverageRating.textContent = averageRating;
-  if (statFiveStarReviews) statFiveStarReviews.textContent = String(fiveStarReviews);
-  if (statCommentedReviews) statCommentedReviews.textContent = String(commentedReviews);
+  if (statFiveStarReviews) statFiveStarReviews.textContent = String(Number(safe.five_star) || 0);
+  if (statCommentedReviews) statCommentedReviews.textContent = String(Number(safe.commented) || 0);
 }
 
-// resetPage=false is used after an auto-refresh so a Manager mid-way
-// through the list isn't yanked back to page 1 every time; the page is
-// clamped instead, in case the refreshed data has fewer pages than before.
-function applyFilters({ resetPage = true } = {}) {
-  const query = (searchInput?.value || '').trim().toLowerCase();
-  const filteredReviews = !query
-    ? allReviews
-    : allReviews.filter((review) => {
-      const customer = review.customer || {};
-      const reservation = review.reservation || {};
-      const haystacks = [
-        getCustomerName(customer, reservation),
-        customer.email,
-        reservation.contact_email,
-        reservation.event_type,
-        review.packageName,
-        review.comment,
-        String(review.rating || '')
-      ]
-        .filter(Boolean)
-        .map((value) => String(value).toLowerCase());
-
-      return haystacks.some((value) => value.includes(query));
-    });
-
-  reviewsFiltered = filteredReviews;
-  if (resetPage) {
-    reviewsCurrentPage = 1;
-  } else {
-    reviewsCurrentPage = Math.min(reviewsCurrentPage, getTotalPages(filteredReviews.length, PAGE_SIZE));
-  }
-  renderReviewsPage();
-
-  const summaryText = filteredReviews.length
-    ? `Showing ${filteredReviews.length} of ${allReviews.length} submitted review(s).`
-    : `No submitted reviews matched "${query}".`;
-
-  setReviewsMessage(summaryText);
-}
-
-function renderReviewsPage() {
-  renderReviews(paginate(reviewsFiltered, reviewsCurrentPage, PAGE_SIZE));
+function renderReviewsView(reviews) {
+  renderReviews(reviews);
   renderPagination(reviewsPagination, {
-    totalItems: reviewsFiltered.length,
+    totalItems: reviewsTotal,
     currentPage: reviewsCurrentPage,
-    pageSize: PAGE_SIZE,
+    pageSize: REVIEWS_PAGE_SIZE,
     onPageChange: (page) => {
       reviewsCurrentPage = page;
-      renderReviewsPage();
+      loadReviews({ withStats: false });
     }
   });
-}
 
-async function fetchProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(`
-      user_id,
-      first_name,
-      middle_name,
-      last_name,
-      email,
-      role
-    `)
-    .eq('role', 'customer');
-
-  if (error) {
-    throw error;
+  // reviews.length is the rows on screen (at most one page); the "1-10 of N"
+  // range for the current search is in the pagination bar below the table.
+  if (reviewsTotal) {
+    setReviewsMessage(`Showing ${reviews.length} of ${totalReviewCount} submitted review(s).`);
+  } else if (activeSearch) {
+    setReviewsMessage(`No submitted reviews matched "${activeSearch}".`);
+  } else {
+    setReviewsMessage('No submitted reviews yet.');
   }
-
-  return data || [];
 }
 
-async function fetchReservations() {
-  const { data, error } = await supabase
-    .from('reservations')
-    .select(`
-      reservation_id,
-      user_id,
-      contact_name,
-      contact_email,
-      event_type,
-      event_date,
-      package:package_id ( package_name )
-    `);
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
-}
-
-async function fetchReviews() {
-  const { data, error } = await supabase
-    .from('reviews')
-    .select(`
-      review_id,
-      reservation_id,
-      user_id,
-      rating,
-      comment,
-      created_at
-    `)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
-}
-
-function mergeReviewsWithContext(reviews, profiles, reservations) {
-  const profilesById = profiles.reduce((map, profile) => {
-    map[profile.user_id] = profile;
-    return map;
-  }, {});
-
-  const reservationsById = reservations.reduce((map, reservation) => {
-    map[reservation.reservation_id] = reservation;
-    return map;
-  }, {});
-
-  return reviews.map((review) => {
-    const customer = profilesById[review.user_id] || {};
-    const reservation = reservationsById[review.reservation_id] || {};
-
-    return {
-      ...review,
-      customer,
-      reservation,
-      packageName: reservation.package?.package_name || 'Package not available'
-    };
+// One page of reviews (filtered by `search`), each row already carrying the
+// customer, reservation and package details it needs. The RPC takes
+// limit/offset, which is the same window .range(from, to) would select.
+async function fetchReviewsPage(page, search) {
+  const { from } = getPageRange(page, REVIEWS_PAGE_SIZE);
+  const { data, error } = await supabase.rpc('get_admin_reviews_page', {
+    p_search: search || null,
+    p_limit: REVIEWS_PAGE_SIZE,
+    p_offset: from
   });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  return {
+    total: Number(data?.total) || 0,
+    reviews: rows.map((row) => ({
+      review_id: row.review_id,
+      reservation_id: row.reservation_id,
+      user_id: row.user_id,
+      rating: row.rating,
+      comment: row.comment,
+      created_at: row.created_at,
+      customer: {
+        first_name: row.first_name,
+        middle_name: row.middle_name,
+        last_name: row.last_name,
+        email: row.customer_email
+      },
+      reservation: {
+        contact_name: row.contact_name,
+        contact_email: row.contact_email,
+        event_type: row.event_type,
+        event_date: row.event_date
+      },
+      packageName: row.package_name || 'Package not available'
+    }))
+  };
+}
+
+// If the requested page no longer exists (reviews were removed since the last
+// load, so there are fewer pages now), fall back to the last page that does
+// exist instead of showing an empty table.
+async function fetchPageWithClamp(page, search) {
+  let result = await fetchReviewsPage(page, search);
+  const lastPage = getTotalPages(result.total, REVIEWS_PAGE_SIZE);
+
+  if (page > lastPage) {
+    page = lastPage;
+    result = await fetchReviewsPage(page, search);
+  }
+
+  return { ...result, page };
+}
+
+async function fetchReviewStats() {
+  const { data, error } = await supabase.rpc('get_admin_review_stats');
+
+  if (error) {
+    throw error;
+  }
+
+  return data || {};
+}
+
+function refreshSidebarBadges() {
+  return refreshAdminSidebarCounts({
+    supabase,
+    reservationBadgeEl: navReservationCount,
+    paymentBadgeEl: navPaymentCount,
+    contractBadgeEl: navContractCount,
+    reviewBadgeEl: navReviewCount
+  }).catch(() => {});
 }
 
 // silent=true is used by the auto-refresh triggers: it skips the
 // "Loading..." message so existing rows stay on screen, and on failure it
 // keeps the last-good data and fails quietly instead of blanking the table.
-async function loadReviews({ silent = false } = {}) {
+// withStats=false is used for page changes and searches, which don't affect
+// the stat cards or the unread-review badge, so only the page itself is fetched.
+// Every call takes a request id; if a newer call starts before this one
+// finishes, this one's result is discarded so a slow, older response can
+// never overwrite a newer one.
+async function loadReviews({ silent = false, withStats = true } = {}) {
+  const requestId = ++latestRequestId;
+
   if (!silent) {
     setReviewsMessage('Loading reviews...');
   }
 
   try {
-    if (adminSession?.user?.id) {
+    // Reviews are marked seen BEFORE the sidebar recount below, so the
+    // unread badge drops to 0 on this very load.
+    if (withStats && adminSession?.user?.id) {
       await markAdminReviewsSeen({
         supabase,
         userId: adminSession.user.id
       }).catch(() => {});
     }
 
-    const [profiles, reservations, reviews] = await Promise.all([
-      fetchProfiles(),
-      fetchReservations(),
-      fetchReviews()
+    const [result, stats] = await Promise.all([
+      fetchPageWithClamp(reviewsCurrentPage, activeSearch),
+      withStats ? fetchReviewStats() : Promise.resolve(null)
     ]);
 
-    allReviews = mergeReviewsWithContext(reviews, profiles, reservations);
-    updateStats(allReviews);
+    if (requestId !== latestRequestId) return;
 
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    reviewsCurrentPage = result.page;
+    reviewsTotal = result.total;
 
-    applyFilters({ resetPage: !silent });
+    if (!activeSearch) {
+      totalReviewCount = result.total;
+    } else if (stats) {
+      totalReviewCount = Number(stats.total) || 0;
+    }
+
+    if (stats) {
+      updateStats(stats);
+    }
+
+    renderReviewsView(result.reviews);
+
+    if (withStats) {
+      await refreshSidebarBadges();
+    }
   } catch (error) {
+    if (requestId !== latestRequestId) return;
+
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded reviews:', error.message);
       return;
     }
-    allReviews = [];
-    updateStats([]);
+
+    reviewsTotal = 0;
+    if (withStats) {
+      updateStats(null);
+    }
     renderReviews([]);
-    setReviewsMessage('Failed to load reviews. Please try again.', true);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    renderPagination(reviewsPagination, {
+      totalItems: 0,
+      currentPage: 1,
+      pageSize: REVIEWS_PAGE_SIZE,
+      onPageChange: () => {}
+    });
+    if (withStats) {
+      await refreshSidebarBadges();
+    }
     setReviewsMessage(
       `Failed to load submitted reviews: ${error?.message || 'unknown error'}.`,
       true
     );
   }
+}
+
+// Search runs in the database, so wait for a short pause in typing instead of
+// sending a request on every keystroke. A new search always starts at page 1.
+function handleSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const nextSearch = (searchInput?.value || '').trim();
+    if (nextSearch === activeSearch) return;
+
+    activeSearch = nextSearch;
+    reviewsCurrentPage = 1;
+    loadReviews({ withStats: false });
+  }, SEARCH_DEBOUNCE_MS);
 }
 
 wireLogoutButton();
@@ -393,7 +403,7 @@ validateAdminSession({
     initAdminNav({ role: profile.role });
 
     // Wire UI
-    searchInput?.addEventListener('input', () => applyFilters());
+    searchInput?.addEventListener('input', handleSearchInput);
 
     // Load data
     await loadReviews();
