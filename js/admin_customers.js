@@ -5,7 +5,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 
 const sidebarName = document.getElementById('sidebarName');
@@ -25,9 +25,18 @@ const statCustomersWithReservations = document.getElementById('statCustomersWith
 const statNewThisMonth = document.getElementById('statNewThisMonth');
 const statCustomersWithPhone = document.getElementById('statCustomersWithPhone');
 
-let allCustomers = [];
-let customersFiltered = [];
+// Server-side pagination: the database returns one page of customers at a
+// time (get_admin_customers_page), already filtered by the search term. The
+// browser never holds the full customer list.
+const CUSTOMERS_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
+
 let customersCurrentPage = 1;
+let customersTotal = 0;            // customers matching the active search
+let totalRegisteredCustomers = 0;  // all customers, ignoring the search
+let activeSearch = '';             // the search term currently applied
+let latestRequestId = 0;           // lets a newer request supersede an older one
+let searchDebounceTimer = null;
 
 function redirectToAdminLogin() {
   window.location.replace('/admin');
@@ -109,16 +118,15 @@ function getActivityLabel(totalReservations) {
   return `${totalReservations} reservations`;
 }
 
-function belongsToCurrentMonth(value) {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-
+// Start (inclusive) and end (exclusive) of the admin's current local calendar
+// month, sent to the database so "New this month" means the same thing it
+// always did in the browser.
+function getCurrentMonthRange() {
   const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear()
-    && date.getMonth() === now.getMonth()
-  );
+  return {
+    startIso: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+    endIso: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+  };
 }
 
 function renderCustomers(customers) {
@@ -180,151 +188,170 @@ function renderCustomers(customers) {
   }).join('');
 }
 
-function updateStats(customers) {
-  const customersWithReservations = customers.filter((customer) => customer.totalReservations > 0).length;
-  const newThisMonth = customers.filter((customer) => belongsToCurrentMonth(customer.date_registered)).length;
-  const customersWithPhone = customers.filter((customer) => Boolean(customer.phone_number)).length;
+function updateStats(stats) {
+  const safe = stats || {};
+  const asCount = (value) => String(Number(value) || 0);
 
-  if (statTotalCustomers) statTotalCustomers.textContent = String(customers.length);
-  if (statCustomersWithReservations) statCustomersWithReservations.textContent = String(customersWithReservations);
-  if (statNewThisMonth) statNewThisMonth.textContent = String(newThisMonth);
-  if (statCustomersWithPhone) statCustomersWithPhone.textContent = String(customersWithPhone);
+  if (statTotalCustomers) statTotalCustomers.textContent = asCount(safe.total);
+  if (statCustomersWithReservations) statCustomersWithReservations.textContent = asCount(safe.with_reservations);
+  if (statNewThisMonth) statNewThisMonth.textContent = asCount(safe.new_this_month);
+  if (statCustomersWithPhone) statCustomersWithPhone.textContent = asCount(safe.with_phone);
 }
 
-// resetPage=false is used after an auto-refresh so a Manager mid-way
-// through the list isn't yanked back to page 1 every time; the page is
-// clamped instead, in case the refreshed data has fewer pages than before.
-function applyFilters({ resetPage = true } = {}) {
-  const query = (searchInput?.value || '').trim().toLowerCase();
-  const filteredCustomers = !query
-    ? allCustomers
-    : allCustomers.filter((customer) => {
-      const haystacks = [
-        getCustomerName(customer),
-        customer.email,
-        customer.phone_number
-      ]
-        .filter(Boolean)
-        .map((value) => value.toLowerCase());
-
-      return haystacks.some((value) => value.includes(query));
-    });
-
-  customersFiltered = filteredCustomers;
-  if (resetPage) {
-    customersCurrentPage = 1;
-  } else {
-    customersCurrentPage = Math.min(customersCurrentPage, getTotalPages(filteredCustomers.length, PAGE_SIZE));
-  }
-  renderCustomersPage();
-
-  const summaryText = filteredCustomers.length
-    ? `Showing ${filteredCustomers.length} of ${allCustomers.length} registered customer(s).`
-    : `No registered customers matched "${query}".`;
-
-  setCustomersMessage(summaryText);
-}
-
-function renderCustomersPage() {
-  renderCustomers(paginate(customersFiltered, customersCurrentPage, PAGE_SIZE));
+function renderCustomersView(customers) {
+  renderCustomers(customers);
   renderPagination(customersPagination, {
-    totalItems: customersFiltered.length,
+    totalItems: customersTotal,
     currentPage: customersCurrentPage,
-    pageSize: PAGE_SIZE,
+    pageSize: CUSTOMERS_PAGE_SIZE,
     onPageChange: (page) => {
       customersCurrentPage = page;
-      renderCustomersPage();
+      loadCustomers({ withStats: false });
     }
   });
+
+  if (customersTotal) {
+    setCustomersMessage(`Showing ${customersTotal} of ${totalRegisteredCustomers} registered customer(s).`);
+  } else if (activeSearch) {
+    setCustomersMessage(`No registered customers matched "${activeSearch}".`);
+  } else {
+    setCustomersMessage('No registered customers yet.');
+  }
 }
 
-async function fetchProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(`
-      user_id,
-      first_name,
-      middle_name,
-      last_name,
-      email,
-      phone_number,
-      date_registered,
-      role
-    `)
-    .eq('role', 'customer')
-    .order('date_registered', { ascending: false });
+// One page of customers (filtered by `search`), each row already carrying its
+// reservation totals. The RPC takes limit/offset, which is the same window
+// .range(from, to) would select.
+async function fetchCustomersPage(page, search) {
+  const { from } = getPageRange(page, CUSTOMERS_PAGE_SIZE);
+  const { data, error } = await supabase.rpc('get_admin_customers_page', {
+    p_search: search || null,
+    p_limit: CUSTOMERS_PAGE_SIZE,
+    p_offset: from
+  });
 
   if (error) {
     throw error;
   }
 
-  return data || [];
-}
-
-// Per-customer totals (total reservations, approved count, most recent
-// date) used to come from fetching every reservation row and reducing it
-// in JS — see get_customer_reservation_activity() in
-// supabase/migrations/20260927_customer_reservation_activity_rpc.sql for
-// why that's now one aggregate query, computing the exact same three
-// numbers per user_id.
-async function fetchCustomerReservationActivity() {
-  const { data, error } = await supabase.rpc('get_customer_reservation_activity');
-  if (error) {
-    throw error;
-  }
-  return data || [];
-}
-
-function mergeCustomersWithActivity(profiles, activityRows) {
-  const activityByUser = activityRows.reduce((map, row) => {
-    if (!row.user_id) return map;
-    map[row.user_id] = {
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  return {
+    total: Number(data?.total) || 0,
+    customers: rows.map((row) => ({
+      ...row,
       totalReservations: row.total_reservations || 0,
       approvedReservations: row.approved_reservations || 0,
       lastReservationDate: row.last_reservation_date || null
-    };
-    return map;
-  }, {});
+    }))
+  };
+}
 
-  return profiles.map((profile) => ({
-    ...profile,
-    totalReservations: activityByUser[profile.user_id]?.totalReservations || 0,
-    approvedReservations: activityByUser[profile.user_id]?.approvedReservations || 0,
-    lastReservationDate: activityByUser[profile.user_id]?.lastReservationDate || null
-  }));
+// If the requested page no longer exists (customers were removed since the
+// last load, so there are fewer pages now), fall back to the last page that
+// does exist instead of showing an empty table.
+async function fetchPageWithClamp(page, search) {
+  let result = await fetchCustomersPage(page, search);
+  const lastPage = getTotalPages(result.total, CUSTOMERS_PAGE_SIZE);
+
+  if (page > lastPage) {
+    page = lastPage;
+    result = await fetchCustomersPage(page, search);
+  }
+
+  return { ...result, page };
+}
+
+// The four stat cards. They describe ALL customers, never the current search.
+async function fetchCustomerStats() {
+  const { startIso, endIso } = getCurrentMonthRange();
+  const { data, error } = await supabase.rpc('get_admin_customer_stats', {
+    p_month_start: startIso,
+    p_month_end: endIso
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data || {};
 }
 
 // silent=true is used by the auto-refresh triggers: it skips the
 // "Loading..." message so existing rows stay on screen, and on failure it
 // keeps the last-good data and fails quietly instead of blanking the table.
-async function loadCustomers({ silent = false } = {}) {
+// withStats=false is used for page changes and searches, which don't affect
+// the stat cards, so only the page itself is fetched.
+// Every call takes a request id; if a newer call starts before this one
+// finishes, this one's result is discarded so a slow, older response can
+// never overwrite a newer one.
+async function loadCustomers({ silent = false, withStats = true } = {}) {
+  const requestId = ++latestRequestId;
+
   if (!silent) {
     setCustomersMessage('Loading customers...');
   }
 
   try {
-    const [profiles, activity] = await Promise.all([
-      fetchProfiles(),
-      fetchCustomerReservationActivity()
+    const [result, stats] = await Promise.all([
+      fetchPageWithClamp(customersCurrentPage, activeSearch),
+      withStats ? fetchCustomerStats() : Promise.resolve(null)
     ]);
 
-    allCustomers = mergeCustomersWithActivity(profiles, activity);
+    if (requestId !== latestRequestId) return;
 
-    updateStats(allCustomers);
-    initAdminSidebarBadges(supabase)
+    customersCurrentPage = result.page;
+    customersTotal = result.total;
 
-    applyFilters({ resetPage: !silent });
+    if (!activeSearch) {
+      totalRegisteredCustomers = result.total;
+    } else if (stats) {
+      totalRegisteredCustomers = Number(stats.total) || 0;
+    }
+
+    if (stats) {
+      updateStats(stats);
+    }
+    if (withStats) {
+      initAdminSidebarBadges(supabase);
+    }
+
+    renderCustomersView(result.customers);
   } catch (error) {
+    if (requestId !== latestRequestId) return;
+
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded customers:', error.message);
       return;
     }
-    allCustomers = [];
-    updateStats([]);
+
+    customersTotal = 0;
+    if (withStats) {
+      updateStats(null);
+      initAdminSidebarBadges(supabase);
+    }
     renderCustomers([]);
-    initAdminSidebarBadges(supabase)
+    renderPagination(customersPagination, {
+      totalItems: 0,
+      currentPage: 1,
+      pageSize: CUSTOMERS_PAGE_SIZE,
+      onPageChange: () => {}
+    });
     setCustomersMessage('Failed to load registered customers. Please try again.', true);
   }
+}
+
+// Search runs in the database, so wait for a short pause in typing instead of
+// sending a request on every keystroke. A new search always starts at page 1.
+function handleSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const nextSearch = (searchInput?.value || '').trim();
+    if (nextSearch === activeSearch) return;
+
+    activeSearch = nextSearch;
+    customersCurrentPage = 1;
+    loadCustomers({ withStats: false });
+  }, SEARCH_DEBOUNCE_MS);
 }
 
 wireLogoutButton();
@@ -343,7 +370,7 @@ validateAdminSession({
     initAdminNav({ role: profile.role });
 
     // Attach UI listeners (IMPORTANT)
-    searchInput?.addEventListener('input', () => applyFilters());
+    searchInput?.addEventListener('input', handleSearchInput);
 
     // Load data
     await loadCustomers();
@@ -354,4 +381,4 @@ validateAdminSession({
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-initAutoRefresh(() => loadCustomers({ silent: true }));
+initAutoRefresh(() => loadCustomers({ silent: true })); 

@@ -9,6 +9,16 @@ export function paginate(items, page, pageSize = PAGE_SIZE) {
   return items.slice(start, start + pageSize);
 }
 
+// Server-side pagination: turns a 1-based page number into the zero-based,
+// inclusive { from, to } pair that supabase-js .range(from, to) expects.
+// An RPC that takes limit/offset uses `from` as the offset and pageSize as
+// the limit. Invalid page numbers fall back to page 1.
+export function getPageRange(page, pageSize = PAGE_SIZE) {
+  const safePage = Number.isInteger(page) && page >= 1 ? page : 1;
+  const from = (safePage - 1) * pageSize;
+  return { from, to: from + pageSize - 1 };
+}
+
 function buildPageList(current, total) {
   if (total <= 7) {
     return Array.from({ length: total }, (_, i) => i + 1);
