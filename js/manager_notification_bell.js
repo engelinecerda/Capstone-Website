@@ -3,6 +3,7 @@
 // Reuses the existing `notifications` table/RLS setup — only the
 // presentation (header bell + dropdown instead of a sidebar badge) is new.
 import { initAutoRefresh } from './auto_refresh.js';
+import { runWhenIdle } from './idle_task.js';
 
 function escHtml(value) {
     return String(value ?? '')
@@ -221,7 +222,9 @@ export function initManagerNotificationBell(supabase, userId) {
         }
     });
 
-    fetchAndRender();
+    // First load waits until the page's own data has finished loading, so the
+    // bell's request does not land in the same instant as every other one.
+    runWhenIdle(fetchAndRender);
 
     // Was a standing realtime postgres_changes channel, opened fresh on every
     // admin page load (this bell mounts on nearly every Manager/Admin page).

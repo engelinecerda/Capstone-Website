@@ -126,7 +126,7 @@ This does **not** apply to `/js/*` — JS here is native ES modules with deep tr
 
 ## Key Shared Modules
 
-- `js/admin_sidebar_counts.js` — runs on every admin page; injects hamburger, subscribes to Supabase Realtime for live nav badge counts
+- `js/admin_sidebar_counts.js` — runs on every admin page; injects hamburger, fills the nav badges and the maintenance strip from one `get_admin_nav_counts()` RPC call (cached ~45 s in sessionStorage, made after the page finishes loading; falls back to separate queries if the RPC is missing)
 - `js/audit_logger.js` — call `logAudit(action, category, details)` to write to `audit_log` table
 - `js/super_admin_inactivity.js` — call `setupInactivityLogout(role)` on admin pages; only activates for `role === 'admin'`
 
