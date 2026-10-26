@@ -20,11 +20,16 @@
 //   - the visitor's own connection being down (navigator.onLine === false) is
 //     never counted: that is not a Supabase problem, so the notice stays quiet.
 //
-// Cadence: healthy = one check per HEALTHY_INTERVAL_MS, after a failure the
-// next check comes after RETRY_GAP_MS (so the notice is not delayed by a full
-// minute), and while the notice is showing it rechecks every OUTAGE_INTERVAL_MS.
-// Checks only run while the tab is visible; a hidden tab catches up the moment
-// it is shown again.
+// Cadence: healthy = one check per HEALTHY_INTERVAL_MS. After a failure the
+// gap between checks follows RETRY_LADDER_MS (5s, 10s, 30s, then 60s and stays
+// there). The two short gaps are the quick confirmation retries that lead to
+// the third failure (and so the notice) within seconds; the long gaps are the
+// sustained part of an outage, so a struggling server is not hit harder by
+// every open tab. The ladder keeps applying while the notice is showing, and
+// resets after the first healthy check. Every gap gets random jitter (see
+// jittered()) so tabs that started together drift apart instead of probing in
+// the same second. Checks only run while the tab is visible; a hidden tab
+// catches up the moment it is shown again.
 //
 // Deliberately separate from js/system_notice.js (the testing-phase disclosure,
 // which is removed when testing ends). This file is a permanent feature.
@@ -38,11 +43,11 @@
   window.__eliSupabaseHealthLoaded = true;
 
   // ── Tunables ───────────────────────────────────────────────────────────
-  var CHECK_TIMEOUT_MS = 8000;         // a check slower than this counts as failed
+  var CHECK_TIMEOUT_MS = 5000;         // a check slower than this counts as failed
   var FAILS_TO_ALERT = 3;              // consecutive failed checks before the notice shows
-  var HEALTHY_INTERVAL_MS = 60000;     // gap between checks while everything is fine
-  var RETRY_GAP_MS = 5000;             // gap between checks after a failure, before the notice shows
-  var OUTAGE_INTERVAL_MS = 15000;      // gap between checks while the notice is showing
+  var HEALTHY_INTERVAL_MS = 150000;    // gap between checks while everything is fine (2.5 min)
+  var RETRY_LADDER_MS = [5000, 10000, 30000, 60000]; // gaps after consecutive failures; the last one repeats
+  var JITTER = 0.2;                    // every gap is randomised by +/- this fraction
   var FIRST_CHECK_DELAY_MS = 3000;     // let the page finish loading before the first check
   var DISMISS_TTL_MS = 30 * 60 * 1000; // a closed notice stays a pill across page loads for this long
   var RELAPSE_WINDOW_MS = 10 * 60 * 1000; // an outage returning within this long after a seen-and-closed one is pill-only
@@ -114,6 +119,7 @@
 
   // ── State ──────────────────────────────────────────────────────────────
   var fails = 0;            // consecutive failed checks
+  var backoffStep = 0;      // position on RETRY_LADDER_MS; only a healthy check resets it
   var alerting = false;     // an outage is on (popup, pill, or popup waiting its turn)
   var dismissed = false;    // visitor closed the popup during this outage
   var modalOpen = false;    // the popup is on screen
@@ -167,9 +173,21 @@
     });
   }
 
+  // +/- JITTER around ms, so tabs do not probe in lockstep.
+  function jittered(ms) {
+    return Math.round(ms * (1 - JITTER + Math.random() * 2 * JITTER));
+  }
+
+  // Gap before the next retry: the ladder step we are on, then one step further.
+  function retryGap() {
+    var gap = RETRY_LADDER_MS[Math.min(backoffStep, RETRY_LADDER_MS.length - 1)];
+    backoffStep++;
+    return gap;
+  }
+
   function schedule(ms) {
     clearTimeout(timer);
-    timer = setTimeout(tick, ms);
+    timer = setTimeout(tick, jittered(ms));
   }
 
   function tick() {
@@ -188,19 +206,22 @@
 
   function handle(result) {
     if (result === 'skip') {
+      // Not Supabase's fault (visitor offline): no failure counted, and the
+      // ladder does not advance, but an ongoing outage is still rechecked.
       fails = 0;
-      schedule(alerting ? OUTAGE_INTERVAL_MS : HEALTHY_INTERVAL_MS);
+      schedule(alerting ? RETRY_LADDER_MS[Math.min(backoffStep, RETRY_LADDER_MS.length - 1)] : HEALTHY_INTERVAL_MS);
       return;
     }
     if (result === 'ok') {
       fails = 0;
+      backoffStep = 0;
       if (alerting) setAlert(false);
       schedule(HEALTHY_INTERVAL_MS);
       return;
     }
     fails++;
     if (fails >= FAILS_TO_ALERT && !alerting) setAlert(true);
-    schedule(alerting ? OUTAGE_INTERVAL_MS : RETRY_GAP_MS);
+    schedule(retryGap());
   }
 
   // ── The notice ─────────────────────────────────────────────────────────
@@ -381,6 +402,7 @@
   window.addEventListener('offline', function () { fails = 0; });
   window.addEventListener('online', function () {
     fails = 0;
+    backoffStep = 0;
     if (!running && !document.hidden) schedule(1500); // re-verify soon after the connection returns
   });
 
