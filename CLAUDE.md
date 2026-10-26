@@ -145,6 +145,17 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_locked boolean NOT NULL 
 
 `js/system_notice.js` shows a closable "System Notice" popup once per browser session plus a small bottom-left pill, on every root-level public page. It is hardcoded, self-contained (styles injected by the script), and intentionally not admin-configurable. To remove it: delete `js/system_notice.js` and the two lines tagged `SYSTEM-NOTICE` (a comment + a `<script>`) near the end of `<body>` in each root `.html` file (`grep -rl "SYSTEM-NOTICE" --include=*.html .`).
 
+## Board kiosk polling (`js/board.js`)
+
+The board stays open all day with the screen kept awake (wake lock), so it never pauses like a normal hidden tab. To keep it from loading Supabase, `board.js` follows these rules (constants at the top of the file):
+
+- One schedule refresh per `SCHEDULE_REFRESH_MS` (60 s). Each refresh is two requests: `board_reservations_view` + `reservation_staff_assignments`. A new or changed reservation can take up to about a minute to appear.
+- The next refresh is scheduled only after the previous one finishes (a `setTimeout` chain, not `setInterval`), so slow responses never overlap.
+- After a failed refresh the gap doubles (60 s → 120 s → 240 s, capped at `SCHEDULE_REFRESH_MAX_MS` = 5 min) with ±10% jitter, and returns to 60 s after one success.
+- The full role check (`verifyPortalSession`, which queries `profiles`) runs on load and then every `SESSION_RECHECK_MS` (10 min). Every refresh in between only reads the locally stored session (no request); if it is gone, the signed-out state is shown.
+- A hidden tab skips refreshes; focus / visibility events trigger one refresh (events within `REFRESH_MIN_GAP_MS` share it).
+- The footer text ("refreshes every N seconds") reads `SCHEDULE_REFRESH_MS`, so changing the constant updates it.
+
 ## Supabase health notice (permanent)
 
 `js/supabase_health_notice.js` watches whether the site's own Supabase project is answering and, after 3 failed checks in a row, shows a "Service Notice" popup (same look and behaviour as the System Notice: backdrop, page scroll locked, Esc/backdrop/button to close) once per outage. Closing it leaves a small bottom-right pill that reopens it; both remove themselves when Supabase answers again. If the System Notice or Beta Testing Guide popup is open when the outage is detected, this popup waits until it is closed instead of stacking on top. If an outage comes back within 10 minutes of one the visitor had already seen and closed, it returns as the pill only (no second popup); after 10 minutes of stability the next outage gets the full popup again (`RELAPSE_WINDOW_MS`). A check is one small read of the public `business_contact` table; no answer within 8 seconds, a network error, or a 5xx counts as a failure, while a slow-but-successful answer is healthy. A visitor who is offline is never counted. The timings (timeout, number of checks, intervals) are constants at the top of the file. It is a separate file from `system_notice.js` so it survives the testing-phase removal. Loaded on every root-level public page via the two lines tagged `SUPABASE-HEALTH` near the end of `<body>` (`grep -rl "SUPABASE-HEALTH" --include=*.html .`); admin and board pages do not load it. Its Supabase URL/key are copied from `js/supabase.js` and must be kept in sync.

@@ -22,7 +22,22 @@ const boardLogoutConfirmBtn = document.getElementById('boardLogoutConfirmBtn');
 
 const IDLE_RETURN_MS = 40000;
 const RECENTLY_UPDATED_MS = 4 * 60 * 60 * 1000;
-const SCHEDULE_REFRESH_MS = 10000;
+
+// ── Polling cadence ─────────────────────────────────────────────────────────
+// The board stays open all day with the screen kept awake, so it never pauses
+// the way a normal tab does. Every refresh costs two requests (reservations +
+// staff assignments), so the cadence is deliberately gentle:
+//   - one refresh per SCHEDULE_REFRESH_MS while everything is fine;
+//   - after a failure the gap doubles (up to SCHEDULE_REFRESH_MAX_MS) so a
+//     struggling server is not hit harder, and snaps back after one success;
+//   - the next refresh is only scheduled once the previous one has finished,
+//     so slow responses can never pile up;
+//   - the full role check (a query on `profiles`) runs only every
+//     SESSION_RECHECK_MS; the cheap local session check runs every refresh.
+const SCHEDULE_REFRESH_MS = 60000;
+const SCHEDULE_REFRESH_MAX_MS = 5 * 60 * 1000;
+const SESSION_RECHECK_MS = 10 * 60 * 1000;
+const REFRESH_MIN_GAP_MS = 5000; // focus / visibility events closer than this share one refresh
 
 const state = {
   days: [],
@@ -31,7 +46,12 @@ const state = {
   selectedDate: null,
   idleTimer: null,
   kioskMode: false,
-  wakeLockSentinel: null
+  wakeLockSentinel: null,
+  refreshTimer: null,
+  refreshInFlight: false,
+  lastRefreshStartedAt: 0,
+  lastSessionCheckAt: 0,
+  failureCount: 0
 };
 
 const STATUS_META = {
@@ -433,12 +453,69 @@ async function refreshSchedule() {
   try {
     state.days = await fetchSchedule();
     state.connectionLost = false;
+    state.failureCount = 0;
     state.lastUpdatedAt = new Date();
     render();
     renderFooter();
+    return true;
   } catch (error) {
     state.connectionLost = true;
+    state.failureCount += 1;
     renderFooter();
+    return false;
+  }
+}
+
+// Gap before the next refresh: the normal cadence, doubled per consecutive
+// failure up to the ceiling, with ±10% jitter so several boards drift apart
+// instead of hitting the server in the same second.
+function nextRefreshDelay() {
+  const base = Math.min(SCHEDULE_REFRESH_MS * 2 ** state.failureCount, SCHEDULE_REFRESH_MAX_MS);
+  return Math.round(base * (0.9 + Math.random() * 0.2));
+}
+
+function scheduleNextRefresh() {
+  clearTimeout(state.refreshTimer);
+  state.refreshTimer = setTimeout(runScheduledRefresh, nextRefreshDelay());
+}
+
+function runScheduledRefresh() {
+  // A hidden tab has nobody looking at it; the visibilitychange handler
+  // refreshes the moment it is shown again.
+  if (document.visibilityState !== 'visible') {
+    scheduleNextRefresh();
+    return;
+  }
+  refreshNow();
+}
+
+// Focus / visibility handlers call this. Two events fired together (a tab
+// becoming visible usually also fires focus) share one refresh.
+function requestRefresh() {
+  if (Date.now() - state.lastRefreshStartedAt < REFRESH_MIN_GAP_MS) return;
+  refreshNow();
+}
+
+async function refreshNow() {
+  if (state.refreshInFlight) return;
+  state.refreshInFlight = true;
+  state.lastRefreshStartedAt = Date.now();
+  try {
+    if (Date.now() - state.lastSessionCheckAt >= SESSION_RECHECK_MS) {
+      // Full check: confirms the account still has the staff role (queries `profiles`).
+      if (!(await checkSession())) return;
+    } else {
+      // Cheap check: reads the locally stored session, no request to the server.
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session) {
+        showSignedOutState();
+        return;
+      }
+    }
+    await refreshSchedule();
+  } finally {
+    state.refreshInFlight = false;
+    scheduleNextRefresh();
   }
 }
 
@@ -458,6 +535,7 @@ async function checkSession() {
     showSignedOutState();
     return false;
   }
+  state.lastSessionCheckAt = Date.now();
   showBoard();
   return true;
 }
@@ -529,6 +607,7 @@ async function init() {
     return;
   }
 
+  state.lastSessionCheckAt = Date.now();
   state.kioskMode = detectKioskMode();
   document.body.classList.toggle('kiosk-mode', state.kioskMode);
   if (state.kioskMode) applyKioskViewport();
@@ -562,23 +641,19 @@ async function init() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     acquireWakeLock();
-    refreshSchedule();
+    requestRefresh();
   });
-  window.addEventListener('focus', () => {
-    refreshSchedule();
-  });
+  window.addEventListener('focus', requestRefresh);
 
   renderClock();
+  state.lastRefreshStartedAt = Date.now();
   await refreshSchedule();
+  scheduleNextRefresh();
   resetIdleTimer();
   await acquireWakeLock();
 
   setInterval(renderClock, 1000);
   setInterval(render, 30000);
-  setInterval(async () => {
-    const stillSignedIn = await checkSession();
-    if (stillSignedIn) await refreshSchedule();
-  }, SCHEDULE_REFRESH_MS);
 
   supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') showSignedOutState();
