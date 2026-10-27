@@ -211,7 +211,7 @@ function renderCustomersView(customers) {
   });
 
   if (customersTotal) {
-    setCustomersMessage(`Showing ${customers.length} of ${totalRegisteredCustomers} registered customer(s).`);
+    setCustomersMessage('');
   } else if (activeSearch) {
     setCustomersMessage(`No registered customers matched "${activeSearch}".`);
   } else {
