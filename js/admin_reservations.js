@@ -9,7 +9,7 @@ import {
   getScopeLabel as getSharedScopeLabel,
 } from './reservation_availability.js';
 import { getPaymentStatusPillMeta, fetchUnseenReservationChanges, markReservationChangesSeen } from './reservation_shared.js';
-import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 
 const tableMessage = document.getElementById('tableMessage');
@@ -32,12 +32,24 @@ const rescheduleAlertCount = document.getElementById('rescheduleAlertCount');
 const rescheduleAlertText = document.getElementById('rescheduleAlertText');
 const rescheduleAlertAction = document.getElementById('rescheduleAlertAction');
 const rescheduleAlertDismiss = document.getElementById('rescheduleAlertDismiss');
-const UPCOMING_ACTIVE_STATUSES = new Set(['pending', 'approved', 'rescheduled']);
 
-let reservationsCache = [];
-let reservationsFiltered = [];
+// Server-side pagination: the database returns one page of reservations at a
+// time (get_admin_reservations_page), already filtered by status and search,
+// and the stat-card / chip counts come from get_admin_reservation_counts().
+// The browser never holds the full reservation list.
+const RESERVATIONS_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
+
 let reservationsCurrentPage = 1;
-let paymentSummaryMap = {};
+let reservationsTotal = 0;      // reservations matching the active filters
+let visibleReservations = [];   // the rows of the page on screen
+let paymentSummaryMap = {};     // payment fields for the rows on screen
+let activeSearch = '';          // the search term currently applied
+let latestRequestId = 0;        // lets a newer request supersede an older one
+let searchDebounceTimer = null;
+let rosterLoaded = false;
+let unseenChangeNames = [];     // { reservation_id, reservation_number, contact_name } for the banner
+let appliedReviewIds = null;    // ids the list on screen is narrowed to (null = not narrowed)
 let adminSession = null;
 let currentRole = null;
 let staffDirectory = [];
@@ -114,124 +126,12 @@ function formatCurrency(value) {
   return `₱${Number(value || 0).toLocaleString()}`;
 }
 
-function buildLocalDateKey(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0')
-  ].join('-');
-}
-
-function getTodayDateKey() {
-  return buildLocalDateKey(new Date());
-}
-
-function parseReservationTimeParts(timeValue) {
-  const value = String(timeValue || '').trim();
-  if (!value) return null;
-
-  const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (match) {
-    return {
-      hours: Number(match[1]),
-      minutes: Number(match[2])
-    };
-  }
-
-  const parsed = new Date(`1970-01-01 ${value}`);
-  if (Number.isNaN(parsed.getTime())) return null;
-
-  return {
-    hours: parsed.getHours(),
-    minutes: parsed.getMinutes()
-  };
-}
-
-function getReservationEventDateTime(reservation) {
-  const dateKey = formatDateKey(reservation?.event_date);
-  if (!dateKey) return null;
-
-  const timeParts = parseReservationTimeParts(reservation?.event_time);
-  const eventDate = new Date(`${dateKey}T00:00:00`);
-  if (Number.isNaN(eventDate.getTime())) return null;
-
-  if (timeParts) {
-    eventDate.setHours(timeParts.hours, timeParts.minutes, 0, 0);
-  }
-
-  return eventDate;
-}
-
-// Completion requires the outstanding balance (from the module-level
-// paymentSummaryMap, same source paymentStatus() reads) to be confirmed
-// <= 0 — without a summary entry it never infers 'completed' on its own,
-// only reflects an already-persisted value. Event-passed-but-unpaid is
-// left entirely to the auto-cancel-overdue flow.
+// The status shown for a reservation (confirmed -> approved, an event that
+// has passed and is paid in full -> completed, ...) is worked out in the
+// database by reservation_effective_status(), so the status filters, the
+// chip counts and this pill can never disagree. This just reads it back.
 function getEffectiveReservationStatus(reservation) {
-  const normalizedStatus = String(reservation?.status || 'pending').toLowerCase();
-  if (['completed', 'cancelled', 'declined'].includes(normalizedStatus)) {
-    return normalizedStatus;
-  }
-
-  const outstandingBalance = Number(paymentSummaryMap[reservation?.reservation_id]?.outstanding_balance);
-  const isPaidInFull = Number.isFinite(outstandingBalance) && outstandingBalance <= 0;
-  const eventDateTime = getReservationEventDateTime(reservation);
-  if (isPaidInFull && eventDateTime && eventDateTime.getTime() < Date.now() && ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus)) {
-    return 'completed';
-  }
-
-  if (normalizedStatus === 'confirmed') {
-    return 'approved';
-  }
-
-  return normalizedStatus;
-}
-
-function getReservationTimeSortValue(timeValue) {
-  const value = String(timeValue || '').trim();
-  if (!value) return null;
-
-  const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (match) {
-    return (Number(match[1]) * 60) + Number(match[2]);
-  }
-
-  const parsed = new Date(`1970-01-01T${value}`);
-  if (!Number.isNaN(parsed.getTime())) {
-    return (parsed.getHours() * 60) + parsed.getMinutes();
-  }
-
-  return null;
-}
-
-function isUpcomingReservation(reservation) {
-  const status = getEffectiveReservationStatus(reservation);
-  const eventDateKey = formatDateKey(reservation?.event_date);
-  return Boolean(eventDateKey)
-    && eventDateKey >= getTodayDateKey()
-    && UPCOMING_ACTIVE_STATUSES.has(status);
-}
-
-function sortReservationsForView(list, status) {
-  const rows = [...list];
-  if (status !== 'upcoming') return rows;
-
-  return rows.sort((left, right) => {
-    const leftDateKey = formatDateKey(left.event_date);
-    const rightDateKey = formatDateKey(right.event_date);
-    if (leftDateKey !== rightDateKey) {
-      return leftDateKey.localeCompare(rightDateKey);
-    }
-
-    const leftTime = getReservationTimeSortValue(left.event_time);
-    const rightTime = getReservationTimeSortValue(right.event_time);
-    if (leftTime !== null && rightTime !== null && leftTime !== rightTime) {
-      return leftTime - rightTime;
-    }
-
-    return new Date(left.created_at || 0) - new Date(right.created_at || 0);
-  });
+  return String(reservation?.effective_status || reservation?.status || 'pending').toLowerCase();
 }
 
 function getEmptyFilterMessage(status) {
@@ -294,19 +194,6 @@ function getReservationRescheduleRequests(reservation) {
   return reservation.reschedule_requests || [];
 }
 
-async function fetchPaymentSummaries(reservationIds) {
-  if (!reservationIds.length) return {};
-  const { data, error } = await supabase
-    .from('reservation_payment_summary')
-    .select('reservation_id, reservation_total, total_paid, outstanding_balance, latest_payment_date, computed_status')
-    .in('reservation_id', reservationIds);
-  if (error) throw error;
-  return (data || []).reduce((map, row) => {
-    map[row.reservation_id] = row;
-    return map;
-  }, {});
-}
-
 function formatReadableKey(value) {
   return String(value || '')
     .split('_')
@@ -318,16 +205,6 @@ function formatReadableKey(value) {
 function getLatestOpenRescheduleRequest(reservation) {
   return getReservationRescheduleRequests(reservation)
     .find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment') || null;
-}
-
-// update-v20 — no manager approval left to flag; this now tracks whether
-// a reservation has an unseen customer-initiated cancellation or
-// reschedule (finalized or still awaiting fee), per unseenChangeIds
-// (js/reservation_shared.js's fetchUnseenReservationChanges, refreshed in
-// loadData()). Function name kept for the smaller diff against the
-// pre-existing "only show reschedule-flagged rows" filter below.
-function hasPendingRescheduleRequest(reservation) {
-  return reviewFilterIds.has(reservation.reservation_id);
 }
 
 function renderPendingRescheduleAlert() {
@@ -353,10 +230,11 @@ function renderPendingRescheduleAlert() {
 
   // Name the specific booking(s) instead of a bare count, so an admin can
   // tell at a glance which reservation(s) triggered this without clicking
-  // through — reservationsCache holds the full unpaginated list, so every
-  // id in unseenChangeIds is guaranteed to resolve to a row here.
+  // through. The names come from fetchUnseenReservationChanges(), which
+  // returns them alongside the ids, so this no longer depends on the
+  // reservation being on the current page.
   const MAX_NAMED = 3;
-  const changed = reservationsCache.filter((r) => unseenChangeIds.has(r.reservation_id));
+  const changed = unseenChangeNames.filter((r) => unseenChangeIds.has(r.reservation_id));
   const names = changed.map((r) => r.reservation_number || r.contact_name || 'Unknown booking');
   const namedList = names.length > MAX_NAMED
     ? `${names.slice(0, MAX_NAMED).join(', ')}, and ${names.length - MAX_NAMED} more`
@@ -409,39 +287,20 @@ function renderAssignedStaffMarkup(reservationId) {
   `;
 }
 
-function matchesSearch(res, term) {
-  if (!term) return true;
-  const needle = term.toLowerCase();
-  return (res.contact_name || '').toLowerCase().includes(needle)
-      || (res.contact_email || '').toLowerCase().includes(needle)
-      || (res.package?.package_name || '').toLowerCase().includes(needle)
-      || (res.reservation_number || '').toLowerCase().includes(needle);
-}
+// counts comes from get_admin_reservation_counts(): the same numbers the
+// browser used to tally from the full list, now computed in the database.
+function renderStats(counts) {
+  const safe = counts || {};
+  const countFor = (key) => Number(safe[key]) || 0;
 
-function matchesStatus(res, status) {
-  if (status === 'all') return true;
-  if (status === 'upcoming') return isUpcomingReservation(res);
-  return getEffectiveReservationStatus(res) === status;
-}
-
-function renderStats(list) {
-  const counts = {
-    upcoming: 0, pending: 0, approved: 0, declined: 0, completed: 0,
-    cancelled: 0, rescheduled: 0, total: list.length
-  };
-  list.forEach(r => {
-    const k = getEffectiveReservationStatus(r);
-    if (counts[k] !== undefined) counts[k] += 1;
-    if (isUpcomingReservation(r)) counts.upcoming += 1;
-  });
   statIds.forEach(id => {
     const el = document.getElementById(`stat-${id}`);
-    if (el) el.textContent = counts[id] ?? 0;
+    if (el) el.textContent = countFor(id);
   });
-  setBadgeCount(navReservationCount, counts.pending);
+  setBadgeCount(navReservationCount, countFor('pending'));
   chipsRow?.querySelectorAll('.chip').forEach(chip => {
     const status = chip.dataset.status;
-    const val = status === 'all' ? counts.total : (counts[status] ?? 0);
+    const val = countFor(status === 'all' ? 'total' : status);
     chip.textContent = `${chip.textContent.split('(')[0].trim()} (${val})`;
   });
   renderPendingRescheduleAlert();
@@ -509,55 +368,69 @@ function renderTable(list) {
 
 
 
-function filterAndRender({ resetPage = true } = {}) {
-  const term = searchInput?.value.trim().toLowerCase();
+// Which status filter is active: the dropdown wins over the chips, as before.
+function getActiveStatus() {
   const dropdownStatus = statusDropdown?.value || 'all';
   const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
-  const status = dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
-  // BUG-04 fix: this used to check unseenChangeIds (the badge count), which
-  // both "Review" flows clear as their very first step (marking the rows
-  // seen) before calling filterAndRender() — so the "only show these rows"
-  // filter this same function was told to turn on a moment earlier
-  // immediately turned itself back off. reviewFilterIds is the snapshot
-  // meant to survive that clear (see its declaration comment); only reset
-  // the filter once there's nothing left in that snapshot to show.
+  return dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
+}
+
+// BUG-04 fix (kept): "Review" clears unseenChangeIds as its very first step
+// (so the banner disappears) before the list reloads, so the "only show these
+// rows" filter is driven by reviewFilterIds, the snapshot taken when Review
+// was clicked. Only reset the filter once nothing is left in that snapshot.
+// Returns the ids to narrow the list to, or null for no narrowing.
+function getReviewIdsFilter() {
   if (!reviewFilterIds.size) {
     showPendingRescheduleOnly = false;
   }
-  const filtered = sortReservationsForView(
-    reservationsCache.filter(r => matchesStatus(r, status) && matchesSearch(r, term) && (!showPendingRescheduleOnly || hasPendingRescheduleRequest(r))),
-    status
-  );
-  renderStats(reservationsCache);
-  reservationsFiltered = filtered;
-  if (resetPage) {
-    reservationsCurrentPage = 1;
-  } else {
-    reservationsCurrentPage = Math.min(reservationsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
-  }
-  renderReservationsPage();
-  setMessage(tableMessage, filtered.length ? '' : getEmptyFilterMessage(status), false);
+  return showPendingRescheduleOnly ? Array.from(reviewFilterIds) : null;
 }
 
-function renderReservationsPage() {
-  renderTable(paginate(reservationsFiltered, reservationsCurrentPage, PAGE_SIZE));
+function renderReservationsView(status) {
+  renderTable(visibleReservations);
   renderPagination(reservationsPagination, {
-    totalItems: reservationsFiltered.length,
+    totalItems: reservationsTotal,
     currentPage: reservationsCurrentPage,
-    pageSize: PAGE_SIZE,
+    pageSize: RESERVATIONS_PAGE_SIZE,
     onPageChange: (page) => {
       reservationsCurrentPage = page;
-      renderReservationsPage();
+      // Moving between pages must stay inside the list on screen, so keep
+      // the same narrowing instead of re-reading the (possibly reset) flag.
+      loadData({ full: false, keepNarrowing: true });
     }
   });
+  setMessage(tableMessage, reservationsTotal ? '' : getEmptyFilterMessage(status), false);
+  if (!assignmentFeatureReady) {
+    setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
+  }
+}
+
+// A changed filter or search always starts again from page 1.
+function reloadFromFirstPage() {
+  reservationsCurrentPage = 1;
+  loadData({ full: false });
+}
+
+// Search runs in the database, so wait for a short pause in typing instead of
+// sending a request on every keystroke.
+function handleSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const nextSearch = (searchInput?.value || '').trim();
+    if (nextSearch === activeSearch) return;
+
+    activeSearch = nextSearch;
+    reloadFromFirstPage();
+  }, SEARCH_DEBOUNCE_MS);
 }
 
 function wireFilters() {
-  searchInput?.addEventListener('input', filterAndRender);
+  searchInput?.addEventListener('input', handleSearchInput);
   statusDropdown?.addEventListener('change', () => {
     showPendingRescheduleOnly = false;
     chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    filterAndRender();
+    reloadFromFirstPage();
   });
   chipsRow?.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
@@ -566,7 +439,7 @@ function wireFilters() {
     chipsRow.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     statusDropdown.value = 'all';
-    filterAndRender();
+    reloadFromFirstPage();
   });
   rescheduleAlertAction?.addEventListener('click', async () => {
     reviewFilterIds = new Set(unseenChangeIds);
@@ -578,7 +451,7 @@ function wireFilters() {
     const idsToMark = Array.from(unseenChangeIds);
     unseenChangeIds = new Set();
     renderPendingRescheduleAlert();
-    filterAndRender();
+    reloadFromFirstPage();
 
     try {
       await markReservationChangesSeen(supabase, idsToMark);
@@ -603,110 +476,88 @@ function wireFilters() {
   });
 }
 
-async function fetchReservations() {
-  const { data: reservations, error } = await supabase
-    .from('reservations')
-    .select(`
-      reservation_id,
-      reservation_number,
-      contact_name,
-      contact_email,
-      contact_phone,
-      status,
-      event_type,
-      event_date,
-      event_time,
-      start_time,
-      event_end_time,
-      duration_hours,
-      guest_count,
-      location_type,
-      venue_location,
-      special_requests,
-      total_price,
-      created_at,
-      booking_scope,
-      package:package_id ( package_name, duration_hours, booking_scope )
-    `)
-    .order('created_at', { ascending: false });
+// One page of reservations (already filtered by status / search / review ids
+// in the database), each row carrying its effective status and the payment
+// summary fields the table shows. The RPC takes limit/offset, which is the same
+// window .range(from, to) would select.
+async function fetchReservationsPage(page, { status, search, ids }) {
+  const { from } = getPageRange(page, RESERVATIONS_PAGE_SIZE);
+  const { data, error } = await supabase.rpc('get_admin_reservations_page', {
+    p_status: status,
+    p_search: search || null,
+    p_reservation_ids: ids,
+    p_limit: RESERVATIONS_PAGE_SIZE,
+    p_offset: from
+  });
+
   if (error) throw error;
 
-  const list = reservations || [];
-  const reservationIds = list.map((reservation) => reservation.reservation_id).filter(Boolean);
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  return {
+    total: Number(data?.total) || 0,
+    rows: rows.map((row) => ({
+      ...row,
+      package: row.package_name ? { package_name: row.package_name } : null
+    }))
+  };
+}
 
-  if (!reservationIds.length) return list;
+// If the requested page no longer exists (reservations were removed or changed
+// status since the last load, so there are fewer pages now), fall back to the
+// last page that does exist instead of showing an empty table.
+async function fetchPageWithClamp(page, filters) {
+  let result = await fetchReservationsPage(page, filters);
+  const lastPage = getTotalPages(result.total, RESERVATIONS_PAGE_SIZE);
 
+  if (page > lastPage) {
+    page = lastPage;
+    result = await fetchReservationsPage(page, filters);
+  }
+
+  return { ...result, page };
+}
+
+// Stat cards, status chips and the sidebar badge. They describe ALL
+// reservations, never the current search or page.
+async function fetchReservationCounts() {
+  const { data, error } = await supabase.rpc('get_admin_reservation_counts');
+  if (error) throw error;
+  return data || {};
+}
+
+function buildPaymentSummaryMap(rows) {
+  return rows.reduce((map, row) => {
+    map[row.reservation_id] = {
+      reservation_id: row.reservation_id,
+      computed_status: row.computed_status,
+      outstanding_balance: row.outstanding_balance
+    };
+    return map;
+  }, {});
+}
+
+// ids of every reservation with a customer-initiated cancellation or an
+// approved/completed reschedule, whether or not it has been "seen". Used only
+// by the Dashboard's "Review" deep link (?filter=changed).
+async function fetchChangedReservationIds() {
   const [
-    contracts,
-    { data: payments, error: paymentsError },
-    { data: rescheduleRequests, error: rescheduleError }
+    { data: byStatus, error: statusError },
+    { data: byReschedule, error: rescheduleError }
   ] = await Promise.all([
-    fetchReservationContracts(reservationIds),
     supabase
-      .from('payment')
-      .select(`
-        payment_id,
-        reservation_id,
-        reschedule_request_id,
-        payment_type,
-        payment_method,
-        amount,
-        payment_status,
-        reference_number,
-        payment_date,
-        notes,
-        proof_url,
-        cash_payment_date,
-        submitted_at,
-        verified_at
-      `)
-      .in('reservation_id', reservationIds)
-      .order('submitted_at', { ascending: false }),
+      .from('reservations')
+      .select('reservation_id')
+      .in('status', ['cancellation_requested', 'cancellation_approved', 'cancelled']),
     supabase
       .from('reschedule_requests')
-      .select(`
-        reschedule_request_id,
-        reservation_id,
-        original_date,
-        original_time,
-        requested_date,
-        requested_time,
-        status,
-        requested_at,
-        reviewed_at
-      `)
-      .in('reservation_id', reservationIds)
-      .order('requested_at', { ascending: false })
+      .select('reservation_id')
+      .in('status', ['approved_pending_payment', 'completed'])
   ]);
 
-  if (paymentsError) throw paymentsError;
+  if (statusError) throw statusError;
   if (rescheduleError) throw rescheduleError;
 
-  const contractsByReservationId = (contracts || []).reduce((map, contract) => {
-    map[contract.reservation_id] = contract;
-    return map;
-  }, {});
-
-  const paymentsByReservationId = (payments || []).reduce((map, payment) => {
-    if (!map[payment.reservation_id]) map[payment.reservation_id] = [];
-    map[payment.reservation_id].push(payment);
-    return map;
-  }, {});
-
-  const requestsByReservationId = (rescheduleRequests || []).reduce((map, request) => {
-    if (!map[request.reservation_id]) map[request.reservation_id] = [];
-    map[request.reservation_id].push(request);
-    return map;
-  }, {});
-
-  return list.map((reservation) => ({
-    ...reservation,
-    contracts: contractsByReservationId[reservation.reservation_id]
-      ? [contractsByReservationId[reservation.reservation_id]]
-      : [],
-    payments: paymentsByReservationId[reservation.reservation_id] || [],
-    reschedule_requests: requestsByReservationId[reservation.reservation_id] || []
-  }));
+  return new Set([...(byStatus || []), ...(byReschedule || [])].map((row) => row.reservation_id));
 }
 
 // Unfiltered — this file only ever uses the roster to resolve names for
@@ -727,6 +578,44 @@ async function fetchStaffRoster() {
 
   if (error) throw error;
   return data || [];
+}
+
+// Staff names for the reservations on screen. The roster (a small table) is
+// re-read on a full load / auto-refresh and reused when only the page, search
+// or filter changed; the assignments are always read for the visible rows only.
+async function fetchStaffForRows(rows, { refreshRoster }) {
+  let directory = staffDirectory;
+  let rosterOk = rosterLoaded;
+  let ready = true;
+  let message = '';
+
+  if (refreshRoster || !rosterLoaded) {
+    try {
+      directory = await fetchStaffRoster();
+      rosterOk = true;
+    } catch (staffError) {
+      directory = [];
+      rosterOk = false;
+      ready = false;
+      message = getStaffDirectoryHint(staffError);
+    }
+  }
+
+  let assignmentMap = {};
+  if (ready) {
+    try {
+      assignmentMap = await fetchReservationAssignments(
+        rows.map((row) => row.reservation_id).filter(Boolean),
+        directory
+      );
+    } catch (assignmentError) {
+      ready = false;
+      message = getAssignmentSchemaHint(assignmentError);
+      assignmentMap = {};
+    }
+  }
+
+  return { directory, assignmentMap, ready, message, rosterOk };
 }
 
 async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
@@ -775,98 +664,78 @@ async function fetchReservationAssignments(reservationIds, knownStaffRoster) {
   }, {});
 }
 
-async function fetchReservationContracts(reservationIds) {
-  if (!reservationIds.length) return [];
-
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
-  const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
-  const { data, error } = await supabase
-    .from('reservation_contracts')
-    .select(extendedSelect)
-    .in('reservation_id', reservationIds);
-
-  if (!error) {
-    return data || [];
-  }
-
-  if (
-    isMissingColumnError(error, 'review_status')
-    || isMissingColumnError(error, 'review_notes')
-    || isMissingColumnError(error, 'reviewed_at')
-  ) {
-    const fallback = await supabase
-      .from('reservation_contracts')
-      .select(fallbackSelect)
-      .in('reservation_id', reservationIds);
-
-    if (fallback.error) throw fallback.error;
-    return fallback.data || [];
-  }
-
-  throw error;
+function refreshSidebarBadges() {
+  return refreshAdminSidebarCounts({
+    supabase,
+    reservationBadgeEl: navReservationCount,
+    paymentBadgeEl: navPaymentCount,
+    contractBadgeEl: navContractCount,
+    reviewBadgeEl: navReviewCount
+  }).catch(() => {});
 }
 
+// silent=true is used by the auto-refresh triggers: it skips the
+// "Loading..." message so existing rows stay on screen, and on failure it
+// keeps the last-good data and fails quietly instead of blanking the table.
+// full=false is used for page changes, searches and filter changes, which
+// don't affect the stat cards, chips or banner, so only the page itself (and
+// the staff for its rows) is fetched.
+// keepNarrowing=true (page changes only) reuses the id narrowing of the list
+// already on screen; every other load works it out afresh.
+// Every call takes a request id; if a newer call starts before this one
+// finishes, this one's result is discarded so a slow, older response can
+// never overwrite a newer one.
+async function loadData({ silent = false, full = true, keepNarrowing = false } = {}) {
+  const requestId = ++latestRequestId;
 
-
-
-
-
-async function loadData({ silent = false } = {}) {
   if (!silent) {
     setMessage(tableMessage, 'Loading reservations...');
   }
+
   try {
-    let nextAssignmentFeatureReady = true;
-    let nextAssignmentFeatureMessage = '';
+    const status = getActiveStatus();
+    const ids = keepNarrowing ? appliedReviewIds : getReviewIdsFilter();
 
-    const freshReservations = await fetchReservations();
-    const freshReservationIds = freshReservations.map((r) => r.reservation_id).filter(Boolean);
+    const [pageResult, counts, unseenChanges] = await Promise.all([
+      fetchPageWithClamp(reservationsCurrentPage, { status, search: activeSearch, ids }),
+      full ? fetchReservationCounts() : Promise.resolve(null),
+      full
+        ? fetchUnseenReservationChanges(supabase).catch(() => ({ reservationIds: [], reservations: [] }))
+        : Promise.resolve(null)
+    ]);
+    if (requestId !== latestRequestId) return;
 
-    const freshPaymentSummaryMap = await fetchPaymentSummaries(freshReservationIds).catch(() => ({}));
-    const unseenChanges = await fetchUnseenReservationChanges(supabase).catch(() => ({ reservationIds: [] }));
-    unseenChangeIds = new Set(unseenChanges.reservationIds);
+    const staff = await fetchStaffForRows(pageResult.rows, { refreshRoster: full });
+    if (requestId !== latestRequestId) return;
 
-    let freshStaffDirectory = [];
-    let freshAssignmentMap = {};
-
-    try {
-      freshStaffDirectory = await fetchStaffRoster();
-    } catch (staffError) {
-      nextAssignmentFeatureReady = false;
-      nextAssignmentFeatureMessage = getStaffDirectoryHint(staffError);
+    if (full) {
+      await refreshSidebarBadges();
+      if (requestId !== latestRequestId) return;
     }
 
-    if (nextAssignmentFeatureReady) {
-      try {
-        freshAssignmentMap = await fetchReservationAssignments(freshReservationIds, freshStaffDirectory);
-      } catch (assignmentError) {
-        nextAssignmentFeatureReady = false;
-        nextAssignmentFeatureMessage = getAssignmentSchemaHint(assignmentError);
-        freshAssignmentMap = {};
-      }
+    appliedReviewIds = ids;
+    reservationsCurrentPage = pageResult.page;
+    reservationsTotal = pageResult.total;
+    visibleReservations = pageResult.rows;
+    paymentSummaryMap = buildPaymentSummaryMap(pageResult.rows);
+    staffDirectory = staff.directory;
+    rosterLoaded = staff.rosterOk;
+    assignmentMapByReservationId = staff.assignmentMap;
+    assignmentFeatureReady = staff.ready;
+    assignmentFeatureMessage = staff.message;
+
+    if (unseenChanges) {
+      unseenChangeIds = new Set(unseenChanges.reservationIds || []);
+      unseenChangeNames = unseenChanges.reservations || [];
+    }
+    if (counts) {
+      renderStats(counts);
     }
 
-
-    reservationsCache = freshReservations;
-    paymentSummaryMap = freshPaymentSummaryMap;
-    staffDirectory = freshStaffDirectory;
-    assignmentMapByReservationId = freshAssignmentMap;
-    assignmentFeatureReady = nextAssignmentFeatureReady;
-    assignmentFeatureMessage = nextAssignmentFeatureMessage;
-
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
-    renderStats(reservationsCache);
-    filterAndRender({ resetPage: !silent });  
-    if (!assignmentFeatureReady) {
-      setMessage(tableMessage, `Loaded reservations. Staff assignment note: ${assignmentFeatureMessage}`, true);
-    }
+    renderReservationsView(status);
   } catch (err) {
+    if (requestId !== latestRequestId) return;
+
     if (silent) {
       // Quiet failure: keep whatever is already on screen; the next
       // successful trigger (focus, poll, or the user changing a filter)
@@ -875,14 +744,18 @@ async function loadData({ silent = false } = {}) {
       return;
     }
     setMessage(tableMessage, `Failed to load: ${err.message}`, true);
-    await refreshAdminSidebarCounts({
-      supabase,
-      reservationBadgeEl: navReservationCount,
-      paymentBadgeEl: navPaymentCount,
-      contractBadgeEl: navContractCount,
-      reviewBadgeEl: navReviewCount
-    }).catch(() => {});
+    if (full) {
+      await refreshSidebarBadges();
+    }
+    reservationsTotal = 0;
+    visibleReservations = [];
     renderTable([]);
+    renderPagination(reservationsPagination, {
+      totalItems: 0,
+      currentPage: 1,
+      pageSize: RESERVATIONS_PAGE_SIZE,
+      onPageChange: () => {}
+    });
   }
 }
 
@@ -951,18 +824,21 @@ validateAdminSession({
     if (roleBottomEl) roleBottomEl.textContent = profile.role === 'admin' ? 'Admin' : 'Manager';
     initManagerNotificationBell(supabase, session.user.id);
     initAdminNav({ role: profile.role });
-    await loadData();
-
     // Arrived from the Dashboard's "Review" action (already marked seen
-    // there) — apply the same "recently changed" filter here too.
+    // there) - apply the same "recently changed" filter here too. The ids are
+    // looked up first so the list loads once, already narrowed.
     if (new URLSearchParams(window.location.search).get('filter') === 'changed') {
-      const isChanged = (reservation) => (
-        ['cancellation_requested', 'cancellation_approved', 'cancelled'].includes(String(reservation.status || '').toLowerCase())
-        || getReservationRescheduleRequests(reservation).some((req) => ['approved_pending_payment', 'completed'].includes(String(req.status || '').toLowerCase()))
-      );
-      reviewFilterIds = new Set(reservationsCache.filter(isChanged).map((r) => r.reservation_id));
-      showPendingRescheduleOnly = true;
-      filterAndRender();
+      try {
+        const changedIds = await fetchChangedReservationIds();
+        if (changedIds.size) {
+          reviewFilterIds = changedIds;
+          showPendingRescheduleOnly = true;
+        }
+      } catch (error) {
+        // Non-fatal - fall back to the normal, unfiltered list.
+      }
     }
+
+    await loadData();
   }
 });
