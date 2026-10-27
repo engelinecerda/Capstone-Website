@@ -399,14 +399,11 @@ function renderContractsView() {
     }
   });
 
-  if (!contractsTotal) {
-    setMessage(tableMessage, getEmptyMessage());
-  } else {
-    setMessage(
-      tableMessage,
-      `Showing ${contractsTotal} of ${contractsOverallTotal} submitted contract(s).`
-    );
-  }
+  // With rows on screen the pagination bar below the table already says
+  // "Showing x-y of N", so the message line stays empty (same as the
+  // Reservations page) instead of repeating a count that reads like "all
+  // of them are shown". It only speaks when there is nothing to show.
+  setMessage(tableMessage, contractsTotal ? '' : getEmptyMessage());
 }
 
 // One page of contracts (already filtered by status / search in the
