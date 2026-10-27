@@ -13,6 +13,8 @@ let allLogs     = [];
 let currentPage = 1;
 const PAGE_SIZE = 10;
 let totalCount  = 0;
+let totalCountReady = false; // true once the current filters' total has been counted
+let latestLoadId = 0;   // lets a newer load supersede an older, slower one
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const auditSearchInput   = document.getElementById('auditSearchInput');
@@ -152,17 +154,15 @@ function getDateRange(filter) {
 // ─── Stats ────────────────────────────────────────────────────────────────────
 async function loadStats() {
   try {
+    // The database counts today's entries by category; the browser no
+    // longer downloads them just to count.
     const todayStart = getDateRange('today');
-    const { data, error } = await supabase
-      .from('audit_log')
-      .select('category')
-      .gte('created_at', todayStart);
+    const { data, error } = await supabase.rpc('get_admin_audit_stats', { p_since: todayStart });
     if (error) throw error;
-    const logs = data || [];
-    statTodayActions.textContent = logs.length;
-    statReservation.textContent  = logs.filter(l => l.category === 'reservation').length;
-    statPayment.textContent      = logs.filter(l => l.category === 'payment').length;
-    statPackage.textContent      = logs.filter(l => l.category === 'contract').length;
+    statTodayActions.textContent = Number(data?.total) || 0;
+    statReservation.textContent  = Number(data?.reservation) || 0;
+    statPayment.textContent      = Number(data?.payment) || 0;
+    statPackage.textContent      = Number(data?.contract) || 0;
   } catch (err) {
     // The 4 stat cards just keep showing "0" — not worth interrupting the
     // page for a decorative summary count.
@@ -170,7 +170,9 @@ async function loadStats() {
 }
 
 // ─── Build query filters (shared between load and export) ─────────────────────
-function buildAuditQuery(forExport = false) {
+// withCount=false skips the exact row count (the export never reads it, and
+// page changes reuse the count from the last filter change).
+function buildAuditQuery(forExport = false, { withCount = true } = {}) {
   const search    = (auditSearchInput.value || '').trim().toLowerCase();
   const role      = roleFilter?.value || '';
   const actionType = actionTypeFilter?.value || '';
@@ -185,7 +187,7 @@ function buildAuditQuery(forExport = false) {
 
   let query = supabase
     .from('audit_log')
-    .select('*', { count: 'exact' })
+    .select('*', withCount ? { count: 'exact' } : {})
     .order('created_at', { ascending: false });
 
   if (role)           query = query.eq('user_role', role);
@@ -205,24 +207,42 @@ function buildAuditQuery(forExport = false) {
 }
 
 // ─── Load & render ────────────────────────────────────────────────────────────
-async function loadAuditLogs() {
+// keepCount=true is used by Previous / Next: moving between pages doesn't
+// change which logs match, so the total from the last filter change is
+// reused instead of counting every matching row again. Any filter, search
+// or date change loads without it and counts afresh.
+// Every call takes a load id; if a newer call starts before this one
+// finishes, this one's result is discarded so a slow, older response can
+// never overwrite a newer one.
+async function loadAuditLogs({ keepCount = false } = {}) {
+  const loadId = ++latestLoadId;
+  // Reuse the count only if the current filters' total actually arrived;
+  // otherwise (e.g. Next clicked while a filter change is still loading)
+  // count afresh.
+  const needCount = !keepCount || !totalCountReady;
+  if (needCount) totalCountReady = false;
   setMessage('Loading audit logs…');
 
   try {
     const from = (currentPage - 1) * PAGE_SIZE;
     const to   = from + PAGE_SIZE - 1;
-    const { data, error, count } = await buildAuditQuery().range(from, to);
+    const { data, error, count } = await buildAuditQuery(false, { withCount: needCount }).range(from, to);
+    if (loadId !== latestLoadId) return;
 
     if (error) throw error;
 
     allLogs    = data || [];
-    totalCount = count || 0;
+    if (needCount) {
+      totalCount = count || 0;
+      totalCountReady = true;
+    }
 
     renderAuditTable();
     updatePagination();
-    updateFilterRangeMessage(count || 0);
+    updateFilterRangeMessage(totalCount);
     setMessage('');
   } catch (err) {
+    if (loadId !== latestLoadId) return;
     setMessage(`Failed to load audit logs: ${err.message}`, 'error');
     auditTableBody.innerHTML = '<tr class="empty-row"><td colspan="4">Failed to load audit logs.</td></tr>';
   }
@@ -330,11 +350,11 @@ function updatePagination() {
 }
 
 prevPageBtn.addEventListener('click', () => {
-  if (currentPage > 1) { currentPage--; loadAuditLogs(); }
+  if (currentPage > 1) { currentPage--; loadAuditLogs({ keepCount: true }); }
 });
 nextPageBtn.addEventListener('click', () => {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  if (currentPage < totalPages) { currentPage++; loadAuditLogs(); }
+  if (currentPage < totalPages) { currentPage++; loadAuditLogs({ keepCount: true }); }
 });
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
@@ -354,10 +374,10 @@ dateFilter.addEventListener('change', () => { currentPage = 1; loadAuditLogs(); 
 async function populateCategoryFilterOptions() {
   if (!categoryFilter) return;
   try {
-    const { data, error } = await supabase.from('audit_log').select('category').limit(1000);
-    if (error || !data) return;
+    const { data, error } = await supabase.rpc('get_admin_audit_categories');
+    if (error || !Array.isArray(data)) return;
     const known = new Set(Array.from(categoryFilter.options).map(o => o.value));
-    const categories = [...new Set(data.map(r => r.category).filter(Boolean))].sort();
+    const categories = [...new Set(data.filter(Boolean))].sort();
     categories.forEach(cat => {
       if (known.has(cat)) return;
       const opt = document.createElement('option');
@@ -398,7 +418,7 @@ async function exportAuditPdf() {
 
   try {
     // Fetch ALL matching logs (no pagination) for the export
-    const { data, error, count } = await buildAuditQuery();
+    const { data, error } = await buildAuditQuery(true, { withCount: false });
     if (error) throw error;
 
     const logs = data || [];
