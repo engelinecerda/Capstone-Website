@@ -5,7 +5,7 @@ import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { getPaymentStatusPillMeta, resolvePaymentEvidenceSource, getCancellationFee, getRescheduleFee } from './reservation_shared.js';
 import { fetchBlackoutDates, fetchDateAvailability, getBookingScope as getSharedBookingScope } from './reservation_availability.js';
 import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
@@ -107,9 +107,44 @@ const PAYMENT_BALANCE_DUE_DAYS = 7;
 let adminSession = null;
 let refreshSidebarBadges = () => {};
 let currentRole = null;
-let paymentsCache = [];
-let paymentsFiltered = [];
+// Server-side pagination: the database returns one page of payments at a time
+// (get_admin_payments_page), already filtered by status / reservation and
+// searched. The browser never holds the full payment list. paymentsCache is
+// only the payments on the CURRENT page; every lookup map below (reservations,
+// receipts, summaries, ...) is likewise built just for that page's ids.
+const PAYMENTS_PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
+// The columns the review modal / record-payment flow read from a payment.
+const PAYMENT_COLUMNS = `
+  payment_id,
+  reservation_id,
+  reschedule_request_id,
+  extension_id,
+  additional_head_request_id,
+  payment_type,
+  payment_method,
+  payment_method_id,
+  payment_method_label,
+  payment_source,
+  amount,
+  payment_status,
+  reference_number,
+  payment_date,
+  notes,
+  proof_url,
+  cash_payment_date,
+  actual_payment_date,
+  submitted_at,
+  verified_at,
+  ocr_extracted
+`;
+let paymentsCache = [];          // payments on the current page
+let pinnedPayment = null;        // the payment open in the review modal, when it is not on the current page
+let paymentsTotal = 0;           // payments matching the current status / search / reservation filter
 let paymentsCurrentPage = 1;
+let activeSearch = '';           // the search term currently applied
+let latestRequestId = 0;         // lets a newer request supersede an older one
+let searchDebounceTimer = null;
 let reservationMap = {};
 let receiptMap = {};
 let rescheduleRequestMap = {};
@@ -428,53 +463,13 @@ function clampPaymentProofZoom(nextZoom) {
   return Math.max(PAYMENT_PROOF_MIN_ZOOM, Math.min(PAYMENT_PROOF_MAX_ZOOM, nextZoom));
 }
 
-function renderStats(list) {
-  const counts = {
-    pending_review: 0,
-    approved: 0,
-    rejected: 0,
-    total: list.length
-  };
-
-  list.forEach((payment) => {
-    const key = String(payment.payment_status || '').toLowerCase();
-    if (counts[key] !== undefined) counts[key] += 1;
-  });
-
-  document.getElementById('stat-pending').textContent = counts.pending_review;
-  document.getElementById('stat-approved').textContent = counts.approved;
-  document.getElementById('stat-rejected').textContent = counts.rejected;
-  document.getElementById('stat-total').textContent = counts.total;
-  
-}
-
-function matchesSearch(payment, term) {
-  if (!term) return true;
-  const reservation = getReservation(payment.reservation_id);
-  const haystacks = [
-    reservation?.reservation_number,
-    reservation?.contact_name,
-    reservation?.contact_email,
-    reservation?.package?.package_name,
-    reservation?.event_time,
-    payment.payment_method,
-    payment.payment_method_label,
-    getPaymentMethodLabel(payment.payment_method),
-    getPaymentTypeLabel(payment.payment_type),
-    payment.reference_number
-  ].filter(Boolean).map((value) => String(value).toLowerCase());
-
-  return haystacks.some((value) => value.includes(term));
-}
-
-function matchesStatus(payment, status) {
-  if (status === 'all') return true;
-  return String(payment.payment_status || '').toLowerCase() === status;
-}
-
-function matchesReservationFilter(payment) {
-  if (!reservationFilterParam) return true;
-  return String(payment.reservation_id) === String(reservationFilterParam);
+// The four stat cards. They describe ALL payments, never the current filter.
+function renderStats(counts) {
+  const safe = counts || {};
+  document.getElementById('stat-pending').textContent = Number(safe.pending_review) || 0;
+  document.getElementById('stat-approved').textContent = Number(safe.approved) || 0;
+  document.getElementById('stat-rejected').textContent = Number(safe.rejected) || 0;
+  document.getElementById('stat-total').textContent = Number(safe.total) || 0;
 }
 
 function renderTable(list) {
@@ -538,45 +533,25 @@ function renderTable(list) {
   }).join('');
 }
 
-// resetPage=false is used after an auto-refresh so a Manager mid-way
-// through the list isn't yanked back to page 1 every time; the page is
-// clamped instead, in case the refreshed data has fewer pages than before.
-function filterAndRender({ resetPage = true } = {}) {
-  const term = String(searchInput?.value || '').trim().toLowerCase();
-  const status = statusDropdown?.value || 'all';
-  const filtered = paymentsCache.filter((payment) => (
-    matchesReservationFilter(payment)
-    && matchesStatus(payment, status)
-    && matchesSearch(payment, term)
-  ));
-  renderStats(paymentsCache);
-  paymentsFiltered = filtered;
-  if (resetPage) {
-    paymentsCurrentPage = 1;
-  } else {
-    paymentsCurrentPage = Math.min(paymentsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
-  }
-  renderPaymentsPage();
-  if (!filtered.length) {
+function renderPaymentsView() {
+  renderTable(paymentsCache);
+  renderPagination(paymentsPagination, {
+    totalItems: paymentsTotal,
+    currentPage: paymentsCurrentPage,
+    pageSize: PAYMENTS_PAGE_SIZE,
+    onPageChange: (page) => {
+      paymentsCurrentPage = page;
+      loadData({ withStats: false });
+    }
+  });
+
+  if (!paymentsTotal) {
     setMessage(tableMessage, 'No payment submissions match the current filter.');
   } else if (reservationFilterParam) {
     setMessage(tableMessage, 'Showing payment submissions for the selected reservation.');
   } else {
     setMessage(tableMessage, '');
   }
-}
-
-function renderPaymentsPage() {
-  renderTable(paginate(paymentsFiltered, paymentsCurrentPage, PAGE_SIZE));
-  renderPagination(paymentsPagination, {
-    totalItems: paymentsFiltered.length,
-    currentPage: paymentsCurrentPage,
-    pageSize: PAGE_SIZE,
-    onPageChange: (page) => {
-      paymentsCurrentPage = page;
-      renderPaymentsPage();
-    }
-  });
 }
 
 async function fetchReservationsForPayments(reservationIds) {
@@ -686,36 +661,60 @@ async function fetchAdditionalHeadRequests(requestIds) {
   }, {});
 }
 
-async function fetchPayments() {
-  const { data, error } = await supabase
-    .from('payment')
-    .select(`
-      payment_id,
-      reservation_id,
-      reschedule_request_id,
-      extension_id,
-      additional_head_request_id,
-      payment_type,
-      payment_method,
-      payment_method_id,
-      payment_method_label,
-      payment_source,
-      amount,
-      payment_status,
-      reference_number,
-      payment_date,
-      notes,
-      proof_url,
-      cash_payment_date,
-      actual_payment_date,
-      submitted_at,
-      verified_at,
-      ocr_extracted
-    `)
-    .order('submitted_at', { ascending: false });
+// One page of payments, already filtered by status / reservation and searched
+// in the database (get_admin_payments_page). Returns the same payment columns
+// the page used to select, so the rest of the page is unchanged.
+async function fetchPaymentsPage(page, { status, search }) {
+  const { from } = getPageRange(page, PAYMENTS_PAGE_SIZE);
+  const { data, error } = await supabase.rpc('get_admin_payments_page', {
+    p_status: status,
+    p_search: search || null,
+    p_reservation_id: reservationFilterParam || null,
+    p_limit: PAYMENTS_PAGE_SIZE,
+    p_offset: from
+  });
 
   if (error) throw error;
-  return data || [];
+
+  return {
+    total: Number(data?.total) || 0,
+    rows: Array.isArray(data?.rows) ? data.rows : []
+  };
+}
+
+// If the requested page no longer exists (payments were removed or the filter
+// changed, so there are fewer pages now), fall back to the last page that does
+// exist instead of showing an empty table.
+async function fetchPageWithClamp(page, filters) {
+  let result = await fetchPaymentsPage(page, filters);
+  const lastPage = getTotalPages(result.total, PAYMENTS_PAGE_SIZE);
+
+  if (page > lastPage) {
+    page = lastPage;
+    result = await fetchPaymentsPage(page, filters);
+  }
+
+  return { ...result, page };
+}
+
+async function fetchPaymentCounts() {
+  const { data, error } = await supabase.rpc('get_admin_payment_counts');
+  if (error) throw error;
+  return data || {};
+}
+
+// A single payment by id: used to keep the review modal working for a payment
+// that has just moved off the current page (e.g. approved while the "Pending
+// Review" filter is on).
+async function fetchPaymentById(paymentId) {
+  const { data, error } = await supabase
+    .from('payment')
+    .select(PAYMENT_COLUMNS)
+    .eq('payment_id', paymentId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
 }
 
 async function fetchPaymentMethodsById(ids) {
@@ -732,7 +731,10 @@ async function fetchPaymentMethodsById(ids) {
 }
 
 function getPaymentById(paymentId) {
-  return paymentsCache.find((payment) => String(payment.payment_id) === String(paymentId)) || null;
+  const key = String(paymentId);
+  const onPage = paymentsCache.find((payment) => String(payment.payment_id) === key);
+  if (onPage) return onPage;
+  return pinnedPayment && String(pinnedPayment.payment_id) === key ? pinnedPayment : null;
 }
 
 // ── OCR helpers ─────────────────────────────────────────────────────────────
@@ -1460,37 +1462,68 @@ function wireRecordPaymentModal() {
 // open payment review modal (a background refresh must not disturb a
 // Manager mid-review, e.g. typing a rejection reason), and on failure keeps
 // the last-good data and fails quietly instead of blanking the table.
-async function loadData({ silent = false } = {}) {
+// withStats=false is used for page changes, searches and filter changes,
+// which don't affect the stat cards or the sidebar badge, so only the page
+// itself is fetched.
+// Every call takes a request id; if a newer call starts before this one
+// finishes, this one's result is discarded so a slow, older response can
+// never overwrite a newer one.
+async function loadData({ silent = false, withStats = true } = {}) {
+  const requestId = ++latestRequestId;
+
   if (!silent) {
     setMessage(tableMessage, 'Loading payment submissions...');
   }
   try {
-    paymentsCache = await fetchPayments();
-    reservationMap = await fetchReservationsForPayments(
-      Array.from(new Set(paymentsCache.map((payment) => payment.reservation_id).filter(Boolean)))
-    );
-    receiptMap = await fetchReceipts(
-      Array.from(new Set(paymentsCache.map((payment) => payment.payment_id).filter(Boolean)))
-    );
-    rescheduleRequestMap = await fetchRescheduleRequests(
-      Array.from(new Set(paymentsCache.map((payment) => payment.reschedule_request_id).filter(Boolean)))
-    );
-    extensionRequestMap = await fetchExtensionRequests(
-      Array.from(new Set(paymentsCache.map((payment) => payment.extension_id).filter(Boolean)))
-    );
-    additionalHeadRequestMap = await fetchAdditionalHeadRequests(
-      Array.from(new Set(paymentsCache.map((payment) => payment.additional_head_request_id).filter(Boolean)))
-    );
-    paymentSummaryMap = await fetchPaymentSummaries(
-      Array.from(new Set(paymentsCache.map((payment) => payment.reservation_id).filter(Boolean)))
-    );
-    paymentMethodMap = await fetchPaymentMethodsById(
-      Array.from(new Set(paymentsCache.map((payment) => payment.payment_method_id).filter(Boolean)))
-    );
+    const status = statusDropdown?.value || 'all';
+    const [result, counts] = await Promise.all([
+      fetchPageWithClamp(paymentsCurrentPage, { status, search: activeSearch }),
+      withStats ? fetchPaymentCounts() : Promise.resolve(null)
+    ]);
 
-    await refreshSidebarBadges();
+    // A payment whose review modal is open must stay available even when it
+    // is no longer on this page -- approving it while the "Pending Review"
+    // filter is on moves it off the filtered list, and the modal still has to
+    // show the result.
+    let pinned = null;
+    if (activePaymentReviewId
+      && !result.rows.some((payment) => String(payment.payment_id) === String(activePaymentReviewId))) {
+      pinned = await fetchPaymentById(activePaymentReviewId).catch(() => null);
+    }
 
-    filterAndRender({ resetPage: !silent });
+    // Everything the table and modals look up (reservation, receipt, ...) is
+    // fetched for just these rows, so each request lists at most a page's
+    // worth of ids.
+    const rows = pinned ? [...result.rows, pinned] : result.rows;
+    const idsOf = (key) => Array.from(new Set(rows.map((payment) => payment[key]).filter(Boolean)));
+
+    const nextReservationMap = await fetchReservationsForPayments(idsOf('reservation_id'));
+    const nextReceiptMap = await fetchReceipts(idsOf('payment_id'));
+    const nextRescheduleRequestMap = await fetchRescheduleRequests(idsOf('reschedule_request_id'));
+    const nextExtensionRequestMap = await fetchExtensionRequests(idsOf('extension_id'));
+    const nextAdditionalHeadRequestMap = await fetchAdditionalHeadRequests(idsOf('additional_head_request_id'));
+    const nextPaymentSummaryMap = await fetchPaymentSummaries(idsOf('reservation_id'));
+    const nextPaymentMethodMap = await fetchPaymentMethodsById(idsOf('payment_method_id'));
+
+    if (requestId !== latestRequestId) return;
+
+    paymentsCache = result.rows;
+    pinnedPayment = pinned;
+    paymentsTotal = result.total;
+    paymentsCurrentPage = result.page;
+    reservationMap = nextReservationMap;
+    receiptMap = nextReceiptMap;
+    rescheduleRequestMap = nextRescheduleRequestMap;
+    extensionRequestMap = nextExtensionRequestMap;
+    additionalHeadRequestMap = nextAdditionalHeadRequestMap;
+    paymentSummaryMap = nextPaymentSummaryMap;
+    paymentMethodMap = nextPaymentMethodMap;
+
+    if (counts) {
+      renderStats(counts);
+    }
+
+    renderPaymentsView();
     if (!silent && activePaymentReviewId) {
       if (getPaymentById(activePaymentReviewId)) {
         renderPaymentReviewModal(activePaymentReviewId);
@@ -1498,20 +1531,53 @@ async function loadData({ silent = false } = {}) {
         closeDetailsModal();
       }
     }
+
+    if (withStats) {
+      await refreshSidebarBadges();
+    }
   } catch (error) {
+    if (requestId !== latestRequestId) return;
+
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded payments:', error.message);
       return;
     }
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
-    await refreshSidebarBadges();
+    if (withStats) {
+      await refreshSidebarBadges();
+    }
     renderTable([]);
+    renderPagination(paymentsPagination, {
+      totalItems: 0,
+      currentPage: 1,
+      pageSize: PAYMENTS_PAGE_SIZE,
+      onPageChange: () => {}
+    });
   }
 }
 
+// Search runs in the database, so wait for a short pause in typing instead of
+// sending a request on every keystroke. A new search always starts at page 1.
+function handleSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const nextSearch = String(searchInput?.value || '').trim();
+    if (nextSearch === activeSearch) return;
+
+    activeSearch = nextSearch;
+    paymentsCurrentPage = 1;
+    loadData({ withStats: false });
+  }, SEARCH_DEBOUNCE_MS);
+}
+
+function handleStatusChange() {
+  paymentsCurrentPage = 1;
+  loadData({ withStats: false });
+}
+
 function wireFilters() {
-  searchInput?.addEventListener('input', filterAndRender);
-  statusDropdown?.addEventListener('change', filterAndRender);
+  searchInput?.addEventListener('input', handleSearchInput);
+  statusDropdown?.addEventListener('change', handleStatusChange);
 }
 
 function wireTableActions() {
