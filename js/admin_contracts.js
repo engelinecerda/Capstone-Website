@@ -6,7 +6,7 @@ import { initAdminSidebarBadges  } from './admin_sidebar_counts.js';
 import { initAdminNav } from './admin_nav.js';
 import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
-import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
+import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
@@ -42,10 +42,21 @@ const contractStatusRows = document.getElementById('contractStatusRows');
 const contractDetailsMessage = document.getElementById('contractDetailsMessage');
 const contractFooterActions = document.getElementById('contractFooterActions');
 
-let contractsCache = [];
-let contractsFiltered = [];
+// Server-side pagination: the database returns one page of contracts at a time
+// (get_admin_contracts_page), already filtered by status and search, and the
+// stat-card / chip counts come from get_admin_contract_counts(). The browser
+// never holds the full contract list.
+const CONTRACTS_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
+
+let visibleContracts = [];        // the rows of the page on screen
 let contractsCurrentPage = 1;
-let allReservationsCount = 0;
+let contractsTotal = 0;           // contracts matching the active filters
+let contractsOverallTotal = 0;    // all contracts with a file (ignores filters)
+let activeSearch = '';            // the search term currently applied
+let latestRequestId = 0;          // lets a newer request supersede an older one
+let searchDebounceTimer = null;
+let activeReservationRecord = null; // the open review window's contract when it is not on the page on screen
 let activeContractReservationId = null;
 let contractDetailsFlash = null;
 let refreshSidebarBadges = () => {};
@@ -172,12 +183,6 @@ function dlRow(label, value, options = {}) {
   `;
 }
 
-function isMissingColumnError(error, columnName) {
-  const message = error?.message || '';
-  return message.includes(`Could not find the '${columnName}' column`)
-    || message.includes(`column reservation_contracts.${columnName} does not exist`);
-}
-
 function formatReservationStatus(status) {
   const normalizedKey = String(status || 'pending').toLowerCase();
   const key = normalizedKey === 'confirmed' ? 'approved' : normalizedKey;
@@ -266,48 +271,29 @@ function getReservationApprovalState(reservation) {
   return { canApprove: true, reason: '' };
 }
 
-function getContractActivityDate(reservation) {
-  const contract = reservation?.contracts?.[0] || null;
-  return contract?.reviewed_at
-    || contract?.verified_date
-    || reservation?.created_at
-    || 0;
-}
-
 function getReservationById(reservationId) {
-  return contractsCache.find((reservation) => String(reservation.reservation_id) === String(reservationId)) || null;
+  const match = (reservation) => String(reservation?.reservation_id) === String(reservationId);
+  return visibleContracts.find(match)
+    || (match(activeReservationRecord) ? activeReservationRecord : null);
 }
 
-function getContractCounts(list) {
-  return list.reduce((counts, reservation) => {
-    const key = getContractReviewMeta(reservation).key;
-    counts.total += 1;
-    if (key === 'approved') {
-      counts.approved += 1;
-    } else {
-      counts.pending += 1;
-    }
-    return counts;
-  }, {
-    total: 0,
-    pending: 0,
-    approved: 0
-  });
-}
+function renderStats(counts) {
+  const safeCounts = {
+    total: Number(counts?.total) || 0,
+    pending: Number(counts?.pending) || 0,
+    approved: Number(counts?.approved) || 0
+  };
 
-function renderStats(list) {
-  const counts = getContractCounts(list);
-
-  if (statPendingContracts) statPendingContracts.textContent = String(counts.pending);
-  if (statVerifiedContracts) statVerifiedContracts.textContent = String(counts.approved);
-  if (statTotalContracts) statTotalContracts.textContent = String(counts.total);
+  if (statPendingContracts) statPendingContracts.textContent = String(safeCounts.pending);
+  if (statVerifiedContracts) statVerifiedContracts.textContent = String(safeCounts.approved);
+  if (statTotalContracts) statTotalContracts.textContent = String(safeCounts.total);
 
   if (!chipsRow) return;
 
   const chipCounts = {
-    all: counts.total,
-    pending: counts.pending,
-    approved: counts.approved
+    all: safeCounts.total,
+    pending: safeCounts.pending,
+    approved: safeCounts.approved
   };
 
   chipsRow.querySelectorAll('.chip').forEach((chip) => {
@@ -315,32 +301,6 @@ function renderStats(list) {
     const label = chip.textContent.split(' (')[0];
     chip.textContent = `${label} (${chipCounts[status] || 0})`;
   });
-}
-
-function matchesSearch(reservation, term) {
-  if (!term) return true;
-  const contract = getContractReviewMeta(reservation);
-  const haystacks = [
-    reservation.contact_name,
-    reservation.contact_email,
-    reservation.package?.package_name,
-    reservation.event_type,
-    reservation.venue_location,
-    reservation.reservation_number,
-    contract.note,
-    contract.label
-  ]
-    .filter(Boolean)
-    .map((value) => String(value).toLowerCase());
-
-  return haystacks.some((value) => value.includes(term));
-}
-
-function matchesStatus(reservation, status) {
-  if (status === 'all') return true;
-  const key = getContractReviewMeta(reservation).key;
-  if (status === 'pending') return key !== 'approved';
-  return key === status;
 }
 
 function renderTable(list) {
@@ -417,120 +377,124 @@ function syncActiveChip() {
   });
 }
 
-function filterAndRender({ resetPage = true } = {}) {
-  const term = String(searchInput?.value || '').trim().toLowerCase();
-  const status = statusDropdown?.value || 'all';
-  const filtered = contractsCache.filter((reservation) => (
-    matchesSearch(reservation, term)
-    && matchesStatus(reservation, status)
-  ));
+function getActiveStatus() {
+  return statusDropdown?.value || 'all';
+}
 
+function getEmptyMessage() {
+  if (!contractsOverallTotal) return 'No submitted contracts are available yet.';
+  return 'No submitted contracts matched the current filter.';
+}
+
+function renderContractsView() {
   syncActiveChip();
-  renderStats(contractsCache);
-  contractsFiltered = filtered;
-  if (resetPage) {
-    contractsCurrentPage = 1;
-  } else {
-    contractsCurrentPage = Math.min(contractsCurrentPage, getTotalPages(filtered.length, PAGE_SIZE));
-  }
-  renderContractsPage();
+  renderTable(visibleContracts);
+  renderPagination(contractsPagination, {
+    totalItems: contractsTotal,
+    currentPage: contractsCurrentPage,
+    pageSize: CONTRACTS_PAGE_SIZE,
+    onPageChange: (page) => {
+      contractsCurrentPage = page;
+      loadData({ full: false });
+    }
+  });
 
-  if (!contractsCache.length) {
-    setMessage(tableMessage, 'No submitted contracts are available yet.');
-  } else if (!filtered.length) {
-    setMessage(tableMessage, 'No submitted contracts matched the current filter.');
+  if (!contractsTotal) {
+    setMessage(tableMessage, getEmptyMessage());
   } else {
     setMessage(
       tableMessage,
-      `Showing ${filtered.length} of ${contractsCache.length} submitted contract(s).`
+      `Showing ${contractsTotal} of ${contractsOverallTotal} submitted contract(s).`
     );
   }
 }
 
-function renderContractsPage() {
-  renderTable(paginate(contractsFiltered, contractsCurrentPage, PAGE_SIZE));
-  renderPagination(contractsPagination, {
-    totalItems: contractsFiltered.length,
-    currentPage: contractsCurrentPage,
-    pageSize: PAGE_SIZE,
-    onPageChange: (page) => {
-      contractsCurrentPage = page;
-      renderContractsPage();
-    }
+// One page of contracts (already filtered by status / search in the
+// database), each row carrying its contract record. The RPC takes
+// limit/offset, which is the same window .range(from, to) would select.
+// Shaped here to what the rest of this file expects: the package as
+// { package_name } and the contract as a one-item contracts array.
+function shapeContractRow(row) {
+  const { package_name: packageName, contract, ...reservation } = row;
+  return {
+    ...reservation,
+    package: packageName ? { package_name: packageName } : null,
+    contracts: contract ? [contract] : []
+  };
+}
+
+async function fetchContractsPage(page, { status, search }) {
+  const { from } = getPageRange(page, CONTRACTS_PAGE_SIZE);
+  const { data, error } = await supabase.rpc('get_admin_contracts_page', {
+    p_status: status,
+    p_search: search || null,
+    p_reservation_id: null,
+    p_limit: CONTRACTS_PAGE_SIZE,
+    p_offset: from
   });
-}
-
-async function fetchReservationContracts(reservationIds) {
-  if (!reservationIds.length) return [];
-
-  const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
-  const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
-
-  const { data, error } = await supabase
-    .from('reservation_contracts')
-    .select(extendedSelect)
-    .in('reservation_id', reservationIds);
-
-  if (!error) {
-    return data || [];
-  }
-
-  if (
-    isMissingColumnError(error, 'review_status')
-    || isMissingColumnError(error, 'review_notes')
-    || isMissingColumnError(error, 'reviewed_at')
-  ) {
-    const fallback = await supabase
-      .from('reservation_contracts')
-      .select(fallbackSelect)
-      .in('reservation_id', reservationIds);
-
-    if (fallback.error) throw fallback.error;
-    return fallback.data || [];
-  }
-
-  throw error;
-}
-
-async function fetchReservations() {
-  const { data: reservations, error } = await supabase
-    .from('reservations')
-    .select(`
-      reservation_id,
-      reservation_number,
-      contact_name,
-      contact_email,
-      contact_phone,
-      status,
-      event_type,
-      event_date,
-      event_time,
-      guest_count,
-      location_type,
-      venue_location,
-      total_price,
-      created_at,
-      package:package_id ( package_name )
-    `)
-    .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  const list = reservations || [];
-  const reservationIds = list.map((reservation) => reservation.reservation_id).filter(Boolean);
-  const contracts = await fetchReservationContracts(reservationIds);
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  return {
+    total: Number(data?.total) || 0,
+    rows: rows.map(shapeContractRow)
+  };
+}
 
-  const contractsByReservationId = (contracts || []).reduce((map, contract) => {
-    map[contract.reservation_id] = contract;
-    return map;
-  }, {});
+// If the requested page no longer exists (contracts were removed or changed
+// status since the last load, so there are fewer pages now), fall back to the
+// last page that does exist instead of showing an empty table.
+async function fetchPageWithClamp(page, filters) {
+  let result = await fetchContractsPage(page, filters);
+  const lastPage = getTotalPages(result.total, CONTRACTS_PAGE_SIZE);
 
-  return list.map((reservation) => ({
-    ...reservation,
-    contracts: contractsByReservationId[reservation.reservation_id]
-      ? [contractsByReservationId[reservation.reservation_id]]
-      : []
-  }));
+  if (page > lastPage) {
+    page = lastPage;
+    result = await fetchContractsPage(page, filters);
+  }
+
+  return { ...result, page };
+}
+
+// One contract by reservation id, whatever the filters or page on screen.
+// Used for the "?reservation=<id>" deep link and to keep the review window
+// open after an action moves its contract off the page on screen.
+async function fetchContractByReservationId(reservationId) {
+  const { data, error } = await supabase.rpc('get_admin_contracts_page', {
+    p_status: 'all',
+    p_search: null,
+    p_reservation_id: reservationId,
+    p_limit: 1,
+    p_offset: 0
+  });
+
+  if (error) throw error;
+
+  const row = Array.isArray(data?.rows) ? data.rows[0] : null;
+  return row ? shapeContractRow(row) : null;
+}
+
+// Makes sure the contract for the review window is available: from the page
+// on screen if it is there, otherwise fetched on its own.
+async function ensureReservationLoaded(reservationId) {
+  if (!reservationId) return null;
+
+  if (visibleContracts.some((reservation) => String(reservation.reservation_id) === String(reservationId))) {
+    activeReservationRecord = null;
+    return getReservationById(reservationId);
+  }
+
+  activeReservationRecord = await fetchContractByReservationId(reservationId);
+  return getReservationById(reservationId);
+}
+
+// Stat cards and status chips. They describe ALL contracts, never the current
+// search or page.
+async function fetchContractCounts() {
+  const { data, error } = await supabase.rpc('get_admin_contract_counts');
+  if (error) throw error;
+  return data || {};
 }
 
 async function logReservationStatusChange(reservationId, previousStatus, newStatus) {
@@ -623,6 +587,7 @@ function setContractDetailsMessage(message = '', isError = false) {
 
 function closeContractDetailsModal() {
   activeContractReservationId = null;
+  activeReservationRecord = null;
   contractDetailsFlash = null;
   contractDetailsModal?.classList.add('hidden');
   contractDetailsModal?.setAttribute('aria-hidden', 'true');
@@ -815,23 +780,53 @@ async function performContractAction(action, button) {
   return { message: '' };
 }
 
-async function loadData({ silent = false } = {}) {
+// silent=true is used by the auto-refresh trigger: it skips the "Loading..."
+// message so existing rows stay on screen, and on failure it keeps the
+// last-good data and fails quietly instead of blanking the table.
+// full=false is used for page changes, searches and filter changes, which
+// don't affect the stat cards or chips, so only the page itself is fetched.
+// Every call takes a request id; if a newer call starts before this one
+// finishes, this one's result is discarded so a slow, older response can
+// never overwrite a newer one.
+async function loadData({ silent = false, full = true } = {}) {
+  const requestId = ++latestRequestId;
+
   if (!silent) {
     setMessage(tableMessage, 'Loading contracts...');
   }
 
   try {
-    const reservations = await fetchReservations();
-    allReservationsCount = reservations.length;
-    await refreshSidebarBadges();
+    const [pageResult, counts] = await Promise.all([
+      fetchPageWithClamp(contractsCurrentPage, { status: getActiveStatus(), search: activeSearch }),
+      full ? fetchContractCounts() : Promise.resolve(null)
+    ]);
+    if (requestId !== latestRequestId) return;
 
-    contractsCache = reservations
-      .filter((reservation) => getContractReviewMeta(reservation).hasFile)
-      .sort((left, right) => new Date(getContractActivityDate(right)) - new Date(getContractActivityDate(left)));
+    if (full) {
+      await refreshSidebarBadges();
+      if (requestId !== latestRequestId) return;
+    }
 
-    filterAndRender({ resetPage: !silent });
+    contractsCurrentPage = pageResult.page;
+    contractsTotal = pageResult.total;
+    visibleContracts = pageResult.rows;
 
-     if (!silent && activeContractReservationId) {
+    if (counts) {
+      contractsOverallTotal = Number(counts.total) || 0;
+      renderStats(counts);
+    }
+
+    // Keep the open review window current. Its contract may have moved off
+    // the page on screen (e.g. verified while the Pending filter is on), so
+    // it is fetched on its own when needed.
+    if (!silent && activeContractReservationId) {
+      await ensureReservationLoaded(activeContractReservationId);
+      if (requestId !== latestRequestId) return;
+    }
+
+    renderContractsView();
+
+    if (!silent && activeContractReservationId) {
       if (getReservationById(activeContractReservationId)) {
         renderContractDetailsModal(activeContractReservationId);
       } else {
@@ -839,25 +834,60 @@ async function loadData({ silent = false } = {}) {
       }
     }
   } catch (error) {
+    if (requestId !== latestRequestId) return;
+
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded contracts:', error.message);
       return;
     }
     setMessage(tableMessage, `Failed to load contracts: ${error.message}`, true);
-    await refreshSidebarBadges().catch(() => {});
-    renderStats([]);
+    if (full) {
+      await refreshSidebarBadges().catch(() => {});
+    }
+    contractsTotal = 0;
+    visibleContracts = [];
+    renderStats(null);
     renderTable([]);
+    renderPagination(contractsPagination, {
+      totalItems: 0,
+      currentPage: 1,
+      pageSize: CONTRACTS_PAGE_SIZE,
+      onPageChange: () => {}
+    });
   }
 }
 
+// A changed filter or search always starts again from page 1.
+function reloadFromFirstPage() {
+  contractsCurrentPage = 1;
+  loadData({ full: false });
+}
+
+// Search runs in the database, so wait for a short pause in typing instead of
+// sending a request on every keystroke.
+function handleSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const nextSearch = String(searchInput?.value || '').trim();
+    if (nextSearch === activeSearch) return;
+
+    activeSearch = nextSearch;
+    reloadFromFirstPage();
+  }, SEARCH_DEBOUNCE_MS);
+}
+
 function wireFilters() {
-  searchInput?.addEventListener('input', filterAndRender);
-  statusDropdown?.addEventListener('change', filterAndRender);
+  searchInput?.addEventListener('input', handleSearchInput);
+  statusDropdown?.addEventListener('change', () => {
+    syncActiveChip();
+    reloadFromFirstPage();
+  });
   chipsRow?.addEventListener('click', (event) => {
     const button = event.target.closest('.chip');
     if (!button) return;
     statusDropdown.value = button.dataset.status || 'all';
-    filterAndRender();
+    syncActiveChip();
+    reloadFromFirstPage();
   });
 }
 
@@ -934,9 +964,17 @@ validateAdminSession({
     
     await loadData();
 
+    // Deep link (?reservation=<id>): the contract may not be on the first
+    // page, so it is looked up on its own.
     const requestedReservationId = new URLSearchParams(window.location.search).get('reservation');
-    if (requestedReservationId && getReservationById(requestedReservationId)) {
-      openContractDetailsModal(requestedReservationId);
+    if (requestedReservationId) {
+      try {
+        if (await ensureReservationLoaded(requestedReservationId)) {
+          openContractDetailsModal(requestedReservationId);
+        }
+      } catch (error) {
+        console.warn('Could not open the requested contract:', error.message);
+      }
     }
   }
 });
