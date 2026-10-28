@@ -718,24 +718,28 @@
 }
 
 /* "Review anonymously" switch inside the write / edit review modals.
-   Reuses the .reviews-toggle switch; this just lays out the two-line label. */
+   Sits in a soft card (same look as the reservation summary above it) and
+   reuses the standard-size .reviews-toggle switch, with a bold title and a
+   short hint beside it. */
 .review-anon-toggle {
-    position: relative;
+    display: flex;
     align-items: flex-start;
     gap: 14px;
-    padding: 14px 16px;
-    border: 1px solid #e6d5c3;
-    border-radius: 14px;
-    background: #fffaf4;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid #eadbcf;
+    background: linear-gradient(135deg, #fff8f0 0%, #fffdf9 100%);
 }
 
 .review-anon-toggle .reviews-toggle__slider {
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .review-anon-toggle__text {
     display: grid;
-    gap: 3px;
+    gap: 4px;
 }
 
 .review-anon-toggle__title {
@@ -745,9 +749,47 @@
 }
 
 .review-anon-toggle__hint {
-    font-size: 12px;
+    font-size: 12.5px;
     line-height: 1.5;
-    color: #74655b;
+    color: #7a6b60;
+}
+
+/* "My Reviews" chip in the filter bar */
+.reviews-mine-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    border: 1px solid var(--brown-mid, #6B3820);
+    background: #fff;
+    color: var(--brown-primary, #3D1A0A);
+    padding: 7px 14px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.reviews-mine-btn[hidden] {
+    display: none;
+}
+
+.reviews-mine-btn:hover {
+    background: var(--cream-dark, #F2EBE0);
+}
+
+.reviews-mine-btn.is-active {
+    background: var(--brown-primary, #3D1A0A);
+    border-color: var(--brown-primary, #3D1A0A);
+    color: #fff;
+}
+
+.reviews-mine-btn__count {
+    font-weight: 500;
+    opacity: 0.8;
 }
 
 .review-edit-note {
@@ -760,4 +802,3 @@
     font-style: italic;
     word-break: break-word;
 }
-

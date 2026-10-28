@@ -1,5 +1,5 @@
 /* admin_reviews.css */
-@import url('./admin_customers.css?v=57');
+@import url('./admin_customers.css?v=58');
 
 /* Marks a review the customer chose to post anonymously. Admins/managers still
    see the real name above it; the public Reviews page does not. */

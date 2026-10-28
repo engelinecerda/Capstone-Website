@@ -16,6 +16,7 @@ const REVIEWS_PER_PAGE = 10;
 let showRatingOnly = false;
 let allReviews = [];
 let currentFilter = 'all';
+let mineOnly = false; // "My Reviews" chip: show only the signed-in customer's reviews
 let currentSort = 'newest';
 let visibleCount = REVIEWS_PER_PAGE;
 
@@ -153,6 +154,22 @@ function escapeHtml(str) {
 /* ============================================================
    RENDER LIST
 ============================================================ */
+// Shows the "My Reviews" chip only for a signed-in customer who has at least
+// one public review; is_mine comes from the database (get_public_reviews).
+function updateMyReviewsButton() {
+    const btn = document.getElementById('myReviewsBtn');
+    if (!btn) return;
+
+    const count = allReviews.filter(r => r.is_mine).length;
+    if (count === 0) mineOnly = false;
+
+    btn.hidden = count === 0;
+    btn.classList.toggle('is-active', mineOnly);
+    btn.setAttribute('aria-pressed', String(mineOnly));
+    const countEl = document.getElementById('myReviewsCount');
+    if (countEl) countEl.textContent = count > 0 ? `(${count})` : '';
+}
+
 function renderReviews() {
     const list            = document.getElementById('reviewsList');
     const empty           = document.getElementById('reviewsEmpty');
@@ -160,9 +177,15 @@ function renderReviews() {
     const loadMoreBtn     = document.getElementById('loadMoreBtn');
     const countText       = document.getElementById('reviewsCountText');
 
-    let filtered = showRatingOnly
-        ? [...allReviews]
-        : allReviews.filter(r => r.comment && r.comment.trim().length > 0);
+    updateMyReviewsButton();
+
+    // "My Reviews" ignores the rating-only toggle so the customer always sees
+    // every review they posted, including ones without a comment.
+    let filtered = mineOnly
+        ? allReviews.filter(r => r.is_mine)
+        : showRatingOnly
+            ? [...allReviews]
+            : allReviews.filter(r => r.comment && r.comment.trim().length > 0);
 
     if (currentFilter !== 'all') {
         filtered = filtered.filter(r => r.rating === Number(currentFilter));
@@ -178,6 +201,14 @@ function renderReviews() {
     const totalFiltered = filtered.length;
 
     if (totalFiltered === 0) {
+        const emptyTitle = document.getElementById('reviewsEmptyTitle');
+        const emptyCopy  = document.getElementById('reviewsEmptyCopy');
+        if (emptyTitle && emptyCopy) {
+            emptyTitle.textContent = mineOnly ? 'No reviews to show' : 'No reviews yet';
+            emptyCopy.textContent  = mineOnly
+                ? 'None of your reviews match this star filter. Try "All".'
+                : 'Be the first to share your experience after your reservation!';
+        }
         list.innerHTML = '';
         empty.hidden = false;
         loadMoreWrapper.hidden = true;
@@ -785,6 +816,12 @@ function setupListeners() {
             visibleCount  = REVIEWS_PER_PAGE;
             renderReviews();
         });
+    });
+
+    document.getElementById('myReviewsBtn')?.addEventListener('click', () => {
+        mineOnly     = !mineOnly;
+        visibleCount = REVIEWS_PER_PAGE;
+        renderReviews();
     });
 
     document.getElementById('sortReviews').addEventListener('change', e => {
