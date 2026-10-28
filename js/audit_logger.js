@@ -43,7 +43,7 @@ export async function logAudit({ action, category, details, entityId }) {
     // already succeeded or failed on its own terms and reports that
     // itself — the user shouldn't be interrupted over an audit-trail
     // write failing.
-    await supabase.from('audit_log').insert({
+    const { error } = await supabase.from('audit_log').insert({
       user_id:   userId,
       user_name: userName,
       user_role: userRole,
@@ -52,7 +52,16 @@ export async function logAudit({ action, category, details, entityId }) {
       details:   details || null,
       entity_id: entityId || null,
     });
+
+    // Supabase reports a rejected insert (row-level security, a constraint,
+    // a bad column value) as a returned error, not a thrown one, so it used
+    // to vanish without a trace. Still never interrupt the caller — just
+    // leave a message in the browser console (DevTools -> Console).
+    if (error) {
+      console.error(`[audit] Could not save audit entry "${action}":`, error.message || error, error);
+    }
   } catch (err) {
-    // same reasoning — swallow, don't interrupt the caller's own flow.
+    // same reasoning — don't interrupt the caller's own flow, but leave a trace.
+    console.error(`[audit] Could not save audit entry "${action}":`, err);
   }
 }
