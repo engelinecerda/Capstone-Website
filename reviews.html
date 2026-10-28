@@ -10,12 +10,12 @@
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-    <link rel="stylesheet" href="/css/tabler-icons-local.css?v=56">
-    <link rel="stylesheet" href="/css/styles.css?v=56">
-    <link rel="stylesheet" href="/css/reviews.css?v=56">
-    <link rel="stylesheet" href="/css/home.css?v=56">
-    <link rel="stylesheet" href="/css/account.css?v=56">
-    <link rel="stylesheet" href="/css/announcement_banner.css?v=56">
+    <link rel="stylesheet" href="/css/tabler-icons-local.css?v=57">
+    <link rel="stylesheet" href="/css/styles.css?v=57">
+    <link rel="stylesheet" href="/css/reviews.css?v=57">
+    <link rel="stylesheet" href="/css/home.css?v=57">
+    <link rel="stylesheet" href="/css/account.css?v=57">
+    <link rel="stylesheet" href="/css/announcement_banner.css?v=57">
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -265,6 +265,15 @@
                     <span class="review-field-label">Comment</span>
                     <textarea id="review-prompt-comment" class="review-comment-input" rows="5" maxlength="800" placeholder="Optional: tell us what went well or what could be improved."></textarea>
                 </label>
+
+                <label class="reviews-toggle review-anon-toggle" for="review-prompt-anonymous">
+                    <input type="checkbox" id="review-prompt-anonymous">
+                    <span class="reviews-toggle__slider" aria-hidden="true"></span>
+                    <span class="review-anon-toggle__text">
+                        <span class="review-anon-toggle__title">Review anonymously</span>
+                        <span class="review-anon-toggle__hint">Your name is hidden from other guests. Our team can still see who wrote it.</span>
+                    </span>
+                </label>
             </div>
 
             <p class="account-modal-message" id="review-prompt-message"></p>
@@ -272,6 +281,37 @@
             <div class="account-modal-actions">
                 <button type="button" class="account-modal-btn secondary" id="review-prompt-back">Back</button>
                 <button type="button" class="account-modal-btn primary" id="review-prompt-submit">Submit Review</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT MY REVIEW MODAL (anonymity only) -->
+    <div class="account-modal-backdrop hidden" id="review-edit-backdrop" aria-hidden="true">
+        <div class="account-modal-card review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-edit-title">
+            <button type="button" class="account-modal-close" id="review-edit-close" aria-label="Close edit review">x</button>
+            <p class="account-modal-eyebrow">Your Review</p>
+            <h2 class="account-modal-title" id="review-edit-title">Edit Your Review</h2>
+            <p class="account-modal-copy">Choose whether your name is shown next to this review.</p>
+
+            <div class="review-reservation-summary" id="review-edit-summary"></div>
+
+            <div class="review-form-shell">
+                <label class="reviews-toggle review-anon-toggle" for="review-edit-anonymous">
+                    <input type="checkbox" id="review-edit-anonymous">
+                    <span class="reviews-toggle__slider" aria-hidden="true"></span>
+                    <span class="review-anon-toggle__text">
+                        <span class="review-anon-toggle__title">Review anonymously</span>
+                        <span class="review-anon-toggle__hint">Your name is hidden from other guests. Our team can still see who wrote it.</span>
+                    </span>
+                </label>
+                <p class="review-edit-note">Your rating and comment can't be changed after submitting.</p>
+            </div>
+
+            <p class="account-modal-message" id="review-edit-message"></p>
+
+            <div class="account-modal-actions">
+                <button type="button" class="account-modal-btn secondary" id="review-edit-cancel">Cancel</button>
+                <button type="button" class="account-modal-btn primary" id="review-edit-save">Save Changes</button>
             </div>
         </div>
     </div>

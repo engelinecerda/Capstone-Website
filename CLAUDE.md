@@ -130,6 +130,16 @@ This does **not** apply to `/js/*` — JS here is native ES modules with deep tr
 - `js/audit_logger.js` — call `logAudit(action, category, details)` to write to `audit_log` table
 - `js/super_admin_inactivity.js` — call `setupInactivityLogout(role)` on admin pages; only activates for `role === 'admin'`
 
+## Anonymous reviews
+
+A customer can tick "Review anonymously" when submitting a review, and can flip it later with the **Edit** button on their own cards on `reviews.html` (only anonymity is editable — rating and comment stay as written). Backed by `supabase/migrations/20261105_anonymous_reviews.sql`:
+- `reviews.is_anonymous boolean not null default false`.
+- `get_public_reviews()` (security definer, callable by `anon`) is what the public page loads. For an anonymous review it returns `first_name`/`last_name` as NULL and never returns `user_id`, so the name is stripped in the database, not just hidden in JS. It also returns `is_mine` (the caller's own rows) which drives the Edit button.
+- `set_review_anonymity(review_id, bool)` (security definer, `authenticated`) is the only way a customer can modify a review — no general UPDATE policy was added to `public.reviews`.
+- Admin/manager still see the real name in `admin/reviews.html` with an "Anonymous publicly" pill (`get_admin_reviews_page` now also returns `is_anonymous`).
+- `js/reviews.js` falls back to the old direct query only when `get_public_reviews` is missing (PGRST202/42883, i.e. migration not applied yet). Delete `fetchReviewsLegacy()` once the migration is live everywhere.
+- Check the live DB has no broad public SELECT policy on `reviews`/`profiles` names that bypasses the function (query in the migration header).
+
 ## Database Migrations
 
 Schema changes go in `supabase/migrations/` as dated SQL files. They are applied manually in the Supabase SQL Editor (not via CLI) since the project targets the hosted Supabase instance directly.

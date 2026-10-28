@@ -26,10 +26,46 @@ let eligibleReservations = [];
 let activeReviewReservation = null;
 let reviewPromptRatingValue = 0;
 
+// Edit-my-review flow: the review currently open in the edit modal.
+let editingReview = null;
+
 /* ============================================================
    FETCH REVIEWS
 ============================================================ */
+// Reads the public list through get_public_reviews() (supabase/migrations/
+// 20261105_anonymous_reviews.sql). The database blanks the reviewer's name
+// on anonymous reviews BEFORE the row reaches the browser, and flags the
+// signed-in customer's own reviews with is_mine so the Edit button can show.
 async function fetchReviews() {
+    const { data, error } = await supabase.rpc('get_public_reviews');
+
+    if (error) {
+        // Only fall back when the function simply isn't installed yet (the
+        // migration hasn't been run). Any other failure must NOT fall back:
+        // the legacy path below has no idea which reviews are anonymous.
+        const code = String(error.code || '');
+        if (code === 'PGRST202' || code === '42883') {
+            return fetchReviewsLegacy();
+        }
+        throw error;
+    }
+
+    return (data || []).map(r => ({
+        review_id:      r.review_id,
+        reservation_id: r.reservation_id,
+        rating:         r.rating,
+        comment:        r.comment,
+        created_at:     r.created_at,
+        is_anonymous:   !!r.is_anonymous,
+        is_mine:        !!r.is_mine,
+        profile:        r.is_anonymous ? null : { first_name: r.first_name, last_name: r.last_name },
+        packageName:    r.package_name || null,
+    }));
+}
+
+// Pre-migration path (no anonymous reviews can exist yet). Remove once
+// 20261105_anonymous_reviews.sql has been applied everywhere.
+async function fetchReviewsLegacy() {
     // Step 1: Get reviews
     const { data: reviews, error: reviewsError } = await supabase
         .from('reviews')
@@ -152,7 +188,8 @@ function renderReviews() {
     const visible = filtered.slice(0, visibleCount);
 
     list.innerHTML = visible.map(r => {
-        const name       = getDisplayName(r.profile);
+        const isAnon     = !!r.is_anonymous;
+        const name       = isAnon ? 'Anonymous' : getDisplayName(r.profile);
         const initials   = getInitials(name);
         const stars      = renderStars(r.rating);
         const date       = formatDate(r.created_at);
@@ -170,11 +207,25 @@ function renderReviews() {
             ? `<div class="review-card__package"><i class="ti ti-box"></i> ${escapeHtml(r.packageName)}</div>`
             : '';
 
+        const avatarHtml = isAnon
+            ? `<div class="review-card__avatar review-card__avatar--anon" title="Posted anonymously"><i class="ti ti-eye-off" aria-hidden="true"></i></div>`
+            : `<div class="review-card__avatar">${escapeHtml(initials)}</div>`;
+
+        // Only the signed-in author's own reviews get this row (is_mine is
+        // set by the database, not guessed here).
+        const ownHtml = r.is_mine
+            ? `
+                <div class="review-card__own">
+                    <span class="review-card__own-tag"><i class="ti ti-user" aria-hidden="true"></i> Your review${isAnon ? ' &middot; shown as Anonymous' : ''}</span>
+                    <button type="button" class="review-card__edit-btn" data-review-id="${escapeHtml(r.review_id)}"><i class="ti ti-pencil" aria-hidden="true"></i> Edit</button>
+                </div>`
+            : '';
+
         return `
             <article class="${cardClass}">
                 <div class="review-card__header">
                     <div class="review-card__user">
-                        <div class="review-card__avatar">${initials}</div>
+                        ${avatarHtml}
                         <div>
                             <div class="review-card__name">${escapeHtml(name)}</div>
                             <div class="review-card__date">${date}</div>
@@ -187,6 +238,7 @@ function renderReviews() {
                 ${packageHtml}
                 <p class="review-card__comment">${commentHtml}</p>
                 ${badgeHtml}
+                ${ownHtml}
             </article>
         `;
     }).join('');
@@ -444,6 +496,9 @@ function openReviewPromptModal(reservation) {
     const commentInput = document.getElementById('review-prompt-comment');
     if (commentInput) commentInput.value = '';
 
+    const anonymousInput = document.getElementById('review-prompt-anonymous');
+    if (anonymousInput) anonymousInput.checked = false;
+
     const meta = document.getElementById('review-prompt-reservation-meta');
     if (meta) {
         meta.innerHTML = `
@@ -469,11 +524,15 @@ function closeReviewPromptModal() {
     unlockBodyScroll();
 }
 
-function openSubmissionFeedbackModal() {
+function openSubmissionFeedbackModal({
+    eyebrow = 'Review Submitted',
+    title = 'Thank You for the Feedback',
+    copy = 'Your review has been saved to your completed reservation.'
+} = {}) {
     const backdrop = document.getElementById('submission-feedback-backdrop');
-    document.getElementById('submission-feedback-eyebrow').textContent = 'Review Submitted';
-    document.getElementById('submission-feedback-title').textContent = 'Thank You for the Feedback';
-    document.getElementById('submission-feedback-copy').textContent = 'Your review has been saved to your completed reservation.';
+    document.getElementById('submission-feedback-eyebrow').textContent = eyebrow;
+    document.getElementById('submission-feedback-title').textContent = title;
+    document.getElementById('submission-feedback-copy').textContent = copy;
     backdrop?.classList.remove('hidden');
     backdrop?.setAttribute('aria-hidden', 'false');
     lockBodyScroll();
@@ -484,6 +543,109 @@ function closeSubmissionFeedbackModal() {
     backdrop?.classList.add('hidden');
     backdrop?.setAttribute('aria-hidden', 'true');
     unlockBodyScroll();
+}
+
+async function refreshPublicReviews(reason) {
+    try {
+        const raw = await fetchReviews();
+        allReviews = raw.filter((r) => !shouldHideReview(r.comment).hide);
+        renderSummary();
+        renderReviews();
+    } catch (refreshError) {
+        console.error(`[reviews] failed to refresh reviews after ${reason}:`, refreshError);
+    }
+}
+
+/* ============================================================
+   EDIT MY REVIEW (anonymity only)
+============================================================ */
+function setReviewEditMessage(message, type = '') {
+    const messageEl = document.getElementById('review-edit-message');
+    if (!messageEl) return;
+    messageEl.textContent = message;
+    messageEl.classList.remove('error', 'success');
+    if (type) messageEl.classList.add(type);
+}
+
+function setReviewEditBusy(isBusy) {
+    ['review-edit-close', 'review-edit-cancel', 'review-edit-save', 'review-edit-anonymous'].forEach((id) => {
+        document.getElementById(id)?.toggleAttribute('disabled', isBusy);
+    });
+}
+
+function openReviewEditModal(review) {
+    editingReview = review;
+
+    setReviewEditBusy(false);
+    setReviewEditMessage('');
+
+    const toggle = document.getElementById('review-edit-anonymous');
+    if (toggle) toggle.checked = !!review.is_anonymous;
+
+    const hasComment = review.comment && review.comment.trim().length > 0;
+    const summary = document.getElementById('review-edit-summary');
+    if (summary) {
+        summary.innerHTML = `
+            <div class="review-reservation-title">${escapeHtml(review.packageName || 'Your review')}</div>
+            <div class="review-reservation-copy">${renderStars(review.rating)} &bull; ${escapeHtml(formatDate(review.created_at))}</div>
+            ${hasComment ? `<div class="review-reservation-copy review-edit-comment">&ldquo;${escapeHtml(review.comment)}&rdquo;</div>` : ''}
+        `;
+    }
+
+    const backdrop = document.getElementById('review-edit-backdrop');
+    backdrop?.classList.remove('hidden');
+    backdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
+}
+
+function closeReviewEditModal() {
+    editingReview = null;
+    setReviewEditBusy(false);
+    setReviewEditMessage('');
+    const backdrop = document.getElementById('review-edit-backdrop');
+    backdrop?.classList.add('hidden');
+    backdrop?.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
+}
+
+async function saveReviewEdit() {
+    const review = editingReview;
+    if (!review) return;
+
+    const makeAnonymous = !!document.getElementById('review-edit-anonymous')?.checked;
+
+    // Nothing changed: no need to call the server.
+    if (makeAnonymous === !!review.is_anonymous) {
+        closeReviewEditModal();
+        return;
+    }
+
+    try {
+        setReviewEditBusy(true);
+        setReviewEditMessage('Saving your changes...');
+
+        const { error } = await supabase.rpc('set_review_anonymity', {
+            p_review_id: review.review_id,
+            p_is_anonymous: makeAnonymous
+        });
+        if (error) throw error;
+
+        closeReviewEditModal();
+
+        openSubmissionFeedbackModal({
+            eyebrow: 'Review Updated',
+            title: makeAnonymous ? 'Your Review Is Now Anonymous' : 'Your Name Is Now Shown',
+            copy: makeAnonymous
+                ? 'Other guests will now see this review as Anonymous.'
+                : 'Your name will now appear next to this review.'
+        });
+
+        await refreshPublicReviews('edit');
+    } catch (error) {
+        setReviewEditBusy(false);
+        setReviewEditMessage('Failed to update your review. Please try again.', 'error');
+        console.error('[reviews] failed to update review anonymity:', error);
+    }
 }
 
 async function submitReservationReview() {
@@ -503,6 +665,7 @@ async function submitReservationReview() {
         setReviewPromptMessage('Submitting your review...');
 
         const comment = document.getElementById('review-prompt-comment')?.value.trim() || null;
+        const isAnonymous = !!document.getElementById('review-prompt-anonymous')?.checked;
 
         const { error } = await supabase
             .from('reviews')
@@ -510,7 +673,10 @@ async function submitReservationReview() {
                 reservation_id: reservation.reservation_id,
                 user_id: currentUser.id,
                 rating: reviewPromptRatingValue,
-                comment
+                comment,
+                // Only sent when ticked, so a normal (named) review still
+                // saves even if the is_anonymous column isn't there yet.
+                ...(isAnonymous ? { is_anonymous: true } : {})
             });
 
         if (error) throw error;
@@ -525,17 +691,12 @@ async function submitReservationReview() {
         );
         updateWriteReviewVisibility();
 
-        openSubmissionFeedbackModal();
+        openSubmissionFeedbackModal(isAnonymous ? {
+            copy: 'Your review has been saved and will appear as Anonymous.'
+        } : undefined);
 
         // Refresh the public list so the new review appears right away.
-        try {
-            const raw = await fetchReviews();
-            allReviews = raw.filter((r) => !shouldHideReview(r.comment).hide);
-            renderSummary();
-            renderReviews();
-        } catch (refreshError) {
-            console.error('[reviews] failed to refresh reviews after submit:', refreshError);
-        }
+        await refreshPublicReviews('submit');
     } catch (error) {
         setReviewPromptBusy(false);
         const message = String(error?.message || '');
@@ -590,6 +751,20 @@ function setupWriteReviewListeners() {
         setReviewPromptRating(starBtn.dataset.ratingValue);
     });
     document.getElementById('review-prompt-submit')?.addEventListener('click', submitReservationReview);
+
+    // Edit button on the signed-in customer's own review cards
+    document.getElementById('reviewsList')?.addEventListener('click', (event) => {
+        const editBtn = event.target.closest('.review-card__edit-btn');
+        if (!editBtn) return;
+        const review = allReviews.find((entry) => String(entry.review_id) === editBtn.dataset.reviewId);
+        if (review && review.is_mine) openReviewEditModal(review);
+    });
+    document.getElementById('review-edit-close')?.addEventListener('click', closeReviewEditModal);
+    document.getElementById('review-edit-cancel')?.addEventListener('click', closeReviewEditModal);
+    document.getElementById('review-edit-save')?.addEventListener('click', saveReviewEdit);
+    document.getElementById('review-edit-backdrop')?.addEventListener('click', (event) => {
+        if (event.target.id === 'review-edit-backdrop') closeReviewEditModal();
+    });
 
     document.getElementById('submission-feedback-close')?.addEventListener('click', closeSubmissionFeedbackModal);
     document.getElementById('submission-feedback-dismiss')?.addEventListener('click', closeSubmissionFeedbackModal);

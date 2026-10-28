@@ -155,6 +155,7 @@ function renderReviews(reviews) {
               <div>
                 <span class="table-main">${escapeHtml(customerName)}</span>
                 <span class="table-sub">${escapeHtml(customerEmail)}</span>
+                ${review.is_anonymous ? '<span class="review-anon-pill" title="The customer chose to post this review anonymously. Only staff can see who wrote it."><i class="ti ti-eye-off" aria-hidden="true"></i> Anonymous publicly</span>' : ''}
               </div>
             </div>
           </div>
@@ -239,6 +240,7 @@ async function fetchReviewsPage(page, search) {
       rating: row.rating,
       comment: row.comment,
       created_at: row.created_at,
+      is_anonymous: !!row.is_anonymous,
       customer: {
         first_name: row.first_name,
         middle_name: row.middle_name,

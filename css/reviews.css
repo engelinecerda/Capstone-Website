@@ -660,3 +660,104 @@
         text-align: center;
     }
 }
+
+/* ========================
+   Anonymous Reviews
+======================== */
+/* Anonymous reviewer avatar (name hidden) */
+.review-card__avatar--anon {
+    background: linear-gradient(135deg, #8a7b70, #b8a99c);
+    font-size: 18px;
+}
+
+/* "Your review" row + Edit button, shown only on the signed-in author's cards */
+.review-card__own {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 2px;
+    padding-top: 12px;
+    border-top: 1px dashed #ead8c7;
+}
+
+.review-card__own-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #74655b;
+}
+
+.review-card__edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border, rgba(61,26,10,0.18));
+    border-radius: 2px;
+    background: #fff;
+    color: var(--brown-primary, #3D1A0A);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.review-card__edit-btn:hover,
+.review-card__edit-btn:focus-visible {
+    outline: none;
+    background: var(--brown-primary, #3D1A0A);
+    border-color: var(--brown-primary, #3D1A0A);
+    color: #fff;
+}
+
+/* "Review anonymously" switch inside the write / edit review modals.
+   Reuses the .reviews-toggle switch; this just lays out the two-line label. */
+.review-anon-toggle {
+    position: relative;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid #e6d5c3;
+    border-radius: 14px;
+    background: #fffaf4;
+}
+
+.review-anon-toggle .reviews-toggle__slider {
+    margin-top: 2px;
+}
+
+.review-anon-toggle__text {
+    display: grid;
+    gap: 3px;
+}
+
+.review-anon-toggle__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2A1408;
+}
+
+.review-anon-toggle__hint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #74655b;
+}
+
+.review-edit-note {
+    margin: 0;
+    font-size: 12px;
+    color: #74655b;
+}
+
+.review-edit-comment {
+    font-style: italic;
+    word-break: break-word;
+}
+
