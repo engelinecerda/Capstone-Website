@@ -661,7 +661,7 @@ async function logReservationStatusChange(reservationId, previousStatus, newStat
   if (error) throw error;
 }
 
-async function updateReservationStatus(reservationId, status, previousStatus = null) {
+async function updateReservationStatus(reservationId, status, previousStatus = null, reservationNumber = null) {
   const normalizedPreviousStatus = String(previousStatus || '').toLowerCase();
   const normalizedNextStatus = String(status || '').toLowerCase();
   if (normalizedPreviousStatus && normalizedPreviousStatus === normalizedNextStatus) return;
@@ -670,6 +670,18 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   if (error) throw error;
 
   await logReservationStatusChange(reservationId, previousStatus, status);
+
+  // reservation_status (above) is the status history; this adds who did it to
+  // the audit trail. Only approve / decline are audited here.
+  if (normalizedNextStatus === 'approved' || normalizedNextStatus === 'declined') {
+    await logAudit({
+      action: normalizedNextStatus === 'approved' ? 'Approved Reservation' : 'Declined Reservation',
+      category: 'reservations',
+      details: `${normalizedNextStatus === 'approved' ? 'Approved' : 'Declined'} reservation${reservationNumber ? ` ${reservationNumber}` : ''}`
+        + (previousStatus ? ` (was ${previousStatus})` : ''),
+      entityId: reservationId
+    });
+  }
 }
 
 /* ---------------------------------------------------------------- */
@@ -1336,6 +1348,7 @@ async function saveRecordPayment() {
 
     await recordInCafePayment(supabase, {
       reservationId: reservation.reservation_id,
+      reservationNumber: reservation.reservation_number,
       existingPaymentId: recordPaymentTargetPayment?.payment_id || null,
       amount: recordPaymentAmountInput?.value,
       paymentMethodId: selectedMethod.payment_method_id,
@@ -1765,11 +1778,11 @@ function wireHeaderActions() {
         if (limitMessage) throw new Error(limitMessage);
         const approvalState = getReservationApprovalState(reservation);
         if (!approvalState.canApprove) throw new Error(approvalState.reason);
-        await updateReservationStatus(reservation.reservation_id, 'approved', previousStatus);
+        await updateReservationStatus(reservation.reservation_id, 'approved', previousStatus, reservation.reservation_number);
         await reloadAndRender('Reservation approved.');
         maybeShowApprovalPrompt();
       } else if (action === 'decline') {
-        await updateReservationStatus(reservation.reservation_id, 'declined', previousStatus);
+        await updateReservationStatus(reservation.reservation_id, 'declined', previousStatus, reservation.reservation_number);
         await reloadAndRender('Reservation declined.');
       }
     } catch (error) {

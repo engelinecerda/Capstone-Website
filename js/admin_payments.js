@@ -13,6 +13,7 @@ import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { logAudit } from './audit_logger.js';
 import { clampNumberInput } from './numeric_input.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
@@ -892,6 +893,21 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
 
   if (paymentError) throw paymentError;
 
+  // Audit the decision as soon as it is saved. nextStatus is the FINAL
+  // outcome (a reschedule fee whose date is no longer available is turned
+  // into a rejection above), so the entry always matches what was stored.
+  const reviewedReservationNumber = getReservation(payment.reservation_id)?.reservation_number;
+  const reviewedPaymentType = String(payment.payment_type || 'payment').replace(/_/g, ' ');
+  const reviewedAmount = `\u20B1${Number(payment.amount || 0).toLocaleString()}`;
+  await logAudit({
+    action: nextStatus === 'approved' ? 'Approved Payment' : 'Rejected Payment',
+    category: 'payments',
+    details: `${nextStatus === 'approved' ? 'Approved' : 'Rejected'} ${reviewedPaymentType} of ${reviewedAmount}`
+      + (reviewedReservationNumber ? ` for reservation ${reviewedReservationNumber}` : '')
+      + (nextStatus === 'rejected' && rejectionReason ? ` — reason: ${rejectionReason}` : ''),
+    entityId: paymentId
+  });
+
   if (nextStatus === 'approved') {
     await ensureReceiptForPayment(supabase, paymentId, getReceipt(paymentId));
 
@@ -1418,6 +1434,7 @@ async function saveRecordPayment() {
 
     await recordInCafePayment(supabase, {
       reservationId: recordPaymentTargetPayment.reservation_id,
+      reservationNumber: getReservation(recordPaymentTargetPayment.reservation_id)?.reservation_number,
       existingPaymentId: recordPaymentTargetPayment.payment_id,
       amount: recordPaymentAmountInput?.value,
       paymentMethodId: selectedMethod.payment_method_id,

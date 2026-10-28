@@ -507,7 +507,7 @@ async function logReservationStatusChange(reservationId, previousStatus, newStat
   if (error) throw error;
 }
 
-async function updateReservationStatus(reservationId, status, previousStatus = null) {
+async function updateReservationStatus(reservationId, status, previousStatus = null, reservationNumber = null) {
   const normalizedPreviousStatus = String(previousStatus || '').toLowerCase();
   const normalizedNextStatus = String(status || '').toLowerCase();
 
@@ -523,6 +523,18 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   if (error) throw error;
 
   await logReservationStatusChange(reservationId, previousStatus, status);
+
+  // reservation_status (above) is the status history; this adds who did it to
+  // the audit trail. Only approve / decline are audited here.
+  if (normalizedNextStatus === 'approved' || normalizedNextStatus === 'declined') {
+    await logAudit({
+      action: normalizedNextStatus === 'approved' ? 'Approved Reservation' : 'Declined Reservation',
+      category: 'reservations',
+      details: `${normalizedNextStatus === 'approved' ? 'Approved' : 'Declined'} reservation${reservationNumber ? ` ${reservationNumber}` : ''}`
+        + (previousStatus ? ` (was ${previousStatus})` : ''),
+      entityId: reservationId
+    });
+  }
 }
 
 const SIGNATURE_CHECK_ICON = {
@@ -733,12 +745,12 @@ async function performContractAction(action, button) {
       throw new Error(approvalState.reason);
     }
 
-    await updateReservationStatus(reservationId, 'approved', previousStatus);
+    await updateReservationStatus(reservationId, 'approved', previousStatus, reservation?.reservation_number);
     return { message: 'Reservation approved.' };
   }
 
   if (action === 'decline-reservation') {
-    await updateReservationStatus(reservationId, 'declined', previousStatus);
+    await updateReservationStatus(reservationId, 'declined', previousStatus, reservation?.reservation_number);
     return { message: 'Reservation declined.' };
   }
 

@@ -8,6 +8,8 @@
 // relocated here and re-exported for admin_payments.js's own approve flow
 // to keep using).
 
+import { logAudit } from './audit_logger.js';
+
 const CLOUDINARY_CONFIG = {
   cloudName: 'dtt707f1w',
   // See the matching comment in js/customer_payments.js — eli_contracts'
@@ -137,6 +139,7 @@ export async function fetchCafeIssuedPaymentMethods(supabase) {
 // none exists — see getPendingCafePayment() in admin_reservation_details.js.
 export async function recordInCafePayment(supabase, {
   reservationId,
+  reservationNumber = null,
   existingPaymentId = null,
   amount,
   paymentMethodId,
@@ -194,6 +197,7 @@ export async function recordInCafePayment(supabase, {
     if (!data) throw new Error('This payment was already updated — please refresh and try again.');
 
     await ensureReceiptForPayment(supabase, data.payment_id);
+    await auditRecordedPayment(data.payment_id, { numericAmount, paymentMethodLabel, reservationNumber, confirmedExisting: true });
     return data;
   }
 
@@ -225,6 +229,22 @@ export async function recordInCafePayment(supabase, {
   if (error) throw error;
 
   await ensureReceiptForPayment(supabase, data.payment_id);
+  await auditRecordedPayment(data.payment_id, { numericAmount, paymentMethodLabel, reservationNumber, confirmedExisting: false });
 
   return data;
+}
+
+// One audit entry per recorded in-café payment, written after the payment
+// (and its receipt) are saved. Lives here, in the shared function, so both
+// places that record a payment (Payments page, reservation details) are
+// covered by the same single call.
+async function auditRecordedPayment(paymentId, { numericAmount, paymentMethodLabel, reservationNumber, confirmedExisting }) {
+  await logAudit({
+    action: 'Recorded In-Cafe Payment',
+    category: 'payments',
+    details: `${confirmedExisting ? 'Confirmed pending payment as paid' : 'Recorded payment'} of \u20B1${Number(numericAmount).toLocaleString()}`
+      + (paymentMethodLabel ? ` via ${paymentMethodLabel}` : '')
+      + (reservationNumber ? ` for reservation ${reservationNumber}` : ''),
+    entityId: paymentId
+  });
 }
