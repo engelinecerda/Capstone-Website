@@ -206,7 +206,7 @@ function renderReviewsView(reviews) {
   // reviews.length is the rows on screen (at most one page); the "1-10 of N"
   // range for the current search is in the pagination bar below the table.
   if (reviewsTotal) {
-    setReviewsMessage(`Showing ${reviews.length} of ${totalReviewCount} submitted review(s).`);
+    setReviewsMessage('');
   } else if (activeSearch) {
     setReviewsMessage(`No submitted reviews matched "${activeSearch}".`);
   } else {
