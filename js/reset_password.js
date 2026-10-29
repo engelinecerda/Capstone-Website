@@ -75,7 +75,16 @@ form?.addEventListener('submit', async function (e) {
         return;
     }
 
-    setMessage('success', 'Password updated successfully. You can now log in.');
     form.reset();
     subscription.unsubscribe();
+
+    // The recovery session exists only so this password could be set. End it
+    // now (this browser only, other devices stay signed in) so the customer
+    // has to log in with the new password. js/supabase.js clears its recovery
+    // flag on the resulting SIGNED_OUT; if the sign-out call fails the flag
+    // stays set, and the next customer page discards the session instead.
+    await supabase.auth.signOut({ scope: 'local' });
+
+    setMessage('success', 'Password updated successfully. Redirecting to login...');
+    setTimeout(() => window.location.replace('/login'), 1500);
 });

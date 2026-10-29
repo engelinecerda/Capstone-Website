@@ -60,8 +60,15 @@ async function redirectIfStaffSessionExists() {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) return;
 
-    const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
+    // skipMfaCheck: this is the login page itself, so a password-only session
+    // here is normal (it is waiting on the 2FA step) and must not be signed out.
+    const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff', skipMfaCheck: true });
     if (session) {
+        // A password-only session for an account that still owes a 2FA code is
+        // not a login — stay on this page instead of forwarding to the board.
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') return;
+
         window.location.replace(BOARD_ROUTE);
     }
 }
@@ -133,7 +140,9 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         return;
     }
 
-    const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff' });
+    // skipMfaCheck: the 2FA step has not happened yet at this point; the check
+    // below starts it. The board page itself enforces 2FA completion.
+    const { session } = await verifyPortalSession(supabase, { requiredRole: 'staff', skipMfaCheck: true });
     if (!session) {
         await supabase.auth.signOut();
         setMessage(WRONG_PORTAL_MESSAGE, 'error');
@@ -156,6 +165,12 @@ adminLoginForm?.addEventListener('submit', async (event) => {
             showMfaCard();
             return;
         }
+
+        // 2FA is required but no usable authenticator was found. Signing in
+        // would now just bounce off the board's session check, so stop here.
+        await supabase.auth.signOut();
+        setMessage('Two-factor authentication is required for this account but no authenticator was found. Contact the administrator.', 'error');
+        return;
     }
 
     localStorage.removeItem('profile');

@@ -76,11 +76,84 @@ const supabaseKey = supabaseOverride?.key || DEFAULT_SUPABASE_KEY
     window.location.replace(destination + hash)
 })()
 
+// ── Customer password-recovery sessions ─────────────────────────────────────
+// Opening the link in a password-reset email gives the browser a real Supabase
+// session so the customer can call updateUser({ password }). Left alone, that
+// session is indistinguishable from a normal login on every other page
+// (account, reservations, payment, ...), even if the customer never sets a new
+// password. So the moment a recovery session starts, a flag is stored; on every
+// customer page except /reset-password that flag causes the stored session to
+// be discarded before any page code can read it. The flag is cleared by that
+// discard, or by the sign-out that follows a successful password change
+// (js/reset_password.js). Admin/board pages use other storage keys and are not
+// touched here.
+//
+// This is done by removing the stored session synchronously (rather than only
+// calling auth.signOut()) so that a page which reads the session right after
+// import can never see it, and the server-side session is then revoked in the
+// background. An unrevoked recovery session could otherwise be refreshed.
+const CUSTOMER_STORAGE_KEY = 'eli-customer-auth'
+const CUSTOMER_RECOVERY_FLAG = 'eli-customer-recovery'
+
+function setCustomerRecoveryFlag() {
+    try { window.localStorage.setItem(CUSTOMER_RECOVERY_FLAG, '1') } catch (error) { /* storage unavailable */ }
+}
+
+function clearCustomerRecoveryFlag() {
+    try { window.localStorage.removeItem(CUSTOMER_RECOVERY_FLAG) } catch (error) { /* storage unavailable */ }
+}
+
+;(function isolateCustomerRecoverySession() {
+    if (typeof window === 'undefined' || !window.localStorage) return
+
+    const path = window.location.pathname
+    if (path.startsWith('/admin') || path.startsWith('/board')) return
+
+    // Arriving through a recovery link (tokens in the URL hash): mark the
+    // session that supabase-js is about to create from it. This also covers a
+    // link that lands on the wrong customer page.
+    const hash = window.location.hash || ''
+    const arrivingViaRecoveryLink = hash.includes('type=recovery') && hash.includes('access_token=')
+    if (arrivingViaRecoveryLink) setCustomerRecoveryFlag()
+
+    // The reset page is the one place a recovery session is allowed to be used.
+    if (path === '/reset-password' || path === '/reset-password.html') return
+
+    let recoveryPending = false
+    try {
+        recoveryPending = window.localStorage.getItem(CUSTOMER_RECOVERY_FLAG) === '1'
+    } catch (error) {
+        return
+    }
+    if (!recoveryPending) return
+
+    let accessToken = ''
+    try {
+        const raw = window.localStorage.getItem(CUSTOMER_STORAGE_KEY)
+        accessToken = (raw && JSON.parse(raw)?.access_token) || ''
+    } catch (error) { /* unreadable session: it is removed below anyway */ }
+    try { window.localStorage.removeItem(CUSTOMER_STORAGE_KEY) } catch (error) { /* storage unavailable */ }
+
+    if (accessToken && typeof fetch === 'function') {
+        try {
+            fetch(`${supabaseUrl}/auth/v1/logout?scope=local`, {
+                method: 'POST',
+                headers: { apikey: supabaseKey, Authorization: `Bearer ${accessToken}` },
+                keepalive: true
+            }).catch(() => {})
+        } catch (error) { /* best effort: the local session is already gone */ }
+    }
+
+    // On a misrouted recovery link the session is only created after this
+    // runs, so keep the flag and let the next customer page clean it up.
+    if (!arrivingViaRecoveryLink) clearCustomerRecoveryFlag()
+})()
+
 function makeClient(storageKey) {
     if (typeof window === 'undefined' || !window.supabase || typeof window.supabase.createClient !== 'function') {
         throw new Error('Supabase UMD bundle not loaded — add <script src=".../supabase-js@2.../dist/umd/supabase.js" defer> before this page\'s module scripts.')
     }
-    return window.supabase.createClient(supabaseUrl, supabaseKey, {
+    const client = window.supabase.createClient(supabaseUrl, supabaseKey, {
         auth: {
             storageKey,
             persistSession: true,
@@ -88,6 +161,18 @@ function makeClient(storageKey) {
             detectSessionInUrl: true
         }
     })
+
+    if (storageKey === CUSTOMER_STORAGE_KEY) {
+        // Backstop for the hash check above: PASSWORD_RECOVERY is the event
+        // supabase-js raises when a recovery session starts, however the link
+        // arrived. A sign-out ends the recovery state.
+        client.auth.onAuthStateChange((event) => {
+            if (event === 'PASSWORD_RECOVERY') setCustomerRecoveryFlag()
+            else if (event === 'SIGNED_OUT') clearCustomerRecoveryFlag()
+        })
+    }
+
+    return client
 }
 
 function lazyClient(storageKey) {
@@ -105,7 +190,7 @@ function lazyClient(storageKey) {
     });
 }
 
-export const customerSupabase = lazyClient('eli-customer-auth')
+export const customerSupabase = lazyClient(CUSTOMER_STORAGE_KEY)
 export const portalSupabase = lazyClient('eli-portal-auth')
 // Kept fully separate from portalSupabase: the shared staff/board kiosk
 // credential must never share a browser session bucket with manager/admin,

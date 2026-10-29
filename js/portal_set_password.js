@@ -14,6 +14,21 @@ const message = document.getElementById('portal-set-password-msg');
 // exactly what this page exists to do.
 let activationReady = false;
 
+// When the invite token is rejected, Supabase redirects here with the reason
+// in the URL (e.g. #error=access_denied&error_code=otp_expired). This page
+// used to ignore that and show a generic message. Read it before anything
+// below touches the Supabase client, which can rewrite the URL.
+function readInviteLinkError() {
+  const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  const queryParams = new URLSearchParams(window.location.search || '');
+  const code = hashParams.get('error_code') || queryParams.get('error_code') || '';
+  const error = hashParams.get('error') || queryParams.get('error') || '';
+  if (!code && !error) return null;
+  return { code: code || error };
+}
+
+const inviteLinkError = readInviteLinkError();
+
 function setMessage(type, text) {
   message.className = `form-msg ${type}`.trim();
   message.innerText = text;
@@ -27,7 +42,7 @@ function setSubmitDisabled(disabled) {
 const {
   data: { subscription }
 } = supabase.auth.onAuthStateChange((event) => {
-  if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+  if (!inviteLinkError && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
     activationReady = true;
     setMessage('', '');
   }
@@ -37,11 +52,17 @@ const {
   data: { session }
 } = await supabase.auth.getSession();
 
-if (session) {
+if (session && !inviteLinkError) {
   activationReady = true;
 }
 
-if (!activationReady) {
+if (inviteLinkError) {
+  // A rejected link must not fall back to whatever session happens to be in
+  // this browser (for example an admin already signed in) and let that
+  // account's password be changed here.
+  setSubmitDisabled(true);
+  setMessage('error', `This invite link is invalid, has expired, or was already used (${inviteLinkError.code}). Ask your administrator to resend the invite email.`);
+} else if (!activationReady) {
   setMessage('error', 'Open this page using the invite link sent to your email.');
 }
 

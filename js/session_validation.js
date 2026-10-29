@@ -66,6 +66,30 @@ export async function validateAdminSession({
     return null;
   }
 
+  // A password-only (aal1) session must not pass for an account that has 2FA
+  // enrolled — nextLevel stays 'aal2' until the TOTP code is verified at
+  // login. Accounts with no verified factor report nextLevel 'aal1' and are
+  // unaffected. Read from the local session (no network call); if it cannot
+  // be read, the session is not trusted. Kept inline rather than imported
+  // from admin_auth.js so a stale cached copy of that file cannot break this
+  // one's imports.
+  let mfaIncomplete = true;
+  try {
+    const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (!aalError && aalData) {
+      mfaIncomplete = aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2';
+    }
+  } catch (_) {
+    mfaIncomplete = true;
+  }
+
+  if (mfaIncomplete) {
+    await supabase.auth.signOut();
+    localStorage.removeItem('profile');
+    window.location.replace(redirectTo);
+    return null;
+  }
+
   // Always re-fetch the live row — a cached copy goes stale the moment a
   // role changes (promotion/demotion) and was previously trusted forever,
   // which let a stale role get silently resubmitted on unrelated saves

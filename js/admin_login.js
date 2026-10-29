@@ -77,9 +77,16 @@ async function redirectIfPortalSessionExists() {
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) return;
 
-    const { session, profile } = await verifyPortalSession(supabase);
+    // skipMfaCheck: this is the login page itself, so a password-only session
+    // here is normal (it is waiting on the 2FA step) and must not be signed out.
+    const { session, profile } = await verifyPortalSession(supabase, { skipMfaCheck: true });
 
     if (session) {
+        // A password-only session for an account that still owes a 2FA code is
+        // not a login — stay on this page instead of forwarding to the dashboard.
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') return;
+
         const route = getPortalRoute(profile?.role);
         if (route) {
             window.location.replace(route);
@@ -157,7 +164,9 @@ adminLoginForm?.addEventListener('submit', async (event) => {
         return;
     }
 
-    const { session, profile, message } = await verifyPortalSession(supabase);
+    // skipMfaCheck: the 2FA step has not happened yet at this point; the check
+    // below starts it. Every page after this one enforces 2FA completion.
+    const { session, profile, message } = await verifyPortalSession(supabase, { skipMfaCheck: true });
     if (!session) {
         await supabase.auth.signOut();
         setMessage(message || 'This account is not allowed to sign in here.', 'error');
@@ -188,6 +197,12 @@ adminLoginForm?.addEventListener('submit', async (event) => {
             showMfaCard();
             return;
         }
+
+        // 2FA is required but no usable authenticator was found. Signing in
+        // would now just bounce off the page guards, so stop here with a message.
+        await supabase.auth.signOut();
+        setMessage('Two-factor authentication is required for this account but no authenticator was found. Contact the administrator.', 'error');
+        return;
     }
 
     localStorage.removeItem('profile');
