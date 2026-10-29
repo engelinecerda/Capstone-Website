@@ -33,17 +33,45 @@ let reportsCurrentPage = 1;
 
 const state = {
     reservations: [],
-    paymentSummaryMap: {}
+    paymentSummaryMap: {},
+    // true when the payment totals could not be loaded, so the page never
+    // shows (or exports) a made-up PHP 0 as if it were a real total.
+    paymentsUnavailable: false
 };
 
-async function fetchPaymentSummaries(reservationIds) {
-    if (!reservationIds.length) return {};
-    const { data, error } = await supabase
+// Supabase caps every response at its "max rows" setting (1000 by default),
+// so a single .select() silently drops everything past that. This reads a
+// table/view in chunks until every row is in. buildQuery receives the
+// select options to use ({ count: 'exact' } on the first chunk so we know
+// the total, undefined afterwards) and returns the select + order query.
+const FETCH_CHUNK_SIZE = 1000;
+
+async function fetchAllRows(buildQuery) {
+    const rows = [];
+    let total = null;
+    while (total === null || rows.length < total) {
+        const from = rows.length;
+        const { data, error, count } = await buildQuery(total === null ? { count: 'exact' } : undefined)
+            .range(from, from + FETCH_CHUNK_SIZE - 1);
+        if (error) throw error;
+        if (total === null) {
+            total = Number.isFinite(count) ? count : Infinity;
+        }
+        if (!data?.length) break;
+        rows.push(...data);
+    }
+    return rows;
+}
+
+// Reads reservation_payment_summary in chunks (one row per reservation)
+// instead of one .in('reservation_id', [every id]) request, whose URL grows
+// with every reservation and eventually exceeds the server's URL limit.
+async function fetchPaymentSummaries() {
+    const rows = await fetchAllRows((options) => supabase
         .from('reservation_payment_summary')
-        .select('reservation_id, total_paid, outstanding_balance')
-        .in('reservation_id', reservationIds);
-    if (error) throw error;
-    return (data || []).reduce((map, row) => {
+        .select('reservation_id, total_paid, outstanding_balance', options)
+        .order('reservation_id', { ascending: true }));
+    return rows.reduce((map, row) => {
         map[row.reservation_id] = row;
         return map;
     }, {});
@@ -209,7 +237,7 @@ function buildSummaryCards(reservations) {
         { label: 'Cancelled', value: totals.cancelled, copy: 'Cancelled reservations within the selected range.' },
         { label: 'Declined', value: totals.declined, copy: 'Reservations that were declined.' },
         { label: 'Rescheduled', value: totals.rescheduled, copy: 'Reservations currently marked as rescheduled.' },
-        { label: 'Payments Collected', value: `₱${totals.totalPaid.toLocaleString()}`, copy: 'Total approved payments across the filtered reservations.' }
+        { label: 'Payments Collected', value: state.paymentsUnavailable ? 'Unavailable' : `₱${totals.totalPaid.toLocaleString()}`, copy: 'Total approved payments across the filtered reservations.' }
     ];
 }
 
@@ -432,6 +460,11 @@ async function exportReportsExcel() {
         return;
     }
 
+    if (state.paymentsUnavailable) {
+        setReportsMessage("Export is paused because payment totals couldn't be loaded, and the Amount Paid column would be wrong. Refresh the page and try again.", true);
+        return;
+    }
+
     const ExcelJSLib = window.ExcelJS;
     if (!ExcelJSLib) {
         setReportsMessage('Excel export is not available because the export library did not load.', true);
@@ -481,7 +514,10 @@ async function exportReportsExcel() {
 }
 
 async function fetchReservations() {
-    const { data, error } = await supabase
+    // reservation_id is the tie-breaker: many reservations share an event
+    // date, and without a unique sort key the chunk boundaries could skip or
+    // repeat rows.
+    return fetchAllRows((options) => supabase
         .from('reservations')
         .select(`
             reservation_id,
@@ -498,14 +534,9 @@ async function fetchReservations() {
                 package_name,
                 package_type
             )
-        `)
-        .order('event_date', { ascending: false });
-
-    if (error) {
-        throw error;
-    }
-
-    return data || [];
+        `, options)
+        .order('event_date', { ascending: false })
+        .order('reservation_id', { ascending: false }));
 }
 
 async function validateAdminSession() {
@@ -545,15 +576,23 @@ async function loadReports({ silent = false } = {}) {
 
     try {
         const rawReservations = await fetchReservations();
-        state.paymentSummaryMap = await fetchPaymentSummaries(
-            rawReservations.map((r) => r.reservation_id).filter(Boolean)
-        ).catch(() => ({}));
+        state.paymentsUnavailable = false;
+        try {
+            state.paymentSummaryMap = await fetchPaymentSummaries();
+        } catch (paymentError) {
+            console.warn('Could not load payment totals for reports:', paymentError?.message);
+            state.paymentSummaryMap = {};
+            state.paymentsUnavailable = true;
+        }
         state.reservations = await syncCompletedReservations({
             supabase,
             reservations: rawReservations,
             getOutstandingBalance: (reservation) => state.paymentSummaryMap[reservation?.reservation_id]?.outstanding_balance
         });
         renderReports({ resetPage: !silent });
+        if (state.paymentsUnavailable) {
+            setReportsMessage("Reservations loaded, but payment totals couldn't be loaded. Payments Collected is unavailable until you refresh.", true);
+        }
         await refreshAdminSidebarCounts({
             supabase,
             reservationBadgeEl: navReservationCount,
