@@ -575,14 +575,21 @@ async function loadReports({ silent = false } = {}) {
     }
 
     try {
-        const rawReservations = await fetchReservations();
-        state.paymentsUnavailable = false;
-        try {
-            state.paymentSummaryMap = await fetchPaymentSummaries();
-        } catch (paymentError) {
-            console.warn('Could not load payment totals for reports:', paymentError?.message);
-            state.paymentSummaryMap = {};
-            state.paymentsUnavailable = true;
+        // Reservations and payment totals don't depend on each other any more
+        // (the payment fetch no longer needs the reservation ids), so they load
+        // at the same time. A payment failure is caught on its own so it only
+        // flips the "Unavailable" state and never fails the reservations load.
+        const [rawReservations, paymentResult] = await Promise.all([
+            fetchReservations(),
+            fetchPaymentSummaries().then(
+                (map) => ({ map, failed: false }),
+                (error) => ({ map: {}, failed: true, error })
+            )
+        ]);
+        state.paymentSummaryMap = paymentResult.map;
+        state.paymentsUnavailable = paymentResult.failed;
+        if (paymentResult.failed) {
+            console.warn('Could not load payment totals for reports:', paymentResult.error?.message);
         }
         state.reservations = await syncCompletedReservations({
             supabase,

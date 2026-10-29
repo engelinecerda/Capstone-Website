@@ -175,6 +175,9 @@ export function getEffectiveReservationStatus(reservation, { timeZone = BUSINESS
     return normalizedStatus;
 }
 
+// Max reservation ids per status update (keeps each request URL short).
+const COMPLETE_UPDATE_BATCH_SIZE = 100;
+
 // getOutstandingBalance(reservation) => number is required to persist
 // anything — without it this is a no-op, same "never guess" rule as above.
 export async function syncCompletedReservations({ supabase, reservations, timeZone = BUSINESS_TIME_ZONE, getOutstandingBalance }) {
@@ -195,23 +198,34 @@ export async function syncCompletedReservations({ supabase, reservations, timeZo
         return items;
     }
 
-    try {
-        const { error } = await supabase
-            .from('reservations')
-            .update({ status: 'completed' })
-            .in('reservation_id', candidateIds);
-
-        if (error) {
-            return items;
+    // Sent in batches: .in('reservation_id', [...]) puts every id in the
+    // request URL, which grows with the list and is rejected by the server
+    // once it gets long enough (a few hundred ids). A failed batch is
+    // skipped, not fatal: the others still apply, and only the ids that were
+    // actually saved are reported as completed.
+    const persistedIds = new Set();
+    for (let i = 0; i < candidateIds.length; i += COMPLETE_UPDATE_BATCH_SIZE) {
+        const batch = candidateIds.slice(i, i + COMPLETE_UPDATE_BATCH_SIZE);
+        try {
+            const { error } = await supabase
+                .from('reservations')
+                .update({ status: 'completed' })
+                .in('reservation_id', batch);
+            if (!error) {
+                batch.forEach((id) => persistedIds.add(String(id)));
+            }
+        } catch (error) {
+            // leave this batch as-is; the next sync (or the auto-complete job) retries it
         }
+    }
 
-        const completedSet = new Set(candidateIds.map((value) => String(value)));
-        return items.map((reservation) => (
-            completedSet.has(String(reservation?.reservation_id))
-                ? { ...reservation, status: 'completed' }
-                : reservation
-        ));
-    } catch (error) {
+    if (!persistedIds.size) {
         return items;
     }
+
+    return items.map((reservation) => (
+        persistedIds.has(String(reservation?.reservation_id))
+            ? { ...reservation, status: 'completed' }
+            : reservation
+    ));
 }
