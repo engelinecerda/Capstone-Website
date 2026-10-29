@@ -591,7 +591,7 @@ async function handleCreateAccount() {
     // the handle_new_user() trigger the moment the account is created —
     // no separate profiles update needed here anymore.
 
-    await logAudit({ action: 'Invited User', category: 'accounts', details: `Invited ${firstName} ${lastName} (${email}) as ${role}`, entityId: data.user_id });
+    await logAudit({ action: 'Invited User', category: 'account', details: `Invited ${firstName} ${lastName} (${email}) as ${role}`, entityId: data.user_id });
 
     showMsg('Invite sent. A welcome email is on its way.', 'success');
     await loadAccounts();
@@ -702,10 +702,10 @@ async function saveAccountUpdate(a, { firstName, lastName, middleName, role, sta
     }
 
     if (role !== a.role) {
-      await logAudit({ action: 'Changed Role', category: 'accounts', details: `${displayName(a)}: ${formatRoleLabel(a.role)} → ${formatRoleLabel(role)}`, entityId: a.user_id });
+      await logAudit({ action: 'Changed Role', category: 'account', details: `${displayName(a)}: ${formatRoleLabel(a.role)} → ${formatRoleLabel(role)}`, entityId: a.user_id });
     }
     if (newPassword) {
-      await logAudit({ action: 'Changed Password', category: 'accounts', details: `Password changed for ${displayName(a)} (${a.email})`, entityId: a.user_id });
+      await logAudit({ action: 'Changed Password', category: 'account', details: `Password changed for ${displayName(a)} (${a.email})`, entityId: a.user_id });
     }
 
     const idx = allAccounts.findIndex(x => x.user_id === a.user_id);
@@ -758,7 +758,7 @@ async function sendPasswordReset(a) {
 
     await logAudit({
       action: 'Resent Password Email',
-      category: 'accounts',
+      category: 'account',
       details: `${a._status === 'invited' ? 'Invite' : 'Password reset'} email resent to ${displayName(a)} (${a.email})`,
       entityId: a.user_id
     });
@@ -800,7 +800,7 @@ function openLockConfirm(a) {
 
     await logAudit({
       action: newLocked ? 'Deactivated Account' : 'Reactivated Account',
-      category: 'accounts',
+      category: 'account',
       details: `${displayName(a)} was ${newLocked ? 'deactivated' : 'reactivated'}`,
       entityId: a.user_id
     });
@@ -864,7 +864,7 @@ function openBoardResetConfirm(a) {
 
     // Never include the password itself here — audit trail records that the
     // shared credential was rotated and by whom, not what it was rotated to.
-    await logAudit({ action: 'Reset Board Password', category: 'accounts', details: `Shared board account password was reset (${displayName(a)})`, entityId: a.user_id });
+    await logAudit({ action: 'Reset Board Password', category: 'account', details: `Shared board account password was reset (${displayName(a)})`, entityId: a.user_id });
 
     msg.className = 'modal-message success';
     msg.textContent = `New password: ${data.password} — copy this now, it will not be shown again.`;
@@ -896,7 +896,7 @@ function openRemoveConfirm(a) {
       return;
     }
 
-    await logAudit({ action: 'Removed Account', category: 'accounts', details: `Removed ${displayName(a)} (${a.email})`, entityId: a.user_id });
+    await logAudit({ action: 'Removed Account', category: 'account', details: `Removed ${displayName(a)} (${a.email})`, entityId: a.user_id });
 
     allAccounts = allAccounts.filter(x => x.user_id !== a.user_id);
     updateStats();

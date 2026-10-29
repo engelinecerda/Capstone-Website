@@ -802,3 +802,36 @@
     font-style: italic;
     word-break: break-word;
 }
+.review-card__moderation {
+    display: grid;
+    gap: 6px;
+    flex: 1 0 100%;
+    box-sizing: border-box;
+    margin: 2px 0 0;
+    padding: 12px 14px;
+    border: 1px solid #d7ccbb;
+    border-left: 4px solid #8b7355;
+    border-radius: 8px;
+    background: #f3efe8;
+    color: #4f4438;
+    font-size: .9rem;
+    line-height: 1.5;
+}
+.review-card__moderation > strong { color: #4d3d2c; }
+.review-card__moderation-reason {
+    padding: 9px 11px;
+    border: 1px solid #cfc2af;
+    border-radius: 6px;
+    background: #e8e0d4;
+    color: #463a2d;
+}
+.review-card__moderation-reason-label {
+    display: block;
+    margin-bottom: 2px;
+    color: #6d5c49;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.review-card__moderation-reason p { margin: 0; font-weight: 700; overflow-wrap: anywhere; }

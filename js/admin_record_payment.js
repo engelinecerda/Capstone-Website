@@ -241,7 +241,7 @@ export async function recordInCafePayment(supabase, {
 async function auditRecordedPayment(paymentId, { numericAmount, paymentMethodLabel, reservationNumber, confirmedExisting }) {
   await logAudit({
     action: 'Recorded In-Cafe Payment',
-    category: 'payments',
+    category: 'payment',
     details: `${confirmedExisting ? 'Confirmed pending payment as paid' : 'Recorded payment'} of \u20B1${Number(numericAmount).toLocaleString()}`
       + (paymentMethodLabel ? ` via ${paymentMethodLabel}` : '')
       + (reservationNumber ? ` for reservation ${reservationNumber}` : ''),

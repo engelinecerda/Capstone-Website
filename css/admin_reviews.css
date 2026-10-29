@@ -1,5 +1,5 @@
 /* admin_reviews.css */
-@import url('./admin_customers.css?v=58');
+@import url('./admin_customers.css?v=59');
 
 /* Marks a review the customer chose to post anonymously. Admins/managers still
    see the real name above it; the public Reviews page does not. */
@@ -18,3 +18,28 @@
   line-height: 1.5;
   white-space: nowrap;
 }
+
+.review-row { cursor: pointer; }
+.review-row:focus-visible { outline: 2px solid #8a4d2b; outline-offset: -2px; }
+.review-row.is-hidden { background: #fff8f2; }
+.review-hidden-pill { display: inline-flex; margin: 5px 0 0 6px; padding: 2px 8px; border-radius: 999px; background: #fce8e3; color: #8c2f20; font-size: 11px; font-weight: 700; }
+.review-detail-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(20, 16, 13, .62); }
+.review-detail-backdrop.hidden { display: none; }
+.review-detail-card { position: relative; width: min(620px, 100%); max-height: min(90vh, 900px); overflow: auto; padding: 28px; border-radius: 18px; background: #fff; box-shadow: 0 24px 80px rgba(0,0,0,.25); }
+.review-detail-close { position: absolute; top: 14px; right: 16px; border: 0; background: transparent; font-size: 28px; cursor: pointer; }
+.review-detail-eyebrow { margin: 0 0 6px; color: #8a4d2b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.review-detail-card h2 { margin: 0 0 14px; }
+.review-detail-customer { margin: 0; font-weight: 700; }
+.review-detail-sub { margin: 4px 0 18px; color: #716b66; }
+.review-detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 18px; }
+.review-detail-facts div { min-width: 0; padding: 10px 12px; border-radius: 10px; background: #f8f5f2; }
+.review-detail-facts dt { margin-bottom: 4px; color: #716b66; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.review-detail-facts dd { margin: 0; overflow-wrap: anywhere; }
+.review-detail-comment { margin: 0 0 18px; padding: 16px; border-left: 3px solid #8a4d2b; background: #faf7f4; white-space: pre-wrap; }
+.review-moderation-label { display: block; margin-bottom: 6px; font-weight: 700; }
+#reviewModerationReason { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #d8d0ca; border-radius: 9px; font: inherit; resize: vertical; }
+.review-detail-message { min-height: 1.3em; color: #9b3326; }
+.review-detail-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.review-detail-actions button { padding: 10px 16px; border-radius: 9px; cursor: pointer; font: inherit; font-weight: 700; }
+.review-detail-secondary { border: 1px solid #d8d0ca; background: #fff; }
+.review-detail-primary { border: 1px solid #773d22; background: #773d22; color: #fff; }

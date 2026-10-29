@@ -42,6 +42,7 @@ let activeSearch = '';       // the search term currently applied
 let latestRequestId = 0;     // lets a newer request supersede an older one
 let searchDebounceTimer = null;
 let adminSession = null;
+let currentPageReviews = [];
 
 function redirectToAdminLogin() {
   window.location.replace('/admin');
@@ -147,7 +148,7 @@ function renderReviews(reviews) {
       : 'No comment provided.';
 
     return `
-      <tr>
+      <tr class="review-row ${review.is_hidden ? 'is-hidden' : ''}" data-review-id="${escapeHtml(review.review_id)}" tabindex="0" role="button" aria-label="Open review details for ${escapeHtml(customerName)}">
         <td data-label="Customer">
           <div class="customer-cell">
             <div class="customer-head">
@@ -156,6 +157,7 @@ function renderReviews(reviews) {
                 <span class="table-main">${escapeHtml(customerName)}</span>
                 <span class="table-sub">${escapeHtml(customerEmail)}</span>
                 ${review.is_anonymous ? '<span class="review-anon-pill" title="The customer chose to post this review anonymously. Only staff can see who wrote it."><i class="ti ti-eye-off" aria-hidden="true"></i> Anonymous publicly</span>' : ''}
+                ${review.is_hidden ? '<span class="review-hidden-pill">Hidden</span>' : ''}
               </div>
             </div>
           </div>
@@ -178,6 +180,52 @@ function renderReviews(reviews) {
       </tr>
     `;
   }).join('');
+}
+
+function closeReviewDetail() {
+  document.getElementById('reviewDetailModal')?.classList.add('hidden');
+}
+
+function openReviewDetail(review) {
+  if (!review) return;
+  const customer = review.customer || {};
+  const reservation = review.reservation || {};
+  document.getElementById('reviewDetailCustomer').textContent = getCustomerName(customer, reservation);
+  document.getElementById('reviewDetailEmail').textContent = customer.email || reservation.contact_email || 'No email on file';
+  document.getElementById('reviewDetailReservation').textContent = `${reservation.event_type || 'Completed reservation'} · ${review.packageName || 'Package not available'} · ${formatDate(reservation.event_date)}`;
+  document.getElementById('reviewDetailRating').textContent = `${Number(review.rating || 0)}/5`;
+  document.getElementById('reviewDetailComment').textContent = review.comment || 'No comment provided.';
+  document.getElementById('reviewDetailSubmitted').textContent = formatDateTime(review.created_at);
+  document.getElementById('reviewDetailAnonymous').textContent = review.is_anonymous ? 'Shown anonymously to guests' : 'Customer name shown to guests';
+  document.getElementById('reviewDetailStatus').textContent = review.is_hidden ? `Hidden · ${review.moderation_reason}` : 'Visible publicly';
+  document.getElementById('reviewModerationReason').value = review.is_hidden ? review.moderation_reason : '';
+  const action = document.getElementById('reviewModerationAction');
+  action.textContent = review.is_hidden ? 'Unhide review' : 'Hide review';
+  action.dataset.reviewId = review.review_id;
+  action.dataset.hidden = String(!review.is_hidden);
+  document.getElementById('reviewDetailMessage').textContent = '';
+  document.getElementById('reviewDetailModal')?.classList.remove('hidden');
+}
+
+async function moderateOpenReview(button) {
+  const reason = document.getElementById('reviewModerationReason').value.trim();
+  const message = document.getElementById('reviewDetailMessage');
+  if (!reason) { message.textContent = 'Enter a reason for this moderation action.'; return; }
+  button.disabled = true;
+  try {
+    const { error } = await supabase.rpc('moderate_review', {
+      p_review_id: button.dataset.reviewId,
+      p_hidden: button.dataset.hidden === 'true',
+      p_reason: reason
+    });
+    if (error) throw error;
+    closeReviewDetail();
+    await loadReviews({ withStats: true });
+  } catch (error) {
+    message.textContent = `Could not update review: ${error.message || 'unknown error'}`;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 // The four stat cards. They describe ALL reviews, never the current search.
@@ -241,6 +289,9 @@ async function fetchReviewsPage(page, search) {
       comment: row.comment,
       created_at: row.created_at,
       is_anonymous: !!row.is_anonymous,
+      is_hidden: !!row.is_hidden,
+      moderation_reason: row.moderation_reason || '',
+      moderated_at: row.moderated_at || null,
       customer: {
         first_name: row.first_name,
         middle_name: row.middle_name,
@@ -327,6 +378,7 @@ async function loadReviews({ silent = false, withStats = true } = {}) {
 
     reviewsCurrentPage = result.page;
     reviewsTotal = result.total;
+    currentPageReviews = result.reviews;
 
     if (!activeSearch) {
       totalReviewCount = result.total;
@@ -406,6 +458,23 @@ validateAdminSession({
 
     // Wire UI
     searchInput?.addEventListener('input', handleSearchInput);
+    reviewsBody?.addEventListener('click', (event) => {
+      const row = event.target.closest('[data-review-id]');
+      if (row) openReviewDetail(currentPageReviews.find((review) => String(review.review_id) === row.dataset.reviewId));
+    });
+    reviewsBody?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const row = event.target.closest('[data-review-id]');
+      if (!row) return;
+      event.preventDefault();
+      openReviewDetail(currentPageReviews.find((review) => String(review.review_id) === row.dataset.reviewId));
+    });
+    document.getElementById('reviewDetailClose')?.addEventListener('click', closeReviewDetail);
+    document.getElementById('reviewDetailCloseAction')?.addEventListener('click', closeReviewDetail);
+    document.getElementById('reviewDetailModal')?.addEventListener('click', (event) => {
+      if (event.target.id === 'reviewDetailModal') closeReviewDetail();
+    });
+    document.getElementById('reviewModerationAction')?.addEventListener('click', (event) => moderateOpenReview(event.currentTarget));
 
     // Load data
     await loadReviews();

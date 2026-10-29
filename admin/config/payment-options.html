@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=58">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=58">
-  <link rel="stylesheet" href="/css/admin_payment_options.css?v=58">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=58">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=59">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=59">
+  <link rel="stylesheet" href="/css/admin_payment_options.css?v=59">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=59">
 </head>
 <body>
 
@@ -363,8 +363,8 @@
 
         <!-- Bank + E-wallet: account name -->
         <div class="field pm2-fields-bank pm2-fields-ewallet">
-          <label class="field-label">Account name</label>
-          <input type="text" class="field-input" id="pm2AccountName" placeholder="e.g. ELI Coffee Events" maxlength="150">
+          <label class="field-label" for="pm2AccountName">Account name</label>
+          <input type="text" class="field-input" id="pm2AccountName" name="account_name" placeholder="e.g. ELI Coffee Events" maxlength="150" autocomplete="organization">
         </div>
 
         <!-- Bank only -->

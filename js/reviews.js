@@ -1,6 +1,5 @@
 // /js/reviews.js
 import { customerSupabase as supabase } from './supabase.js';
-import { shouldHideReview } from './reviews_filter.js';
 import { getEffectiveReservationStatus, getReservationPackageName } from './reservation_shared.js';
 import {
     fetchPayments as fetchSharedPayments,
@@ -33,12 +32,12 @@ let editingReview = null;
 /* ============================================================
    FETCH REVIEWS
 ============================================================ */
-// Reads the public list through get_public_reviews() (supabase/migrations/
-// 20261105_anonymous_reviews.sql). The database blanks the reviewer's name
+// Reads through get_public_reviews_with_moderation() (supabase/migrations/
+// 20261107_review_moderation.sql). The database blanks the reviewer's name
 // on anonymous reviews BEFORE the row reaches the browser, and flags the
 // signed-in customer's own reviews with is_mine so the Edit button can show.
 async function fetchReviews() {
-    const { data, error } = await supabase.rpc('get_public_reviews');
+    const { data, error } = await supabase.rpc('get_public_reviews_with_moderation');
 
     if (error) {
         // Only fall back when the function simply isn't installed yet (the
@@ -51,6 +50,20 @@ async function fetchReviews() {
         throw error;
     }
 
+    // Moderation reasons are private to the review author and staff. Fetch
+    // them through an authenticated, owner-scoped function rather than the
+    // public review RPC so other guests never receive the reason.
+    let moderationReasons = new Map();
+    const { data: { session } = {} } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+        const { data: reasons, error: reasonError } = await supabase.rpc('get_my_hidden_review_reasons');
+        if (reasonError) {
+            console.warn('[reviews] could not load private moderation reasons:', reasonError.message);
+        } else {
+            moderationReasons = new Map((reasons || []).map(row => [String(row.review_id), row.moderation_reason]));
+        }
+    }
+
     return (data || []).map(r => ({
         review_id:      r.review_id,
         reservation_id: r.reservation_id,
@@ -59,6 +72,8 @@ async function fetchReviews() {
         created_at:     r.created_at,
         is_anonymous:   !!r.is_anonymous,
         is_mine:        !!r.is_mine,
+        is_hidden:      !!r.is_hidden,
+        moderation_reason: moderationReasons.get(String(r.review_id)) || '',
         profile:        r.is_anonymous ? null : { first_name: r.first_name, last_name: r.last_name },
         packageName:    r.package_name || null,
     }));
@@ -184,8 +199,8 @@ function renderReviews() {
     let filtered = mineOnly
         ? allReviews.filter(r => r.is_mine)
         : showRatingOnly
-            ? [...allReviews]
-            : allReviews.filter(r => r.comment && r.comment.trim().length > 0);
+            ? allReviews.filter(r => !r.is_hidden)
+            : allReviews.filter(r => !r.is_hidden && r.comment && r.comment.trim().length > 0);
 
     if (currentFilter !== 'all') {
         filtered = filtered.filter(r => r.rating === Number(currentFilter));
@@ -247,8 +262,17 @@ function renderReviews() {
         const ownHtml = r.is_mine
             ? `
                 <div class="review-card__own">
-                    <span class="review-card__own-tag"><i class="ti ti-user" aria-hidden="true"></i> Your review${isAnon ? ' &middot; shown as Anonymous' : ''}</span>
-                    <button type="button" class="review-card__edit-btn" data-review-id="${escapeHtml(r.review_id)}"><i class="ti ti-pencil" aria-hidden="true"></i> Edit</button>
+                    <span class="review-card__own-tag"><i class="ti ti-user" aria-hidden="true"></i> Your review${r.is_hidden ? ' &middot; Under review' : (isAnon ? ' &middot; shown as Anonymous' : '')}</span>
+                    ${r.is_hidden ? `
+                        <div class="review-card__moderation" role="status">
+                            <strong>Under review</strong>
+                            <span>Your review is temporarily hidden while our team reviews it.</span>
+                            <div class="review-card__moderation-reason">
+                                <span class="review-card__moderation-reason-label">Reason</span>
+                                <p>${escapeHtml(r.moderation_reason || 'Our team is reviewing this review.')}</p>
+                            </div>
+                        </div>
+                    ` : `<button type="button" class="review-card__edit-btn" data-review-id="${escapeHtml(r.review_id)}"><i class="ti ti-pencil" aria-hidden="true"></i> Edit</button>`}
                 </div>`
             : '';
 
@@ -294,7 +318,8 @@ function renderReviews() {
    SUMMARY
 ============================================================ */
 function renderSummary() {
-    const total     = allReviews.length;
+    const publicReviews = allReviews.filter(r => !r.is_hidden);
+    const total     = publicReviews.length;
     const avgEl     = document.getElementById('averageRating');
     const totalEl   = document.getElementById('totalReviews');
     const starsEl   = document.getElementById('averageStars');
@@ -309,13 +334,13 @@ function renderSummary() {
         return;
     }
 
-    const avg = allReviews.reduce((acc, r) => acc + r.rating, 0) / total;
+    const avg = publicReviews.reduce((acc, r) => acc + r.rating, 0) / total;
     avgEl.textContent   = avg.toFixed(1);
     starsEl.textContent = renderStars(Math.round(avg));
 
     let html = '';
     for (let star = 5; star >= 1; star--) {
-        const count = allReviews.filter(r => r.rating === star).length;
+        const count = publicReviews.filter(r => r.rating === star).length;
         const pct   = total ? (count / total) * 100 : 0;
         html += `
             <div class="rating-bar-row">
@@ -579,7 +604,7 @@ function closeSubmissionFeedbackModal() {
 async function refreshPublicReviews(reason) {
     try {
         const raw = await fetchReviews();
-        allReviews = raw.filter((r) => !shouldHideReview(r.comment).hide);
+        allReviews = raw.filter((r) => (!r.is_hidden || r.is_mine));
         renderSummary();
         renderReviews();
     } catch (refreshError) {
@@ -860,7 +885,7 @@ async function init() {
     try {
         const raw = await fetchReviews();
 
-        allReviews = raw.filter(r => !shouldHideReview(r.comment).hide);
+        allReviews = raw.filter(r => (!r.is_hidden || r.is_mine));
 
         if (loadingEl) loadingEl.remove();
 
@@ -889,7 +914,7 @@ async function init() {
         initWriteReview();
         fetchReviews()
             .then((raw) => {
-                allReviews = raw.filter((r) => !shouldHideReview(r.comment).hide);
+                allReviews = raw.filter((r) => (!r.is_hidden || r.is_mine));
                 renderSummary();
                 renderReviews();
             })

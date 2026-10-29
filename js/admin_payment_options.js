@@ -129,8 +129,13 @@ const PM2_DEFAULT_ICON_BY_TYPE = {
 };
 
 function pm2SetTypeFields(type) {
-  document.querySelectorAll('.pm2-fields-bank').forEach(el => { el.style.display = type === 'bank' ? '' : 'none'; });
-  document.querySelectorAll('.pm2-fields-ewallet').forEach(el => { el.style.display = type === 'ewallet' ? '' : 'none'; });
+  document.querySelectorAll('.pm2-fields-bank, .pm2-fields-ewallet').forEach(el => {
+    const showForBank = type === 'bank' && el.classList.contains('pm2-fields-bank');
+    const showForWallet = type === 'ewallet' && el.classList.contains('pm2-fields-ewallet');
+    el.style.display = showForBank || showForWallet ? '' : 'none';
+  });
+  const accountName = document.getElementById('pm2AccountName');
+  if (accountName) accountName.required = type === 'bank' || type === 'ewallet';
   // Card is the same on-site flow as cash (pick an arrival date, staff
   // confirms in person), so it reuses the exact same field group.
   document.querySelectorAll('.pm2-fields-cash').forEach(el => { el.style.display = (type === 'cash' || type === 'card') ? '' : 'none'; });

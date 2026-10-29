@@ -676,7 +676,7 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   if (normalizedNextStatus === 'approved' || normalizedNextStatus === 'declined') {
     await logAudit({
       action: normalizedNextStatus === 'approved' ? 'Approved Reservation' : 'Declined Reservation',
-      category: 'reservations',
+      category: 'reservation',
       details: `${normalizedNextStatus === 'approved' ? 'Approved' : 'Declined'} reservation${reservationNumber ? ` ${reservationNumber}` : ''}`
         + (previousStatus ? ` (was ${previousStatus})` : ''),
       entityId: reservationId
@@ -1041,7 +1041,7 @@ async function voidCharge(chargeId) {
 
     await logAudit({
       action: 'Voided Manual Charge',
-      category: 'payments',
+      category: 'payment',
       details: `Voided "${charge.label}" (${formatCurrency(charge.amount)})`,
       entityId: currentReservation.reservation_id
     });
@@ -1466,7 +1466,7 @@ async function saveAddCharge() {
 
     await logAudit({
       action: 'Added Manual Charge',
-      category: 'payments',
+      category: 'payment',
       details: `Added "${label}" (${formatCurrency(amount)})${note ? ` — ${note}` : ''}`,
       entityId: reservation.reservation_id
     });
@@ -1582,7 +1582,7 @@ async function handleManualVerifyContract() {
 
     await logAudit({
       action: 'Manually Verified Contract Signature',
-      category: 'contracts',
+      category: 'contract',
       details: 'Automatic signature scan did not confirm a signature; verified manually after visual review.',
       entityId: reservation.reservation_id
     });

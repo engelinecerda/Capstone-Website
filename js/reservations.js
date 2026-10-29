@@ -2169,7 +2169,9 @@ async function loadPackages() {
         if (!existing || row.is_cover) coverPhotoMap.set(row.package_id, row);
     });
 
-    const visible = pkgs.filter(p => p.package_category?.is_active !== false);
+    // Public category RLS hides archived rows, leaving a null relation for
+    // packages that still reference them. Exclude those packages explicitly.
+    const visible = pkgs.filter(p => !p.package_category_id || p.package_category?.is_active === true);
     MINI = []; SNACK = []; OFFSITE_ALL = [];
     MINI_BY_CAT = {}; OFFSITE_BY_CAT = {};
     const onsiteCatMap  = new Map(); // categoryId -> { id, name, sortOrder, count }

@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=58">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=58">
-  <link rel="stylesheet" href="/css/admin_reviews.css?v=58">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=58">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=59">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=59">
+  <link rel="stylesheet" href="/css/admin_reviews.css?v=59">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=59">
 </head>
 <body>
   <aside class="sidebar">
@@ -48,8 +48,8 @@
     <section class="page-shell page-shell--wide">
       <header class="page-header">
         <div>
-          <h1 class="page-title">Customer reviews<span class="view-only-pill">View only</span></h1>
-          <p class="page-sub">Submitted customer feedback in one place.</p>
+          <h1 class="page-title">Customer reviews</h1>
+          <p class="page-sub">Open a review to read its full details and moderate it.</p>
         </div>
         <div class="header-actions">
           <span id="managerNotifBell"></span>
@@ -60,7 +60,7 @@
         <div class="stat-card">
           <p class="stat-label">Total reviews</p>
           <p class="stat-value" id="statTotalReviews">0</p>
-          <p class="stat-sub">All submitted customer reviews currently saved</p>
+          <p class="stat-sub">Reviews currently visible to customers</p>
         </div>
         <div class="stat-card">
           <p class="stat-label">Average rating</p>
@@ -118,6 +118,31 @@
       </section>
     </section>
   </main>
+
+  <div class="review-detail-backdrop hidden" id="reviewDetailModal" role="dialog" aria-modal="true" aria-labelledby="reviewDetailHeading">
+    <section class="review-detail-card">
+      <button type="button" class="review-detail-close" id="reviewDetailClose" aria-label="Close review details">×</button>
+      <p class="review-detail-eyebrow">Customer review</p>
+      <h2 id="reviewDetailHeading">Review details</h2>
+      <p class="review-detail-customer" id="reviewDetailCustomer"></p>
+      <p class="review-detail-sub" id="reviewDetailEmail"></p>
+      <dl class="review-detail-facts">
+        <div><dt>Reservation</dt><dd id="reviewDetailReservation"></dd></div>
+        <div><dt>Rating</dt><dd id="reviewDetailRating"></dd></div>
+        <div><dt>Submitted</dt><dd id="reviewDetailSubmitted"></dd></div>
+        <div><dt>Privacy</dt><dd id="reviewDetailAnonymous"></dd></div>
+        <div><dt>Status</dt><dd id="reviewDetailStatus"></dd></div>
+      </dl>
+      <blockquote class="review-detail-comment" id="reviewDetailComment"></blockquote>
+      <label class="review-moderation-label" for="reviewModerationReason">Moderation reason</label>
+      <textarea id="reviewModerationReason" rows="3" maxlength="500" placeholder="Explain why this review is being hidden or restored."></textarea>
+      <p class="review-detail-message" id="reviewDetailMessage" role="status"></p>
+      <div class="review-detail-actions">
+        <button type="button" class="review-detail-secondary" id="reviewDetailCloseAction">Close</button>
+        <button type="button" class="review-detail-primary" id="reviewModerationAction">Hide review</button>
+      </div>
+    </section>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="../js/admin_reviews.js"></script>

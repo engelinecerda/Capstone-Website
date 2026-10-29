@@ -901,7 +901,7 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
   const reviewedAmount = `\u20B1${Number(payment.amount || 0).toLocaleString()}`;
   await logAudit({
     action: nextStatus === 'approved' ? 'Approved Payment' : 'Rejected Payment',
-    category: 'payments',
+    category: 'payment',
     details: `${nextStatus === 'approved' ? 'Approved' : 'Rejected'} ${reviewedPaymentType} of ${reviewedAmount}`
       + (reviewedReservationNumber ? ` for reservation ${reviewedReservationNumber}` : '')
       + (nextStatus === 'rejected' && rejectionReason ? ` — reason: ${rejectionReason}` : ''),

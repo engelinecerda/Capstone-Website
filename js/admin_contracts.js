@@ -529,7 +529,7 @@ async function updateReservationStatus(reservationId, status, previousStatus = n
   if (normalizedNextStatus === 'approved' || normalizedNextStatus === 'declined') {
     await logAudit({
       action: normalizedNextStatus === 'approved' ? 'Approved Reservation' : 'Declined Reservation',
-      category: 'reservations',
+      category: 'reservation',
       details: `${normalizedNextStatus === 'approved' ? 'Approved' : 'Declined'} reservation${reservationNumber ? ` ${reservationNumber}` : ''}`
         + (previousStatus ? ` (was ${previousStatus})` : ''),
       entityId: reservationId
@@ -778,7 +778,7 @@ async function performContractAction(action, button) {
 
     await logAudit({
       action: 'Manually Verified Contract Signature',
-      category: 'contracts',
+      category: 'contract',
       details: 'Automatic signature scan did not confirm a signature; verified manually after visual review.',
       entityId: reservationId
     });
