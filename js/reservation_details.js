@@ -524,7 +524,17 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     // to reach their payment/receipt history from this page.
     const showPaymentCta = true;
     const nothingOwed = hideActions || paymentDone;
-    const locked = !verificationDone;
+    // "Unlocks after your reservation is verified" only makes sense for a
+    // reservation that never got verified. A cancelled one was verified
+    // before it was cancelled (and can still owe/hold a cancellation fee),
+    // and js/payment.js already renders a full cancelled view for it —
+    // payment history and receipts included. isReservationPaymentEnabled()
+    // deliberately excludes 'cancelled' (no more balance to pay), which
+    // used to lock this button and cut the customer off from their own
+    // payment records. The page itself is read-only for the old balance.
+    const isCancelledReservation = effectiveStatus === 'cancelled'
+        || String(reservation?.status || '').toLowerCase() === 'cancelled';
+    const locked = !verificationDone && !isCancelledReservation;
 
     // Manual Charge for Special Requests — active (non-voided) charges only;
     // a voided charge no longer affects this customer's balance, and its

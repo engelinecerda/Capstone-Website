@@ -1170,9 +1170,17 @@ function isSignaturePresent() {
     return !!(signatureTypeInput?.value || '').trim();
 }
 
+// The printed name under the signature is always the customer's Full Name
+// from the reservation form, whichever way they sign. A typed signature used
+// to double as the printed name (so "Juan D." typed in the signature box
+// became the printed name) while a drawn one used Full Name — two different
+// results for the same customer. The typed text is now only the signature
+// image. If Full Name is somehow empty, a typed signature is the fallback.
 function getSignerName() {
+    const printedName = (S.name || '').trim();
+    if (printedName) return printedName;
     if (signatureState.mode === 'type') return (signatureTypeInput?.value || '').trim();
-    return S.name || '';
+    return '';
 }
 
 function renderTypedSignatureToDataUrl(text) {
@@ -4572,6 +4580,14 @@ async function submitDone() {
             if (/total price cannot be less/i.test(insertError.message || '')) {
                 throw new Error('We couldn\u2019t confirm the price for this package. Please review your selections and try again, or contact us if it keeps happening.');
             }
+            // A manager closed this date after the calendar loaded (see
+            // 20261111_reject_closed_date_bookings.sql). Re-read the
+            // calendar so the date shows as closed, and show the database's
+            // customer-friendly wording without the "save failed" prefix.
+            if (insertError.hint === 'date_closed' || /no longer available for booking/i.test(insertError.message || '')) {
+                try { await loadAvailabilityCalendar(); } catch { /* the message below still shows */ }
+                throw new Error(insertError.message);
+            }
             throw new Error('Reservation save failed: ' + insertError.message);
         }
 
@@ -4582,7 +4598,10 @@ async function submitDone() {
                 signer_name: signerName,
                 signature_type: signatureType,
                 agreement_view_method: signatureState.agreementViewMethod,
-                agreement_viewed_at: signatureState.agreementViewedAt
+                agreement_viewed_at: signatureState.agreementViewedAt,
+                // So the contract's signed date/time is in the customer's own
+                // time zone instead of the server's (UTC).
+                time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
             }
         });
 

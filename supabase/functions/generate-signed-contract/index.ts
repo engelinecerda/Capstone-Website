@@ -56,6 +56,25 @@ function formatCurrency(amount: number): string {
   });
 }
 
+// The Edge Function runs in UTC, so date/time labels formatted without a
+// time zone showed the UTC date — which can be a different calendar day from
+// the one the customer signed on (e.g. signing at 7 AM in Manila is still the
+// previous evening in UTC). The browser sends its own IANA time zone and the
+// labels are formatted in it; an unknown/invalid value falls back to the
+// business's own zone so the contract never goes out in UTC by accident.
+const DEFAULT_TIME_ZONE = 'Asia/Manila';
+
+function resolveTimeZone(candidate: unknown): string {
+  const tz = typeof candidate === 'string' ? candidate.trim() : '';
+  if (!tz || tz.length > 64) return DEFAULT_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat('en-PH', { timeZone: tz });
+    return tz;
+  } catch {
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'TBD';
   const d = new Date(`${dateStr}T00:00:00`);
@@ -617,6 +636,7 @@ async function buildContractPdf(
   lockedClauses: LockedClauses,
   signatureBytes: Uint8Array,
   signerName: string,
+  timeZone: string,
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -625,9 +645,11 @@ async function buildContractPdf(
   newPage(ctx);
 
   const now = new Date();
-  const generatedDateLabel = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const generatedDateLabel = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', timeZone: timeZone });
   const signedDateLabel = generatedDateLabel;
-  const signedTimeLabel = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+  // timeZoneName makes the zone explicit on the PDF (e.g. "GMT+8") so the
+  // time is unambiguous wherever the contract is read.
+  const signedTimeLabel = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short', timeZone: timeZone });
 
   drawHeader(ctx, { contractNumber: data.reservationNumber, status: 'SIGNED', generatedDate: generatedDateLabel });
 
@@ -709,6 +731,7 @@ Deno.serve(async (req: Request) => {
   let signature_type: string | undefined;
   let agreement_view_method: string | undefined;
   let agreement_viewed_at: string | undefined;
+  let time_zone = DEFAULT_TIME_ZONE;
 
   try {
     const body = await req.json();
@@ -718,6 +741,7 @@ Deno.serve(async (req: Request) => {
     signature_type = body.signature_type;
     agreement_view_method = body.agreement_view_method;
     agreement_viewed_at = body.agreement_viewed_at;
+    time_zone = resolveTimeZone(body.time_zone);
   } catch {
     return jsonResponse({ success: false, error: 'Invalid JSON body.' }, 400);
   }
@@ -814,6 +838,7 @@ Deno.serve(async (req: Request) => {
     const reservationNumber = reservation.reservation_number as string;
     const signedAtLabel = new Date().toLocaleString('en-PH', {
       year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      timeZoneName: 'short', timeZone: time_zone,
     });
 
     const packageName = reservation.package?.package_name || 'Selected Package';
@@ -908,6 +933,7 @@ Deno.serve(async (req: Request) => {
       lockedClauses,
       signatureBytes,
       sanitizeForPdf(signer_name),
+      time_zone,
     );
 
     // resourceType 'image' (not 'raw') — required so Cloudinary's pg_N page
