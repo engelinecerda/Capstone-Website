@@ -1,4 +1,5 @@
-// supabase_health_notice.js — "service issue" notice for the customer site.
+// supabase_health_notice.js — "service issue" notice for the whole site: the
+// customer pages and the admin / manager / staff portals (admin/, board/).
 //
 // Watches whether the site's own Supabase project is answering. When it has
 // failed 3 checks in a row, a popup (same look and behaviour as the System
@@ -20,7 +21,13 @@
 //   - the visitor's own connection being down (navigator.onLine === false) is
 //     never counted: that is not a Supabase problem, so the notice stays quiet.
 //
-// Cadence: healthy = one check per HEALTHY_INTERVAL_MS. After a failure the
+// Cadence: healthy = one check per HEALTHY_INTERVAL_MS, which depends on who
+// is using the page (customers are the biggest crowd and the quickest to give
+// up, so they get the shortest gap; each staff tab is one of few):
+//   customer pages ................ 2.5 min
+//   admin / manager (/admin/*) .... 3 min
+//   staff (/board/*) .............. 3.5 min
+// After a failure the
 // gap between checks follows RETRY_LADDER_MS (5s, 10s, 30s, then 60s and stays
 // there). The two short gaps are the quick confirmation retries that lead to
 // the third failure (and so the notice) within seconds; the long gaps are the
@@ -35,17 +42,32 @@
 // which is removed when testing ends). This file is a permanent feature.
 //
 // To REMOVE: delete this file and the two lines tagged "SUPABASE-HEALTH"
-// (a comment + a <script>) near the end of <body> in each root-level .html file:
+// (a comment + a <script>) near the end of <body> in every .html file that
+// carries them (customer pages at the root, admin/, board/):
 //   grep -rl "SUPABASE-HEALTH" --include=*.html .
 (function () {
   'use strict';
   if (window.__eliSupabaseHealthLoaded) return;
   window.__eliSupabaseHealthLoaded = true;
 
+  // Staff accounts are refused on the /admin pages and customers never see
+  // either portal, so the first path segment identifies the audience.
+  function healthyIntervalFor(pathname) {
+    var path = String(pathname || '').toLowerCase();
+    if (/^\/board(\/|$)/.test(path)) return STAFF_HEALTHY_INTERVAL_MS;
+    if (/^\/admin(\/|$)/.test(path)) return ADMIN_HEALTHY_INTERVAL_MS;
+    return CUSTOMER_HEALTHY_INTERVAL_MS;
+  }
+
   // ── Tunables ───────────────────────────────────────────────────────────
   var CHECK_TIMEOUT_MS = 5000;         // a check slower than this counts as failed
   var FAILS_TO_ALERT = 3;              // consecutive failed checks before the notice shows
-  var HEALTHY_INTERVAL_MS = 150000;    // gap between checks while everything is fine (2.5 min)
+  var CUSTOMER_HEALTHY_INTERVAL_MS = 150000; // customer pages: gap between checks while everything is fine (2.5 min)
+  var ADMIN_HEALTHY_INTERVAL_MS = 180000;    // admin / manager portal, /admin/* (3 min)
+  var STAFF_HEALTHY_INTERVAL_MS = 210000;    // staff portal, /board/* (3.5 min)
+  // Only the healthy gap differs per portal; the failure ladder below is the
+  // same everywhere so an outage is confirmed just as fast for everyone.
+  var HEALTHY_INTERVAL_MS = healthyIntervalFor(location.pathname);
   var RETRY_LADDER_MS = [5000, 10000, 30000, 60000]; // gaps after consecutive failures; the last one repeats
   var JITTER = 0.2;                    // every gap is randomised by +/- this fraction
   var FIRST_CHECK_DELAY_MS = 3000;     // let the page finish loading before the first check
