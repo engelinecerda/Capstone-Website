@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=59">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=59">
-  <link rel="stylesheet" href="/css/super_admin_settings.css?v=59">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=59">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=60">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=60">
+  <link rel="stylesheet" href="/css/super_admin_settings.css?v=60">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=60">
 </head>
 <body>
 
@@ -64,7 +64,20 @@
       <!-- ── OPERATING HOURS ── -->
       <div class="card" id="hours">
         <p class="card-title">Operating Hours</p>
-        <p class="card-sub">Per-weekday hours bound which start times customers can select — the last valid start time always leaves room for the full package duration before closing. A closed day offers no bookable times at all. Changes affect new bookings only.</p>
+        <p class="card-sub">Per-weekday hours bound which start times customers can select — the last valid start time always leaves room for the full package duration before closing. A closed day offers no bookable times at all. A closing time at or before the opening time (for example 12:00 pm to 12:00 am) means the venue closes after midnight. Changes affect new bookings only.</p>
+
+        <div class="hours-default-bar">
+          <div class="hours-default-copy">
+            <p class="pr-row-label">Set the same hours for the whole week</p>
+            <p class="pr-row-desc">Pick an opening and closing time, then apply it to every day. You can still change any single day afterwards — days whose times you have edited by hand are left as they are.</p>
+          </div>
+          <div class="hours-default-controls">
+            <input type="time" id="hoursDefaultOpen" aria-label="Default opening time">
+            <span class="hours-default-sep">to</span>
+            <input type="time" id="hoursDefaultClose" aria-label="Default closing time">
+            <button type="button" class="btn-secondary" id="applyDefaultHoursBtn">Apply to all days</button>
+          </div>
+        </div>
 
         <div class="table-wrap">
           <table class="et-table" id="hoursTable">

@@ -16,7 +16,6 @@ const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
 const reservationsPagination = document.getElementById('reservationsPagination');
 const searchInput = document.getElementById('searchInput');
-const statusDropdown = document.getElementById('statusDropdown');
 const chipsRow = document.getElementById('chipsRow');
 const navReservationCount = document.getElementById('navReservationCount');
 const navContractCount = document.getElementById('navContractCount');
@@ -368,11 +367,9 @@ function renderTable(list) {
 
 
 
-// Which status filter is active: the dropdown wins over the chips, as before.
+// Which status filter is active: the selected chip (the page opens on "Upcoming").
 function getActiveStatus() {
-  const dropdownStatus = statusDropdown?.value || 'all';
-  const chipStatus = chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
-  return dropdownStatus !== 'all' ? dropdownStatus : chipStatus;
+  return chipsRow?.querySelector('.chip.active')?.dataset.status || 'all';
 }
 
 // BUG-04 fix (kept): "Review" clears unseenChangeIds as its very first step
@@ -427,24 +424,17 @@ function handleSearchInput() {
 
 function wireFilters() {
   searchInput?.addEventListener('input', handleSearchInput);
-  statusDropdown?.addEventListener('change', () => {
-    showPendingRescheduleOnly = false;
-    chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    reloadFromFirstPage();
-  });
   chipsRow?.addEventListener('click', (e) => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
     showPendingRescheduleOnly = false;
     chipsRow.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
-    statusDropdown.value = 'all';
     reloadFromFirstPage();
   });
   rescheduleAlertAction?.addEventListener('click', async () => {
     reviewFilterIds = new Set(unseenChangeIds);
     showPendingRescheduleOnly = true;
-    statusDropdown.value = 'all';
     chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     chipsRow?.querySelector('[data-status="all"]')?.classList.add('active');
 
@@ -791,7 +781,6 @@ function applyStatusFilterFromUrl() {
   if (!chip) return;
   chipsRow.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
   chip.classList.add('active');
-  if (statusDropdown) statusDropdown.value = 'all';
 }
 
 // Legacy deep links (e.g. notification emails) point to
@@ -833,6 +822,10 @@ validateAdminSession({
         if (changedIds.size) {
           reviewFilterIds = changedIds;
           showPendingRescheduleOnly = true;
+          // The "recently changed" list must not be narrowed by the default
+          // "Upcoming" chip, so show it under "All" (same as the Review button).
+          chipsRow?.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          chipsRow?.querySelector('[data-status="all"]')?.classList.add('active');
         }
       } catch (error) {
         // Non-fatal - fall back to the normal, unfiltered list.

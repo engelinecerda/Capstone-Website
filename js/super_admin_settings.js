@@ -69,6 +69,7 @@ const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 
 const DEFAULT_DAY_HOURS = { is_open: true, open_time: '13:00', close_time: '22:00' };
 
 let hoursCache = []; // [{ weekday, is_open, open_time, close_time }]
+const manuallyEditedDays = new Set(); // weekdays whose times the admin changed by hand this session; "Apply to all days" skips them
 
 function setHoursMsg(msg, isError = false) {
   const el = document.getElementById('hours-settings-msg');
@@ -107,10 +108,37 @@ document.addEventListener('change', (e) => {
     row.querySelectorAll('input[type="time"]').forEach((el) => { el.disabled = !day.is_open; });
   } else if (e.target.dataset.field === 'open_time') {
     day.open_time = e.target.value;
+    manuallyEditedDays.add(weekday);
   } else if (e.target.dataset.field === 'close_time') {
     day.close_time = e.target.value;
+    manuallyEditedDays.add(weekday);
   }
 });
+
+// "Set the same hours for the whole week": copies one opening/closing pair onto
+// every day except those the admin already edited by hand. Open/closed toggles
+// are never touched, and nothing is saved until "Save Operating Hours".
+function applyDefaultHours() {
+  const open = document.getElementById('hoursDefaultOpen')?.value;
+  const close = document.getElementById('hoursDefaultClose')?.value;
+  if (!open || !close) {
+    setHoursMsg('Pick both an opening and a closing time to apply to the week.', true);
+    return;
+  }
+
+  const skipped = [];
+  hoursCache.forEach((day) => {
+    if (manuallyEditedDays.has(day.weekday)) { skipped.push(WEEKDAY_LABELS[day.weekday]); return; }
+    day.open_time = open;
+    day.close_time = close;
+  });
+  renderHoursTable();
+
+  const skippedNote = skipped.length ? ` Left unchanged (edited by hand): ${skipped.join(', ')}.` : '';
+  // Any pair of times is valid: a closing time at or before the opening time
+  // (e.g. 12:00 pm to 12:00 am) means the venue closes after midnight.
+  setHoursMsg(`Applied to ${hoursCache.length - skipped.length} day(s).${skippedNote} Click "Save Operating Hours" to keep the changes.`);
+}
 
 async function loadOperatingHours() {
   const { data, error } = await supabase
@@ -135,10 +163,6 @@ async function saveOperatingHours() {
   for (const day of hoursCache) {
     if (day.is_open && (!day.open_time || !day.close_time)) {
       setHoursMsg(`${WEEKDAY_LABELS[day.weekday]}: both opening and closing times are required for an open day.`, true);
-      return;
-    }
-    if (day.is_open && day.open_time >= day.close_time) {
-      setHoursMsg(`${WEEKDAY_LABELS[day.weekday]}: closing time must be after opening time.`, true);
       return;
     }
   }
@@ -845,6 +869,7 @@ async function init() {
   await loadVenueCapacity();
 
   document.getElementById('saveHoursBtn')?.addEventListener('click', saveOperatingHours);
+  document.getElementById('applyDefaultHoursBtn')?.addEventListener('click', applyDefaultHours);
   document.getElementById('saveMinAdvanceBtn')?.addEventListener('click', saveMinAdvanceDays);
   document.getElementById('saveEventTypeAdvanceBtn')?.addEventListener('click', saveEventTypeAdvanceOverrides);
   document.getElementById('saveCancellationNoticeBtn')?.addEventListener('click', saveCancellationNoticeRules);

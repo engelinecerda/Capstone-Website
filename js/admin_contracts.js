@@ -16,7 +16,9 @@ const sidebarEmailEl = document.getElementById('sidebarEmail');
 const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const searchInput = document.getElementById('searchInput');
-const statusDropdown = document.getElementById('statusDropdown');
+// The status chips are the only status filter; the page opens on "Pending" so the
+// contracts that need review are shown first.
+let activeStatus = 'pending';
 const tableMessage = document.getElementById('tableMessage');
 const contractsBody = document.getElementById('contractsBody');
 const contractsPagination = document.getElementById('contractsPagination');
@@ -371,14 +373,13 @@ function renderTable(list) {
 
 function syncActiveChip() {
   if (!chipsRow) return;
-  const selectedStatus = statusDropdown?.value || 'all';
   chipsRow.querySelectorAll('.chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.dataset.status === selectedStatus);
+    chip.classList.toggle('active', chip.dataset.status === activeStatus);
   });
 }
 
 function getActiveStatus() {
-  return statusDropdown?.value || 'all';
+  return activeStatus;
 }
 
 function getEmptyMessage() {
@@ -887,14 +888,10 @@ function handleSearchInput() {
 
 function wireFilters() {
   searchInput?.addEventListener('input', handleSearchInput);
-  statusDropdown?.addEventListener('change', () => {
-    syncActiveChip();
-    reloadFromFirstPage();
-  });
   chipsRow?.addEventListener('click', (event) => {
     const button = event.target.closest('.chip');
     if (!button) return;
-    statusDropdown.value = button.dataset.status || 'all';
+    activeStatus = button.dataset.status || 'all';
     syncActiveChip();
     reloadFromFirstPage();
   });

@@ -6,11 +6,11 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <title>Audit Trail - Admin</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=59">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=59">
-  <link rel="stylesheet" href="/css/admin_customers.css?v=59">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=59">
-  <link rel="stylesheet" href="/css/super_admin_audit.css?v=59">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=60">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=60">
+  <link rel="stylesheet" href="/css/admin_customers.css?v=60">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=60">
+  <link rel="stylesheet" href="/css/super_admin_audit.css?v=60">
 </head>
 <body>
 
@@ -54,7 +54,8 @@
           <p class="page-sub">A read-only record of configuration and account changes.</p>
         </div>
         <div class="page-header-actions">
-          <button type="button" class="btn-primary" id="exportAuditPdfBtn">Export</button>
+          <button type="button" class="btn-primary" id="exportAuditPdfBtn">Export PDF</button>
+          <button type="button" class="btn-primary" id="exportAuditExcelBtn">Export to Excel</button>
           <span id="managerNotifBell"></span>
         </div>
       </div>
@@ -163,6 +164,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>

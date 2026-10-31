@@ -65,6 +65,8 @@ const locationTagInput     = document.getElementById('locationTagInput');
 const locationNameInput    = document.getElementById('locationNameInput');
 const locationAddressInput = document.getElementById('locationAddressInput');
 const locationHoursInput   = document.getElementById('locationHoursInput');
+const locationHoursOpen    = document.getElementById('locationHoursOpen');
+const locationHoursClose   = document.getElementById('locationHoursClose');
 const locationModalSave    = document.getElementById('locationModalSave');
 const locationModalSaveLabel = document.getElementById('locationModalSaveLabel');
 
@@ -163,6 +165,40 @@ locationList.addEventListener('click', e => {
 
 document.getElementById('addLocationBtn').addEventListener('click', () => openLocationModal(null));
 
+// ── Hours helpers ────────────────────────────────────────────────
+// The DB stores one free-text `hours_label` (e.g. "Daily · 1:00 PM – 10:00 PM").
+// The modal edits it as "days text" + two time pickers and rebuilds that same
+// string on save, so every page that displays hours_label is unaffected.
+const HOURS_LABEL_RE = /^(?:(.*?)\s*·\s*)?(\d{1,2}:\d{2}\s?[AP]M)\s*[–—-]\s*(\d{1,2}:\d{2}\s?[AP]M)\s*$/i;
+
+function to12Hour(value) {            // "13:00" -> "1:00 PM"
+  const [h, m] = value.split(':').map(Number);
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+function to24Hour(label) {            // "1:00 PM" -> "13:00"
+  const match = /^(\d{1,2}):(\d{2})\s?([AP]M)$/i.exec(label.trim());
+  if (!match) return '';
+  let h = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') h += 12;
+  return `${String(h).padStart(2, '0')}:${match[2]}`;
+}
+
+function fillHoursFields(label) {
+  const match = HOURS_LABEL_RE.exec(label || '');
+  if (match) {
+    locationHoursInput.value = match[1] || '';
+    locationHoursOpen.value = to24Hour(match[2]);
+    locationHoursClose.value = to24Hour(match[3]);
+  } else {
+    // Older / free-form label: keep the whole text as typed, times stay empty.
+    locationHoursInput.value = label || '';
+    locationHoursOpen.value = '';
+    locationHoursClose.value = '';
+  }
+}
+
 function openLocationModal(id) {
   editingLocationId = id;
   const loc = id ? locations.find(l => l.id === id) : null;
@@ -171,7 +207,7 @@ function openLocationModal(id) {
   locationTagInput.value = loc?.branch_tag || '';
   locationNameInput.value = loc?.name || '';
   locationAddressInput.value = loc?.address || '';
-  locationHoursInput.value = loc?.hours_label || '';
+  fillHoursFields(loc?.hours_label);
   setModalMsg(locationModalMessage, '');
   openModal(locationModal);
 }
@@ -181,13 +217,24 @@ locationModalSave.addEventListener('click', async () => {
   const address = locationAddressInput.value.trim();
   if (!name || !address) { setModalMsg(locationModalMessage, 'Name and address are both required.'); return; }
 
+  const hoursDays = locationHoursInput.value.trim();
+  const hoursOpen = locationHoursOpen.value;
+  const hoursClose = locationHoursClose.value;
+  if (!!hoursOpen !== !!hoursClose) {
+    setModalMsg(locationModalMessage, 'Set both an opening and a closing time, or leave both empty.');
+    return;
+  }
+  const hoursLabel = hoursOpen && hoursClose
+    ? `${hoursDays ? `${hoursDays} · ` : ''}${to12Hour(hoursOpen)} – ${to12Hour(hoursClose)}`
+    : hoursDays;
+
   locationModalSave.disabled = true;
   try {
     const payload = {
       branch_tag: locationTagInput.value.trim() || null,
       name,
       address,
-      hours_label: locationHoursInput.value.trim() || null,
+      hours_label: hoursLabel || null,
       updated_at: new Date().toISOString()
     };
 

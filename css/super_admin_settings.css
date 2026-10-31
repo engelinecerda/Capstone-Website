@@ -10,7 +10,7 @@
    that's why the sidebar looked outdated here specifically. Fixed the same
    way admin_reservation_form.css already was: no local :root, reuse the
    shared component classes instead of redeclaring them. */
-@import url('./admin_payment_options.css?v=59');
+@import url('./admin_payment_options.css?v=60');
 
 /* Keeps the jumped-to section clear of the viewport edge when the sidebar's
    Availability and scheduling sub-links (admin_nav_data.js) land on
@@ -18,6 +18,33 @@
    #capacity-overrides — same fix as #payment-methods etc. in
    admin_payment_options.css. */
 #hours, #notice, #notice-overrides, #buffer-capacity, #capacity-overrides { scroll-margin-top: 24px; }
+
+/* ── Weekly default hours bar (above the Operating Hours table) ── */
+.hours-default-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 14px 0 6px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+}
+.hours-default-copy { flex: 1 1 280px; min-width: 0; }
+.hours-default-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hours-default-controls input[type="time"] {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+  width: 128px;
+}
+.hours-default-sep { font-size: 12px; color: var(--muted); }
 
 /* ── Data table (Operating Hours / Per-Scope Capacity Override) ── */
 .table-wrap { overflow-x: auto; }

@@ -3169,28 +3169,22 @@ function wireEditProfileToggle() {
     const readonlyView = document.getElementById('info-readonly-view');
     const editView     = document.getElementById('info-edit-view');
 
+    // While editing, the only way out is the "Cancel" button next to Save
+    // Changes, so the header button is hidden instead of turning into a second,
+    // identical "Cancel Edit" control.
     function enterEditMode() {
         readonlyView?.setAttribute('hidden', '');
         editView?.removeAttribute('hidden');
-        if (editBtn) editBtn.innerHTML = '<i class="ti ti-x"></i> Cancel Edit';
+        if (editBtn) editBtn.style.display = 'none';
     }
 
     function exitEditMode() {
         editView?.setAttribute('hidden', '');
         readonlyView?.removeAttribute('hidden');
-        if (editBtn) editBtn.innerHTML = '<i class="ti ti-edit"></i> Edit Profile';
+        if (editBtn) editBtn.style.display = '';
     }
 
-    // Toggle: if already in edit mode, cancel; otherwise open
-    editBtn?.addEventListener('click', () => {
-        if (editView && !editView.hasAttribute('hidden')) {
-            exitEditMode();
-        } else {
-            enterEditMode();
-        }
-    });
-
-    // The "Cancel" button next to Save Changes also exits edit mode
+    editBtn?.addEventListener('click', enterEditMode);
     cancelBtn?.addEventListener('click', exitEditMode);
 }
 

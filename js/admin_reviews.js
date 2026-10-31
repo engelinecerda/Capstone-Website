@@ -470,7 +470,6 @@ validateAdminSession({
       openReviewDetail(currentPageReviews.find((review) => String(review.review_id) === row.dataset.reviewId));
     });
     document.getElementById('reviewDetailClose')?.addEventListener('click', closeReviewDetail);
-    document.getElementById('reviewDetailCloseAction')?.addEventListener('click', closeReviewDetail);
     document.getElementById('reviewDetailModal')?.addEventListener('click', (event) => {
       if (event.target.id === 'reviewDetailModal') closeReviewDetail();
     });

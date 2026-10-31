@@ -106,17 +106,16 @@ body { background: var(--cream, #FAF8F4); }
 }
 
 /* ── CATEGORY CHIPS ──────────────────────────────────────────────────────── */
+/* Chips wrap onto extra rows instead of sitting in a horizontal scroller with a
+   hidden scrollbar, which left the last label (e.g. "Birthday party") cut off at
+   the edge of the screen with no sign that it could be scrolled to. */
 .menu-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
   margin-bottom: 40px;
-  scrollbar-width: none;
 }
-.menu-chips::-webkit-scrollbar { display: none; }
 /* Both start empty until loadMenuSections() resolves (menu.html) — give
    the cfg-loading shimmer something sized to cover, since neither has any
    hardcoded fallback content underneath it to size against anymore. */
@@ -133,7 +132,6 @@ body { background: var(--cream, #FAF8F4); }
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
-  scroll-snap-align: start;
   background: var(--white, #fff);
   color: var(--text-mid, #5A3420);
   border: 1.5px solid rgba(61,26,10,.14);

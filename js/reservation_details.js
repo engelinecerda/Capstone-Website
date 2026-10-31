@@ -686,6 +686,21 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
     }
 
     const latestRequest = rescheduleRequests[0] || null;
+
+    // Nothing can be changed until the reservation is approved; say so instead
+    // of showing no controls at all (which left customers wondering where the
+    // reschedule / cancel options were).
+    if (effectiveStatus === 'pending' && !latestRequest) {
+        return `
+            <div class="rd-reschedule-row">
+                <div class="rd-reschedule-row-left">
+                    <i class="ti ti-info-circle" aria-hidden="true"></i>
+                    <span>Your reservation must be approved before you can request to reschedule or cancel it.</span>
+                </div>
+            </div>
+        `;
+    }
+
     const openRescheduleUrl = `/account?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
     // A block reason is only ever shown for the time-based rules (min notice

@@ -28,6 +28,7 @@ const prevPageBtn        = document.getElementById('prevPageBtn');
 const nextPageBtn        = document.getElementById('nextPageBtn');
 const paginationInfo     = document.getElementById('paginationInfo');
 const exportAuditPdfBtn  = document.getElementById('exportAuditPdfBtn');
+const exportAuditExcelBtn = document.getElementById('exportAuditExcelBtn');
 const auditDateFrom      = document.getElementById('auditDateFrom');
 const auditDateTo        = document.getElementById('auditDateTo');
 const clearDateRangeBtn  = document.getElementById('clearDateRangeBtn');
@@ -493,6 +494,84 @@ async function exportAuditPdf() {
 }
 
 exportAuditPdfBtn?.addEventListener('click', exportAuditPdf);
+
+// ─── Excel Export ─────────────────────────────────────────────────────────────
+// Same data as the PDF export: every log matching the current filters (not
+// just the visible page), via the shared buildAuditQuery().
+async function exportAuditExcel() {
+  const ExcelJSLib = window.ExcelJS;
+  if (!ExcelJSLib) {
+    setMessage('Excel export is not available because the export library did not load.', 'error');
+    return;
+  }
+
+  setMessage('Preparing Excel export…');
+  exportAuditExcelBtn.disabled = true;
+
+  try {
+    const { data, error } = await buildAuditQuery(true, { withCount: false });
+    if (error) throw error;
+
+    const logs = data || [];
+    if (!logs.length) {
+      setMessage('No audit logs match the current filters. Adjust the range and try again.', 'error');
+      return;
+    }
+
+    const workbook = new ExcelJSLib.Workbook();
+    workbook.creator = 'ELI Coffee Events';
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet('Audit Trail');
+
+    sheet.columns = [
+      { header: 'Timestamp', key: 'timestamp', width: 22, style: { numFmt: 'mmm d, yyyy h:mm AM/PM' } },
+      { header: 'User',      key: 'user',      width: 24 },
+      { header: 'Role',      key: 'role',      width: 14 },
+      { header: 'Action',    key: 'action',    width: 30 },
+      { header: 'Category',  key: 'category',  width: 18 },
+      { header: 'Details',   key: 'details',   width: 70, style: { alignment: { wrapText: true, vertical: 'top' } } }
+    ];
+
+    logs.forEach(log => {
+      const category = log.category || 'system';
+      sheet.addRow({
+        timestamp: log.created_at ? new Date(log.created_at) : '',
+        user:      log.user_name || 'System',
+        role:      log.user_role || '—',
+        action:    log.action || '—',
+        category:  category.charAt(0).toUpperCase() + category.slice(1),
+        details:   log.details || '—'
+      });
+    });
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4E3624' } };
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    sheet.autoFilter = { from: 'A1', to: 'F1' };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    setMessage(`Exported ${logs.length} audit log(s) to Excel.`, 'success');
+  } catch (err) {
+    setMessage(`Excel export failed: ${err.message}`, 'error');
+  } finally {
+    exportAuditExcelBtn.disabled = false;
+  }
+}
+
+exportAuditExcelBtn?.addEventListener('click', exportAuditExcel);
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 function init() {

@@ -21,7 +21,10 @@ const sidebarEmailEl = document.getElementById('sidebarEmail');
 const sidebarRolePillEl = document.getElementById('sidebarRolePill');
 const logoutBtn = document.getElementById('logoutBtn');
 const searchInput = document.getElementById('searchInput');
-const statusDropdown = document.getElementById('statusDropdown');
+const chipsRow = document.getElementById('chipsRow');
+// The status chips are the only status filter; the page opens on "Pending Review"
+// so the payments that need a decision are shown first.
+let activeStatus = 'pending_review';
 const tableMessage = document.getElementById('tableMessage');
 const paymentsBody = document.getElementById('paymentsBody');
 const paymentsPagination = document.getElementById('paymentsPagination');
@@ -38,7 +41,6 @@ const paymentDetailsMessage = document.getElementById('paymentDetailsMessage');
 const paymentReviewActions = document.getElementById('paymentReviewActions');
 const receiptModal = document.getElementById('receiptModal');
 const receiptModalClose = document.getElementById('receiptModalClose');
-const receiptModalDismiss = document.getElementById('receiptModalDismiss');
 const receiptDetailsGrid = document.getElementById('receiptDetailsGrid');
 
 const recordPaymentModal = document.getElementById('recordPaymentModal');
@@ -471,6 +473,17 @@ function renderStats(counts) {
   document.getElementById('stat-approved').textContent = Number(safe.approved) || 0;
   document.getElementById('stat-rejected').textContent = Number(safe.rejected) || 0;
   document.getElementById('stat-total').textContent = Number(safe.total) || 0;
+
+  const chipCounts = {
+    all: safe.total,
+    pending_review: safe.pending_review,
+    approved: safe.approved,
+    rejected: safe.rejected
+  };
+  chipsRow?.querySelectorAll('.chip').forEach((chip) => {
+    const label = chip.textContent.split(' (')[0];
+    chip.textContent = `${label} (${Number(chipCounts[chip.dataset.status]) || 0})`;
+  });
 }
 
 function renderTable(list) {
@@ -1492,7 +1505,7 @@ async function loadData({ silent = false, withStats = true } = {}) {
     setMessage(tableMessage, 'Loading payment submissions...');
   }
   try {
-    const status = statusDropdown?.value || 'all';
+    const status = activeStatus;
     const [result, counts] = await Promise.all([
       fetchPageWithClamp(paymentsCurrentPage, { status, search: activeSearch }),
       withStats ? fetchPaymentCounts() : Promise.resolve(null)
@@ -1592,9 +1605,17 @@ function handleStatusChange() {
   loadData({ withStats: false });
 }
 
+function handleChipClick(event) {
+  const chip = event.target.closest('.chip');
+  if (!chip) return;
+  activeStatus = chip.dataset.status || 'all';
+  chipsRow.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c === chip));
+  handleStatusChange();
+}
+
 function wireFilters() {
   searchInput?.addEventListener('input', handleSearchInput);
-  statusDropdown?.addEventListener('change', handleStatusChange);
+  chipsRow?.addEventListener('click', handleChipClick);
 }
 
 function wireTableActions() {
@@ -1726,7 +1747,6 @@ function wireModals() {
   });
 
   receiptModalClose?.addEventListener('click', closeReceiptModal);
-  receiptModalDismiss?.addEventListener('click', closeReceiptModal);
   receiptModal?.addEventListener('click', (event) => {
     if (event.target === receiptModal) closeReceiptModal();
   });

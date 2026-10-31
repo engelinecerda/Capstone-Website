@@ -772,6 +772,60 @@
   color: var(--text);
 }
 
+/* Label + "?" help tooltip (e.g. Sort Order). The tooltip is anchored to the
+   row's right edge so it stays inside the scrolling .modal instead of
+   creating a horizontal scrollbar when the field sits in the right column. */
+.modal-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  outline: none;
+}
+.info-tip:hover,
+.info-tip:focus-visible { color: var(--text); border-color: var(--text); }
+
+.info-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #2A1208;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: 0 6px 20px rgba(42, 18, 8, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .12s;
+  z-index: 5;
+}
+.info-tip:hover::after,
+.info-tip:focus::after { opacity: 1; visibility: visible; }
+
 .modal-input {
   border: 1px solid var(--input-border);
   border-radius: 8px;

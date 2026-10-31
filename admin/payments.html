@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=59">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=59">
-  <link rel="stylesheet" href="/css/admin_payments.css?v=59">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=59">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=60">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=60">
+  <link rel="stylesheet" href="/css/admin_payments.css?v=60">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=60">
 </head>
 <body>
   <aside class="sidebar">
@@ -86,16 +86,14 @@
             </span>
             <input id="searchInput" type="text" placeholder="Search by customer, package, payment type, or method..." maxlength="100" />
           </label>
-          <div class="filter-select-wrap">
-            <span class="filter-icon">Status</span>
-            <select id="statusDropdown">
-              <option value="all">All Payments</option>
-              <option value="pending_review">Pending Review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
         </div>
+      </section>
+
+      <section class="chips-row" id="chipsRow">
+        <button class="chip" data-status="all">All (0)</button>
+        <button class="chip active" data-status="pending_review">Pending Review (0)</button>
+        <button class="chip" data-status="approved">Approved (0)</button>
+        <button class="chip" data-status="rejected">Rejected (0)</button>
       </section>
 
       <!-- ── Submitted payments table card ── -->
@@ -173,9 +171,6 @@
       <h2 class="modal-title" id="receiptModalTitle">Payment Receipt</h2>
       <p class="modal-copy">Issued automatically after an admin-approved payment.</p>
       <div class="details-grid receipt-grid" id="receiptDetailsGrid"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn-secondary" id="receiptModalDismiss">Close</button>
-      </div>
     </div>
   </div>
 

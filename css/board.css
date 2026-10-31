@@ -181,6 +181,7 @@ body.kiosk-mode {
   grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
   gap: 20px;
   margin-top: 18px;
+  align-items: start;   /* each box is as tall as its content (up to the list cap), not stretched to match its neighbour */
 }
 
 .board-today-panel,
@@ -215,7 +216,19 @@ body.kiosk-mode {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Cap each list so a long day scrolls inside its own box instead of
+     stretching the page, and the neighbouring box (which used to be stretched
+     to match) no longer sits half empty. */
+  max-height: max(320px, calc(100vh - 300px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 4px;
 }
+/* Rows keep their natural height; without this the capped (max-height) flex
+   column squeezed them to their min-height and multi-event days overlapped. */
+.board-today-list > *,
+.board-week-days > * { flex-shrink: 0; }
 
 /* ============================================================
    EVENT CARDS (Today)

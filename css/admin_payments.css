@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=59');
+@import url('./admin_reservations.css?v=60');
 
 /* admin_payments.css */
 
@@ -1009,4 +1009,23 @@
 
 .record-payment-file-remove:hover {
   color: #A32D2D;
+}
+
+/* Status chips (replace the old Status dropdown). Payment-specific data-status
+   values reuse the matching colours the Reservations chips already define. */
+.chip[data-status="pending_review"] {
+  background: var(--pending);
+  border-color: var(--pending-border);
+  color: var(--pending-text);
+}
+.chip[data-status="rejected"] {
+  background: var(--declined);
+  border-color: var(--declined-border);
+  color: var(--declined-text);
+}
+.chip.active[data-status="pending_review"],
+.chip.active[data-status="rejected"] {
+  background: var(--active-bg);
+  border-color: var(--active-bg);
+  color: #fff;
 }

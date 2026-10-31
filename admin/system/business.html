@@ -6,10 +6,10 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <title>Business Profile - ELI Coffee Events</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=59">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=59">
-  <link rel="stylesheet" href="/css/admin_business_profile.css?v=59">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=59">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=60">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=60">
+  <link rel="stylesheet" href="/css/admin_business_profile.css?v=60">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=60">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
@@ -202,7 +202,15 @@
         </div>
         <div class="modal-field">
           <label class="modal-label" for="locationHoursInput">Hours</label>
-          <input type="text" id="locationHoursInput" class="modal-input" placeholder="E.g., Daily · 1:00 PM – 10:00 PM" maxlength="100">
+          <div class="hours-input-row">
+            <input type="text" id="locationHoursInput" class="modal-input hours-days-input" placeholder="Days, e.g., Daily, Weekends, Mon–Fri" maxlength="70">
+            <div class="hours-time-group">
+              <input type="time" id="locationHoursOpen" class="modal-input hours-time-input" aria-label="Opening time">
+              <span class="hours-time-sep" aria-hidden="true">to</span>
+              <input type="time" id="locationHoursClose" class="modal-input hours-time-input" aria-label="Closing time">
+            </div>
+          </div>
+          <span class="modal-hint">Type the days, then pick the opening and closing time. Shown to customers as, e.g., “Daily · 1:00 PM – 10:00 PM”. Leave the times empty to save the text as typed.</span>
         </div>
         <p class="modal-message hidden" id="locationModalMessage"></p>
       </div>
