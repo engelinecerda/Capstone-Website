@@ -547,7 +547,7 @@
     }
 
     .reviews-toggle {
-        justify-content: center;
+        justify-content: flex-start;
         width: 100%;
     }
 }
@@ -582,6 +582,9 @@
 .reviews-write-cta__btn {
     display: inline-flex;
     align-items: center;
+    /* On phones the button stretches full width; without this the icon + label
+       stayed pinned to the left instead of centred. */
+    justify-content: center;
     gap: 8px;
     border: none;
     background: var(--brown-primary, #3D1A0A);
@@ -835,3 +838,28 @@
     text-transform: uppercase;
 }
 .review-card__moderation-reason p { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+
+/* ========================
+   Filter bar alignment — phones / small tablets
+   (placed after the .reviews-mine-btn rule so it wins the cascade)
+======================== */
+@media (max-width: 768px) {
+    /* Rating chips on an even 3-column grid instead of ragged, content-sized
+       rows; "My Reviews" gets its own full-width row, flush with the chips
+       (its desktop margin-left was indenting it when it wrapped). */
+    .reviews-filter-group {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+    .reviews-filter,
+    .reviews-mine-btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+    .reviews-mine-btn {
+        grid-column: 1 / -1;
+        margin-left: 0;
+    }
+}

@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=63');
+@import url('./admin_reservations.css?v=64');
 
 /* ============================================================
    Hidden-state overrides.
@@ -730,7 +730,10 @@
   height: 16px;
 }
 
-.assignment-search-input {
+/* Prefixed with the field class so it outranks the generic
+   input[type="search"] rule in manager-theme.css (which would otherwise reset
+   the left padding reserved for the icon, height and font size). */
+.assignment-search-field .assignment-search-input {
   width: 100%;
   height: 44px;
   padding: 0 14px 0 40px;

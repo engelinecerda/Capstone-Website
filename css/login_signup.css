@@ -531,13 +531,19 @@
         flex: 1;
         width: 100%;
         padding: 48px 32px 56px;
-        align-items: center;
+        /* Centering with align-items: center clips the top of a card that is
+           taller than the panel (unreachable by scrolling). Top-align and
+           centre with auto margins instead: centred when it fits, starts at
+           the top and scrolls when it doesn't. */
+        align-items: flex-start;
         justify-content: center;
     }
 
     .auth-form-card {
         width: 100%;
         max-width: 440px;
+        margin-top: auto;
+        margin-bottom: auto;
     }
 
     .auth-form-title {

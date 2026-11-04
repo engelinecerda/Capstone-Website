@@ -534,7 +534,16 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     // payment records. The page itself is read-only for the old balance.
     const isCancelledReservation = effectiveStatus === 'cancelled'
         || String(reservation?.status || '').toLowerCase() === 'cancelled';
-    const locked = !verificationDone && !isCancelledReservation;
+    // A cancellation has no manager approval step (the fee payment itself is
+    // what finalizes it), so the fee button must be usable from the moment the
+    // customer requests the cancellation — cancellation_requested is not a
+    // "verified" status (isReservationPaymentEnabled), and gating on it left
+    // "Pay cancellation fee" locked here while the account page's Payments
+    // action already worked. Covers the whole cancellation flow so the button
+    // also stays usable (to view the fee payment) once the fee is submitted.
+    const isInCancellationFlow = ['cancellation_requested', 'cancellation_approved', 'cancelled']
+        .includes(String(reservation?.status || '').toLowerCase());
+    const locked = !verificationDone && !isCancelledReservation && !isInCancellationFlow;
 
     // Manual Charge for Special Requests — active (non-voided) charges only;
     // a voided charge no longer affects this customer's balance, and its
