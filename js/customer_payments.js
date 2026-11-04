@@ -733,6 +733,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
 //   'awaiting_approval'    - reservation not yet approved; nothing payable
 //   'pending_review'       - a payment (any type) is awaiting admin review
 //   'cancellation_fee_due' - cancelled, fee unpaid — the only thing payable
+//   'cancellation_fee_pending' - cancelled, fee submitted but not yet verified
 //   'cancelled_settled'    - cancelled, nothing left to pay
 //   'reschedule_fee_due'   - an approved reschedule is awaiting its fee
 //   'extension_fee_due'    - an approved extension is awaiting its fee
@@ -757,6 +758,10 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
             submittable: true,
             amountDue,
             balance,
+            // 'cancellation_requested' still holds the date while the fee is
+            // outstanding — only 'cancelled' is final. The payment page uses
+            // this to say "Cancellation Pending" rather than "Cancelled".
+            cancellationFinalized: String(reservation?.status || '').toLowerCase() === 'cancelled',
             targetType: 'cancellation',
             targetId: reservationId,
             label: 'Cancellation fee due',
@@ -766,6 +771,29 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
     }
 
     if (String(reservation?.status || '').toLowerCase() === 'cancelled') {
+        // The cancellation fee has been submitted but an admin hasn't verified
+        // it yet. Without this, the check below read it as "settled" the moment
+        // the customer submitted — before anyone confirmed the payment — while
+        // the fee box on the same page still said "Pending Review". Same
+        // key as the settled state so every badge/style keyed on it is
+        // unchanged; only the wording differs until the fee is approved.
+        const pendingFeePayment = payments
+            .filter((payment) => payment.payment_type === 'cancellation_fee'
+                && String(payment.payment_status || '').toLowerCase() === 'pending_review')
+            .sort((left, right) => new Date(right.submitted_at || 0) - new Date(left.submitted_at || 0))[0] || null;
+        if (pendingFeePayment) {
+            return {
+                mode: 'cancellation_fee_pending',
+                submittable: false,
+                amountDue: Number(pendingFeePayment.amount || 0),
+                balance,
+                targetType: 'cancellation',
+                targetId: reservationId,
+                label: 'Cancellation fee pending review',
+                key: 'cancelled',
+                sublabel: 'Waiting for admin confirmation'
+            };
+        }
         return {
             mode: 'cancelled_settled',
             submittable: false,

@@ -452,7 +452,13 @@ function getTopSummary(reservation) {
 // with the hero figure or which focus card gets rendered below it.
 function getHeaderStatusMeta(pageState) {
     const { mode, balance } = pageState;
-    if (mode === 'cancellation_fee_due' || mode === 'cancelled_settled') {
+    // Not cancelled yet while the request is still holding the date and the
+    // fee is outstanding — it finalizes once the fee is verified or the hold
+    // expires, so don't label it "Cancelled" before then.
+    if (mode === 'cancellation_fee_due' && pageState.cancellationFinalized === false) {
+        return { cssKey: 'pending', icon: 'clock', label: 'Cancellation Pending' };
+    }
+    if (mode === 'cancellation_fee_due' || mode === 'cancellation_fee_pending' || mode === 'cancelled_settled') {
         return { cssKey: 'cancelled', icon: 'ban', label: 'Cancelled' };
     }
     if (mode === 'paid_in_full') {
@@ -485,11 +491,12 @@ function renderSummaryStrip(reservation) {
     // falsy and silently fell back to the stale base-package balance anyway.
     // pageState.mode is now the single source of truth for both the figure
     // and its caption — no per-field re-derivation to drift out of sync.
-    const SETTLED_VALUE_TEXT = { cancelled_settled: 'Settled', paid_in_full: 'Paid', awaiting_approval: 'Pending' };
+    const SETTLED_VALUE_TEXT = { cancelled_settled: 'Settled', cancellation_fee_pending: 'Pending', paid_in_full: 'Paid', awaiting_approval: 'Pending' };
     const payValueText = SETTLED_VALUE_TEXT[pageState.mode] || formatCurrency(highlightedAmount);
 
     const META_TEXT = {
         cancellation_fee_due: 'Cancellation fee due',
+        cancellation_fee_pending: 'Cancellation fee awaiting confirmation',
         cancelled_settled: 'Cancellation fee settled',
         paid_in_full: 'Completed',
         reschedule_fee_due: 'Reschedule fee due',
@@ -548,7 +555,9 @@ function getCancellationReasonText(reservation) {
         return state.cancellationInfo?.reason
             || 'Automatically cancelled: payment was not received within the grace period.';
     }
-    return state.cancellationInfo?.reason || 'This reservation has been cancelled.';
+    // No fallback sentence: the card heading already says it, and repeating it
+    // as body copy just duplicated the line when no reason is stored.
+    return state.cancellationInfo?.reason || '';
 }
 
 // Replaces the whole payment form once a reservation is cancelled — there is
@@ -558,6 +567,10 @@ function renderCancellationCard(reservation, pageState) {
     const payments = getReservationPayments(state.bundle.paymentsByReservationId, reservation.reservation_id);
     const feePayment = payments.find((payment) => payment.payment_type === 'cancellation_fee') || null;
     const feeOwed = pageState.mode === 'cancellation_fee_due';
+    const isCancellationPending = feeOwed && pageState.cancellationFinalized === false;
+    const reasonText = isCancellationPending
+        ? `Pay the cancellation fee below to finalize it.${reservation.cancellation_hold_expires_at ? ` If it isn't paid and verified by ${formatDateTime(reservation.cancellation_hold_expires_at)}, the cancellation finalizes automatically and your date is released.` : ''}`
+        : getCancellationReasonText(reservation);
     const contractUrl = `/reservation-details?reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
 
     // Previously this card was the entire cancelled-state UI, full stop —
@@ -573,9 +586,11 @@ function renderCancellationCard(reservation, pageState) {
     return `
         <section class="payment-focus-card">
             <div class="payment-cancellation-card">
-                <span class="res-status cancelled"><i class="ti ti-ban" aria-hidden="true"></i> Cancelled</span>
-                <h2 class="payment-readonly-title">This reservation has been cancelled</h2>
-                <p class="payment-readonly-copy">${escapeHtml(getCancellationReasonText(reservation))}</p>
+                ${isCancellationPending
+                    ? '<span class="res-status pending"><i class="ti ti-clock" aria-hidden="true"></i> Cancellation Pending</span>'
+                    : '<span class="res-status cancelled"><i class="ti ti-ban" aria-hidden="true"></i> Cancelled</span>'}
+                <h2 class="payment-readonly-title">${isCancellationPending ? 'Your cancellation is pending' : 'This reservation has been cancelled'}</h2>
+                ${reasonText ? `<p class="payment-readonly-copy">${escapeHtml(reasonText)}</p>` : ''}
                 ${feePayment ? `
                     <div class="payment-dl">
                         <div class="payment-dl-row">
@@ -1312,7 +1327,7 @@ function renderReservationPaymentPage() {
     // paymentRules — same silent-default-fallback bug getActivePaymentPageState
     // had before this consolidation.
     const pageState = getActivePaymentPageState(reservation);
-    const isCancelled = pageState.mode === 'cancellation_fee_due' || pageState.mode === 'cancelled_settled';
+    const isCancelled = pageState.mode === 'cancellation_fee_due' || pageState.mode === 'cancellation_fee_pending' || pageState.mode === 'cancelled_settled';
     const focusCard = isCancelled
         ? renderCancellationCard(reservation, pageState)
         : isCompletedPaymentOverview(
