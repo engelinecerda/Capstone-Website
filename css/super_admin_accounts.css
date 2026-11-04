@@ -643,3 +643,31 @@ tbody tr .actions-cell { opacity: 1; }
     transition: none !important;
   }
 }
+
+/* ── Busy state for confirm dialogs (deactivate / reactivate) ─────── */
+.btn-danger:disabled,
+.btn-cancel:disabled,
+.modal-close:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .7s linear infinite;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner { animation-duration: 1.6s; }
+}

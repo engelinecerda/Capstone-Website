@@ -123,6 +123,10 @@ adminLoginForm?.addEventListener('submit', async (event) => {
 
     setMessage('Verifying credentials...');
 
+    // A new login starts a new inactivity clock; drop any timestamp left over
+    // from an earlier session (see js/super_admin_inactivity.js).
+    try { localStorage.removeItem('eli-admin-last-activity'); } catch (_) { /* storage unavailable */ }
+
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password

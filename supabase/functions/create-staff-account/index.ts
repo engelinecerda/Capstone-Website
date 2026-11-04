@@ -27,6 +27,15 @@ const ALLOWED_ROLES = ['admin', 'manager', 'staff'];
 const SITE_URL = 'https://www.elicoffee-events.cafe';
 const INVITE_REDIRECT_TO = `${SITE_URL}/admin/set-password`;
 
+// The shared board account (role 'staff') is the kiosk login for the counter
+// display. There is exactly one of it, its password is always admin-managed
+// (see reset-board-password + the guard_staff_password_change trigger), and it
+// is never invited by email — the admin gets a generated password to hand
+// over once. Individual staff are roster entries with no login at all.
+function generatePassword() {
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+}
+
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
@@ -84,6 +93,65 @@ Deno.serve(async (req) => {
   }
 
   const middleName = body.middle_name ? String(body.middle_name).trim() : null;
+
+  if (role === 'staff') {
+    // Limit of one: refuse if any staff-role or board profile already exists.
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('profiles')
+      .select('user_id')
+      .or('role.eq.staff,is_board_account.eq.true')
+      .limit(1);
+
+    if (existingError) {
+      return jsonResponse({ detail: 'Could not check for an existing board account' }, 500);
+    }
+    if (existing && existing.length > 0) {
+      return jsonResponse({ detail: 'A shared board account already exists. Only one is allowed.' }, 409);
+    }
+
+    const password = generatePassword();
+    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        role: 'staff',
+        first_name: firstName,
+        middle_name: middleName,
+        last_name: lastName,
+      },
+    });
+
+    if (createError || !created?.user) {
+      return jsonResponse({ detail: createError?.message || 'Failed to create board account' }, 400);
+    }
+
+    // handle_new_user() has just made the profiles row; flag it as the board
+    // account. A unique index (20261113_single_board_account.sql) makes a
+    // second flagged/staff row impossible even if two requests race here.
+    const { error: flagError } = await supabaseAdmin
+      .from('profiles')
+      .update({ role: 'staff', is_board_account: true, is_locked: false })
+      .eq('user_id', created.user.id);
+
+    if (flagError) {
+      // Don't leave a half-made login behind.
+      await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+      const raced = (flagError as { code?: string }).code === '23505';
+      return jsonResponse(
+        { detail: raced ? 'A shared board account already exists. Only one is allowed.' : `Failed to set up board account: ${flagError.message}` },
+        raced ? 409 : 500,
+      );
+    }
+
+    return jsonResponse({
+      user_id: created.user.id,
+      email,
+      role: 'staff',
+      is_board_account: true,
+      password,
+    }, 201);
+  }
 
   // inviteUserByEmail both creates the auth user AND sends the invite email
   // in one call — no more generating a throwaway temp password just to

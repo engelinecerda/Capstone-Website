@@ -714,7 +714,7 @@ async function init() {
 
   watchAuthState();
   wireLogoutButton();
-  setupInactivityLogout();
+  setupInactivityLogout(result.profile.role);
   initAdminSidebarBadges(supabase);
   initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });

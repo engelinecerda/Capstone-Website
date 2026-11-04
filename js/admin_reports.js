@@ -10,6 +10,7 @@ import {
 } from './reservation_status.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { setupInactivityLogout } from './super_admin_inactivity.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -660,6 +661,7 @@ async function validateAdminSession() {
 
     applyRoleVisibility(profile.role);
     initAdminNav({ role: profile.role });
+    setupInactivityLogout(profile.role);
 
     return session;
 }

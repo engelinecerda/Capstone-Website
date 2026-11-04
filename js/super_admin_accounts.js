@@ -445,6 +445,23 @@ document.getElementById('addAccountBtn').addEventListener('click', () => {
   openAddModal();
 });
 
+const INVITE_HINT = 'The account holder will receive an email to set their own password.';
+const BOARD_HINT  = 'Creates the one shared board account for the counter display. No email is sent: a password is generated and shown once for you to copy.';
+const SEND_INVITE_LABEL  = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Send Invite';
+const CREATE_BOARD_LABEL = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Create Board Account';
+
+// Only one shared board (staff) account may exist, so the Staff option is
+// offered in the invite form only while there isn't one yet. The edge
+// function and a unique index enforce the same rule server-side.
+const boardAccountExists = () => allAccounts.some(a => a.role === 'staff' || a.is_board_account);
+
+function syncAddRoleUi() {
+  const isBoard = document.getElementById('addFieldRole').value === 'staff';
+  document.getElementById('addRoleHint').textContent = isBoard ? BOARD_HINT : INVITE_HINT;
+  document.getElementById('addFieldStaffRole').closest('.form-group').style.display = isBoard ? 'none' : '';
+  document.getElementById('accountModalSave').innerHTML = isBoard ? CREATE_BOARD_LABEL : SEND_INVITE_LABEL;
+}
+
 function openAddModal() {
   document.getElementById('accountModalTitle').textContent = 'Invite User';
   document.getElementById('accountModalSub').textContent   = 'Create a new Manager account';
@@ -456,13 +473,20 @@ function openAddModal() {
   clearFields(['fieldFirstName', 'fieldMiddleName', 'fieldLastName', 'fieldEmail']);
   document.getElementById('addFieldStaffRole').value = '';
   document.getElementById('addFieldRole').value   = 'manager';
+  const staffOption = document.querySelector('#addFieldRole option[value="staff"]');
+  if (staffOption) {
+    const taken = boardAccountExists();
+    staffOption.disabled = taken;
+    staffOption.textContent = taken ? 'Staff (board account already exists)' : 'Staff (shared board account)';
+  }
+  document.getElementById('addFieldRole').onchange = syncAddRoleUi;
   document.getElementById('fieldEmail').readOnly  = false;
   document.getElementById('fieldEmailHint').style.display = 'none';
   hideMsg();
 
   document.getElementById('accountModalSave').onclick = handleCreateAccount;
-  document.getElementById('accountModalSave').innerHTML =
-    '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Send Invite';
+  disableSave(false);
+  syncAddRoleUi();
 
   document.getElementById('accountModal')._current = null;
   openModalWithTrap(document.getElementById('accountModal'));
@@ -513,6 +537,11 @@ function openEditModal(a) {
   } else {
     roleSelect.value = a.role || 'manager';
     roleSelect.disabled = false;
+    // The single shared board account can't be created by changing someone's
+    // role, so Staff is not selectable here (the board account's own row
+    // uses the separate, disabled option above).
+    const staticStaffOption = roleSelect.querySelector('option[value="staff"]:not([data-dynamic])');
+    if (staticStaffOption) staticStaffOption.disabled = true;
     staffRoleInput.disabled = false;
     boardHint.style.display = 'none';
   }
@@ -570,8 +599,15 @@ async function handleCreateAccount() {
   }
   if (!email)    { showMsg('Email address is required.', 'error'); return; }
 
-  showMsg('Sending invite…', 'info');
+  const isBoard = role === 'staff';
+  if (isBoard && boardAccountExists()) {
+    showMsg('A shared board account already exists. Only one is allowed.', 'error');
+    return;
+  }
+
+  showMsg(isBoard ? 'Creating board account…' : 'Sending invite…', 'info');
   disableSave(true);
+  let keepSaveDisabled = false;
 
   try {
     const { data, error: fnErr } = await supabase.functions.invoke('create-staff-account', {
@@ -591,6 +627,16 @@ async function handleCreateAccount() {
     // the handle_new_user() trigger the moment the account is created —
     // no separate profiles update needed here anymore.
 
+    if (isBoard) {
+      // The generated password is deliberately not written to the audit log.
+      await logAudit({ action: 'Created Board Account', category: 'account', details: `Created the shared board account (${email})`, entityId: data.user_id });
+
+      showMsg(`Board account created. Password: ${data.password} — copy this now, it will not be shown again.`, 'success');
+      keepSaveDisabled = true; // keep the modal open so the password stays visible
+      await loadAccounts();
+      return;
+    }
+
     await logAudit({ action: 'Invited User', category: 'account', details: `Invited ${firstName} ${lastName} (${email}) as ${role}`, entityId: data.user_id });
 
     showMsg('Invite sent. A welcome email is on its way.', 'success');
@@ -598,9 +644,9 @@ async function handleCreateAccount() {
     setTimeout(closeAccountModal, 1400);
 
   } catch (err) {
-    showMsg(err.message || 'Failed to send invite.', 'error');
+    showMsg(err.message || (isBoard ? 'Failed to create board account.' : 'Failed to send invite.'), 'error');
   } finally {
-    disableSave(false);
+    disableSave(keepSaveDisabled);
   }
 }
 // ── UPDATE ───────────────────────────────────────────────────────
@@ -768,6 +814,19 @@ async function sendPasswordReset(a) {
 }
 
 // ── DEACTIVATE / REACTIVATE ────────────────────────────────────────
+// While a confirm action is running, the Confirm button shows a spinner and
+// the given label, and Confirm / Cancel / X are disabled so the request can't
+// be sent twice or the dialog dismissed mid-flight. The shared confirm button
+// always reads "Confirm" otherwise, so that is what gets restored.
+function setConfirmBusy(busy, label = '') {
+  const ok = document.getElementById('confirmOk');
+  ok.innerHTML = busy ? `<span class="btn-spinner" aria-hidden="true"></span>${label}` : 'Confirm';
+  ['confirmOk', 'confirmCancel', 'confirmClose'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = busy;
+  });
+}
+
 function openLockConfirm(a) {
   const isLocked = a._status === 'deactivated';
 
@@ -784,36 +843,53 @@ function openLockConfirm(a) {
   document.getElementById('confirmBody').textContent  = isLocked
     ? `This will restore access for ${displayName(a)}.`
     : `This will prevent ${displayName(a)} from signing in until reactivated. Their history stays intact.`;
+
+  const msg = document.getElementById('confirmMsg');
+  msg.className = 'modal-message hidden';
+  msg.textContent = '';
+  setConfirmBusy(false);
+
   document.getElementById('confirmOk').onclick = async () => {
     const newLocked = !isLocked;
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_locked: newLocked })
-      .eq('user_id', a.user_id);
+    setConfirmBusy(true, newLocked ? 'Deactivating…' : 'Reactivating…');
+    msg.className = 'modal-message info';
+    msg.textContent = newLocked ? 'Deactivating account…' : 'Reactivating account…';
 
-    if (error) {
-      document.getElementById('confirmMsg').className = 'modal-message error';
-      document.getElementById('confirmMsg').textContent = error.message;
-      return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_locked: newLocked })
+        .eq('user_id', a.user_id);
+
+      if (error) {
+        msg.className = 'modal-message error';
+        msg.textContent = error.message;
+        return;
+      }
+
+      await logAudit({
+        action: newLocked ? 'Deactivated Account' : 'Reactivated Account',
+        category: 'account',
+        details: `${displayName(a)} was ${newLocked ? 'deactivated' : 'reactivated'}`,
+        entityId: a.user_id
+      });
+
+      const idx = allAccounts.findIndex(x => x.user_id === a.user_id);
+      if (idx !== -1) {
+        allAccounts[idx].is_locked = newLocked;
+        allAccounts[idx]._status = newLocked ? 'deactivated' : (!allAccounts[idx].last_sign_in_at ? 'invited' : 'active');
+      }
+
+      applyFilters();
+      updateStats();
+      closeConfirmModal();
+    } catch (err) {
+      msg.className = 'modal-message error';
+      msg.textContent = err?.message || 'Something went wrong. Please try again.';
+    } finally {
+      setConfirmBusy(false);
     }
-
-    await logAudit({
-      action: newLocked ? 'Deactivated Account' : 'Reactivated Account',
-      category: 'account',
-      details: `${displayName(a)} was ${newLocked ? 'deactivated' : 'reactivated'}`,
-      entityId: a.user_id
-    });
-
-    const idx = allAccounts.findIndex(x => x.user_id === a.user_id);
-    if (idx !== -1) {
-      allAccounts[idx].is_locked = newLocked;
-      allAccounts[idx]._status = newLocked ? 'deactivated' : (!allAccounts[idx].last_sign_in_at ? 'invited' : 'active');
-    }
-
-    applyFilters();
-    updateStats();
-    closeConfirmModal();
   };
   openModalWithTrap(document.getElementById('confirmModal'));
 }
@@ -1038,7 +1114,7 @@ async function init() {
 
   watchAuthState();
   wireLogoutButton();
-  setupInactivityLogout();
+  setupInactivityLogout(result.profile.role);
   initAdminSidebarBadges(supabase);
   initManagerNotificationBell(supabase, result.session.user.id);
   initAdminNav({ role: result.profile.role });
