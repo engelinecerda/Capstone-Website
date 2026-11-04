@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=61">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=61">
-  <link rel="stylesheet" href="/css/admin_profile.css?v=61">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=61">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=62">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=62">
+  <link rel="stylesheet" href="/css/admin_profile.css?v=62">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=62">
 </head>
 <body>
   <aside class="sidebar">
@@ -272,10 +272,25 @@
     </section>
   </main>
 
+  <!-- Confirmation modal for turning off 2FA (replaces the native confirm() dialog) -->
+  <div class="confirm-modal-backdrop" id="mfaDisableModal" hidden>
+    <div class="confirm-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="mfaDisableModalTitle" aria-describedby="mfaDisableModalText">
+      <span class="confirm-modal-icon" aria-hidden="true">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </span>
+      <h2 class="confirm-modal-title" id="mfaDisableModalTitle">Turn off two-factor authentication?</h2>
+      <p class="confirm-modal-text" id="mfaDisableModalText">You will no longer need a code from your authenticator app to sign in. Your account will be protected by your password only.</p>
+      <div class="confirm-modal-actions">
+        <button type="button" class="secondary-btn" id="mfaDisableModalCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="mfaDisableModalConfirm">Turn off 2FA</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="../js/admin_profile.js"></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=61" defer></script>
+  <script src="/js/supabase_health_notice.js?v=62" defer></script>
 </body>
 </html>

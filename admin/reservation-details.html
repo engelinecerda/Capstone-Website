@@ -13,10 +13,10 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=61">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=61">
-  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=61">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=61">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=62">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=62">
+  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=62">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=62">
 </head>
 <body>
   <aside class="sidebar">
@@ -369,6 +369,38 @@
     </div>
   </div>
 
+  <div class="modal-backdrop hidden" id="voidChargeModal" aria-hidden="true">
+    <div class="modal-card assignment-modal-card" role="alertdialog" aria-modal="true" aria-labelledby="voidChargeModalTitle">
+      <div class="assignment-modal-header">
+        <div>
+          <h2 class="assignment-modal-title" id="voidChargeModalTitle">Void this charge?</h2>
+          <p class="assignment-modal-subtitle">This removes the charge from the reservation's balance. This cannot be undone.</p>
+        </div>
+        <button type="button" class="assignment-modal-close" id="voidChargeModalClose" aria-label="Close void charge dialog">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="assignment-modal-body">
+        <div class="assignment-context-block">
+          <span class="record-payment-context-label">Charge</span>
+          <p class="assignment-context-main" id="voidChargeContextLabel"></p>
+          <div class="record-payment-context-balance-row">
+            <span>Amount</span>
+            <span id="voidChargeContextAmount"></span>
+          </div>
+        </div>
+
+        <p class="modal-message" id="voidChargeMessage"></p>
+      </div>
+
+      <div class="assignment-modal-footer">
+        <button type="button" class="header-action-btn" id="voidChargeCancelBtn">Cancel</button>
+        <button type="button" class="header-action-btn danger" id="voidChargeConfirmBtn">Void charge</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop hidden" id="addChargeModal" aria-hidden="true">
     <div class="modal-card assignment-modal-card" role="dialog" aria-modal="true" aria-labelledby="addChargeModalTitle">
       <div class="assignment-modal-header">
@@ -413,8 +445,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="../js/admin_reservation_details.js?v=61"></script>
+  <script type="module" src="../js/admin_reservation_details.js?v=62"></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=61" defer></script>
+  <script src="/js/supabase_health_notice.js?v=62" defer></script>
 </body>
 </html>

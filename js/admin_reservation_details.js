@@ -101,6 +101,14 @@ const addChargeAmountInput = document.getElementById('addChargeAmountInput');
 clampNumberInput(addChargeAmountInput, { min: 0.01, max: 1000000, decimals: 2 });
 const addChargeNoteInput = document.getElementById('addChargeNoteInput');
 
+const voidChargeModal = document.getElementById('voidChargeModal');
+const voidChargeModalClose = document.getElementById('voidChargeModalClose');
+const voidChargeCancelBtn = document.getElementById('voidChargeCancelBtn');
+const voidChargeConfirmBtn = document.getElementById('voidChargeConfirmBtn');
+const voidChargeMessage = document.getElementById('voidChargeMessage');
+const voidChargeContextLabel = document.getElementById('voidChargeContextLabel');
+const voidChargeContextAmount = document.getElementById('voidChargeContextAmount');
+
 const recordPaymentModal = document.getElementById('recordPaymentModal');
 const recordPaymentModalClose = document.getElementById('recordPaymentModalClose');
 const recordPaymentCancelBtn = document.getElementById('recordPaymentCancelBtn');
@@ -995,12 +1003,41 @@ function renderPaymentHistory() {
 /* Manual charges — Manual Charge for Special Requests                */
 /* ---------------------------------------------------------------- */
 
+// A manual charge has no payment of its own — it just raises the reservation's
+// effective total, and the customer pays it down through the ordinary payment
+// flow. So "paid" is derived: whatever has been paid beyond the base price
+// (reservations.total_price) is applied to the active charges oldest-first,
+// and a charge is Paid once its full amount is covered. Voided charges are
+// skipped. Returns a Map of charge_id -> true for every fully-paid charge.
+function getPaidChargeIds(reservation) {
+  const paidIds = new Map();
+  const totalPaid = Number(currentPaymentSummary?.total_paid);
+  if (!Number.isFinite(totalPaid)) return paidIds;
+
+  const baseTotal = Number(reservation?.total_price || 0);
+  let coverage = Math.round((totalPaid - baseTotal) * 100);
+  if (coverage <= 0) return paidIds;
+
+  const activeCharges = getReservationCharges(reservation)
+    .filter((charge) => !charge.voided)
+    .sort((left, right) => new Date(left.created_at || 0) - new Date(right.created_at || 0));
+
+  for (const charge of activeCharges) {
+    const cents = Math.round(Number(charge.amount || 0) * 100);
+    if (coverage < cents) break;
+    paidIds.set(charge.charge_id, true);
+    coverage -= cents;
+  }
+  return paidIds;
+}
+
 function renderCharges() {
   if (!chargesHistoryBody) return;
   const reservation = currentReservation;
   const rows = getReservationCharges(reservation)
     .slice()
     .sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0));
+  const paidChargeIds = getPaidChargeIds(reservation);
 
   if (!rows.length) {
     chargesHistoryBody.innerHTML = '<tr class="payment-history-empty-row"><td colspan="6">No manual charges added yet</td></tr>';
@@ -1009,12 +1046,20 @@ function renderCharges() {
 
   chargesHistoryBody.innerHTML = rows.map((charge) => {
     const dateLabel = formatReservationDate(charge.created_at);
-    const statusCell = charge.voided
-      ? `<span class="status-pill rejected" title="${escapeHtml(charge.void_reason || 'Voided')}">Voided</span>`
-      : '<span class="status-pill approved">Active</span>';
-    const voidAction = charge.voided
+    // Active = added but not yet paid, Paid = covered by payments, Voided = cancelled.
+    const isPaid = !charge.voided && paidChargeIds.has(charge.charge_id);
+    let statusCell;
+    if (charge.voided) {
+      statusCell = `<span class="status-pill rejected" title="${escapeHtml(charge.void_reason || 'Voided')}">Voided</span>`;
+    } else if (isPaid) {
+      statusCell = '<span class="status-pill approved">Paid</span>';
+    } else {
+      statusCell = '<span class="status-pill pending">Active</span>';
+    }
+    // A paid charge can no longer be voided (the database refuses it too).
+    const voidAction = (charge.voided || isPaid)
       ? '<span class="payment-history-no-receipt">&mdash;</span>'
-      : `<button type="button" class="charge-void-btn" data-action="void-charge" data-charge-id="${escapeHtml(charge.charge_id)}">Void</button>`;
+      : `<button type="button" class="charge-void-btn" data-action="void-charge" data-charge-id="${escapeHtml(charge.charge_id)}"${currentRole === 'admin' ? ` disabled title="${escapeHtml(VIEW_ONLY_TITLE)}"` : ''}>Void</button>`;
     const rowClass = charge.voided ? ' class="charge-row-voided"' : '';
 
     return `
@@ -1030,10 +1075,44 @@ function renderCharges() {
   }).join('');
 }
 
-async function voidCharge(chargeId) {
+let pendingVoidChargeId = null;
+
+function setVoidChargeMessage(message, isError = false) {
+  if (!voidChargeMessage) return;
+  voidChargeMessage.textContent = message || '';
+  voidChargeMessage.classList.toggle('error', isError);
+}
+
+function openVoidChargeModal(chargeId) {
+  if (currentRole === 'admin') return;
   const charge = getReservationCharges(currentReservation).find((c) => c.charge_id === chargeId);
-  if (!charge) return;
-  if (!window.confirm(`Void the charge "${charge.label}" (${formatCurrency(charge.amount)})? This cannot be undone.`)) return;
+  if (!charge || charge.voided) return;
+
+  pendingVoidChargeId = chargeId;
+  if (voidChargeContextLabel) voidChargeContextLabel.textContent = charge.label || '—';
+  if (voidChargeContextAmount) voidChargeContextAmount.textContent = formatCurrency(charge.amount);
+  setVoidChargeMessage('');
+  if (voidChargeConfirmBtn) voidChargeConfirmBtn.disabled = false;
+  voidChargeModal?.classList.remove('hidden');
+  voidChargeModal?.setAttribute('aria-hidden', 'false');
+  // Cancel gets focus first so an accidental Enter never voids a charge.
+  voidChargeCancelBtn?.focus();
+}
+
+function closeVoidChargeModal() {
+  pendingVoidChargeId = null;
+  voidChargeModal?.classList.add('hidden');
+  voidChargeModal?.setAttribute('aria-hidden', 'true');
+}
+
+async function confirmVoidCharge() {
+  if (currentRole === 'admin') return;
+  const chargeId = pendingVoidChargeId;
+  const charge = getReservationCharges(currentReservation).find((c) => c.charge_id === chargeId);
+  if (!charge) { closeVoidChargeModal(); return; }
+
+  if (voidChargeConfirmBtn) voidChargeConfirmBtn.disabled = true;
+  setVoidChargeMessage('Voiding charge...');
 
   try {
     const { error } = await supabase.rpc('void_reservation_charge', { p_charge_id: chargeId, p_reason: null });
@@ -1046,9 +1125,11 @@ async function voidCharge(chargeId) {
       entityId: currentReservation.reservation_id
     });
 
+    closeVoidChargeModal();
     await reloadPaymentSection('Charge voided.');
   } catch (error) {
-    window.alert(`Failed to void charge: ${error.message}`);
+    if (voidChargeConfirmBtn) voidChargeConfirmBtn.disabled = false;
+    setVoidChargeMessage(`Failed to void charge: ${error.message}`, true);
   }
 }
 
@@ -1128,10 +1209,16 @@ function wireReceiptViewer() {
 /* Record payment modal                                               */
 /* ---------------------------------------------------------------- */
 
+// The admin role is view-only on this page: payment actions stay visible but
+// disabled (rather than hidden) so it's clear they exist but aren't available.
+const VIEW_ONLY_TITLE = 'View only — your role cannot perform this action.';
+
 function renderRecordPaymentAvailability() {
   if (!recordPaymentBtn) return;
   if (currentRole === 'admin') {
-    recordPaymentBtn.classList.add('hidden');
+    recordPaymentBtn.classList.remove('hidden');
+    recordPaymentBtn.setAttribute('disabled', '');
+    recordPaymentBtn.title = VIEW_ONLY_TITLE;
     return;
   }
   recordPaymentBtn.classList.remove('hidden');
@@ -1155,7 +1242,9 @@ function renderRecordPaymentAvailability() {
 function renderAddChargeAvailability() {
   if (!addChargeBtn) return;
   if (currentRole === 'admin') {
-    addChargeBtn.classList.add('hidden');
+    addChargeBtn.classList.remove('hidden');
+    addChargeBtn.setAttribute('disabled', '');
+    addChargeBtn.title = VIEW_ONLY_TITLE;
     return;
   }
   addChargeBtn.classList.remove('hidden');
@@ -1492,8 +1581,17 @@ function wireAddChargeModal() {
   });
   chargesHistoryBody?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-action="void-charge"]');
-    if (!btn) return;
-    voidCharge(btn.dataset.chargeId);
+    if (!btn || btn.disabled) return;
+    openVoidChargeModal(btn.dataset.chargeId);
+  });
+  voidChargeModalClose?.addEventListener('click', closeVoidChargeModal);
+  voidChargeCancelBtn?.addEventListener('click', closeVoidChargeModal);
+  voidChargeConfirmBtn?.addEventListener('click', confirmVoidCharge);
+  voidChargeModal?.addEventListener('click', (event) => {
+    if (event.target === voidChargeModal) closeVoidChargeModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && voidChargeModal && !voidChargeModal.classList.contains('hidden')) closeVoidChargeModal();
   });
   staffAssignedList?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-action="view-all-staff"]');

@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=61');
+@import url('./admin_reservations.css?v=62');
 
 /* ============================================================
    Hidden-state overrides.
@@ -223,6 +223,16 @@
 
 .header-action-btn.decline:hover:not(:disabled) {
   background: #FCEBEB;
+}
+
+.header-action-btn.danger {
+  background: #A32D2D;
+  border-color: #A32D2D;
+  color: #FFFFFF;
+}
+
+.header-action-btn.danger:hover:not(:disabled) {
+  background: #8A2323;
 }
 
 .header-action-btn:disabled {
@@ -1091,8 +1101,13 @@
   transition: filter 0.15s ease;
 }
 
-.charge-void-btn:hover {
+.charge-void-btn:hover:not(:disabled) {
   filter: brightness(0.97);
+}
+
+.charge-void-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .payment-history-empty-row td {

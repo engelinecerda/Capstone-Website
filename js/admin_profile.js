@@ -54,6 +54,9 @@ const mfaDisableCode = document.getElementById('mfaDisableCode');
 const mfaDisableMessage = document.getElementById('mfaDisableMessage');
 const mfaConfirmDisableBtn = document.getElementById('mfaConfirmDisableBtn');
 const mfaCancelDisableBtn = document.getElementById('mfaCancelDisableBtn');
+const mfaDisableModal = document.getElementById('mfaDisableModal');
+const mfaDisableModalConfirm = document.getElementById('mfaDisableModalConfirm');
+const mfaDisableModalCancel = document.getElementById('mfaDisableModalCancel');
 
 // ── Personal Information — view/edit toggle ─────────────────────────────
 // First/Middle/Last Name and Phone are the account holder's own contact
@@ -435,11 +438,44 @@ async function handleVerifyEnroll() {
   setMfaMsg('Two-factor authentication has been enabled.', 'success');
 }
 
-// Disabling 2FA is gated two ways: an explicit confirm() dialog, and proof
+// Disabling 2FA is gated two ways: an explicit in-page confirmation modal, and proof
 // of current possession of the second factor (a live TOTP code, verified
 // through the same challengeAndVerify() call enrollment uses) before the
 // unenroll call is ever made — rather than trusting a bare "Remove" click.
 let pendingDisableFactorId = '';
+
+// In-page replacement for the native confirm() dialog. Resolves true when the
+// user clicks "Turn off 2FA", false on Cancel, Escape, or a backdrop click.
+function confirmDisableMfa() {
+  return new Promise((resolve) => {
+    if (!mfaDisableModal) { resolve(false); return; }
+
+    const previouslyFocused = document.activeElement;
+
+    function finish(result) {
+      mfaDisableModal.hidden = true;
+      mfaDisableModalConfirm?.removeEventListener('click', onConfirm);
+      mfaDisableModalCancel?.removeEventListener('click', onCancel);
+      mfaDisableModal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKeydown);
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+      resolve(result);
+    }
+    const onConfirm = () => finish(true);
+    const onCancel = () => finish(false);
+    const onBackdrop = (event) => { if (event.target === mfaDisableModal) finish(false); };
+    const onKeydown = (event) => { if (event.key === 'Escape') finish(false); };
+
+    mfaDisableModalConfirm?.addEventListener('click', onConfirm);
+    mfaDisableModalCancel?.addEventListener('click', onCancel);
+    mfaDisableModal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKeydown);
+
+    mfaDisableModal.hidden = false;
+    // Focus Cancel first so an accidental Enter never turns 2FA off.
+    mfaDisableModalCancel?.focus();
+  });
+}
 
 function handleStartDisable(event) {
   const factorId = event.currentTarget.dataset.factorId;
@@ -458,7 +494,7 @@ async function handleConfirmDisable() {
     setMfaDisableMsg('Enter the current 6-digit code from your authenticator app.', 'error');
     return;
   }
-  if (!confirm('Turn off two-factor authentication? You will no longer need a code to sign in.')) return;
+  if (!(await confirmDisableMfa())) return;
 
   setMfaDisableMsg('Verifying...');
   if (mfaConfirmDisableBtn) mfaConfirmDisableBtn.disabled = true;

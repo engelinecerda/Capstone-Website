@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=61');
+@import url('./admin_reservations.css?v=62');
 
 /* This page builds directly on manager-theme.css's shared design system
    (.card, .btn-primary/.primary-btn, .btn-secondary/.secondary-btn,
@@ -501,4 +501,77 @@
   .btn-danger {
     transition: none !important;
   }
+}
+
+/* ── Confirmation modal (2FA disable) ─────────────────────────────── */
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(59, 38, 22, 0.42);
+}
+
+.confirm-modal-backdrop[hidden] {
+  display: none;
+}
+
+.confirm-modal-card {
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 24px 22px;
+  background: #FFFFFF;
+  border: 0.5px solid #E8DFD3;
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(58, 34, 17, 0.16);
+}
+
+.confirm-modal-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: var(--declined);
+  color: var(--declined-txt);
+}
+
+.confirm-modal-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.confirm-modal-text {
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.confirm-modal-actions .secondary-btn,
+.confirm-modal-actions .btn-danger {
+  flex: 1;
+  max-width: 180px;
+}
+
+.confirm-modal-actions .btn-danger:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
