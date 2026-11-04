@@ -1,4 +1,4 @@
-import { portalSupabase as supabase } from './supabase.js';
+import { portalActivationSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
 import { validatePassword } from './password_rules.js';
 
@@ -29,6 +29,25 @@ function readInviteLinkError() {
 
 const inviteLinkError = readInviteLinkError();
 
+// Newer invite emails link here as /admin/set-password?token_hash=...&type=invite
+// instead of going through Supabase's one-click verify URL. That one-click URL
+// is consumed the moment anything opens it — including email security
+// scanners and link previewers — which is what produced "otp_expired" for
+// links nobody had actually used. A token_hash link is NOT touched on page
+// load: it is only redeemed (verifyOtp) when the person submits a valid
+// password below, which a scanner can't do. Old-style links (tokens in the
+// URL hash) still work through the session handling that follows.
+function readTokenHashLink() {
+  const params = new URLSearchParams(window.location.search || '');
+  const tokenHash = params.get('token_hash') || '';
+  const type = params.get('type') || '';
+  if (!tokenHash || type !== 'invite') return null;
+  return { tokenHash, type };
+}
+
+const tokenHashLink = inviteLinkError ? null : readTokenHashLink();
+let tokenRedeemed = false;
+
 function setMessage(type, text) {
   message.className = `form-msg ${type}`.trim();
   message.innerText = text;
@@ -54,6 +73,13 @@ const {
 
 if (session && !inviteLinkError) {
   activationReady = true;
+}
+
+// A token_hash link has no session yet — it gets one when it is redeemed on
+// submit — so the form is allowed to proceed.
+if (tokenHashLink) {
+  activationReady = true;
+  setMessage('', '');
 }
 
 if (inviteLinkError) {
@@ -97,6 +123,22 @@ form?.addEventListener('submit', async (event) => {
   setSubmitDisabled(true);
   submitBtn.textContent = 'Activating...';
 
+  // Redeem the invite token only now, after the password has passed
+  // validation, so a typo in the form never uses up the one-time link.
+  if (tokenHashLink && !tokenRedeemed) {
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHashLink.tokenHash,
+      type: tokenHashLink.type
+    });
+    if (verifyError) {
+      submitBtn.textContent = 'Activate Account';
+      activationReady = false;
+      setMessage('error', 'This invite link is invalid, has expired, or was already used. Ask your administrator to resend the invite email.');
+      return;
+    }
+    tokenRedeemed = true;
+  }
+
   const { error } = await supabase.auth.updateUser({
     password: newPassword
   });
@@ -112,5 +154,8 @@ form?.addEventListener('submit', async (event) => {
   setMessage('success', 'Account activated. Redirecting to login...');
   form.reset();
   subscription.unsubscribe();
+  // End the invite session so the new account has to sign in with the
+  // password it just chose, instead of being logged in by the invite link.
+  await supabase.auth.signOut().catch(() => {});
   setTimeout(() => window.location.replace('/admin'), 1400);
 });

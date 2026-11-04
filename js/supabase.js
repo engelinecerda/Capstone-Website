@@ -192,6 +192,14 @@ function lazyClient(storageKey) {
 
 export const customerSupabase = lazyClient(CUSTOMER_STORAGE_KEY)
 export const portalSupabase = lazyClient('eli-portal-auth')
+// Used ONLY by admin/set-password and admin/reset-password. An invite or
+// reset link hands the browser a real session; if that session were stored
+// under 'eli-portal-auth' it would (a) log the invitee straight into the
+// portal whether or not they ever chose a password, and (b) overwrite the
+// session of anyone already signed in to the portal in the same browser.
+// A separate storage key keeps it invisible to every other admin page, and
+// those two pages sign it out once the password is saved.
+export const portalActivationSupabase = lazyClient('eli-portal-activation-auth')
 // Kept fully separate from portalSupabase: the shared staff/board kiosk
 // credential must never share a browser session bucket with manager/admin,
 // otherwise signing in on one login page silently overwrites the other's

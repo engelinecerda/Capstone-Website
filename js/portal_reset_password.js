@@ -1,4 +1,4 @@
-import { portalSupabase as supabase } from './supabase.js';
+import { portalActivationSupabase as supabase } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
 import { validatePassword } from './password_rules.js';
 
@@ -111,4 +111,7 @@ form?.addEventListener('submit', async (event) => {
   setMessage('success', 'Password updated successfully. You can now log in.');
   form.reset();
   subscription.unsubscribe();
+  // End the recovery session so the reset link doesn't leave a logged-in
+  // session behind; the user signs in again with the new password.
+  await supabase.auth.signOut().catch(() => {});
 });
