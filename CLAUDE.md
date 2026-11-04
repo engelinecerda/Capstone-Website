@@ -127,6 +127,10 @@ This does **not** apply to `/js/*` — JS here is native ES modules with deep tr
 ## Key Shared Modules
 
 - `js/admin_sidebar_counts.js` — runs on every admin page; injects hamburger, fills the nav badges and the maintenance strip from one `get_admin_nav_counts()` RPC call (cached ~45 s in sessionStorage, made after the page finishes loading; falls back to separate queries if the RPC is missing)
+- `js/auto_refresh.js` — `initAutoRefresh(fn, { pollMs })` re-runs a page's loader on tab focus/visibility/bfcache restore and on a slow timer (default 2 min; `pollMs: 0` = no timer; dashboard/customers/reviews/roster/calendar/accounts/banner use 5 min). It skips every automatic refresh while the service-issue notice is showing (`window.__eliSupabaseDown`, set by `js/supabase_health_notice.js`, which also fires `eli:supabase-down` / `eli:supabase-up`) and refreshes once on recovery. A loader that fails quietly should `return false` so the "Updated" time is not advanced. The returned function also has `.refresh()`, `.getLastUpdated()`, `.isRefreshing()`, `.subscribe(fn)`.
+- `js/refresh_status.js` — `mountRefreshStatus(autoRefresh)` adds the Refresh button and "Updated 2:41 PM" label under the page subtitle (Reservations, Contracts, Payments, Customers, Reviews). Styles live in `css/admin_sidebar.css`.
+- `js/footer_content.js` — public footer data (contact, social links, locations, services) is cached in localStorage (`eli-footer-cache-v1`) for 5 minutes, each part separately; an expired copy is still shown if Supabase fails or is reported down. Business Profile / Page Content clear the admin's own copy when leaving (`js/footer_cache.js`). Edits can take up to 5 min to reach other visitors.
+- `js/load_exceljs.js` — `loadExcelJS()` downloads ExcelJS (pinned 4.4.0) on the first export only (Reports, Audit Trail); do not add it back as a `<script>` tag.
 - `js/audit_logger.js` — call `logAudit(action, category, details)` to write to `audit_log` table
 - `js/super_admin_inactivity.js` — call `setupInactivityLogout(role)` on admin pages; only activates for `role === 'admin'`
 

@@ -374,7 +374,7 @@ document.getElementById('statusFilterSeg').addEventListener('click', e => {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-initAutoRefresh(() => loadAccounts({ silent: true }));
+initAutoRefresh(() => loadAccounts({ silent: true }), { pollMs: 5 * 60 * 1000 });
 
 // ── FOCUS TRAP (shared by Account + Confirm modals) ───────────────
 function trapFocus(container) {

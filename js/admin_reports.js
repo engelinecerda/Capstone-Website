@@ -16,6 +16,9 @@ const sidebarEmail = document.getElementById('sidebarEmail');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const exportExcelBtn = document.getElementById('exportExcelBtn');
+const exportReportsPdfBtn = document.getElementById('exportReportsPdfBtn');
+const reportsExportTrigger = document.getElementById('reportsExportTrigger');
+const reportsExportOptions = document.getElementById('reportsExportOptions');
 const reportDateFrom = document.getElementById('reportDateFrom');
 const reportDateTo = document.getElementById('reportDateTo');
 const reportSearch = document.getElementById('reportSearch');
@@ -513,6 +516,101 @@ async function exportReportsExcel() {
     }
 }
 
+async function exportReportsPdf() {
+    const filteredReservations = getFilteredReservations();
+    if (!filteredReservations.length) {
+        setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
+        return;
+    }
+    if (state.paymentsUnavailable) {
+        setReportsMessage("Export is paused because payment totals couldn't be loaded. Refresh the page and try again.", true);
+        return;
+    }
+
+    const jsPDF = window.jspdf?.jsPDF;
+    if (!jsPDF) {
+        setReportsMessage('PDF export is unavailable because the PDF library did not load.', true);
+        return;
+    }
+
+    exportReportsPdfBtn.disabled = true;
+    setReportsMessage('Preparing PDF export…');
+    try {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        const rangeLabel = [
+            reportDateFrom?.value ? `From ${reportDateFrom.value}` : '',
+            reportDateTo?.value ? `To ${reportDateTo.value}` : ''
+        ].filter(Boolean).join('  ') || 'All reservation dates';
+        doc.setFontSize(16);
+        doc.text('Reservation Report', 14, 16);
+        doc.setFontSize(10);
+        doc.text(`Date range: ${rangeLabel}`, 14, 23);
+        doc.text(`Generated: ${new Date().toLocaleString('en-PH')}`, 14, 29);
+
+        const rows = filteredReservations.map((reservation) => {
+            const eventDate = reservation?.event_date ? new Date(reservation.event_date) : null;
+            const schedule = eventDate && !Number.isNaN(eventDate.getTime())
+                ? `${eventDate.toLocaleDateString('en-PH')}${reservation?.event_time ? ` ${reservation.event_time}` : ''}`
+                : '—';
+            const status = formatStatusLabel(getEffectiveReservationStatus(reservation));
+            const total = Number(reservation?.total_price || 0).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return [getCustomerName(reservation), reservation?.event_type || 'Reservation', schedule,
+                getPackageName(reservation), status, `₱${total}`];
+        });
+        doc.autoTable({
+            startY: 35,
+            head: [['Customer', 'Event', 'Schedule', 'Package', 'Status', 'Total Price']],
+            body: rows,
+            styles: { fontSize: 8, cellPadding: 2.5 },
+            headStyles: { fillColor: [78, 54, 36] },
+            alternateRowStyles: { fillColor: [248, 245, 240] }
+        });
+
+        const fromValue = reportDateFrom?.value || '';
+        const toValue = reportDateTo?.value || '';
+        const periodPart = fromValue || toValue
+            ? `${fromValue || 'start'}_to_${toValue || 'now'}`
+            : new Date().toISOString().slice(0, 10);
+        doc.save(`reservation-report_${periodPart}.pdf`);
+        setReportsMessage(`Exported ${filteredReservations.length} reservation(s) to PDF.`);
+    } catch (error) {
+        setReportsMessage("Couldn't generate the PDF — please try again.", true);
+    } finally {
+        exportReportsPdfBtn.disabled = false;
+    }
+}
+
+function closeReportsExportMenu() {
+    reportsExportOptions.hidden = true;
+    reportsExportTrigger.setAttribute('aria-expanded', 'false');
+}
+
+reportsExportTrigger?.addEventListener('click', () => {
+    const isOpen = reportsExportTrigger.getAttribute('aria-expanded') === 'true';
+    reportsExportOptions.hidden = isOpen;
+    reportsExportTrigger.setAttribute('aria-expanded', String(!isOpen));
+});
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('#reportsExportMenu')) closeReportsExportMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && reportsExportTrigger.getAttribute('aria-expanded') === 'true') {
+        closeReportsExportMenu();
+        reportsExportTrigger.focus();
+    }
+});
+
+exportExcelBtn?.addEventListener('click', () => {
+    closeReportsExportMenu();
+    exportReportsExcel();
+});
+exportReportsPdfBtn?.addEventListener('click', () => {
+    closeReportsExportMenu();
+    exportReportsPdf();
+});
+
 async function fetchReservations() {
     // reservation_id is the tie-breaker: many reservations share an event
     // date, and without a unique sort key the chunk boundaries could skip or
@@ -634,7 +732,6 @@ async function loadReports({ silent = false } = {}) {
 // cached copy can only lose the spinner, never the page.
 wireLogoutButton('logoutBtn', '/admin');
 
-exportExcelBtn?.addEventListener('click', exportReportsExcel);
 reportDateFrom?.addEventListener('input', renderReports);
 reportDateTo?.addEventListener('input', renderReports);
 reportSearch?.addEventListener('input', renderReports);

@@ -600,7 +600,7 @@ wireBlackoutModal();
 wireDayPanelBookingLinks();
 wireClosedDatesList();
 
-initAutoRefresh(() => loadMonth({ silent: true }));
+initAutoRefresh(() => loadMonth({ silent: true }), { pollMs: 2 * 60 * 1000 });
 
 validateAdminSession({
   onSuccess: async ({ session, profile }) => {

@@ -11,6 +11,7 @@ import {
 import { getPaymentStatusPillMeta, fetchUnseenReservationChanges, markReservationChangesSeen } from './reservation_shared.js';
 import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { mountRefreshStatus } from './refresh_status.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -731,7 +732,7 @@ async function loadData({ silent = false, full = true, keepNarrowing = false } =
       // successful trigger (focus, poll, or the user changing a filter)
       // resumes normal updates.
       console.warn('Auto-refresh failed, keeping last loaded reservations:', err.message);
-      return;
+      return false; // tells initAutoRefresh not to advance the "Updated" time
     }
     setMessage(tableMessage, `Failed to load: ${err.message}`, true);
     if (full) {
@@ -772,7 +773,8 @@ function escapeHtml(str) {
 // Manager hits Back after acting on reservation-details.html) without
 // re-running any module code — pageshow with event.persisted (handled
 // inside initAutoRefresh) is the only reliable signal for that case.
-initAutoRefresh(() => loadData({ silent: true }));
+const autoRefresh = initAutoRefresh(() => loadData({ silent: true }));
+mountRefreshStatus(autoRefresh);
 
 function applyStatusFilterFromUrl() {
   const requestedStatus = new URLSearchParams(window.location.search).get('status');

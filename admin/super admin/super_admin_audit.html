@@ -6,11 +6,11 @@
   <link rel="preconnect" href="https://gznemevovvcfjnuwsixl.supabase.co" crossorigin />
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <title>Audit Trail - Admin</title>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=60">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=60">
-  <link rel="stylesheet" href="/css/admin_customers.css?v=60">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=60">
-  <link rel="stylesheet" href="/css/super_admin_audit.css?v=60">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=61">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=61">
+  <link rel="stylesheet" href="/css/admin_customers.css?v=61">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=61">
+  <link rel="stylesheet" href="/css/super_admin_audit.css?v=61">
 </head>
 <body>
 
@@ -54,8 +54,15 @@
           <p class="page-sub">A read-only record of configuration and account changes.</p>
         </div>
         <div class="page-header-actions">
-          <button type="button" class="btn-primary" id="exportAuditPdfBtn">Export PDF</button>
-          <button type="button" class="btn-primary" id="exportAuditExcelBtn">Export to Excel</button>
+          <div class="audit-export-menu" id="auditExportMenu">
+            <button type="button" class="btn-primary audit-export-trigger" id="auditExportTrigger" aria-haspopup="true" aria-expanded="false" aria-controls="auditExportOptions">
+              Export <span class="audit-export-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div class="audit-export-options" id="auditExportOptions" role="menu" hidden>
+              <button type="button" class="audit-export-option" id="exportAuditPdfBtn" role="menuitem">Export as PDF</button>
+              <button type="button" class="audit-export-option" id="exportAuditExcelBtn" role="menuitem">Export as Excel</button>
+            </div>
+          </div>
           <span id="managerNotifBell"></span>
         </div>
       </div>
@@ -169,7 +176,5 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/super_admin_audit.js"></script>
-  <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js" defer></script>
 </body>
 </html>

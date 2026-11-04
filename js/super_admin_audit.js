@@ -29,6 +29,8 @@ const nextPageBtn        = document.getElementById('nextPageBtn');
 const paginationInfo     = document.getElementById('paginationInfo');
 const exportAuditPdfBtn  = document.getElementById('exportAuditPdfBtn');
 const exportAuditExcelBtn = document.getElementById('exportAuditExcelBtn');
+const auditExportTrigger = document.getElementById('auditExportTrigger');
+const auditExportOptions = document.getElementById('auditExportOptions');
 const auditDateFrom      = document.getElementById('auditDateFrom');
 const auditDateTo        = document.getElementById('auditDateTo');
 const clearDateRangeBtn  = document.getElementById('clearDateRangeBtn');
@@ -572,6 +574,31 @@ async function exportAuditExcel() {
 }
 
 exportAuditExcelBtn?.addEventListener('click', exportAuditExcel);
+
+function closeAuditExportMenu() {
+  auditExportOptions.hidden = true;
+  auditExportTrigger.setAttribute('aria-expanded', 'false');
+}
+
+auditExportTrigger?.addEventListener('click', () => {
+  const isOpen = auditExportTrigger.getAttribute('aria-expanded') === 'true';
+  auditExportOptions.hidden = isOpen;
+  auditExportTrigger.setAttribute('aria-expanded', String(!isOpen));
+});
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('#auditExportMenu')) closeAuditExportMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && auditExportTrigger.getAttribute('aria-expanded') === 'true') {
+    closeAuditExportMenu();
+    auditExportTrigger.focus();
+  }
+});
+
+exportAuditPdfBtn?.addEventListener('click', closeAuditExportMenu);
+exportAuditExcelBtn?.addEventListener('click', closeAuditExportMenu);
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 function init() {

@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { mountRefreshStatus } from './refresh_status.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -400,7 +401,7 @@ async function loadReviews({ silent = false, withStats = true } = {}) {
 
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded reviews:', error.message);
-      return;
+      return false; // tells initAutoRefresh not to advance the "Updated" time
     }
 
     reviewsTotal = 0;
@@ -484,4 +485,5 @@ validateAdminSession({
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-initAutoRefresh(() => loadReviews({ silent: true }));
+const autoRefresh = initAutoRefresh(() => loadReviews({ silent: true }), { pollMs: 2 * 60 * 1000 });
+mountRefreshStatus(autoRefresh);

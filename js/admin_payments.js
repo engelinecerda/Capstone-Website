@@ -12,6 +12,7 @@ import { recordInCafePayment, uploadPaymentReceipt, ensureReceiptForPayment, fet
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { loadPaymentRules } from './customer_payments.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { mountRefreshStatus } from './refresh_status.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { logAudit } from './audit_logger.js';
 import { clampNumberInput } from './numeric_input.js';
@@ -1570,7 +1571,7 @@ async function loadData({ silent = false, withStats = true } = {}) {
 
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded payments:', error.message);
-      return;
+      return false; // tells initAutoRefresh not to advance the "Updated" time
     }
     setMessage(tableMessage, `Failed to load payments: ${error.message}`, true);
     if (withStats) {
@@ -1763,7 +1764,8 @@ function wireModals() {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-initAutoRefresh(() => loadData({ silent: true }));
+const autoRefresh = initAutoRefresh(() => loadData({ silent: true }));
+mountRefreshStatus(autoRefresh);
 
 wireLogoutButton();
 watchAuthState();

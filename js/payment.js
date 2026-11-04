@@ -1804,4 +1804,4 @@ initAutoRefresh(() => {
     if (isEditingForm || state.form.proofFile || state.isSubmitting) return;
 
     loadPaymentPage();
-});
+}, { pollMs: 0 }); // a form page: refresh on tab focus/return only, never on a timer

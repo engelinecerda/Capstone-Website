@@ -7,7 +7,7 @@ import { initAutoRefresh } from './auto_refresh.js';
   const link = document.createElement('link');
   link.id = 'notif-stylesheet';
   link.rel = 'stylesheet';
-  link.href = '/css/notifications.css?v=60';
+  link.href = '/css/notifications.css?v=61';
   document.head.appendChild(link);
 })();
 
@@ -193,7 +193,7 @@ async function markOne(supabase, userId, id, listEl, badgeEl) {
 // matters a lot more once beta testing multiplies how many customer tabs
 // are open at once. initAutoRefresh also fires immediately on tab
 // focus/visibility/bfcache-restore, so returning to a tab still feels
-// current, not just the fixed 60s cadence.
+// current, not just the fixed poll cadence.
 function startPolling(supabase, userId, listEl, badgeEl) {
   initAutoRefresh(() => fetchAndRender(supabase, userId, listEl, badgeEl));
 }

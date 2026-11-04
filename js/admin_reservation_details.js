@@ -2134,7 +2134,7 @@ validateAdminSession({
 
     // A customer withdrawing a request (or any other change) doesn't push
     // to this page on its own — poll it in on focus/visibility-return plus
-    // a 60s fallback, same pattern account.js already uses, so a manager
+    // a slow fallback poll, same pattern account.js already uses, so a manager
     // sitting on this page doesn't need to hit refresh to see it clear.
     initAutoRefresh(() => reloadAndRender(''));
   }

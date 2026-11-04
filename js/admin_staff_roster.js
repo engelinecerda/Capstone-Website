@@ -428,7 +428,7 @@ wireRosterTable();
 wireRosterModal();
 wireRosterConfirmModal();
 
-initAutoRefresh(() => loadRoster({ silent: true }));
+initAutoRefresh(() => loadRoster({ silent: true }), { pollMs: 2 * 60 * 1000 });
 
 validateAdminSession({
   onSuccess: async ({ profile, session }) => {

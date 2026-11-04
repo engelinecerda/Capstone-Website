@@ -1,4 +1,4 @@
-@import url('./admin_homepage.css?v=60');
+﻿@import url('./admin_homepage.css?v=61');
 
 /* .page-shell--wide is defined in manager-theme.css, but this stylesheet loads after it and
    its plain .page-shell { max-width } rule used to win, pinning the page at a fixed width
@@ -36,6 +36,24 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.reports-export-menu { position: relative; }
+.reports-export-trigger { display: inline-flex; align-items: center; gap: 9px; }
+.reports-export-chevron { font-size: 12px; transition: transform .15s ease; }
+.reports-export-trigger[aria-expanded="true"] .reports-export-chevron { transform: rotate(180deg); }
+.reports-export-options {
+  position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; min-width: 172px;
+  padding: 5px; background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+}
+.reports-export-options[hidden] { display: none; }
+.reports-export-option {
+  display: block; width: 100%; padding: 9px 11px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 13px;
+  cursor: pointer;
+}
+.reports-export-option:hover, .reports-export-option:focus-visible { background: var(--bg); outline: none; }
+.reports-export-option:disabled { opacity: .55; cursor: wait; }
 
 .reports-filter-card {
   display: grid;

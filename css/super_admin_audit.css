@@ -18,6 +18,24 @@
 }
 .page-header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
+.audit-export-menu { position: relative; }
+.audit-export-trigger { display: inline-flex; align-items: center; gap: 9px; }
+.audit-export-chevron { font-size: 12px; transition: transform .15s ease; }
+.audit-export-trigger[aria-expanded="true"] .audit-export-chevron { transform: rotate(180deg); }
+.audit-export-options {
+  position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; min-width: 172px;
+  padding: 5px; background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+}
+.audit-export-options[hidden] { display: none; }
+.audit-export-option {
+  display: block; width: 100%; padding: 9px 11px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 13px;
+  cursor: pointer;
+}
+.audit-export-option:hover, .audit-export-option:focus-visible { background: var(--bg); outline: none; }
+.audit-export-option:disabled { opacity: .55; cursor: wait; }
+
 .readonly-marker {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;

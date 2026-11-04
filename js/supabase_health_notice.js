@@ -38,6 +38,11 @@
 // the same second. Checks only run while the tab is visible; a hidden tab
 // catches up the moment it is shown again.
 //
+// Other scripts can tell whether the notice is on: window.__eliSupabaseDown is
+// true while it shows, and the window fires "eli:supabase-down" / "eli:supabase-up"
+// when that changes. js/auto_refresh.js uses this to pause timed refreshes
+// during an outage and to refresh each page once when Supabase answers again.
+//
 // Deliberately separate from js/system_notice.js (the testing-phase disclosure,
 // which is removed when testing ends). This file is a permanent feature.
 //
@@ -388,9 +393,19 @@
   }
   function stopWaiting() { if (waitTimer) { clearInterval(waitTimer); waitTimer = null; } }
 
+  // Tell the rest of the site (see the header comment). Wrapped so a listener
+  // that throws can never break the notice itself.
+  function publishState(down) {
+    window.__eliSupabaseDown = down;
+    try {
+      window.dispatchEvent(new CustomEvent(down ? 'eli:supabase-down' : 'eli:supabase-up'));
+    } catch (e) { /* ignore */ }
+  }
+
   function setAlert(on) {
     if (on) {
       alerting = true;
+      publishState(true);
       // Pill only (no popup) when the visitor already closed it during this
       // outage (on this page or an earlier one in this tab), or when this is a
       // quick relapse after an outage they had seen and closed.
@@ -407,6 +422,7 @@
     // one that cleared on its own unread leaves no relapse window behind.
     var seen = dismissed || recent(DISMISS_KEY, DISMISS_TTL_MS);
     alerting = false;
+    publishState(false);
     dismissed = false;
     drop(DISMISS_KEY);
     if (seen) put(RECOVERED_KEY); else drop(RECOVERED_KEY);

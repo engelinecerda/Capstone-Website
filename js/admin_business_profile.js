@@ -8,6 +8,9 @@ import { getPortalInitials } from './admin_auth.js';
 import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
+import { clearFooterCacheWhenLeaving } from './footer_cache.js';
+
+clearFooterCacheWhenLeaving(); // the public footer is cached for 5 min; refresh the admin's own copy after edits
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { showToast } from './admin_toast.js';
 import { attachPhoneMask } from './phone_format.js';

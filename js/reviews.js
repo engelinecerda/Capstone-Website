@@ -904,7 +904,7 @@ async function init() {
     // used by notifications.js and admin_homepage.js for the same reason)
     // re-runs on tab focus, tab becoming visible again, and bfcache restore
     // (the browser back/forward button, which doesn't re-execute module
-    // scripts on its own), plus a 60s fallback poll — deliberately a plain
+    // scripts on its own), plus a slow 5-minute fallback poll — deliberately a plain
     // interval rather than a realtime subscription, which is what drove
     // this project's Disk IO usage sky-high before (see notifications.js).
     // Re-checks both the write-review eligibility and the public reviews
@@ -919,7 +919,7 @@ async function init() {
                 renderReviews();
             })
             .catch((err) => console.error('[reviews] auto-refresh failed:', err));
-    });
+    }, { pollMs: 5 * 60 * 1000 });
 }
 
 document.addEventListener('DOMContentLoaded', init);

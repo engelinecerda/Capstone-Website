@@ -9,6 +9,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { mountRefreshStatus } from './refresh_status.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
@@ -848,7 +849,7 @@ async function loadData({ silent = false, full = true } = {}) {
 
     if (silent) {
       console.warn('Auto-refresh failed, keeping last loaded contracts:', error.message);
-      return;
+      return false; // tells initAutoRefresh not to advance the "Updated" time
     }
     setMessage(tableMessage, `Failed to load contracts: ${error.message}`, true);
     if (full) {
@@ -946,7 +947,8 @@ function wireModals() {
   });
 }
 
-initAutoRefresh(() => loadData({ silent: true }));
+const autoRefresh = initAutoRefresh(() => loadData({ silent: true }));
+mountRefreshStatus(autoRefresh);
 
 wireLogoutButton();
 watchAuthState();

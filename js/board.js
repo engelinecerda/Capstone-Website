@@ -479,10 +479,22 @@ function scheduleNextRefresh() {
   state.refreshTimer = setTimeout(runScheduledRefresh, nextRefreshDelay());
 }
 
+// True while the "service issue" notice is showing (js/supabase_health_notice.js).
+// Scheduled refreshes skip while it is, so the kiosk does not pile failing
+// requests on a struggling server; it keeps showing the last schedule it has,
+// and refreshes once as soon as Supabase answers again (listener below).
+function supabaseIsDown() {
+  return window.__eliSupabaseDown === true;
+}
+
+window.addEventListener('eli:supabase-up', () => {
+  if (document.visibilityState === 'visible') refreshNow();
+});
+
 function runScheduledRefresh() {
   // A hidden tab has nobody looking at it; the visibilitychange handler
   // refreshes the moment it is shown again.
-  if (document.visibilityState !== 'visible') {
+  if (document.visibilityState !== 'visible' || supabaseIsDown()) {
     scheduleNextRefresh();
     return;
   }
@@ -492,6 +504,7 @@ function runScheduledRefresh() {
 // Focus / visibility handlers call this. Two events fired together (a tab
 // becoming visible usually also fires focus) share one refresh.
 function requestRefresh() {
+  if (supabaseIsDown()) return;
   if (Date.now() - state.lastRefreshStartedAt < REFRESH_MIN_GAP_MS) return;
   refreshNow();
 }

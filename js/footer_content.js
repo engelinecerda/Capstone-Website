@@ -5,6 +5,7 @@
 // no page's footer markup needs to change — only a script tag is added.
 import { customerSupabase as supabase } from './supabase.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
+import { FOOTER_CACHE_KEY } from './footer_cache.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m =>
@@ -96,50 +97,152 @@ document.addEventListener('click', (e) => {
   if (mailMenuEl && !e.target.closest('.footer-mail-menu')) closeMailMenu();
 });
 
-async function loadBusinessContact() {
+// ── Footer data cache ────────────────────────────────────────────────────────
+// Every public page's footer used to ask Supabase for four things on each load
+// (contact info, locations, social links, services). Now the answers are kept
+// in localStorage for FOOTER_CACHE_TTL_MS:
+//   - a fresh copy is used as is: no requests, and the footer fills in at once;
+//   - an expired copy is fetched again, and if that fails (or Supabase is
+//     reported down by js/supabase_health_notice.js) the stored copy is shown
+//     anyway, so the footer survives an outage;
+//   - an edit in Business Profile can take up to FOOTER_CACHE_TTL_MS to reach a
+//     visitor who already has the old copy (the admin's own browser is cleared
+//     when they leave the editing page, see js/footer_cache.js).
+// Each of the four parts is stored and refreshed on its own, so one failing
+// query never throws away the other three. localStorage may be unavailable
+// (private mode, blocked): every access is wrapped and the footer then simply
+// behaves as before.
+const FOOTER_CACHE_TTL_MS = 5 * 60 * 1000;
+const FOOTER_PARTS = ['contact', 'socials', 'locations', 'services'];
+
+function readFooterCache() {
   try {
+    const parsed = JSON.parse(localStorage.getItem(FOOTER_CACHE_KEY) || 'null');
+    if (parsed && typeof parsed === 'object' && parsed.parts && typeof parsed.parts === 'object') return parsed;
+  } catch (err) { /* unavailable or corrupt: treat as empty */ }
+  return null;
+}
+
+function writeFooterCache(cache) {
+  try { localStorage.setItem(FOOTER_CACHE_KEY, JSON.stringify(cache)); } catch (err) { /* full or unavailable */ }
+}
+
+// Each fetcher resolves to the part's data, or rejects when the query failed.
+// (An empty list is valid data: it means nothing is active, and is cached.)
+const FOOTER_FETCHERS = {
+  contact: async () => {
     const { data, error } = await supabase.from('business_contact').select('*').eq('id', true).maybeSingle();
-    if (error || !data) return;
-
-    const descEl = document.querySelector('.footer-new-brand-desc');
-    if (descEl && data.brand_description) descEl.textContent = data.brand_description;
-
-    const fbLink = document.querySelector('.footer-new-social a[aria-label="Facebook"]');
-    if (fbLink && data.facebook_url) fbLink.href = data.facebook_url;
-
-    const igLink = document.querySelector('.footer-new-social a[aria-label="Instagram"]');
-    if (igLink && data.instagram_url) igLink.href = data.instagram_url;
-
-    await appendExtraSocialLinks();
-
-    const phoneSpan = document.querySelector('.footer-new-contact-row .ti-phone')?.closest('.footer-new-contact-row')?.querySelector('span');
-    if (phoneSpan && data.phone) phoneSpan.textContent = data.phone;
-
-    // The email row ships hidden and empty in every page's HTML (nothing hardcoded),
-    // so the address always comes from Business Profile > Contact & Social. It is
-    // shown as a mailto: link only when an email is saved.
-    const emailRow = document.querySelector('.footer-new-contact-row .ti-mail')?.closest('.footer-new-contact-row');
-    const emailSpan = emailRow?.querySelector('span');
-    if (emailRow && emailSpan && data.email) {
-      let emailLink = emailSpan.querySelector('a');
-      if (!emailLink) {
-        emailLink = document.createElement('a');
-        emailSpan.textContent = '';
-        emailSpan.appendChild(emailLink);
-      }
-      emailLink.textContent = data.email;
-      emailLink.href = `mailto:${data.email}`;
-      emailRow.style.display = '';
-    }
-
-    // Navbar logo only — the footer keeps its own separate image
-    // (.footer-new-logo, a different crop meant for its dark background).
-    const navLogoEl = document.querySelector('.logo');
-    if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url, 480);
-    if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
-  } catch (err) {
-    // Falls back to the static footer text already in the HTML (the email row stays hidden).
+    if (error) throw error;
+    return data || null;
+  },
+  socials: async () => {
+    const { data, error } = await supabase
+      .from('business_social_link')
+      .select('label, url')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+  locations: async () => {
+    const { data, error } = await supabase
+      .from('business_location')
+      .select('name')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+  services: async () => {
+    const { data, error } = await supabase
+      .from('landing_service')
+      .select('title, link_url')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return data || [];
   }
+};
+
+// Resolves to { contact, socials, locations, services } where a part is
+// undefined if there is neither a fresh answer nor a stored one.
+async function getFooterData() {
+  const cache = readFooterCache();
+  const now = Date.now();
+  const stored = cache?.parts || {};
+  const savedAt = (name) => (cache?.savedAt && Number(cache.savedAt[name])) || 0;
+  const isFresh = (name) => name in stored && now - savedAt(name) >= 0 && now - savedAt(name) < FOOTER_CACHE_TTL_MS;
+  const supabaseDown = window.__eliSupabaseDown === true;
+
+  const result = {};
+  const toFetch = [];
+  FOOTER_PARTS.forEach((name) => {
+    // During a reported outage, any stored copy (however old) beats a request
+    // that is going to fail slowly.
+    if (isFresh(name) || (supabaseDown && name in stored)) result[name] = stored[name];
+    else toFetch.push(name);
+  });
+
+  if (toFetch.length) {
+    const settled = await Promise.allSettled(toFetch.map((name) => FOOTER_FETCHERS[name]()));
+    const next = {
+      parts: { ...stored },
+      savedAt: { ...(cache?.savedAt || {}) }
+    };
+    let changed = false;
+    settled.forEach((outcome, i) => {
+      const name = toFetch[i];
+      if (outcome.status === 'fulfilled') {
+        result[name] = outcome.value;
+        next.parts[name] = outcome.value;
+        next.savedAt[name] = now;
+        changed = true;
+      } else if (name in stored) {
+        result[name] = stored[name]; // query failed: fall back to the stored copy
+      }
+    });
+    if (changed) writeFooterCache(next);
+  }
+  return result;
+}
+
+function applyBusinessContact(data) {
+  if (!data) return;
+
+  const descEl = document.querySelector('.footer-new-brand-desc');
+  if (descEl && data.brand_description) descEl.textContent = data.brand_description;
+
+  const fbLink = document.querySelector('.footer-new-social a[aria-label="Facebook"]');
+  if (fbLink && data.facebook_url) fbLink.href = data.facebook_url;
+
+  const igLink = document.querySelector('.footer-new-social a[aria-label="Instagram"]');
+  if (igLink && data.instagram_url) igLink.href = data.instagram_url;
+
+  const phoneSpan = document.querySelector('.footer-new-contact-row .ti-phone')?.closest('.footer-new-contact-row')?.querySelector('span');
+  if (phoneSpan && data.phone) phoneSpan.textContent = data.phone;
+
+  // The email row ships hidden and empty in every page's HTML (nothing hardcoded),
+  // so the address always comes from Business Profile > Contact & Social. It is
+  // shown as a mailto: link only when an email is saved.
+  const emailRow = document.querySelector('.footer-new-contact-row .ti-mail')?.closest('.footer-new-contact-row');
+  const emailSpan = emailRow?.querySelector('span');
+  if (emailRow && emailSpan && data.email) {
+    let emailLink = emailSpan.querySelector('a');
+    if (!emailLink) {
+      emailLink = document.createElement('a');
+      emailSpan.textContent = '';
+      emailSpan.appendChild(emailLink);
+    }
+    emailLink.textContent = data.email;
+    emailLink.href = `mailto:${data.email}`;
+    emailRow.style.display = '';
+  }
+
+  // Navbar logo only — the footer keeps its own separate image
+  // (.footer-new-logo, a different crop meant for its dark background).
+  const navLogoEl = document.querySelector('.logo');
+  if (navLogoEl && data.logo_url) navLogoEl.src = optimizedImageUrl(data.logo_url, 480);
+  if (navLogoEl && data.brand_name) navLogoEl.alt = `${data.brand_name} Logo`;
 }
 
 // Facebook/Instagram keep their own two fixed icon slots (above) — anything
@@ -147,76 +250,67 @@ async function loadBusinessContact() {
 // Business Profile > Additional Contacts & Social Links list) is appended
 // after them with a generic link icon, since we can't guess a brand icon
 // for an arbitrary platform label.
-async function appendExtraSocialLinks() {
-  try {
-    const { data, error } = await supabase
-      .from('business_social_link')
-      .select('label, url')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-    if (error || !data || !data.length) return;
+function applyExtraSocialLinks(data) {
+  if (!data || !data.length) return;
+  const socialRow = document.querySelector('.footer-new-social');
+  if (!socialRow) return;
 
-    const socialRow = document.querySelector('.footer-new-social');
-    if (!socialRow) return;
-
-    data.forEach((link) => {
-      const a = document.createElement('a');
-      a.href = link.url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.setAttribute('aria-label', link.label);
-      a.innerHTML = '<i class="ti ti-external-link"></i>';
-      socialRow.appendChild(a);
-    });
-  } catch (err) {
-    // Fixed Facebook/Instagram icons still work — this is additive only.
-  }
+  data.forEach((link) => {
+    const a = document.createElement('a');
+    a.href = link.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.setAttribute('aria-label', link.label);
+    a.innerHTML = '<i class="ti ti-external-link"></i>';
+    socialRow.appendChild(a);
+  });
 }
 
-async function loadFooterLocationsSummary() {
-  try {
-    const { data, error } = await supabase
-      .from('business_location')
-      .select('name')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-    if (error || !data || !data.length) return;
+function applyFooterLocationsSummary(data) {
+  if (!data || !data.length) return;
 
-    const addressSpan = document.querySelector('.footer-new-contact-row .ti-map-pin')?.closest('.footer-new-contact-row')?.querySelector('span');
-    if (!addressSpan) return;
+  const addressSpan = document.querySelector('.footer-new-contact-row .ti-map-pin')?.closest('.footer-new-contact-row')?.querySelector('span');
+  if (!addressSpan) return;
 
-    // Mirrors the current hardcoded summary style: short place names joined
-    // with "&", not full addresses — those live in Find Us / Business
-    // Profile's own location list, not repeated in the footer.
-    const shortNames = data.map(loc => (loc.name || '').split(',')[0].replace(/^ELI Coffee( Events Cafe)?\s*/i, '').trim() || loc.name);
-    addressSpan.textContent = shortNames.join(' & ');
-  } catch (err) {
-    // Falls back to the static footer text already in the HTML.
-  }
+  // Mirrors the current hardcoded summary style: short place names joined
+  // with "&", not full addresses — those live in Find Us / Business
+  // Profile's own location list, not repeated in the footer.
+  const shortNames = data.map(loc => (loc.name || '').split(',')[0].replace(/^ELI Coffee( Events Cafe)?\s*/i, '').trim() || loc.name);
+  addressSpan.textContent = shortNames.join(' & ');
 }
 
-async function loadFooterServices() {
-  try {
-    const { data, error } = await supabase
-      .from('landing_service')
-      .select('title, link_url')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-    if (error || !data || !data.length) return;
+function applyFooterServices(data) {
+  if (!data || !data.length) return;
 
-    const servicesHeading = Array.from(document.querySelectorAll('.footer-new-heading'))
-      .find(p => p.textContent.trim() === 'Services');
-    const servicesList = servicesHeading?.nextElementSibling;
-    if (!servicesList || servicesList.tagName !== 'UL') return;
+  const servicesHeading = Array.from(document.querySelectorAll('.footer-new-heading'))
+    .find(p => p.textContent.trim() === 'Services');
+  const servicesList = servicesHeading?.nextElementSibling;
+  if (!servicesList || servicesList.tagName !== 'UL') return;
 
-    servicesList.innerHTML = data.map(s =>
-      `<li><a href="${escapeHtml(s.link_url || '/packages')}">${escapeHtml(s.title)}</a></li>`
-    ).join('');
-  } catch (err) {
-    // Falls back to the static footer text already in the HTML.
-  }
+  servicesList.innerHTML = data.map(s =>
+    `<li><a href="${escapeHtml(s.link_url || '/packages')}">${escapeHtml(s.title)}</a></li>`
+  ).join('');
 }
 
-loadBusinessContact();
-loadFooterLocationsSummary();
-loadFooterServices();
+// Each part is applied on its own inside try/catch: a problem with one (say a
+// page that lacks that markup) must never stop the others. Anything missing
+// leaves the static footer text already in the HTML.
+async function initFooter() {
+  let data;
+  try {
+    data = await getFooterData();
+  } catch (err) {
+    return;
+  }
+  const steps = [
+    () => applyBusinessContact(data.contact),
+    () => applyExtraSocialLinks(data.socials),
+    () => applyFooterLocationsSummary(data.locations),
+    () => applyFooterServices(data.services)
+  ];
+  steps.forEach((step) => {
+    try { step(); } catch (err) { /* keep the static text */ }
+  });
+}
+
+initFooter();
