@@ -534,6 +534,11 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     // payment records. The page itself is read-only for the old balance.
     const isCancelledReservation = effectiveStatus === 'cancelled'
         || String(reservation?.status || '').toLowerCase() === 'cancelled';
+    // Once cancelled, the original booking (package total / paid / balance due)
+    // no longer applies — the cancellation fee is the only thing owed or paid,
+    // and the notice at the top of the page already reports it. The receipt
+    // below hides those rows for a cancelled reservation so it doesn't keep
+    // showing a "Balance due" the customer no longer owes.
     // A cancellation has no manager approval step (the fee payment itself is
     // what finalizes it), so the fee button must be usable from the moment the
     // customer requests the cancellation — cancellation_requested is not a
@@ -570,6 +575,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
             <h2 class="rd-panel-title">Payment &amp; contract</h2>
 
             <div class="rd-receipt-lines">
+                ${isCancelledReservation ? '' : `
                 <div class="rd-receipt-row">
                     <span>Package total</span>
                     <span>${escapeHtml(formatCurrency(balance.basePackagePrice))}</span>
@@ -584,6 +590,10 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     <span>${baseBalancePaid ? 'Paid in full' : `Balance due by ${escapeHtml(balance.dueDateLabel)}`}</span>
                     <span>${escapeHtml(baseBalancePaid ? formatCurrency(0) : formatCurrency(balance.remainingBalance))}</span>
                 </div>
+                `}
+                ${isCancelledReservation && !cancellationFeeOwed ? `
+                <p class="rd-inline-note">This reservation is cancelled, so no booking balance is due.</p>
+                ` : ''}
                 ${cancellationFeeOwed ? `
                     <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
                         <span>Cancellation fee due</span>

@@ -927,18 +927,42 @@ function renderPayment() {
     latest_payment_date: null,
     computed_status: 'unpaid'
   };
-  const statusMeta = getPaymentStatusPillMeta(summary.computed_status);
+  // Once cancelled, the original booking balance no longer applies — the
+  // cancellation fee is the only thing owed or paid. Showing "Unpaid" and the
+  // full outstanding balance for a void booking (while an approved fee sat in
+  // the history below) was misleading, so the summary follows the fee instead.
+  const isCancelled = String(reservation.status || '').toLowerCase() === 'cancelled';
+  const cancellationFeePayment = isCancelled ? getReservationCancellationFeePayment(reservation) : null;
+  const cancellationFeeStatus = String(cancellationFeePayment?.payment_status || '').toLowerCase();
+  const cancelledStatusMeta = !isCancelled ? null
+    : cancellationFeeStatus === 'approved' ? { key: 'approved', label: 'Cancellation fee paid' }
+    : cancellationFeeStatus === 'pending_review' ? { key: 'pending', label: 'Fee pending review' }
+    : cancellationFeeStatus === 'rejected' ? { key: 'pending', label: 'Fee rejected' }
+    : { key: 'pending', label: 'Cancellation fee due' };
+  const statusMeta = cancelledStatusMeta || getPaymentStatusPillMeta(summary.computed_status);
 
   paymentStatusPill.textContent = statusMeta.label;
   paymentStatusPill.className = `status-pill ${escapeHtml(statusMeta.key)}`;
   openPaymentsLink.href = `/admin/payments?reservation=${encodeURIComponent(reservation.reservation_id)}`;
 
-  paymentDetailsGrid.innerHTML = [
-    dlRow('Reservation total', formatCurrency(summary.reservation_total)),
-    dlRow('Total paid', formatCurrency(summary.total_paid)),
-    dlRow('Outstanding balance', Number(summary.outstanding_balance) <= 0 ? 'None' : formatCurrency(summary.outstanding_balance)),
-    dlRow('Latest payment date', summary.latest_payment_date ? formatReservationDate(summary.latest_payment_date) : 'No payments yet')
-  ].join('');
+  if (isCancelled) {
+    const feeDateValue = cancellationFeeStatus === 'approved'
+      ? (cancellationFeePayment.actual_payment_date || formatDateKey(cancellationFeePayment.payment_date || cancellationFeePayment.cash_payment_date || cancellationFeePayment.submitted_at))
+      : null;
+    paymentDetailsGrid.innerHTML = [
+      dlRow('Cancellation fee', formatCurrency(cancellationFeePayment?.amount ?? getCancellationFee(reservation, currentPaymentRules))),
+      dlRow('Fee status', cancelledStatusMeta.label),
+      dlRow('Booking balance', 'None — reservation cancelled'),
+      dlRow('Fee paid on', feeDateValue ? formatReservationDate(feeDateValue) : 'Not paid yet')
+    ].join('');
+  } else {
+    paymentDetailsGrid.innerHTML = [
+      dlRow('Reservation total', formatCurrency(summary.reservation_total)),
+      dlRow('Total paid', formatCurrency(summary.total_paid)),
+      dlRow('Outstanding balance', Number(summary.outstanding_balance) <= 0 ? 'None' : formatCurrency(summary.outstanding_balance)),
+      dlRow('Latest payment date', summary.latest_payment_date ? formatReservationDate(summary.latest_payment_date) : 'No payments yet')
+    ].join('');
+  }
 
   const extraRows = [];
   const plannedArrival = getPlannedArrivalDate(reservation);

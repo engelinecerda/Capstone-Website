@@ -500,6 +500,12 @@ function renderTable(list) {
     const statusMeta = getStatusMeta(payment.payment_status);
     const paymentInfo = getPaymentInfoSummary(payment);
     const balance = getReservationBalanceSummary(payment.reservation_id);
+    // A cancellation fee is settled against the cancellation, not the booking:
+    // the reservation's outstanding_balance still reads as the full package
+    // price (the summary view doesn't treat cancelled reservations specially),
+    // so showing "Remaining ₱X · Pay by <date>" (and an Overdue pill) beside
+    // the fee was wrong.
+    const isCancellationFee = payment.payment_type === 'cancellation_fee';
 
     const evidenceSource = resolvePaymentEvidenceSource(payment, paymentMethodMap);
     const isPending = String(payment.payment_status || '').toLowerCase() === 'pending_review';
@@ -524,10 +530,15 @@ function renderTable(list) {
         <td class="payment-amount-cell" data-label="Amount">
           <span class="payment-cell-main">${escapeHtml(formatCurrency(payment.amount))}</span>
           <span class="payment-cell-sub">Submitted ${escapeHtml(formatDate(payment.submitted_at))}</span>
+          ${isCancellationFee ? `
+          <div class="payment-balance-block ${String(payment.payment_status || '').toLowerCase() === 'approved' ? 'approved' : 'pending'}">
+            <span class="payment-balance-amount">Cancellation fee</span>
+            <span class="payment-balance-due">Booking cancelled — no balance due</span>
+          </div>` : `
           <div class="payment-balance-block ${escapeHtml(balance.toneKey)}">
             <span class="payment-balance-amount">${balance.remainingBalance <= 0 ? 'Paid' : `Remaining ${escapeHtml(formatCurrency(balance.remainingBalance))}`}</span>
             <span class="payment-balance-due">${escapeHtml(balance.remainingBalance <= 0 ? 'Completed' : `Pay by ${balance.dueDateLabel}`)}</span>
-          </div>
+          </div>`}
         </td>
         <td data-label="Payment Info">
           <div class="payment-mode-stack compact">
@@ -1133,8 +1144,11 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   paymentAmountStatus.innerHTML = renderAmountStatusLine(comparison);
 
   // ── Submission details (definition rows) ──────────────────────────
+  const isCancellationFeePayment = payment.payment_type === 'cancellation_fee';
   const balanceValue = balance.remainingBalance <= 0 ? 'Paid in full' : formatCurrency(balance.remainingBalance);
-  const balanceRaw = `${escapeHtml(balanceValue)}${balance.isPastDue ? ' <span class="status-pill overdue">Overdue</span>' : ''}`;
+  const balanceRaw = isCancellationFeePayment
+    ? 'None — reservation cancelled'
+    : `${escapeHtml(balanceValue)}${balance.isPastDue ? ' <span class="status-pill overdue">Overdue</span>' : ''}`;
 
   const detailRows = [
     dlRow('Reservation', reservation?.package?.package_name || 'Package pending', { sub: `${formatDate(reservation?.event_date)} at ${reservation?.event_time || 'No time selected'}` }),
