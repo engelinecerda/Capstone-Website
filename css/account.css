@@ -2818,7 +2818,16 @@ body {
     color: #166534;
 }
 
-.reschedule-day.booked,
+/* Booked and closed days use the same colours as their legend swatches
+   (.reschedule-swatch.booked / .closed below) so the legend actually reads
+   as a key to the calendar. */
+.reschedule-day.booked {
+    background: #cbb39f;
+    border-color: #b89f89;
+    color: #4a3526;
+    cursor: not-allowed;
+}
+
 .reschedule-day.disabled {
     background: #f7f2ed;
     border-color: #eadbcf;
@@ -2837,9 +2846,9 @@ body {
 }
 
 .reschedule-day.closed {
-    background: #efe5dc;
-    border-color: #d4bca6;
-    color: #7f5539;
+    background: #7f5539;
+    border-color: #6b452d;
+    color: #fff;
     cursor: not-allowed;
 }
 

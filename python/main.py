@@ -20,10 +20,10 @@ logger = logging.getLogger("uvicorn.error")
 _forecast_executor = ThreadPoolExecutor(max_workers=1)
 
 _forecast_status = {
-    "state": "idle",       # "idle" | "running" | "done" | "error"
-    "started_at": None,    # ISO timestamp, set when a run begins
-    "finished_at": None,   # ISO timestamp, set when a run ends (done or error)
-    "error": None,         # error message, only set when state == "error"
+    "state": "idle",      
+    "started_at": None,   
+    "finished_at": None,   
+    "error": None,         
 }
 
 SUPABASE_URL = "https://gznemevovvcfjnuwsixl.supabase.co"
@@ -51,9 +51,6 @@ app.add_middleware(
 # =========================
 # HEALTH / KEEP-ALIVE
 # =========================
-# Lightweight endpoint with zero heavy imports (no pandas/Prophet work),
-# so external uptime pingers can hit this to prevent Render free-tier
-# cold starts without triggering any real work.
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -76,15 +73,6 @@ async def get_forecast():
         )
 
     def fetch_actuals():
-        # Was: .select("event_date").eq("status", "completed") over the
-        # WHOLE reservations table, on every /forecast request (i.e. every
-        # dashboard load) — the same unbounded query forecast.py used to
-        # run once a day, just hit far more often. Now reuses the
-        # monthly-aggregate RPC from forecast.py (backed by
-        # reservations_active_event_date_idx, see
-        # supabase/migrations/20261001_forecast_query_perf.sql and
-        # 20261002_main_endpoints_query_perf.sql), so this returns one row
-        # per month instead of one row per completed reservation.
         return supabase.rpc("get_monthly_completed_reservation_counts").execute()
 
     loop = asyncio.get_event_loop()
@@ -109,10 +97,6 @@ async def get_forecast():
     years = set()
 
     for r in res.data:
-        # r["month"] comes back as "YYYY-MM-DD" from the RPC's
-        # date_trunc('month', ...); r["reservation_count"] is already the
-        # per-month total, so this is a direct assignment now instead of
-        # a += 1 accumulation.
         key = r["month"][:7]
         year = r["month"][:4]
 
@@ -157,10 +141,6 @@ async def _run_forecast_generation(user_id: str | None):
 
     loop = asyncio.get_event_loop()
     try:
-        # run_forecast() is a blocking, CPU-bound call (Prophet fit) — run
-        # it on the dedicated worker thread so it doesn't block the event
-        # loop (and therefore /health and every other request) for the
-        # duration of the fit.
         await loop.run_in_executor(_forecast_executor, forecast_module.run_forecast, user_id)
         _forecast_status["state"] = "done"
         logger.info("forecast/generate: completed successfully")
@@ -176,10 +156,6 @@ async def generate_forecast(
     background_tasks: BackgroundTasks,
     body: GenerateForecastRequest = GenerateForecastRequest(),
 ):
-    # Guard against overlapping runs (e.g. the cron job firing while
-    # someone's mid-click on "Update Forecast") — the ThreadPoolExecutor
-    # above is single-worker anyway, so a second run would just queue up
-    # invisibly; better to say so explicitly.
     if _forecast_status["state"] == "running":
         logger.info("forecast/generate: request received, but a run is already in progress")
         return {"success": True, "message": "Forecast generation already in progress.", "already_running": True}
@@ -191,9 +167,6 @@ async def generate_forecast(
 # =========================
 # FORECAST GENERATION STATUS
 # =========================
-# Lets the frontend poll for actual completion instead of guessing on a
-# fixed timer. "idle" also covers server-restart cases (in-memory status
-# resets), which is fine — the caller just treats it the same as "done".
 @app.get("/forecast/status")
 async def get_forecast_status():
     return _forecast_status
@@ -203,13 +176,6 @@ async def get_forecast_status():
 # =========================
 @app.get("/analytics/monthly-reservations")
 def monthly_reservations():
-    # Was: .select("event_date").in_("status", [...]) over the WHOLE
-    # reservations table (no limit), then a pandas groupby purely to
-    # collapse it to one row per month — every time this chart loads.
-    # get_monthly_reservation_counts() does that GROUP BY in Postgres
-    # (backed by reservations_active_event_date_idx) and returns one row
-    # per month instead of one row per reservation. See
-    # supabase/migrations/20261002_main_endpoints_query_perf.sql.
     res = supabase.rpc(
         "get_monthly_reservation_counts",
         {"p_statuses": ["approved", "confirmed", "completed"]},
@@ -235,14 +201,6 @@ def monthly_reservations():
 # =========================
 @app.get("/analytics/package-distribution")
 def package_distribution():
-    # Was: an unfiltered select of every `reservations` row with a
-    # two-level join (package -> package_category), counted by hand in
-    # Python. No WHERE clause meant a full table scan on every call, and
-    # reservations.package_id has no index (one wouldn't meaningfully
-    # help a 100%-of-the-table aggregate anyway). Now reads a pg_cron-
-    # refreshed summary table instead — see
-    # 20261025_package_distribution_materialized_cache.sql. The chart can
-    # be up to ~30 minutes stale as a result.
     try:
         res = (
             supabase.table("package_category_distribution_cache")

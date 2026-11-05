@@ -91,6 +91,74 @@
     </div>
   </div>
 
+  <div class="account-modal-backdrop hidden" id="reschedule-modal-backdrop" aria-hidden="true">
+    <div class="account-modal-card reschedule-modal-card" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title">
+      <button type="button" class="account-modal-close" id="reschedule-modal-close" aria-label="Close reschedule dialog">x</button>
+      <p class="account-modal-eyebrow">Important Notice</p>
+      <h2 class="account-modal-title" id="reschedule-modal-title">Choose a New Date and Time</h2>
+      <p class="account-modal-copy">Pick an available date first, then select a new start time for your event.</p>
+
+      <div class="cancel-policy-block">
+        <div class="cancel-policy-icon" aria-hidden="true"><i class="ti ti-alert-triangle"></i></div>
+        <div class="cancel-policy-body" id="reschedule-policy-body">
+          <p class="cancel-policy-heading">Rescheduling Policy</p>
+          <p class="cancel-policy-text">Requests are subject to availability on the new date and time you select. Your original booking stays in place until an admin approves the request.</p>
+        </div>
+      </div>
+
+      <div class="cancel-fee-block">
+        <span class="cancel-fee-label">Rescheduling Fee</span>
+        <strong class="cancel-fee-amount" id="reschedule-fee-amount">&#8369;0</strong>
+        <p class="cancel-fee-note">No approval needed — pick a date below and pay this fee to confirm your new date.</p>
+      </div>
+
+      <div class="reschedule-current-block">
+        <span class="reschedule-current-label">Current booking</span>
+        <strong class="reschedule-current-value" id="reschedule-current-value">Loading...</strong>
+      </div>
+
+      <div class="reschedule-calendar-panel">
+        <div class="reschedule-calendar-head">
+          <button type="button" class="reschedule-nav-btn" id="reschedule-prev-month" aria-label="Previous month">&lsaquo;</button>
+          <span class="reschedule-month-label" id="reschedule-month-label">Loading...</span>
+          <button type="button" class="reschedule-nav-btn" id="reschedule-next-month" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <p class="availability-event-type-note">
+          <i class="ti ti-info-circle" aria-hidden="true"></i>
+          Your event type sets its own minimum notice, so some dates may be too soon to book.
+        </p>
+        <div class="reschedule-weekdays" aria-hidden="true">
+          <span>Su</span>
+          <span>Mo</span>
+          <span>Tu</span>
+          <span>We</span>
+          <span>Th</span>
+          <span>Fr</span>
+          <span>Sa</span>
+        </div>
+        <div class="reschedule-calendar-grid" id="reschedule-calendar-grid"></div>
+        <div class="reschedule-legend">
+          <span class="reschedule-legend-item"><span class="reschedule-swatch available"></span>Available</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch booked"></span>Fully Booked</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch closed"></span>Closed</span>
+          <span class="reschedule-legend-item"><span class="reschedule-swatch past"></span>Too Soon to Book</span>
+        </div>
+      </div>
+
+      <div class="reschedule-time-section">
+        <label class="reschedule-section-label">New time</label>
+        <div class="reschedule-time-grid" id="reschedule-time-grid"></div>
+      </div>
+
+      <p class="account-modal-message" id="reschedule-modal-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="reschedule-modal-cancel">Cancel</button>
+        <button type="button" class="account-modal-btn primary" id="reschedule-modal-submit">Submit Reschedule Request</button>
+      </div>
+    </div>
+  </div>
+
   <div class="account-modal-backdrop hidden" id="extension-request-backdrop" aria-hidden="true">
     <div class="account-modal-card" role="dialog" aria-modal="true" aria-labelledby="extension-modal-title">
       <button type="button" class="account-modal-close" id="extension-modal-close" aria-label="Close extension request dialog">&times;</button>

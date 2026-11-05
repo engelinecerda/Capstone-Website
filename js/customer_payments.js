@@ -969,15 +969,22 @@ export function isPendingPaymentOverview(reservation, paymentsByReservationId, r
         && !availableOptions.length;
 }
 
-export async function uploadPaymentProof(file) {
+// Single source of truth for what a proof-of-payment file may be. Used both when
+// the customer picks the file (js/payment.js — so a wrong type / oversized /
+// empty file is rejected immediately instead of reading "Uploaded successfully"
+// and only failing at submit) and again inside uploadPaymentProof() below.
+// The picker's accept="" attribute can't enforce this on its own: Windows'
+// "All files" dropdown and drag-and-drop both bypass it. Returns an error
+// message, or '' when the file is fine.
+export function validateProofFile(file) {
     if (!file) return '';
 
     if (file.size > CLOUDINARY_CONFIG.maxFileSize) {
-        throw new Error('Proof file must be 10MB or smaller.');
+        return 'Proof file must be 10MB or smaller.';
     }
 
     if (Number(file.size || 0) <= 0) {
-        throw new Error('The selected proof file is empty. Please choose a valid image.');
+        return 'The selected proof file is empty. Please choose a valid image.';
     }
 
     const mimeType = String(file.type || '').toLowerCase();
@@ -986,8 +993,17 @@ export async function uploadPaymentProof(file) {
     const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
     if (!allowedMimeTypes.has(mimeType) && !allowedExtensions.has(extension)) {
-        throw new Error('Please upload the proof of payment as a JPG, JPEG, PNG, or WEBP image.');
+        return 'Please upload the proof of payment as a JPG, JPEG, PNG, or WEBP image.';
     }
+
+    return '';
+}
+
+export async function uploadPaymentProof(file) {
+    if (!file) return '';
+
+    const proofError = validateProofFile(file);
+    if (proofError) throw new Error(proofError);
 
     const formData = new FormData();
     formData.append('file', file);

@@ -49,6 +49,7 @@ import { fetchMaxAdditionalHeads, requestAdditionalHeads } from './reservation_a
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { initRescheduleModal } from './reservation_details_reschedule.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -235,7 +236,7 @@ async function loadPageData() {
         fetchReview(reservationId),
         loadReservationRules(supabase),
         loadPaymentRules(supabase).catch(() => null),
-        loadPolicyBodies(supabase, ['cancellation_policy']).catch(() => ({}))
+        loadPolicyBodies(supabase, ['cancellation_policy', 'reschedule_policy']).catch(() => ({}))
     ]);
 
     pageData = {
@@ -720,8 +721,6 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
         `;
     }
 
-    const openRescheduleUrl = `/account?section=reservations&open=reschedule&reservation_id=${encodeURIComponent(reservation.reservation_id)}`;
-
     // A block reason is only ever shown for the time-based rules (min notice
     // / request window) — computeCanCancel already returns false for other
     // reasons (wrong status, open fee) without a matching reason string, so
@@ -738,7 +737,7 @@ function buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canC
     // reschedule isn't available for the more basic "wrong status" reason
     // computeCanReschedule already covers without a matching string.
     const rescheduleMarkup = canReschedule
-        ? `<a class="rd-btn-outline" href="${escapeHtml(openRescheduleUrl)}">Request reschedule</a>`
+        ? `<button type="button" class="rd-btn-outline" data-action="open-reschedule">Request reschedule</button>`
         : (rescheduleBlockReason
             ? `<span class="rd-cancel-blocked" title="${escapeHtml(rescheduleBlockReason)}">${escapeHtml(rescheduleBlockReason)}</span>`
             : '');
@@ -1507,6 +1506,18 @@ async function submitAdditionalHeadRequest() {
     }
 }
 
+// Reschedule modal — lives on this page (js/reservation_details_reschedule.js)
+// so "Request reschedule" no longer sends the customer to My reservations.
+const rescheduleModal = initRescheduleModal({
+    supabase,
+    user,
+    getPageData: () => pageData,
+    onSubmitted: async () => {
+        await loadPageData();
+        render();
+    }
+});
+
 pageContainer?.addEventListener('click', async (event) => {
     const payBtn = event.target.closest('.rd-pay-cta');
     if (payBtn && !payBtn.disabled) {
@@ -1518,6 +1529,12 @@ pageContainer?.addEventListener('click', async (event) => {
     const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
     if (cancelTriggerBtn) {
         openCancelModal();
+        return;
+    }
+
+    const rescheduleTriggerBtn = event.target.closest('[data-action="open-reschedule"]');
+    if (rescheduleTriggerBtn) {
+        rescheduleModal.open();
         return;
     }
 

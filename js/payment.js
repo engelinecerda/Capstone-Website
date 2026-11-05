@@ -25,6 +25,7 @@ import {
     loadReservationRules,
     PAYMENT_DATE_MAX_AGE_DAYS,
     submitCustomerPayment,
+    validateProofFile,
     validateReferenceNumber
 } from './customer_payments.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
@@ -892,7 +893,7 @@ function renderFormSection(reservation) {
                                 <input id="payment-proof-file" class="payment-proof-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" data-field="proofFile">
                                 <div class="payment-proof-icon"><i class="ti ti-upload" aria-hidden="true"></i></div>
                                 <div class="payment-proof-cta">Drop file here or <span>browse</span></div>
-                                <div class="payment-proof-name">PNG, JPG up to 10MB</div>
+                                <div class="payment-proof-name">PNG, JPG or WEBP up to 10MB</div>
                             </label>
                         `}
                     </div>
@@ -1711,6 +1712,17 @@ paymentApp?.addEventListener('change', (event) => {
     const field = event.target.dataset.field;
     if (field === 'proofFile') {
         const file = event.target.files?.[0] || null;
+        const proofError = validateProofFile(file);
+        if (proofError) {
+            // Reject right at selection: keep whatever file was already
+            // attached (if any), clear the picker, and say why.
+            event.target.value = '';
+            state.flashMessage = proofError;
+            state.flashType = 'error';
+            renderReservationPaymentPage();
+            return;
+        }
+        state.flashMessage = '';
         state.form.proofFile = file;
         state.form.proofPreviewDataUrl = null;
         if (file) state.draftResumedMissingFile = false;

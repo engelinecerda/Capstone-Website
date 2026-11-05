@@ -19,17 +19,6 @@ import {
     RESERVATION_RULES_DEFAULTS
 } from './customer_payments.js';
 import {
-    fetchAvailableStartTimes,
-    fetchBlackoutDates,
-    fetchCalendarAvailability,
-    getBookingScope as getSharedBookingScope,
-    getCalendarRange,
-    getScopeLabel,
-    loadAdvanceNoticeRules,
-    getEffectiveMinAdvanceDays,
-    isOutsideBookingWindow,
-} from './reservation_availability.js';
-import {
     BUSINESS_TIME_ZONE,
     PAYMENT_TYPE_META,
     RESCHEDULE_STATUS_META,
@@ -48,7 +37,6 @@ import {
     getReservationStatusMeta,
     getReservationStatusIcon,
     getPaymentLabel,
-    getRescheduleStatusMeta,
     getReservationPackageName,
     getReservationAddOnName,
     getReservationLocationLabel,
@@ -60,7 +48,6 @@ import {
     isExtensionFeeOwed,
     isAdditionalHeadFeeOwed,
     computeContractMeta,
-    computeCanReschedule,
     computeCanCancel
 } from './reservation_shared.js';
 import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
@@ -125,17 +112,6 @@ const receiptModalBackdrop = document.getElementById('receipt-modal-backdrop');
 const receiptModalClose = document.getElementById('receipt-modal-close');
 const receiptModalDismiss = document.getElementById('receipt-modal-dismiss');
 const receiptView = document.getElementById('receipt-view');
-const rescheduleModalBackdrop = document.getElementById('reschedule-modal-backdrop');
-const rescheduleModalClose = document.getElementById('reschedule-modal-close');
-const rescheduleModalCancel = document.getElementById('reschedule-modal-cancel');
-const rescheduleModalSubmit = document.getElementById('reschedule-modal-submit');
-const rescheduleModalMessage = document.getElementById('reschedule-modal-message');
-const rescheduleCurrentValue = document.getElementById('reschedule-current-value');
-const rescheduleMonthLabel = document.getElementById('reschedule-month-label');
-const rescheduleCalendarGrid = document.getElementById('reschedule-calendar-grid');
-const rescheduleTimeGrid = document.getElementById('reschedule-time-grid');
-const reschedulePrevMonth = document.getElementById('reschedule-prev-month');
-const rescheduleNextMonth = document.getElementById('reschedule-next-month');
 const cancelReservationBackdrop = document.getElementById('cancel-reservation-backdrop');
 const cancelModalClose = document.getElementById('cancel-modal-close');
 const cancelModalDismiss = document.getElementById('cancel-modal-dismiss');
@@ -167,18 +143,6 @@ const state = {
     reservationView: 'active',
     reservationPage: 1,
     receiptModalPaymentId: null,
-    rescheduleModal: {
-        reservationId: null,
-        month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        selectedDate: '',
-        selectedTime: '',
-        calendarAvailability: new Map(),
-        availableStartTimes: [],
-        advanceNoticeRules: null,
-        closedDates: new Set(),
-        blackoutDateColumn: null,
-        blackoutReasonColumn: null
-    },
     cancelModal: {
         reservationId: null
     }
@@ -303,31 +267,6 @@ function getReservationBuckets() {
         }
         return groups;
     }, { active: [], past: [] });
-}
-
-function getBookingScope(reservation) {
-    return getSharedBookingScope(
-        reservation?.location_type,
-        reservation?.package?.package_name || reservation?.package_name || ''
-    );
-}
-
-function getReservationDurationHours(reservation) {
-    const packageDuration = Number(reservation?.package?.duration_hours || 0);
-    if (packageDuration > 0) return packageDuration;
-
-    const packageName = String(reservation?.package?.package_name || '').toLowerCase();
-    if (packageName.includes('vip lite')) return 2;
-    if (packageName.includes('vip plus')) return 3;
-    if (packageName.includes('vip max')) return 4;
-    if (packageName.includes('main hall basic')) return 2;
-    if (packageName.includes('main hall plus')) return 3;
-    if (packageName.includes('catering')) return 4;
-    return 3;
-}
-
-function getEffectiveMinAdvanceDaysForReservation(reservation) {
-    return getEffectiveMinAdvanceDays(state.rescheduleModal.advanceNoticeRules, reservation?.event_type);
 }
 
 function getReservationName(profile) {
@@ -853,10 +792,6 @@ function getPaymentNextStepCopy(reservation, paymentSummary, paymentModuleEnable
         : 'Choose an initial payment to confirm this reservation. Reservation Fee, Down Payment, or Full Payment are all accepted.';
 }
 
-function canRescheduleReservation(reservation) {
-    return computeCanReschedule(reservation.status, getReservationRescheduleRequests(reservation.reservation_id));
-}
-
 function canCancelReservation(reservation) {
     return computeCanCancel(reservation?.status, getReservationPayments(reservation.reservation_id), reservation, state.paymentRules);
 }
@@ -1085,43 +1020,6 @@ function renderPaymentReferenceTabs(reservation, options = {}) {
                 </div>
             ` : ''}
         </div>
-    `;
-}
-
-function renderRescheduleSection(reservation) {
-    const latestRequest = getReservationRescheduleRequests(reservation.reservation_id)[0] || null;
-    const canReschedule = canRescheduleReservation(reservation);
-
-    if (!latestRequest && !canReschedule) {
-        return '<div class="payment-empty">Reschedule is not available for this reservation right now.</div>';
-    }
-
-    const summaryRows = latestRequest ? `
-        <div class="reschedule-summary">
-            <div class="reschedule-summary-row"><strong>Current:</strong> ${escapeHtml(formatDate(reservation.event_date))} at ${escapeHtml(reservation.event_time || 'No time')}</div>
-            <div class="reschedule-summary-row"><strong>Requested:</strong> ${escapeHtml(formatDate(latestRequest.requested_date))} at ${escapeHtml(latestRequest.requested_time || 'No time')}</div>
-        </div>
-    ` : '';
-
-    const statusMeta = latestRequest ? getRescheduleStatusMeta(latestRequest.status) : null;
-    const statusBadge = statusMeta
-        ? `<span class="res-section-status ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>`
-        : '';
-
-    const buttonLabel = latestRequest && String(latestRequest.status || '').toLowerCase() === 'rejected'
-        ? 'Submit New Reschedule Request'
-        : 'Request Reschedule';
-
-    return `
-        <div class="res-section-head">
-            <div>
-                <div class="res-section-title">Reschedule Request</div>
-                <div class="res-section-copy">Choose a new available date first, then pay the reschedule fee to finalize it.</div>
-            </div>
-            ${statusBadge}
-        </div>
-        ${summaryRows}
-        ${canReschedule ? `<button type="button" class="res-secondary-btn open-reschedule-btn" data-reservation-id="${escapeHtml(reservation.reservation_id)}">${escapeHtml(buttonLabel)}</button>` : ''}
     `;
 }
 
@@ -2004,11 +1902,9 @@ async function loadReservations({ silent = false } = {}) {
     }
 }
 
-// The standalone reservation-details.html page can't reach this page's
-// Reschedule/Cancel modals directly (separate static file, separate DOM) —
-// it links back here with ?open=reschedule|cancel&reservation_id=<id> and
-// this reopens the existing modal for that reservation instead of
-// duplicating the calendar/fee-confirmation logic on a second page.
+// Links of the form ?open=cancel&reservation_id=<id> reopen the cancel modal
+// for that reservation. (The reschedule modal now lives only on
+// reservation-details.html — js/reservation_details_reschedule.js.)
 function maybeAutoOpenReservationModal() {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('open');
@@ -2018,9 +1914,7 @@ function maybeAutoOpenReservationModal() {
     const exists = state.reservations.some((entry) => String(entry.reservation_id) === String(reservationId));
     if (!exists) return;
 
-    if (action === 'reschedule') {
-        openRescheduleModal(reservationId);
-    } else if (action === 'cancel') {
+    if (action === 'cancel') {
         openCancelModal(reservationId);
     }
 
@@ -2098,232 +1992,6 @@ function closeReceiptModal() {
     state.receiptModalPaymentId = null;
     receiptModalBackdrop?.classList.add('hidden');
     receiptModalBackdrop?.setAttribute('aria-hidden', 'true');
-    unlockBodyScroll();
-}
-
-function setRescheduleModalMessage(message, isError = false) {
-    if (!rescheduleModalMessage) return;
-    rescheduleModalMessage.textContent = message;
-    rescheduleModalMessage.classList.toggle('error', isError);
-}
-
-function formatDateForInput(value) {
-    const key = formatDateKey(value);
-    return key || '';
-}
-
-async function loadRescheduleAvailability(reservation) {
-    const month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const range = getCalendarRange(month);
-    const [blackoutData, calendarAvailability, advanceNoticeRules] = await Promise.all([
-        fetchBlackoutDates(supabase, state.rescheduleModal),
-        fetchCalendarAvailability(supabase, {
-            fromDate: range.fromDate,
-            toDate: range.toDate
-        }),
-        loadAdvanceNoticeRules(supabase)
-    ]);
-
-    state.rescheduleModal.closedDates = blackoutData.closedDates;
-    state.rescheduleModal.blackoutDateColumn = blackoutData.blackoutDateColumn;
-    state.rescheduleModal.blackoutReasonColumn = blackoutData.blackoutReasonColumn;
-    state.rescheduleModal.calendarAvailability = calendarAvailability;
-    state.rescheduleModal.advanceNoticeRules = advanceNoticeRules;
-    state.rescheduleModal.month = month;
-    state.rescheduleModal.selectedDate = '';
-    state.rescheduleModal.selectedTime = reservation.event_time || '';
-    state.rescheduleModal.availableStartTimes = [];
-}
-
-async function loadRescheduleCalendarMonth() {
-    const range = getCalendarRange(state.rescheduleModal.month);
-    state.rescheduleModal.calendarAvailability = await fetchCalendarAvailability(supabase, {
-        fromDate: range.fromDate,
-        toDate: range.toDate
-    });
-}
-
-// Reflects the admin's actual per-weekday Operating Hours + buffer +
-// per-scope capacity, live, per time slot — the same RPC the new-booking
-// calendar in reservations.html uses (get_available_start_times via
-// fetchAvailableStartTimes). Previously this modal built its time buttons
-// from a hardcoded 1:00 PM-10:00 PM list and never disabled an individual
-// slot for being taken, so an admin's hours/buffer/capacity changes never
-// reached this grid at all.
-async function loadRescheduleSelectedDateAvailability(reservation) {
-    if (!state.rescheduleModal.selectedDate) {
-        state.rescheduleModal.availableStartTimes = [];
-        return [];
-    }
-
-    const rows = await fetchAvailableStartTimes(supabase, {
-        eventDate: state.rescheduleModal.selectedDate,
-        scope: getBookingScope(reservation),
-        durationHours: getReservationDurationHours(reservation),
-        excludeReservationId: reservation.reservation_id
-    });
-    state.rescheduleModal.availableStartTimes = rows;
-    return rows;
-}
-
-function isRescheduleDateFullyBooked() {
-    const rows = state.rescheduleModal.availableStartTimes || [];
-    return rows.length === 0 || rows.every((row) => !row.isAvailable);
-}
-
-function renderRescheduleTimes() {
-    if (!rescheduleTimeGrid) return;
-
-    const selectedTime = state.rescheduleModal.selectedTime;
-    const rows = state.rescheduleModal.availableStartTimes || [];
-
-    if (!state.rescheduleModal.selectedDate) {
-        rescheduleTimeGrid.innerHTML = '';
-        return;
-    }
-
-    if (!rows.length) {
-        rescheduleTimeGrid.innerHTML = '<p class="reschedule-time-empty">No valid start times for this date within operating hours.</p>';
-        return;
-    }
-
-    rescheduleTimeGrid.innerHTML = rows.map((row) => `
-        <button
-            type="button"
-            class="reschedule-time-btn ${selectedTime === row.timeLabel ? 'active' : ''} ${!row.isAvailable ? 'disabled' : ''}"
-            data-time="${escapeHtml(row.timeLabel)}"
-            title="${escapeHtml(row.isAvailable ? `Choose ${row.timeLabel} as your new start time.` : (row.reason || 'Unavailable at this time.'))}"
-            ${!row.isAvailable ? 'disabled' : ''}
-        >
-            ${escapeHtml(row.timeLabel)}
-        </button>
-    `).join('');
-}
-
-function renderRescheduleCalendar() {
-    if (!rescheduleCalendarGrid || !rescheduleMonthLabel) return;
-
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
-    if (!reservation) return;
-
-    const month = state.rescheduleModal.month;
-    const start = new Date(month.getFullYear(), month.getMonth(), 1);
-    const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-    const firstWeekday = start.getDay();
-    const daysInMonth = end.getDate();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentReservationDate = formatDateKey(reservation.event_date);
-
-    rescheduleMonthLabel.textContent = month.toLocaleDateString('en-PH', {
-        year: 'numeric',
-        month: 'long'
-    });
-
-    const cells = [];
-    for (let index = 0; index < firstWeekday; index += 1) {
-        cells.push('<div class="reschedule-empty-day"></div>');
-    }
-
-    for (let day = 1; day <= daysInMonth; day += 1) {
-        const date = new Date(month.getFullYear(), month.getMonth(), day);
-        const dateKey = [
-            date.getFullYear(),
-            String(date.getMonth() + 1).padStart(2, '0'),
-            String(date.getDate()).padStart(2, '0')
-        ].join('-');
-        // date < today (not <=) so "today" is excluded only via the notice
-        // window below, same as the booking form's calendar
-        // (js/reservations.js) — using <= here made today always read as
-        // "past" regardless of the configured minimum notice, which is why
-        // this calendar and the booking form's disagreed on the first
-        // selectable date by exactly one day.
-        const isPast = date < today;
-        const isClosed = state.rescheduleModal.closedDates.has(dateKey);
-        const isOutsideWindow = !isPast && isOutsideBookingWindow(
-            date, today, state.rescheduleModal.advanceNoticeRules, reservation.event_type
-        );
-        const dateAvailability = state.rescheduleModal.calendarAvailability.get(dateKey) || {
-            occupiedScopes: [],
-            isFullyBooked: false
-        };
-        const reservationScope = getBookingScope(reservation);
-        const isBooked = dateAvailability.isFullyBooked;
-        const isCurrent = currentReservationDate === dateKey;
-        const isAvailable = !isPast && !isClosed && !isOutsideWindow && !isBooked && !isCurrent;
-        const isSelected = state.rescheduleModal.selectedDate === dateKey;
-        const classNames = ['reschedule-day'];
-        let label = 'Unavailable';
-
-        if (isAvailable) {
-            classNames.push('available');
-            label = 'Available';
-        } else if (isClosed) {
-            classNames.push('closed');
-            label = 'Closed';
-        } else if (isBooked) {
-            classNames.push('booked');
-            label = 'This date is fully booked.';
-        } else if (isCurrent) {
-            // Checked before isOutsideWindow/isPast on purpose — the
-            // reservation's own existing date can easily fall within the
-            // advance-notice window relative to today, but it isn't a "too
-            // soon to book" date for a *new* booking, so it keeps its own
-            // distinct label/styling (.current, added below) instead of
-            // being swept into the "past" treatment.
-            classNames.push('disabled');
-            label = 'Current booking date';
-        } else if (isOutsideWindow) {
-            // Same .past class (and swatch) as the "Too Soon to Book" /
-            // "past" entries on the booking form's calendar
-            // (reservations.html) — previously this used the same generic
-            // 'disabled' class as "fully booked", so a too-soon date was
-            // visually indistinguishable from a booked-out one, and the
-            // legend below had no matching entry for it at all.
-            classNames.push('past');
-            const effectiveMinDays = getEffectiveMinAdvanceDaysForReservation(reservation);
-            const diffDays = Math.round((date - today) / 86400000);
-            label = diffDays < effectiveMinDays
-                ? `Too soon to book — needs at least ${effectiveMinDays} day(s) notice.`
-                : 'Too far in advance to book.';
-        } else if (isPast) {
-            classNames.push('past');
-            label = 'This date has already passed.';
-        } else {
-            classNames.push('disabled');
-            label = 'Unavailable';
-        }
-
-        if (isCurrent) classNames.push('current');
-        if (isSelected) classNames.push('selected');
-
-        cells.push(`
-            <button
-                type="button"
-                class="${classNames.join(' ')}"
-                data-date="${escapeHtml(dateKey)}"
-                aria-label="${escapeHtml(label)} on ${escapeHtml(formatDate(dateKey))}"
-                ${isAvailable ? '' : 'disabled'}
-            >
-                <span>${day}</span>
-            </button>
-        `);
-    }
-
-    rescheduleCalendarGrid.innerHTML = cells.join('');
-}
-
-function closeRescheduleModal() {
-    state.rescheduleModal.reservationId = null;
-    state.rescheduleModal.selectedDate = '';
-    state.rescheduleModal.selectedTime = '';
-    state.rescheduleModal.calendarAvailability = new Map();
-    state.rescheduleModal.availableStartTimes = [];
-    state.rescheduleModal.closedDates = new Set();
-    rescheduleModalBackdrop?.classList.add('hidden');
-    rescheduleModalBackdrop?.setAttribute('aria-hidden', 'true');
-    rescheduleModalSubmit?.removeAttribute('disabled');
-    setRescheduleModalMessage('');
     unlockBodyScroll();
 }
 
@@ -2432,108 +2100,6 @@ async function submitCancellationRequest() {
     }
 }
 
-async function openRescheduleModal(reservationId) {
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(reservationId));
-    if (!reservation) return;
-
-    state.rescheduleModal.reservationId = reservationId;
-    if (rescheduleCurrentValue) {
-        rescheduleCurrentValue.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
-    }
-    const rescheduleFeeAmountEl = document.getElementById('reschedule-fee-amount');
-    if (rescheduleFeeAmountEl) rescheduleFeeAmountEl.textContent = `₱${getRescheduleFee(state.paymentRules).toLocaleString()}`;
-    applyPolicyOverride('reschedule-policy-body', 'reschedule_policy');
-
-    setRescheduleModalMessage('Loading availability...');
-    rescheduleModalBackdrop?.classList.remove('hidden');
-    rescheduleModalBackdrop?.setAttribute('aria-hidden', 'false');
-    lockBodyScroll();
-
-    try {
-        await loadRescheduleAvailability(reservation);
-        renderRescheduleCalendar();
-        renderRescheduleTimes();
-        setRescheduleModalMessage(`Choose a future available date for the ${getScopeLabel(getBookingScope(reservation))} booking slot, then select your new start time.`);
-    } catch (error) {
-        setRescheduleModalMessage(`Failed to load availability: ${error.message}`, true);
-    }
-}
-
-async function submitRescheduleRequest() {
-    const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
-    if (!reservation) return;
-
-    if (!state.rescheduleModal.selectedDate) {
-        setRescheduleModalMessage('Please choose a new available date first.', true);
-        return;
-    }
-
-    if (!state.rescheduleModal.selectedTime) {
-        setRescheduleModalMessage('Please choose a new event time.', true);
-        return;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDateObj = new Date(`${state.rescheduleModal.selectedDate}T00:00:00`);
-    if (isOutsideBookingWindow(selectedDateObj, today, state.rescheduleModal.advanceNoticeRules, reservation.event_type)) {
-        const effectiveMinDays = getEffectiveMinAdvanceDaysForReservation(reservation);
-        const diffDays = Math.round((selectedDateObj - today) / 86400000);
-        setRescheduleModalMessage(
-            diffDays < effectiveMinDays
-                ? `This date is too soon — please choose a date at least ${effectiveMinDays} day(s) from today.`
-                : 'This date is too far in advance — please choose a closer date.',
-            true
-        );
-        return;
-    }
-
-    rescheduleModalSubmit?.setAttribute('disabled', 'true');
-    setRescheduleModalMessage('Submitting your reschedule request...');
-
-    try {
-        // Re-checks the specific selected date+time right before submit (not
-        // just "is the whole date fully booked") — closes the same race a
-        // second customer could otherwise win between this modal opening and
-        // the request being sent.
-        const rows = await loadRescheduleSelectedDateAvailability(reservation);
-        const selectedRow = rows.find((row) => row.timeLabel === state.rescheduleModal.selectedTime);
-        if (!selectedRow?.isAvailable) {
-            state.rescheduleModal.selectedTime = '';
-            renderRescheduleTimes();
-            throw new Error(selectedRow?.reason || 'That time is no longer available. Please choose another.');
-        }
-
-        // No manager approval step — the calendar this modal uses is the
-        // same availability-aware source as the booking form (closed dates,
-        // fully-booked dates, and the advance-notice window are already
-        // enforced by what's selectable), so a submitted date is already
-        // guaranteed valid. Goes straight to awaiting-fee; the manager's
-        // only remaining touchpoint is verifying the fee payment.
-        const payload = {
-            reservation_id: reservation.reservation_id,
-            user_id: user.id,
-            original_date: reservation.event_date,
-            original_time: reservation.event_time,
-            requested_date: state.rescheduleModal.selectedDate,
-            requested_time: state.rescheduleModal.selectedTime,
-            status: 'approved_pending_payment'
-        };
-
-        const { error } = await supabase
-            .from('reschedule_requests')
-            .insert(payload);
-
-        if (error) throw error;
-
-        closeRescheduleModal();
-        await loadReservations();
-    } catch (error) {
-        rescheduleModalSubmit?.removeAttribute('disabled');
-        setRescheduleModalMessage(`Failed to submit request: ${error.message}`, true);
-    }
-}
-
 function activateAccountSection(sectionKey) {
     const normalizedSection = ['profile', 'reservations'].includes(String(sectionKey || '').toLowerCase())
         ? String(sectionKey).toLowerCase()
@@ -2597,12 +2163,6 @@ function wireReservationActions() {
             return;
         }
 
-        const rescheduleBtn = event.target.closest('.open-reschedule-btn');
-        if (rescheduleBtn) {
-            await openRescheduleModal(rescheduleBtn.dataset.reservationId);
-            return;
-        }
-
         const cancelBtn = event.target.closest('.open-cancel-btn');
         if (cancelBtn) {
             openCancelModal(cancelBtn.dataset.reservationId);
@@ -2650,66 +2210,6 @@ function wireReceiptModal() {
     receiptModalDismiss?.addEventListener('click', closeReceiptModal);
     receiptModalBackdrop?.addEventListener('click', (event) => {
         if (event.target === receiptModalBackdrop) closeReceiptModal();
-    });
-}
-
-function wireRescheduleModal() {
-    rescheduleModalClose?.addEventListener('click', closeRescheduleModal);
-    rescheduleModalCancel?.addEventListener('click', closeRescheduleModal);
-    rescheduleModalSubmit?.addEventListener('click', submitRescheduleRequest);
-    rescheduleModalBackdrop?.addEventListener('click', (event) => {
-        if (event.target === rescheduleModalBackdrop) closeRescheduleModal();
-    });
-
-    reschedulePrevMonth?.addEventListener('click', async () => {
-        if (!state.rescheduleModal.reservationId) return;
-        state.rescheduleModal.month = new Date(
-            state.rescheduleModal.month.getFullYear(),
-            state.rescheduleModal.month.getMonth() - 1,
-            1
-        );
-        await loadRescheduleCalendarMonth();
-        renderRescheduleCalendar();
-    });
-
-    rescheduleNextMonth?.addEventListener('click', async () => {
-        if (!state.rescheduleModal.reservationId) return;
-        state.rescheduleModal.month = new Date(
-            state.rescheduleModal.month.getFullYear(),
-            state.rescheduleModal.month.getMonth() + 1,
-            1
-        );
-        await loadRescheduleCalendarMonth();
-        renderRescheduleCalendar();
-    });
-
-    rescheduleCalendarGrid?.addEventListener('click', async (event) => {
-        const dayButton = event.target.closest('.reschedule-day.available');
-        if (!dayButton) return;
-        const reservation = state.reservations.find((entry) => String(entry.reservation_id) === String(state.rescheduleModal.reservationId));
-        if (!reservation) return;
-        state.rescheduleModal.selectedDate = dayButton.dataset.date || '';
-        state.rescheduleModal.selectedTime = '';
-        await loadRescheduleSelectedDateAvailability(reservation);
-        // The just-picked date may no longer hold the previous reservation
-        // time (different scope capacity, buffer, or hours that day), so
-        // don't carry it over — let the customer pick fresh from what's
-        // actually open on this date.
-        renderRescheduleCalendar();
-        renderRescheduleTimes();
-        setRescheduleModalMessage(
-            isRescheduleDateFullyBooked()
-                ? 'This date is fully booked.'
-                : `Selected ${formatDate(state.rescheduleModal.selectedDate)} for your ${getScopeLabel(getBookingScope(reservation))} booking slot.`
-        );
-    });
-
-    rescheduleTimeGrid?.addEventListener('click', (event) => {
-        const timeButton = event.target.closest('.reschedule-time-btn');
-        if (!timeButton) return;
-        if (timeButton.hasAttribute('disabled')) return;
-        state.rescheduleModal.selectedTime = timeButton.dataset.time || '';
-        renderRescheduleTimes();
     });
 }
 
@@ -3155,7 +2655,6 @@ function wireLogout() {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             if (state.receiptModalPaymentId) closeReceiptModal();
-            if (state.rescheduleModal.reservationId) closeRescheduleModal();
             if (submissionFeedbackBackdrop && !submissionFeedbackBackdrop.classList.contains('hidden')) {
                 closeSubmissionFeedbackModal();
             }
@@ -3222,7 +2721,6 @@ wireAccountNavigation();
 wireReservationActions();
 wirePaymentActions();
 wireReceiptModal();
-wireRescheduleModal();
 wireCancelModal();
 wireSubmissionFeedbackModal();
 wireProfileForm();
