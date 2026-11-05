@@ -62,7 +62,7 @@ The `profiles.role` column drives all access control:
 |------------|--------------|------------------------------------------------------|
 | `customer` | Public site  | Own reservations, contracts, payments                |
 | `staff`    | Staff portal | Limited operational view                             |
-| `manager`  | Admin portal | Reservations, contracts, payments, reviews           |
+| `manager`  | Admin portal | Reservations, contracts, payments, reviews (moderation is manager-only) |
 | `admin`    | Admin portal | Everything above + accounts, settings, backup, audit |
 
 `manager` and `admin` share the same admin portal (`admin/dashboard.html`). Role-specific UI is controlled by:

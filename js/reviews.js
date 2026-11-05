@@ -262,14 +262,14 @@ function renderReviews() {
         const ownHtml = r.is_mine
             ? `
                 <div class="review-card__own">
-                    <span class="review-card__own-tag"><i class="ti ti-user" aria-hidden="true"></i> Your review${r.is_hidden ? ' &middot; Under review' : (isAnon ? ' &middot; shown as Anonymous' : '')}</span>
+                    <span class="review-card__own-tag"><i class="ti ti-user" aria-hidden="true"></i> Your review${r.is_hidden ? ' &middot; Hidden' : (isAnon ? ' &middot; shown as Anonymous' : '')}</span>
                     ${r.is_hidden ? `
                         <div class="review-card__moderation" role="status">
-                            <strong>Under review</strong>
-                            <span>Your review is temporarily hidden while our team reviews it.</span>
+                            <strong>Hidden from public view</strong>
+                            <span>Our team has hidden this review, so other guests can&rsquo;t see it right now.</span>
                             <div class="review-card__moderation-reason">
-                                <span class="review-card__moderation-reason-label">Reason</span>
-                                <p>${escapeHtml(r.moderation_reason || 'Our team is reviewing this review.')}</p>
+                                <span class="review-card__moderation-reason-label">Reason from our team</span>
+                                <p>${escapeHtml(r.moderation_reason || 'Our team hid this review. Please contact us if you have questions.')}</p>
                             </div>
                         </div>
                     ` : `<button type="button" class="review-card__edit-btn" data-review-id="${escapeHtml(r.review_id)}"><i class="ti ti-pencil" aria-hidden="true"></i> Edit</button>`}

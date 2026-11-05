@@ -43,6 +43,9 @@ let activeSearch = '';       // the search term currently applied
 let latestRequestId = 0;     // lets a newer request supersede an older one
 let searchDebounceTimer = null;
 let adminSession = null;
+// Only managers moderate reviews. Admins get a read-only view (the database
+// enforces this too: see supabase/migrations/20261114_review_moderation_manager_only.sql).
+let canModerate = false;
 let currentPageReviews = [];
 
 function redirectToAdminLogin() {
@@ -200,6 +203,13 @@ function openReviewDetail(review) {
   document.getElementById('reviewDetailAnonymous').textContent = review.is_anonymous ? 'Shown anonymously to guests' : 'Customer name shown to guests';
   document.getElementById('reviewDetailStatus').textContent = review.is_hidden ? `Hidden · ${review.moderation_reason}` : 'Visible publicly';
   document.getElementById('reviewModerationReason').value = review.is_hidden ? review.moderation_reason : '';
+  // Admins can read everything but not moderate: hide the reason box and the
+  // Hide/Unhide button and show a view-only note instead.
+  const showControls = canModerate ? '' : 'none';
+  document.getElementById('reviewModerationLabel').style.display = showControls;
+  document.getElementById('reviewModerationReason').style.display = showControls;
+  document.getElementById('reviewModerationActions').style.display = showControls;
+  document.getElementById('reviewViewOnlyNote').style.display = canModerate ? 'none' : '';
   const action = document.getElementById('reviewModerationAction');
   action.textContent = review.is_hidden ? 'Unhide review' : 'Hide review';
   action.dataset.reviewId = review.review_id;
@@ -209,6 +219,7 @@ function openReviewDetail(review) {
 }
 
 async function moderateOpenReview(button) {
+  if (!canModerate) return;
   const reason = document.getElementById('reviewModerationReason').value.trim();
   const message = document.getElementById('reviewDetailMessage');
   if (!reason) { message.textContent = 'Enter a reason for this moderation action.'; return; }
@@ -447,6 +458,11 @@ validateAdminSession({
 
     // Save session (you use this later)
     adminSession = session;
+    canModerate = profile.role === 'manager';
+    if (!canModerate) {
+      const sub = document.getElementById('reviewsPageSub');
+      if (sub) sub.textContent = 'Open a review to read its full details. Only managers can moderate reviews.';
+    }
 
     // Setup inactivity
     setupInactivityLogout(profile.role);

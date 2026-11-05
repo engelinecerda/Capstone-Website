@@ -1,5 +1,5 @@
 /* admin_reviews.css */
-@import url('./admin_customers.css?v=65');
+@import url('./admin_customers.css?v=66');
 
 /* Marks a review the customer chose to post anonymously. Admins/managers still
    see the real name above it; the public Reviews page does not. */
@@ -36,6 +36,7 @@
 .review-detail-facts dt { margin-bottom: 4px; color: #716b66; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .review-detail-facts dd { margin: 0; overflow-wrap: anywhere; }
 .review-detail-comment { margin: 0 0 18px; padding: 16px; border-left: 3px solid #8a4d2b; background: #faf7f4; white-space: pre-wrap; }
+.review-detail-viewonly { margin: 0 0 4px; padding: 10px 12px; border-radius: 9px; background: #f3efe8; color: #6d5c49; font-size: .9rem; font-weight: 600; }
 .review-moderation-label { display: block; margin-bottom: 6px; font-weight: 700; }
 #reviewModerationReason { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #d8d0ca; border-radius: 9px; font: inherit; resize: vertical; }
 .review-detail-message { min-height: 1.3em; color: #9b3326; }
