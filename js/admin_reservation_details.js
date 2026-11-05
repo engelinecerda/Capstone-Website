@@ -798,7 +798,11 @@ function renderHeaderActions() {
     const holdNote = (status === 'cancellation_requested' && reservation.cancellation_hold_expires_at)
       ? ` — hold expires ${formatDateTime(reservation.cancellation_hold_expires_at)}`
       : '';
-    if (feePayment && feeStatus !== 'rejected') {
+    if (feePayment && feeStatus === 'approved') {
+      // Fee already verified: nothing is pending and nothing is left to wait
+      // for (the cancellation card below shows it as settled), so no note.
+      // Previously this fell through to "pending review" for an approved fee.
+    } else if (feePayment && feeStatus !== 'rejected') {
       buttons.push(`<span class="header-action-note">Cancellation fee is pending review${escapeHtml(holdNote)}</span>`);
     } else if (feePayment) {
       buttons.push(`<span class="header-action-note">Cancellation fee was rejected — awaiting resubmission${escapeHtml(holdNote)}</span>`);

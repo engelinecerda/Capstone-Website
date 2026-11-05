@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=64');
+@import url('./admin_reservations.css?v=65');
 
 /* ============================================================
    Hidden-state overrides.
@@ -13,6 +13,7 @@
 .details-error.hidden,
 .details-content.hidden,
 .request-card.hidden,
+.request-card-helper.hidden,
 .signature-check-panel.hidden,
 .action-btn.hidden {
   display: none;
