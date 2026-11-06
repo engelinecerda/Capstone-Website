@@ -23,6 +23,7 @@ const reportsExportOptions = document.getElementById('reportsExportOptions');
 const reportDateFrom = document.getElementById('reportDateFrom');
 const reportDateTo = document.getElementById('reportDateTo');
 const reportSearch = document.getElementById('reportSearch');
+const reportsTableHead = document.querySelector('.reports-table thead');
 const reportsMessage = document.getElementById('reportsMessage');
 const reportsSummary = document.getElementById('reportsSummary');
 const reportsTableBody = document.getElementById('reportsTableBody');
@@ -34,6 +35,9 @@ const navReviewCount = document.getElementById('navReviewCount');
 
 let reportsFiltered = [];
 let reportsCurrentPage = 1;
+// null key = the default order the reservations load in (newest event date
+// first). Clicking an active arrow again clears the sort back to that.
+const reportsSort = { key: null, dir: 'asc' };
 
 const state = {
     reservations: [],
@@ -183,12 +187,75 @@ function getPackageName(reservation) {
     return reservation?.package?.package_name || reservation?.package_id || 'No package';
 }
 
+function getReservationStatusLabel(reservation) {
+    return getStatusPillMeta(getEffectiveReservationStatus(reservation)).label;
+}
+
+// "1:00 PM" -> minutes since midnight, so Schedule sorts by time of day when
+// two reservations share a date (event_time is free text, not sortable as is).
+function parseEventTimeToMinutes(value) {
+    const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!match) return null;
+    let hours = Number(match[1]) % 12;
+    if (/pm/i.test(match[3] || '') ) hours += 12;
+    return hours * 60 + Number(match[2]);
+}
+
+// Each getter returns the value to compare; null/'' means "no value" and is
+// always listed last, whichever direction is chosen.
+const REPORT_SORT_GETTERS = {
+    customer: (r) => getCustomerName(r).toLowerCase(),
+    event: (r) => String(r?.event_type || '').toLowerCase(),
+    schedule: (r) => {
+        const date = String(r?.event_date || '').split('T')[0];
+        if (!date) return null;
+        const minutes = parseEventTimeToMinutes(r?.event_time);
+        return `${date}T${String(minutes ?? 0).padStart(5, '0')}`;
+    }
+};
+
+function sortReservations(reservations) {
+    const getter = REPORT_SORT_GETTERS[reportsSort.key];
+    if (!getter) return reservations;
+    const factor = reportsSort.dir === 'desc' ? -1 : 1;
+
+    // Array.prototype.sort is stable, so rows with equal values keep the
+    // default newest-first order.
+    return [...reservations].sort((a, b) => {
+        const left = getter(a);
+        const right = getter(b);
+        const leftMissing = left === null || left === '' || Number.isNaN(left);
+        const rightMissing = right === null || right === '' || Number.isNaN(right);
+        if (leftMissing || rightMissing) {
+            return leftMissing === rightMissing ? 0 : (leftMissing ? 1 : -1);
+        }
+        if (typeof left === 'number' && typeof right === 'number') {
+            return (left - right) * factor;
+        }
+        return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: 'base' }) * factor;
+    });
+}
+
+function updateSortIndicators() {
+    reportsTableHead?.querySelectorAll('th[data-sort-key]').forEach((th) => {
+        const isActive = th.dataset.sortKey === reportsSort.key;
+        th.setAttribute('aria-sort', isActive ? (reportsSort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
+        th.querySelectorAll('.sort-btn').forEach((btn) => {
+            const on = isActive && btn.dataset.dir === reportsSort.dir;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', String(on));
+        });
+    });
+}
+
 function getFilteredReservations() {
     const fromValue = reportDateFrom?.value || '';
     const toValue = reportDateTo?.value || '';
     const searchValue = String(reportSearch?.value || '').trim().toLowerCase();
 
-    return state.reservations.filter((reservation) => {
+    // Sorted here (not only when drawing the table) so the Excel and PDF
+    // exports come out in the same order as the screen.
+    return sortReservations(state.reservations.filter((reservation) => {
         const eventDate = String(reservation?.event_date || '').split('T')[0];
         if (fromValue && eventDate && eventDate < fromValue) {
             return false;
@@ -205,11 +272,12 @@ function getFilteredReservations() {
             getCustomerName(reservation),
             getCustomerEmail(reservation),
             reservation?.event_type,
-            getPackageName(reservation)
+            getPackageName(reservation),
+            getReservationStatusLabel(reservation)
         ].join(' ').toLowerCase();
 
         return haystack.includes(searchValue);
-    });
+    }));
 }
 
 function buildSummaryCards(reservations) {
@@ -460,7 +528,7 @@ function buildSummarySheet(workbook, resvRef) {
 async function exportReportsExcel() {
     const filteredReservations = getFilteredReservations();
     if (!filteredReservations.length) {
-        setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
+        setReportsMessage('Add a date range or adjust the filters so at least one reservation can be exported.', true);
         return;
     }
 
@@ -520,7 +588,7 @@ async function exportReportsExcel() {
 async function exportReportsPdf() {
     const filteredReservations = getFilteredReservations();
     if (!filteredReservations.length) {
-        setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
+        setReportsMessage('Add a date range or adjust the filters so at least one reservation can be exported.', true);
         return;
     }
     if (state.paymentsUnavailable) {
@@ -737,6 +805,26 @@ wireLogoutButton('logoutBtn', '/admin');
 reportDateFrom?.addEventListener('input', renderReports);
 reportDateTo?.addEventListener('input', renderReports);
 reportSearch?.addEventListener('input', renderReports);
+
+// One listener for every header's arrows. Clicking the arrow that is already
+// active clears the sort and goes back to the default order.
+reportsTableHead?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.sort-btn');
+    const th = btn?.closest('th[data-sort-key]');
+    if (!btn || !th) return;
+
+    const key = th.dataset.sortKey;
+    const dir = btn.dataset.dir === 'desc' ? 'desc' : 'asc';
+    if (reportsSort.key === key && reportsSort.dir === dir) {
+        reportsSort.key = null;
+        reportsSort.dir = 'asc';
+    } else {
+        reportsSort.key = key;
+        reportsSort.dir = dir;
+    }
+    updateSortIndicators();
+    renderReports();
+});
 
 supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {

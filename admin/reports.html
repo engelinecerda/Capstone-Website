@@ -72,7 +72,7 @@
       <section class="card reports-filter-card">
         <div>
           <h2 class="card-title">Filter range</h2>
-          <p class="card-sub">Filter reservations by event date before reviewing or exporting the report.</p>
+          <p class="card-sub">Filter reservations by event date or search before reviewing or exporting the report. Sort columns from the table headers.</p>
         </div>
         <div class="reports-filter-grid">
           <div class="reports-field">
@@ -84,8 +84,8 @@
             <input id="reportDateTo" type="date">
           </div>
           <div class="reports-field">
-            <label for="reportSearch">Customer or event</label>
-            <input id="reportSearch" type="text" placeholder="Search customer, event, or package" maxlength="100">
+            <label for="reportSearch">Customer, event, package, or status</label>
+            <input id="reportSearch" type="text" placeholder="Search customer, event, package, or status" maxlength="100">
           </div>
         </div>
         <p class="reports-message" id="reportsMessage">Loading reservations...</p>
@@ -104,9 +104,33 @@
           <table class="reports-table">
             <thead>
               <tr>
-                <th>Customer</th>
-                <th>Event</th>
-                <th>Schedule</th>
+                <th data-sort-key="customer" aria-sort="none">
+                  <span class="th-sort">
+                    <span class="th-sort-label">Customer</span>
+                    <span class="sort-arrows">
+                      <button type="button" class="sort-btn" data-dir="asc" aria-pressed="false" aria-label="Sort by Customer, ascending" title="Sort ascending">▲</button>
+                      <button type="button" class="sort-btn" data-dir="desc" aria-pressed="false" aria-label="Sort by Customer, descending" title="Sort descending">▼</button>
+                    </span>
+                  </span>
+                </th>
+                <th data-sort-key="event" aria-sort="none">
+                  <span class="th-sort">
+                    <span class="th-sort-label">Event</span>
+                    <span class="sort-arrows">
+                      <button type="button" class="sort-btn" data-dir="asc" aria-pressed="false" aria-label="Sort by Event, ascending" title="Sort ascending">▲</button>
+                      <button type="button" class="sort-btn" data-dir="desc" aria-pressed="false" aria-label="Sort by Event, descending" title="Sort descending">▼</button>
+                    </span>
+                  </span>
+                </th>
+                <th data-sort-key="schedule" aria-sort="none">
+                  <span class="th-sort">
+                    <span class="th-sort-label">Schedule</span>
+                    <span class="sort-arrows">
+                      <button type="button" class="sort-btn" data-dir="asc" aria-pressed="false" aria-label="Sort by Schedule, ascending" title="Sort ascending">▲</button>
+                      <button type="button" class="sort-btn" data-dir="desc" aria-pressed="false" aria-label="Sort by Schedule, descending" title="Sort descending">▼</button>
+                    </span>
+                  </span>
+                </th>
                 <th>Package</th>
                 <th>Status</th>
                 <th>Total Price</th>
