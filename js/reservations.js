@@ -1996,7 +1996,16 @@ async function loadAvailabilityCalendar() {
     try {
         const range = getCalendarRange(availabilityState.month);
         const [calendarAvailability, blackoutData] = await Promise.all([
-            fetchCalendarAvailability(supabase, { fromDate: range.fromDate, toDate: range.toDate }),
+            // Scope, duration and room make the month grid answer the same
+            // question the time grid does; with no package chosen yet this
+            // stays the general preview.
+            fetchCalendarAvailability(supabase, {
+                fromDate: range.fromDate,
+                toDate: range.toDate,
+                scope: getSelectedBookingScope(),
+                durationHours: getSelectedDurationHours(),
+                venueId: S.venueId
+            }),
             fetchBlackoutDates(supabase, availabilityState, true)
         ]);
 
@@ -2036,7 +2045,7 @@ async function loadSelectedDateAvailability() {
 
     try {
         const availability = await fetchDateAvailability(supabase, {
-            eventDate: S.eventDate, scope: selectedScope, durationHours: getSelectedDurationHours()
+            eventDate: S.eventDate, scope: selectedScope, durationHours: getSelectedDurationHours(), venueId: S.venueId
         });
         availabilityState.selectedDateAvailability = availability;
         setAvailabilityMessage(availability.scopeTaken ? 'This date is fully booked.' : `Selected ${formatDisplayDate(S.eventDate)}.`, availability.scopeTaken);
@@ -4435,7 +4444,7 @@ async function submitDone() {
 
     try {
         const latestAvail = await fetchDateAvailability(supabase, {
-            eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours()
+            eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours(), venueId: S.venueId
         });
         if (getSelectedBookingScope() && latestAvail.scopeTaken) {
             availabilityState.selectedDateAvailability = latestAvail;
@@ -4587,6 +4596,14 @@ async function submitDone() {
             if (insertError.hint === 'date_closed' || /no longer available for booking/i.test(insertError.message || '')) {
                 try { await loadAvailabilityCalendar(); } catch { /* the message below still shows */ }
                 throw new Error(insertError.message);
+            }
+            // Another booking took this slot between the last availability
+            // check and the insert (the capacity trigger — see
+            // 20261115_date_availability_matches_time_grid.sql). Refresh so
+            // the calendar and time grid reflect it.
+            if (/overlaps an existing booking|daily booking limit/i.test(insertError.message || '')) {
+                try { await loadAvailabilityCalendar(); await buildTimeGrid(); } catch { /* the message below still shows */ }
+                throw new Error('That date or time was just taken by another booking. Please choose another date or time.');
             }
             throw new Error('Reservation save failed: ' + insertError.message);
         }

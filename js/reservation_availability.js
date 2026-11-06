@@ -145,13 +145,50 @@ function normalizeAvailabilityPayload(payload, fallbackDate = '') {
     };
 }
 
+// An RPC that gained an optional parameter (p_venue_id, p_scope, ...) in
+// supabase/migrations/20261115_date_availability_matches_time_grid.sql is
+// only callable with that parameter once the migration has been applied.
+// Migrations here are applied by hand, so a deploy can land first — treat
+// "no function with that signature" as a cue to retry with the old shape.
+function isMissingRpcSignature(error) {
+    const code = String(error?.code || '');
+    return code === 'PGRST202' || code === '42883'
+        || /could not find the function/i.test(String(error?.message || ''));
+}
+
+async function callBookingAvailability(supabase, { eventDate, scope, durationParam, excludeReservationId, venueId }) {
+    const params = {
+        p_event_date: eventDate,
+        p_scope: scope,
+        p_duration_hours: durationParam,
+        p_exclude_reservation_id: excludeReservationId || null
+    };
+    // Only sent when a room is resolved, so every request without one is
+    // byte-for-byte the old call and needs no migration to keep working.
+    if (venueId) params.p_venue_id = venueId;
+
+    let { data, error } = await supabase.rpc('get_booking_availability', params);
+    if (error && venueId && isMissingRpcSignature(error)) {
+        delete params.p_venue_id;
+        ({ data, error } = await supabase.rpc('get_booking_availability', params));
+    }
+    if (error) throw error;
+    return normalizeAvailabilityPayload(data, eventDate);
+}
+
 // get_booking_availability() itself still only ever answers for one scope
 // at a time (that didn't need to change — see the migration's comment on
 // why get_available_start_times() kept a single p_scope too) — a combo
 // package's real answer is "taken" the moment ANY one of its scopes is
 // taken, so this calls it once per scope and ORs scope_taken/is_fully_
 // booked together, unioning occupied_scopes/blocked_times for display.
-export async function fetchDateAvailability(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null } = {}) {
+//
+// venueId: pass the room resolved for the booking (same value the time grid
+// gets) so "is this date taken" is answered for that room, exactly like the
+// start-time list below. Without it the date check counted every room in the
+// scope together and could call a date open while the chosen room had no
+// time left. Only meaningful for a single-scope booking.
+export async function fetchDateAvailability(supabase, { eventDate, scope = '', durationHours = null, excludeReservationId = null, venueId = null } = {}) {
     if (!eventDate) {
         return normalizeAvailabilityPayload({}, '');
     }
@@ -160,26 +197,15 @@ export async function fetchDateAvailability(supabase, { eventDate, scope = '', d
     const durationParam = Number.isFinite(Number(durationHours)) ? Number(durationHours) : null;
 
     if (!scopes.length) {
-        const { data, error } = await supabase.rpc('get_booking_availability', {
-            p_event_date: eventDate,
-            p_scope: null,
-            p_duration_hours: durationParam,
-            p_exclude_reservation_id: excludeReservationId || null
+        return callBookingAvailability(supabase, {
+            eventDate, scope: null, durationParam, excludeReservationId, venueId: null
         });
-        if (error) throw error;
-        return normalizeAvailabilityPayload(data, eventDate);
     }
 
-    const results = await Promise.all(scopes.map(async (singleScope) => {
-        const { data, error } = await supabase.rpc('get_booking_availability', {
-            p_event_date: eventDate,
-            p_scope: singleScope,
-            p_duration_hours: durationParam,
-            p_exclude_reservation_id: excludeReservationId || null
-        });
-        if (error) throw error;
-        return normalizeAvailabilityPayload(data, eventDate);
-    }));
+    const singleScopeVenueId = scopes.length === 1 ? venueId : null;
+    const results = await Promise.all(scopes.map((singleScope) => callBookingAvailability(supabase, {
+        eventDate, scope: singleScope, durationParam, excludeReservationId, venueId: singleScopeVenueId
+    })));
 
     return results.reduce((merged, r) => ({
         eventDate: merged.eventDate || r.eventDate,
@@ -256,21 +282,55 @@ export async function fetchAvailableStartTimes(supabase, { eventDate, scope = ''
     });
 }
 
-export async function fetchCalendarAvailability(supabase, { fromDate, toDate } = {}) {
+async function fetchCalendarRows(supabase, { fromDate, toDate, scope = null, durationHours = null, venueId = null }) {
+    const params = { p_from_date: fromDate, p_to_date: toDate };
+    if (scope) {
+        params.p_scope = scope;
+        if (Number.isFinite(Number(durationHours)) && Number(durationHours) > 0) {
+            params.p_duration_hours = Number(durationHours);
+        }
+        if (venueId) params.p_venue_id = venueId;
+    }
+
+    let { data, error } = await supabase.rpc('get_booking_calendar_availability', params);
+    if (error && scope && isMissingRpcSignature(error)) {
+        // Migration not applied yet — fall back to the old all-scope preview.
+        ({ data, error } = await supabase.rpc('get_booking_calendar_availability', {
+            p_from_date: fromDate,
+            p_to_date: toDate
+        }));
+    }
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+}
+
+// With no scope this is the general preview (a date only reads as fully
+// booked once every scope is exhausted, probed at 1 hour). Pass the booking's
+// scope, package duration and room to get the answer for THAT booking — the
+// same question the time grid asks — so a date with no start time left for
+// this package no longer shows as open. A combo package is checked per scope
+// and a date counts as taken if any one of its scopes is taken.
+export async function fetchCalendarAvailability(supabase, { fromDate, toDate, scope = '', durationHours = null, venueId = null } = {}) {
     if (!fromDate || !toDate) return new Map();
 
-    const { data, error } = await supabase.rpc('get_booking_calendar_availability', {
-        p_from_date: fromDate,
-        p_to_date: toDate
-    });
+    const scopes = asScopeArray(scope);
+    const singleScopeVenueId = scopes.length === 1 ? venueId : null;
 
-    if (error) throw error;
+    const perScopeRows = scopes.length
+        ? await Promise.all(scopes.map((singleScope) => fetchCalendarRows(supabase, {
+            fromDate, toDate, scope: singleScope, durationHours, venueId: singleScopeVenueId
+        })))
+        : [await fetchCalendarRows(supabase, { fromDate, toDate })];
 
-    return (Array.isArray(data) ? data : []).reduce((map, row) => {
+    return perScopeRows.flat().reduce((map, row) => {
         const normalized = normalizeAvailabilityPayload(row, row?.event_date || '');
-        if (normalized.eventDate) {
-            map.set(normalized.eventDate, normalized);
-        }
+        if (!normalized.eventDate) return map;
+        const existing = map.get(normalized.eventDate);
+        map.set(normalized.eventDate, existing ? {
+            ...existing,
+            occupiedScopes: [...new Set([...existing.occupiedScopes, ...normalized.occupiedScopes])],
+            isFullyBooked: existing.isFullyBooked || normalized.isFullyBooked
+        } : normalized);
         return map;
     }, new Map());
 }
