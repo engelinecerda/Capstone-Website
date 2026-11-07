@@ -7,6 +7,7 @@ import { getPortalInitials } from './admin_auth.js';
 import { logAudit } from './audit_logger.js';
 import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
+import { describeAuditDetails } from './audit_summary.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allLogs     = [];
@@ -209,6 +210,34 @@ function buildAuditQuery(forExport = false, { withCount = true } = {}) {
   return query;
 }
 
+// ─── Readable details ─────────────────────────────────────────────────────────
+// Some entries are saved with their raw payload as the details (JSON, or
+// key=value pairs). The list and the exports show a plain-language version
+// of those instead; the expanded row keeps the text exactly as saved. A few of
+// them hold IDs (venues, event types, packages), so their names are fetched
+// once.
+const auditLookups = { venues: {}, eventTypes: {}, packages: {} };
+let auditLookupsPromise = null;
+
+function ensureAuditLookups() {
+  if (!auditLookupsPromise) {
+    auditLookupsPromise = Promise.all([
+      supabase.from('venue').select('venue_id, name'),
+      supabase.from('event_types').select('id, name'),
+      supabase.from('package').select('package_id, package_name')
+    ]).then(([venues, eventTypes, packages]) => {
+      (venues.data || []).forEach((v) => { auditLookups.venues[v.venue_id] = v.name; });
+      (eventTypes.data || []).forEach((e) => { auditLookups.eventTypes[e.id] = e.name; });
+      (packages.data || []).forEach((p) => { auditLookups.packages[String(p.package_id).toLowerCase()] = p.package_name; });
+    }).catch(() => { /* names fall back to "a venue that no longer exists" etc. */ });
+  }
+  return auditLookupsPromise;
+}
+
+function readableDetails(log) {
+  return describeAuditDetails(log, auditLookups);
+}
+
 // ─── Load & render ────────────────────────────────────────────────────────────
 // keepCount=true is used by Previous / Next: moving between pages doesn't
 // change which logs match, so the total from the last filter change is
@@ -239,6 +268,9 @@ async function loadAuditLogs({ keepCount = false } = {}) {
       totalCount = count || 0;
       totalCountReady = true;
     }
+
+    await ensureAuditLookups();
+    if (loadId !== latestLoadId) return;
 
     renderAuditTable();
     updatePagination();
@@ -281,7 +313,7 @@ function buildAuditRow(log, index) {
     </td>
     <td>
       <div class="audit-summary-cell">
-        <span class="audit-summary-text">${escapeHtml(log.action || '—')}${log.details ? ' — ' + escapeHtml(log.details) : ''}</span>
+        <span class="audit-summary-text">${escapeHtml(log.action || '—')}${log.details ? ' — ' + escapeHtml(readableDetails(log)) : ''}</span>
         <svg class="expand-chevron" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </td>
@@ -289,6 +321,7 @@ function buildAuditRow(log, index) {
 }
 
 function buildAuditDetailRow(log, index) {
+  const readable = readableDetails(log);
   const rows = [
     ['Full timestamp', log.created_at || '—'],
     ['Actor', `${log.user_name || 'System'} (${log.user_role || '—'})`],
@@ -296,7 +329,9 @@ function buildAuditDetailRow(log, index) {
     ['Action', log.action || '—'],
     ['Category', log.category || '—'],
     ['Entity ID', log.entity_id || '—'],
-    ['Details', log.details || '—']
+    ['Details', readable || '—'],
+    // Only when the list shows a rewritten version: keep the record as saved.
+    ...(log.details && readable !== log.details ? [['Saved record', log.details]] : [])
   ];
   return `<tr class="audit-detail-row" data-detail-for="${index}" hidden>
     <td colspan="4">
@@ -425,6 +460,7 @@ async function exportAuditPdf() {
     if (error) throw error;
 
     const logs = data || [];
+    await ensureAuditLookups();
     if (!logs.length) {
       setMessage('No audit logs match the current filters. Adjust the range and try again.', 'error');
       exportAuditPdfBtn.disabled = false;
@@ -472,7 +508,7 @@ async function exportAuditPdf() {
             sanitizeForPdf(log.user_role || '—'),
             sanitizeForPdf(log.action || '—'),
             (log.category || 'system').charAt(0).toUpperCase() + (log.category || 'system').slice(1),
-            sanitizeForPdf(log.details || '—')
+            sanitizeForPdf(readableDetails(log) || '—')
         ]),
         styles:     { fontSize: 8.5, cellPadding: 6, overflow: 'linebreak' },
         headStyles: { fillColor: [78, 54, 36] },
@@ -515,6 +551,7 @@ async function exportAuditExcel() {
     if (error) throw error;
 
     const logs = data || [];
+    await ensureAuditLookups();
     if (!logs.length) {
       setMessage('No audit logs match the current filters. Adjust the range and try again.', 'error');
       return;
@@ -542,7 +579,7 @@ async function exportAuditExcel() {
         role:      log.user_role || '—',
         action:    log.action || '—',
         category:  category.charAt(0).toUpperCase() + category.slice(1),
-        details:   log.details || '—'
+        details:   readableDetails(log) || '—'
       });
     });
 
