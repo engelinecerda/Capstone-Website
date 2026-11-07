@@ -11,6 +11,7 @@ import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { mountRefreshStatus } from './refresh_status.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { initTableSort, rpcWithSort } from './table_sort.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -54,6 +55,12 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 let visibleContracts = [];        // the rows of the page on screen
 let contractsCurrentPage = 1;
+// Alphabetical by customer until a header is clicked. Sorting runs in the
+// database so it covers every contract, not just the page on screen.
+const contractsSort = initTableSort(document.querySelector('.contracts-table'), {
+  defaultSort: { key: 'customer', dir: 'asc' },
+  onChange: () => reloadFromFirstPage()
+});
 let contractsTotal = 0;           // contracts matching the active filters
 let contractsOverallTotal = 0;    // all contracts with a file (ignores filters)
 let activeSearch = '';            // the search term currently applied
@@ -312,7 +319,7 @@ function renderTable(list) {
   if (!list.length) {
     contractsBody.innerHTML = `
       <tr class="empty-row">
-        <td colspan="6">No submitted contracts matched the current filter.</td>
+        <td colspan="7">No submitted contracts matched the current filter.</td>
       </tr>
     `;
     return;
@@ -328,15 +335,19 @@ function renderTable(list) {
 
     return `
       <tr class="reservation-row">
-        <td data-label="Customer / Package">
+        <td data-label="Customer">
           <div class="reservation-customer">
             <span class="avatar">${escapeHtml(getCustomerInitials(reservation.contact_name, reservation.contact_email))}</span>
             <div class="reservation-customer-copy">
-              ${reservation.reservation_number ? `<span class="table-reservation-number">${escapeHtml(reservation.reservation_number)}</span>` : ''}
               <span class="table-main">${escapeHtml(reservation.contact_name || 'Unknown customer')}</span>
               <span class="table-sub">${escapeHtml(reservation.contact_email || 'No email on file')}</span>
-              <span class="table-meta">${escapeHtml(reservation.package?.package_name || 'Package pending')}</span>
             </div>
+          </div>
+        </td>
+        <td data-label="Package">
+          <div class="reservation-customer-copy">
+            ${reservation.reservation_number ? `<span class="table-reservation-number">${escapeHtml(reservation.reservation_number)}</span>` : ''}
+            <span class="table-main">${escapeHtml(reservation.package?.package_name || 'Package pending')}</span>
           </div>
         </td>
         <td data-label="Event Schedule">
@@ -424,13 +435,13 @@ function shapeContractRow(row) {
 
 async function fetchContractsPage(page, { status, search }) {
   const { from } = getPageRange(page, CONTRACTS_PAGE_SIZE);
-  const { data, error } = await supabase.rpc('get_admin_contracts_page', {
+  const { data, error } = await rpcWithSort(supabase, 'get_admin_contracts_page', {
     p_status: status,
     p_search: search || null,
     p_reservation_id: null,
     p_limit: CONTRACTS_PAGE_SIZE,
     p_offset: from
-  });
+  }, contractsSort.getRpcParams());
 
   if (error) throw error;
 

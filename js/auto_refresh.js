@@ -5,8 +5,12 @@
 //   - when the tab becomes visible again, the window regains focus, or the page
 //     is restored from the back-forward cache (always, so a visitor who switches
 //     back never waits long to see current data);
-//   - on a slow timer while the tab is visible (pollMs, default 2 minutes; pass
-//     pollMs: 0 for no timer at all, focus/visibility refreshes only).
+//   - on a slow timer while the tab is visible (pollMs, default 1 minute —
+//     AUTO_REFRESH_POLL_MS below; pass pollMs: 0 for no timer at all,
+//     focus/visibility refreshes only). Pages whose refresh is heavy or whose
+//     data changes slowly pass a longer pollMs: 2 minutes on reservations,
+//     payments, customers, reviews, the roster and the availability calendar;
+//     5 minutes on accounts.
 //
 // While the "service issue" notice is showing (js/supabase_health_notice.js sets
 // window.__eliSupabaseDown), every automatic refresh is skipped so open tabs do

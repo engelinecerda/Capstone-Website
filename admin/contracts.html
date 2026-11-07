@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=66">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=66">
-  <link rel="stylesheet" href="/css/admin_contracts.css?v=66">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=66">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=67">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=67">
+  <link rel="stylesheet" href="/css/admin_contracts.css?v=67">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=67">
 </head>
 <body>
 
@@ -105,8 +105,9 @@
           <table class="reservation-table contracts-table">
             <thead>
               <tr>
-                <th>Customer / Package</th>
-                <th>Event Schedule</th>
+                <th data-sort-key="customer">Customer</th>
+                <th data-sort-key="package">Package</th>
+                <th data-sort-key="schedule">Event Schedule</th>
                 <th>Reservation Status</th>
                 <th>Contract Status</th>
                 <th>Review Activity</th>
@@ -176,6 +177,6 @@
   <script type="module" src="../js/admin_contracts.js"></script>
 
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=66" defer></script>
+  <script src="/js/supabase_health_notice.js?v=67" defer></script>
 </body>
 </html>

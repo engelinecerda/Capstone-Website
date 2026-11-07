@@ -16,6 +16,7 @@ import { mountRefreshStatus } from './refresh_status.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { logAudit } from './audit_logger.js';
 import { clampNumberInput } from './numeric_input.js';
+import { initTableSort, rpcWithSort } from './table_sort.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -146,6 +147,12 @@ let paymentsCache = [];          // payments on the current page
 let pinnedPayment = null;        // the payment open in the review modal, when it is not on the current page
 let paymentsTotal = 0;           // payments matching the current status / search / reservation filter
 let paymentsCurrentPage = 1;
+// Alphabetical by customer until a header is clicked. Sorting runs in the
+// database so it covers every payment, not just the page on screen.
+const paymentsSort = initTableSort(document.querySelector('.payments-table'), {
+  defaultSort: { key: 'customer', dir: 'asc' },
+  onChange: () => handleStatusChange()
+});
 let activeSearch = '';           // the search term currently applied
 let latestRequestId = 0;         // lets a newer request supersede an older one
 let searchDebounceTimer = null;
@@ -692,13 +699,13 @@ async function fetchAdditionalHeadRequests(requestIds) {
 // the page used to select, so the rest of the page is unchanged.
 async function fetchPaymentsPage(page, { status, search }) {
   const { from } = getPageRange(page, PAYMENTS_PAGE_SIZE);
-  const { data, error } = await supabase.rpc('get_admin_payments_page', {
+  const { data, error } = await rpcWithSort(supabase, 'get_admin_payments_page', {
     p_status: status,
     p_search: search || null,
     p_reservation_id: reservationFilterParam || null,
     p_limit: PAYMENTS_PAGE_SIZE,
     p_offset: from
-  });
+  }, paymentsSort.getRpcParams());
 
   if (error) throw error;
 
@@ -1778,7 +1785,11 @@ function wireModals() {
 // block in js/admin_reservations.js for the full rationale. Debounced so a
 // focus + visibilitychange pair (which fire together when switching back to
 // this tab) can't trigger a duplicate fetch.
-const autoRefresh = initAutoRefresh(() => loadData({ silent: true }));
+// Every 2 minutes (not the 1-minute default): each refresh here runs the page
+// query, the counts and several follow-up lookups, and the notification bell
+// still flags new payments within a minute. Focus/visibility refreshes and the
+// Refresh button are unaffected.
+const autoRefresh = initAutoRefresh(() => loadData({ silent: true }), { pollMs: 2 * 60 * 1000 });
 mountRefreshStatus(autoRefresh);
 
 wireLogoutButton();

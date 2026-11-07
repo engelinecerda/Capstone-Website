@@ -1409,3 +1409,63 @@ body .fm-title {
 @media (prefers-reduced-motion: reduce) {
   .notif-backdrop { animation: none !important; }
 }
+
+/* ── Sortable table headers (js/table_sort.js) ─────────────────────────────
+   The header text is the button. It inherits the header's own font so it
+   looks identical to a plain header. Every sortable header always shows a
+   faint up/down arrow so it reads as clickable without hovering; it
+   darkens on hover/focus, and the active column shows one solid arrow for
+   its direction. */
+.th-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.th-sort-btn:hover,
+.th-sort-btn:focus-visible,
+th.is-sorted .th-sort-btn {
+  color: var(--text);
+}
+
+.th-sort-btn:focus-visible {
+  outline: 2px solid rgba(61, 26, 10, 0.35);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.th-sort-icon {
+  flex: none;
+  fill: currentColor;
+}
+
+.th-sort-icon path {
+  opacity: 0.35;
+  transition: opacity 0.12s ease;
+}
+
+.th-sort-btn:hover .th-sort-icon path,
+.th-sort-btn:focus-visible .th-sort-icon path {
+  opacity: 0.8;
+}
+
+/* Active column: show only the arrow for the current direction, solid. */
+th[aria-sort="ascending"] .th-sort-icon .i-up,
+th[aria-sort="descending"] .th-sort-icon .i-down {
+  opacity: 1;
+}
+
+th[aria-sort="ascending"] .th-sort-icon .i-down,
+th[aria-sort="descending"] .th-sort-icon .i-up {
+  display: none;
+}

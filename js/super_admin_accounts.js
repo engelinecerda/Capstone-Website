@@ -10,6 +10,7 @@ import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { getPasswordChecks, validatePassword } from './password_rules.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { initTableSort, sortRows } from './table_sort.js';
 
 // supabase-js's functions.invoke() sets `data` to null on any non-2xx
 // response — the actual JSON body the function returned (our friendly
@@ -111,16 +112,28 @@ function updateStats() {
 // resetPage=false is used after an auto-refresh so an admin mid-way
 // through the list isn't yanked back to page 1 every time; the page is
 // clamped instead, in case the refreshed data has fewer pages than before.
+// Every account is already in the browser, so this sorts here. Alphabetical by
+// name until a header is clicked; "Last active" sorts by the real sign-in
+// time (never signed in = no value, listed last), not the "16h ago" text.
+const ACCOUNT_SORT_GETTERS = {
+  name: a => displayName(a).toLowerCase(),
+  lastActive: a => (a.last_sign_in_at ? new Date(a.last_sign_in_at).getTime() : null)
+};
+const accountsSort = initTableSort(document.querySelector('table'), {
+  defaultSort: { key: 'name', dir: 'asc' },
+  onChange: () => applyFilters()
+});
+
 function applyFilters({ resetPage = true } = {}) {
   const q       = document.getElementById('searchInput').value.trim().toLowerCase();
   const statusF = document.querySelector('#statusFilterSeg .seg-btn.active')?.dataset.status || '';
 
-  filtered = allAccounts.filter(a => {
+  filtered = sortRows(allAccounts.filter(a => {
     const name    = [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' ').toLowerCase();
     const matchQ  = !q || name.includes(q) || (a.email || '').toLowerCase().includes(q);
     const matchSt = !statusF || a._status === statusF;
     return matchQ && matchSt;
-  });
+  }), accountsSort.getSort(), ACCOUNT_SORT_GETTERS);
 
   if (resetPage) {
     currentPage = 1;

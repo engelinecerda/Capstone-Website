@@ -8,6 +8,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { mountRefreshStatus } from './refresh_status.js';
+import { initTableSort, rpcWithSort } from './table_sort.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -33,6 +34,15 @@ const CUSTOMERS_PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
 let customersCurrentPage = 1;
+// Alphabetical by name until a header is clicked. Sorting runs in the
+// database so it covers every customer, not just the page on screen.
+const customersSort = initTableSort(document.querySelector('.customers-table'), {
+  defaultSort: { key: 'customer', dir: 'asc' },
+  onChange: () => {
+    customersCurrentPage = 1;
+    loadCustomers({ withStats: false });
+  }
+});
 let customersTotal = 0;            // customers matching the active search
 let totalRegisteredCustomers = 0;  // all customers, ignoring the search
 let activeSearch = '';             // the search term currently applied
@@ -225,11 +235,11 @@ function renderCustomersView(customers) {
 // .range(from, to) would select.
 async function fetchCustomersPage(page, search) {
   const { from } = getPageRange(page, CUSTOMERS_PAGE_SIZE);
-  const { data, error } = await supabase.rpc('get_admin_customers_page', {
+  const { data, error } = await rpcWithSort(supabase, 'get_admin_customers_page', {
     p_search: search || null,
     p_limit: CUSTOMERS_PAGE_SIZE,
     p_offset: from
-  });
+  }, customersSort.getRpcParams());
 
   if (error) {
     throw error;

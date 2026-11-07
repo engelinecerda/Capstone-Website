@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=66">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=66">
-  <link rel="stylesheet" href="/css/admin_customers.css?v=66">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=66">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=67">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=67">
+  <link rel="stylesheet" href="/css/admin_customers.css?v=67">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=67">
 </head>
 <body>
   <aside class="sidebar">
@@ -105,9 +105,9 @@
           <table class="customers-table table-responsive-cards">
             <thead>
               <tr>
-                <th>Customer</th>
+                <th data-sort-key="customer">Customer</th>
                 <th>Contact</th>
-                <th>Registered</th>
+                <th data-sort-key="registered" data-sort-first="desc">Registered</th>
                 <th>Reservation Activity</th>
               </tr>
             </thead>
@@ -123,6 +123,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="../js/admin_customers.js"></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=66" defer></script>
+  <script src="/js/supabase_health_notice.js?v=67" defer></script>
 </body>
 </html>

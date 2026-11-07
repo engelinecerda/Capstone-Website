@@ -12,6 +12,7 @@ import { getPaymentStatusPillMeta, fetchUnseenReservationChanges, markReservatio
 import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { mountRefreshStatus } from './refresh_status.js';
+import { initTableSort, rpcWithSort } from './table_sort.js';
 
 const tableMessage = document.getElementById('tableMessage');
 const reservationsBody = document.getElementById('reservationsBody');
@@ -45,6 +46,13 @@ let reservationsTotal = 0;      // reservations matching the active filters
 let visibleReservations = [];   // the rows of the page on screen
 let paymentSummaryMap = {};     // payment fields for the rows on screen
 let activeSearch = '';          // the search term currently applied
+
+// No default column: with nothing clicked the list keeps its own order
+// (newest booking first, or soonest event first on the Upcoming chip). A
+// header click sorts the whole result in the database, not just this page.
+const reservationsSort = initTableSort(document.querySelector('.reservations-table'), {
+  onChange: () => reloadFromFirstPage()
+});
 let latestRequestId = 0;        // lets a newer request supersede an older one
 let searchDebounceTimer = null;
 let rosterLoaded = false;
@@ -309,7 +317,7 @@ function renderStats(counts) {
 function renderTable(list) {
   if (!reservationsBody) return;
   if (!list.length) {
-    reservationsBody.innerHTML = '<tr class="empty-row"><td colspan="6">No reservations found.</td></tr>';
+    reservationsBody.innerHTML = '<tr class="empty-row"><td colspan="7">No reservations found.</td></tr>';
     return;
   }
   reservationsBody.innerHTML = list.map(res => {
@@ -319,18 +327,22 @@ function renderTable(list) {
     const staffSummary = getStaffSummary(res.reservation_id);
     return `
       <tr class="reservation-row" data-reservation-id="${res.reservation_id}">
-        <td data-label="Customer / Package">
+        <td data-label="Customer">
           <div class="reservation-customer">
             <span class="avatar">${escapeHtml(getCustomerInitials(res.contact_name, res.contact_email))}</span>
             <div class="reservation-customer-copy">
-              ${res.reservation_number ? `<span class="table-reservation-number">${escapeHtml(res.reservation_number)}</span>` : ''}
               <span class="table-main">${escapeHtml(res.contact_name || 'Unknown')}</span>
               <span class="table-sub">${escapeHtml(res.contact_email || '')}</span>
-              <span class="table-meta">${escapeHtml(pkg)}</span>
             </div>
           </div>
         </td>
-        <td data-label="Event Date & Time">
+        <td data-label="Package">
+          <div class="reservation-customer-copy">
+            ${res.reservation_number ? `<span class="table-reservation-number">${escapeHtml(res.reservation_number)}</span>` : ''}
+            <span class="table-main">${escapeHtml(pkg)}</span>
+          </div>
+        </td>
+        <td data-label="Event Schedule">
           <div class="table-date">
             <span class="table-date-main">${escapeHtml(formatReservationDate(res.event_date))}</span>
             <span class="table-date-time">${escapeHtml(formatReservationTime(res.event_time))}</span>
@@ -473,13 +485,13 @@ function wireFilters() {
 // window .range(from, to) would select.
 async function fetchReservationsPage(page, { status, search, ids }) {
   const { from } = getPageRange(page, RESERVATIONS_PAGE_SIZE);
-  const { data, error } = await supabase.rpc('get_admin_reservations_page', {
+  const { data, error } = await rpcWithSort(supabase, 'get_admin_reservations_page', {
     p_status: status,
     p_search: search || null,
     p_reservation_ids: ids,
     p_limit: RESERVATIONS_PAGE_SIZE,
     p_offset: from
-  });
+  }, reservationsSort.getRpcParams());
 
   if (error) throw error;
 
@@ -773,7 +785,10 @@ function escapeHtml(str) {
 // Manager hits Back after acting on reservation-details.html) without
 // re-running any module code — pageshow with event.persisted (handled
 // inside initAutoRefresh) is the only reliable signal for that case.
-const autoRefresh = initAutoRefresh(() => loadData({ silent: true }));
+// Every 2 minutes (not the 1-minute default): each refresh runs the page
+// query, the counts, the unseen-changes check and the staff list, and the
+// notification bell still flags new reservations within a minute.
+const autoRefresh = initAutoRefresh(() => loadData({ silent: true }), { pollMs: 2 * 60 * 1000 });
 mountRefreshStatus(autoRefresh);
 
 function applyStatusFilterFromUrl() {

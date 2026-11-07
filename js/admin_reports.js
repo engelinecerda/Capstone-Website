@@ -11,6 +11,7 @@ import {
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
+import { initTableSort, sortRows } from './table_sort.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -23,7 +24,6 @@ const reportsExportOptions = document.getElementById('reportsExportOptions');
 const reportDateFrom = document.getElementById('reportDateFrom');
 const reportDateTo = document.getElementById('reportDateTo');
 const reportSearch = document.getElementById('reportSearch');
-const reportsTableHead = document.querySelector('.reports-table thead');
 const reportsMessage = document.getElementById('reportsMessage');
 const reportsSummary = document.getElementById('reportsSummary');
 const reportsTableBody = document.getElementById('reportsTableBody');
@@ -35,9 +35,11 @@ const navReviewCount = document.getElementById('navReviewCount');
 
 let reportsFiltered = [];
 let reportsCurrentPage = 1;
-// null key = the default order the reservations load in (newest event date
-// first). Clicking an active arrow again clears the sort back to that.
-const reportsSort = { key: null, dir: 'asc' };
+// No default sort: the report keeps the order reservations load in (newest
+// event date first) until a header is clicked.
+const reportsSort = initTableSort(document.querySelector('.reports-table'), {
+    onChange: () => renderReports()
+});
 
 const state = {
     reservations: [],
@@ -215,37 +217,7 @@ const REPORT_SORT_GETTERS = {
 };
 
 function sortReservations(reservations) {
-    const getter = REPORT_SORT_GETTERS[reportsSort.key];
-    if (!getter) return reservations;
-    const factor = reportsSort.dir === 'desc' ? -1 : 1;
-
-    // Array.prototype.sort is stable, so rows with equal values keep the
-    // default newest-first order.
-    return [...reservations].sort((a, b) => {
-        const left = getter(a);
-        const right = getter(b);
-        const leftMissing = left === null || left === '' || Number.isNaN(left);
-        const rightMissing = right === null || right === '' || Number.isNaN(right);
-        if (leftMissing || rightMissing) {
-            return leftMissing === rightMissing ? 0 : (leftMissing ? 1 : -1);
-        }
-        if (typeof left === 'number' && typeof right === 'number') {
-            return (left - right) * factor;
-        }
-        return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: 'base' }) * factor;
-    });
-}
-
-function updateSortIndicators() {
-    reportsTableHead?.querySelectorAll('th[data-sort-key]').forEach((th) => {
-        const isActive = th.dataset.sortKey === reportsSort.key;
-        th.setAttribute('aria-sort', isActive ? (reportsSort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
-        th.querySelectorAll('.sort-btn').forEach((btn) => {
-            const on = isActive && btn.dataset.dir === reportsSort.dir;
-            btn.classList.toggle('active', on);
-            btn.setAttribute('aria-pressed', String(on));
-        });
-    });
+    return sortRows(reservations, reportsSort.getSort(), REPORT_SORT_GETTERS);
 }
 
 function getFilteredReservations() {
@@ -805,26 +777,6 @@ wireLogoutButton('logoutBtn', '/admin');
 reportDateFrom?.addEventListener('input', renderReports);
 reportDateTo?.addEventListener('input', renderReports);
 reportSearch?.addEventListener('input', renderReports);
-
-// One listener for every header's arrows. Clicking the arrow that is already
-// active clears the sort and goes back to the default order.
-reportsTableHead?.addEventListener('click', (event) => {
-    const btn = event.target.closest('.sort-btn');
-    const th = btn?.closest('th[data-sort-key]');
-    if (!btn || !th) return;
-
-    const key = th.dataset.sortKey;
-    const dir = btn.dataset.dir === 'desc' ? 'desc' : 'asc';
-    if (reportsSort.key === key && reportsSort.dir === dir) {
-        reportsSort.key = null;
-        reportsSort.dir = 'asc';
-    } else {
-        reportsSort.key = key;
-        reportsSort.dir = dir;
-    }
-    updateSortIndicators();
-    renderReports();
-});
 
 supabase.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
