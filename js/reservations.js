@@ -1822,6 +1822,11 @@ function getSelectedBookingScope() {
         if (!S.offsitePackage) return null;
         return ['offsite'];
     }
+    // Onsite, the chosen room decides the scope — a package listed for both
+    // onsite and offsite carries the offsite scope, but booked into VIP Lounge
+    // or Main Hall it occupies that room's scope (same rule the database applies).
+    const roomScope = S.venueId ? S.venueOptions.find(v => v.venue_id === S.venueId)?.booking_scope : null;
+    if (roomScope) return [roomScope];
     return getSharedBookingScope(S.locationType, S.miniPackage?.label || '', S.miniPackage?.bookingScope || null);
 }
 
@@ -2650,10 +2655,19 @@ async function resolveVenueOptionsForPackage(pkg) {
     if (!pkg?.id) return;
 
     try {
-        const { data, error } = await supabase
+        // booking_scope on the room (20261119_onsite_room_sets_booking_scope.sql)
+        // says which scope a booking in that room occupies. Until that
+        // migration is applied the column doesn't exist, so retry without it.
+        let { data, error } = await supabase
             .from('package_venue')
-            .select('venue_id, venue:venue_id(venue_id, name, description, capacity, is_active)')
+            .select('venue_id, venue:venue_id(venue_id, name, description, capacity, is_active, booking_scope)')
             .eq('package_id', pkg.id);
+        if (error) {
+            ({ data, error } = await supabase
+                .from('package_venue')
+                .select('venue_id, venue:venue_id(venue_id, name, description, capacity, is_active)')
+                .eq('package_id', pkg.id));
+        }
         if (error) throw error;
 
         const options = (data || [])

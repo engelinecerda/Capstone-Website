@@ -21,10 +21,15 @@ import { escapeHtml, formatDate, formatDateKey, getRescheduleFee } from './reser
 import { renderPolicyText } from './policy_text.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
+// The reservation's saved booking_scope (set by the database from the package)
+// always wins over guessing from the package name — a combo package such as
+// "VIP Plus" occupies VIP and Main Hall together, and a name-only guess would
+// check just one of them and offer dates/times the server then treats as taken.
 function getBookingScope(reservation) {
     return getSharedBookingScope(
         reservation?.location_type,
-        reservation?.package?.package_name || reservation?.package_name || ''
+        reservation?.package?.package_name || reservation?.package_name || '',
+        reservation?.booking_scope || reservation?.package?.booking_scope || null
     );
 }
 
