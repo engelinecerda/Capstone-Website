@@ -91,9 +91,6 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
 
     // Dates whose open start times have already been looked up this session, and a
     // token that lets a newer scan (month change / reopen) cancel an older one.
-    const slotCheckedDates = new Set();
-    let slotScanToken = 0;
-    const SLOT_SCAN_CONCURRENCY = 5;
 
     const getReservation = () => getPageData()?.reservation || null;
 
@@ -118,7 +115,15 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         const range = getCalendarRange(month);
         const [blackoutData, calendarAvailability, advanceNoticeRules] = await Promise.all([
             fetchBlackoutDates(supabase, state),
-            fetchCalendarAvailability(supabase, { fromDate: range.fromDate, toDate: range.toDate }),
+            // Scope + length make the calendar answer the same question as the
+            // time list (a day with no open start time reads as fully booked),
+            // in one request instead of one per day.
+            fetchCalendarAvailability(supabase, {
+                fromDate: range.fromDate,
+                toDate: range.toDate,
+                scope: getBookingScope(reservation),
+                durationHours: getReservationDurationHours(reservation)
+            }),
             loadAdvanceNoticeRules(supabase)
         ]);
 
@@ -132,15 +137,15 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         state.selectedTime = reservation.event_time || '';
         state.availableStartTimes = [];
         state.noSlotDates = new Set();
-        slotCheckedDates.clear();
-        slotScanToken += 1;
     }
 
-    async function loadCalendarMonth() {
+    async function loadCalendarMonth(reservation) {
         const range = getCalendarRange(state.month);
         state.calendarAvailability = await fetchCalendarAvailability(supabase, {
             fromDate: range.fromDate,
-            toDate: range.toDate
+            toDate: range.toDate,
+            scope: getBookingScope(reservation),
+            durationHours: getReservationDurationHours(reservation)
         });
     }
 
@@ -214,64 +219,6 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         const isCurrent = formatDateKey(reservation.event_date) === dateKey;
         const isAvailable = !isPast && !isClosed && !isOutsideWindow && !isBooked && !isCurrent;
         return { isPast, isClosed, isOutsideWindow, isBooked, isCurrent, isAvailable };
-    }
-
-    // The calendar RPC only knows whether a day has spare capacity; it can't see
-    // that every start time is taken (operating hours, buffer, event length). So
-    // after the month draws, look up the open times for each day that still looks
-    // available and grey out the ones with none — customers shouldn't have to
-    // click a day to discover it is booked out.
-    async function scanMonthForNoSlotDays() {
-        const reservation = getReservation();
-        if (!reservation) return;
-
-        const token = ++slotScanToken;
-        const month = state.month;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-
-        const queue = [];
-        for (let day = 1; day <= daysInMonth; day += 1) {
-            const date = new Date(month.getFullYear(), month.getMonth(), day);
-            const dateKey = [
-                date.getFullYear(),
-                String(date.getMonth() + 1).padStart(2, '0'),
-                String(date.getDate()).padStart(2, '0')
-            ].join('-');
-            if (slotCheckedDates.has(dateKey) || dateKey === state.selectedDate) continue;
-            if (getDayFlags(date, dateKey, reservation, today).isAvailable) queue.push(dateKey);
-        }
-        if (!queue.length) return;
-
-        const scope = getBookingScope(reservation);
-        const durationHours = getReservationDurationHours(reservation);
-
-        async function worker() {
-            while (queue.length) {
-                if (token !== slotScanToken || !state.open) return;
-                const dateKey = queue.shift();
-                try {
-                    const rows = await fetchAvailableStartTimes(supabase, {
-                        eventDate: dateKey,
-                        scope,
-                        durationHours,
-                        excludeReservationId: reservation.reservation_id
-                    });
-                    if (token !== slotScanToken || !state.open) return;
-                    slotCheckedDates.add(dateKey);
-                    if (rows.length === 0 || rows.every((row) => !row.isAvailable)) {
-                        state.noSlotDates.add(dateKey);
-                        renderCalendar();
-                    }
-                } catch (_) {
-                    // A failed lookup just leaves the day as it was; clicking it
-                    // still re-checks (and greys it out if it turns out to be full).
-                }
-            }
-        }
-
-        await Promise.all(Array.from({ length: SLOT_SCAN_CONCURRENCY }, worker));
     }
 
     function renderCalendar() {
@@ -362,8 +309,6 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         state.availableStartTimes = [];
         state.closedDates = new Set();
         state.noSlotDates = new Set();
-        slotCheckedDates.clear();
-        slotScanToken += 1;
         backdrop.classList.add('hidden');
         backdrop.setAttribute('aria-hidden', 'true');
         submitBtn?.removeAttribute('disabled');
@@ -392,7 +337,6 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
             renderCalendar();
             renderTimes();
             setMessage(`Choose a future available date for the ${getScopeLabel(getBookingScope(reservation))} booking slot, then select your new start time.`);
-            scanMonthForNoSlotDays();
         } catch (error) {
             setMessage(`Failed to load availability: ${error.message}`, true);
         }
@@ -477,17 +421,15 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
     prevMonthBtn?.addEventListener('click', async () => {
         if (!state.open) return;
         state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1);
-        await loadCalendarMonth();
+        await loadCalendarMonth(getReservation());
         renderCalendar();
-        scanMonthForNoSlotDays();
     });
 
     nextMonthBtn?.addEventListener('click', async () => {
         if (!state.open) return;
         state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
-        await loadCalendarMonth();
+        await loadCalendarMonth(getReservation());
         renderCalendar();
-        scanMonthForNoSlotDays();
     });
 
     calendarGrid?.addEventListener('click', async (event) => {
@@ -497,6 +439,8 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         if (!reservation) return;
         state.selectedDate = dayButton.dataset.date || '';
         state.selectedTime = '';
+        setMessage('Checking open times…');
+        renderCalendar();
         await loadSelectedDateAvailability(reservation);
         // No open start time means the day is effectively booked out even though
         // the calendar's capacity check let it through — mark it so it shows as

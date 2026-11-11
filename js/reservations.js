@@ -4457,18 +4457,22 @@ async function submitDone() {
     nextBtn.disabled = true; nextBtn.textContent = 'Submitting...';
 
     try {
-        const latestAvail = await fetchDateAvailability(supabase, {
-            eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours(), venueId: S.venueId
-        });
+        // The two checks don't depend on each other, so they run together
+        // instead of one after the other.
+        const [latestAvail, latestStartTimes] = await Promise.all([
+            fetchDateAvailability(supabase, {
+                eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours(), venueId: S.venueId
+            }),
+            fetchAvailableStartTimes(supabase, {
+                eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours(), venueId: S.venueId
+            })
+        ]);
         if (getSelectedBookingScope() && latestAvail.scopeTaken) {
             availabilityState.selectedDateAvailability = latestAvail;
             buildTimeGrid();
             throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
         }
 
-        const latestStartTimes = await fetchAvailableStartTimes(supabase, {
-            eventDate: S.eventDate, scope: getSelectedBookingScope(), durationHours: getSelectedDurationHours(), venueId: S.venueId
-        });
         const chosenRow = latestStartTimes.find(r => r.timeLabel === S.time);
         if (!chosenRow || !chosenRow.isAvailable) {
             availabilityState.availableStartTimes = latestStartTimes;
@@ -4622,6 +4626,7 @@ async function submitDone() {
             throw new Error('Reservation save failed: ' + insertError.message);
         }
 
+        nextBtn.textContent = 'Generating your contract...';
         const { data: contractResult, error: contractError } = await supabase.functions.invoke('generate-signed-contract', {
             body: {
                 reservation_id: reservation.reservation_id,
