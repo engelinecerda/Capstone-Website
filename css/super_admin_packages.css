@@ -841,6 +841,14 @@
 .modal-input:focus { border-color: var(--input-focus); }
 .modal-input::placeholder { color: var(--muted); }
 
+/* Guest-count placeholders are examples, not values: lighter and italic so an
+   empty field can't be mistaken for one that already holds a number. */
+#pkgMinGuests::placeholder,
+#pkgMaxGuests::placeholder {
+  font-style: italic;
+  opacity: 0.55;
+}
+
 .modal-select { cursor: pointer; }
 
 .modal-textarea {

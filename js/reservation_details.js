@@ -191,6 +191,7 @@ async function loadPageData() {
             guest_count,
             location_type,
             venue_location,
+            booking_scope,
             package_id,
             add_on_id,
             total_price,
@@ -202,7 +203,7 @@ async function loadPageData() {
             pre_cancellation_status,
             reschedule_count,
             created_at,
-            package:package_id ( package_name, package_type, duration_hours, allow_additional_head ),
+            package:package_id ( package_name, package_type, duration_hours, booking_scope, allow_additional_head ),
             add_on:add_on_id ( package_name, package_type )
         `)
         .eq('reservation_id', reservationId)
