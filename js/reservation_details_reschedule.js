@@ -110,20 +110,42 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         if (el && body) el.innerHTML = renderPolicyText(body);
     }
 
-    async function loadAvailability(reservation) {
-        const month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    // Month grids already fetched, so stepping back to a month (or ahead to the
+    // prefetched one) shows at once. Entries expire quickly because others may
+    // book in the meantime, and opening the dialog always starts fresh.
+    const calendarCache = new Map();
+    const CALENDAR_CACHE_MS = 60 * 1000;
+
+    async function getMonthCalendar(reservation, month, { useCache = true } = {}) {
         const range = getCalendarRange(month);
+        const params = {
+            fromDate: range.fromDate,
+            toDate: range.toDate,
+            scope: getBookingScope(reservation),
+            durationHours: getReservationDurationHours(reservation)
+        };
+        const key = JSON.stringify(params);
+        const hit = calendarCache.get(key);
+        if (useCache && hit && Date.now() - hit.at < CALENDAR_CACHE_MS) return hit.data;
+        const data = await fetchCalendarAvailability(supabase, params);
+        calendarCache.set(key, { at: Date.now(), data });
+        return data;
+    }
+
+    function prefetchNextMonth(reservation) {
+        const next = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
+        getMonthCalendar(reservation, next).catch(() => { /* fetched when needed instead */ });
+    }
+
+    async function loadAvailability(reservation) {
+        calendarCache.clear();
+        const month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         const [blackoutData, calendarAvailability, advanceNoticeRules] = await Promise.all([
             fetchBlackoutDates(supabase, state),
             // Scope + length make the calendar answer the same question as the
             // time list (a day with no open start time reads as fully booked),
             // in one request instead of one per day.
-            fetchCalendarAvailability(supabase, {
-                fromDate: range.fromDate,
-                toDate: range.toDate,
-                scope: getBookingScope(reservation),
-                durationHours: getReservationDurationHours(reservation)
-            }),
+            getMonthCalendar(reservation, month, { useCache: false }),
             loadAdvanceNoticeRules(supabase)
         ]);
 
@@ -137,16 +159,12 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         state.selectedTime = reservation.event_time || '';
         state.availableStartTimes = [];
         state.noSlotDates = new Set();
+        prefetchNextMonth(reservation);
     }
 
     async function loadCalendarMonth(reservation) {
-        const range = getCalendarRange(state.month);
-        state.calendarAvailability = await fetchCalendarAvailability(supabase, {
-            fromDate: range.fromDate,
-            toDate: range.toDate,
-            scope: getBookingScope(reservation),
-            durationHours: getReservationDurationHours(reservation)
-        });
+        state.calendarAvailability = await getMonthCalendar(reservation, state.month);
+        prefetchNextMonth(reservation);
     }
 
     // Live per-slot availability (operating hours + buffer + capacity) from the

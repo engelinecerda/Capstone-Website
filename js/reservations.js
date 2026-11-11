@@ -1984,8 +1984,18 @@ function renderAvailabilityCalendar() {
                     setAvailabilityMessage('Date selection cleared.', false); return;
                 }
                 syncSelectedDate(dateKey); S.time = ''; setTimeStatusOverride('');
-                await loadSelectedDateAvailability();
-                renderAvailabilityCalendar(); buildTimeGrid();
+                availabilityState.selectedDateAvailability = null;
+                // Show the choice straight away, then check it. The date check and
+                // the time list don't depend on each other, so they run together.
+                const clickToken = ++dateClickToken;
+                renderAvailabilityCalendar();
+                setAvailabilityMessage('Checking availability...', false);
+                await Promise.all([loadSelectedDateAvailability(), buildTimeGrid()]);
+                if (clickToken !== dateClickToken) return;
+                renderAvailabilityCalendar();
+                // Re-run only when the date turned out to be taken (that path
+                // makes no request) so the grid shows the fully-booked state.
+                if (availabilityState.selectedDateAvailability?.scopeTaken) buildTimeGrid();
             });
         }
 
@@ -1994,25 +2004,58 @@ function renderAvailabilityCalendar() {
     }
 }
 
-async function loadAvailabilityCalendar() {
+// Month grids already fetched, so stepping to a month that was loaded (or
+// prefetched) shows at once. Entries expire quickly because other customers can
+// book in the meantime, and every non-navigation reload skips the cache.
+const calendarMonthCache = new Map();
+const CALENDAR_CACHE_MS = 60 * 1000;
+
+function fetchMonthCalendar(range) {
+    const params = {
+        fromDate: range.fromDate,
+        toDate: range.toDate,
+        // Scope, duration and room make the month grid answer the same
+        // question the time grid does; with no package chosen yet this
+        // stays the general preview.
+        scope: getSelectedBookingScope(),
+        durationHours: getSelectedDurationHours(),
+        venueId: S.venueId
+    };
+    const key = JSON.stringify(params);
+    const hit = calendarMonthCache.get(key);
+    return { key, hit: hit && Date.now() - hit.at < CALENDAR_CACHE_MS ? hit.data : null, params };
+}
+
+function prefetchNextMonthCalendar() {
+    const next = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth() + 1, 1);
+    const { key, hit, params } = fetchMonthCalendar(getCalendarRange(next));
+    if (hit) return;
+    fetchCalendarAvailability(supabase, params)
+        .then((data) => calendarMonthCache.set(key, { at: Date.now(), data }))
+        .catch(() => { /* a prefetch that fails is simply fetched when needed */ });
+}
+
+async function loadAvailabilityCalendar({ useCache = false } = {}) {
     updateDateDisplayPlaceholder();
-    setAvailabilityMessage('Loading availability...');
 
     try {
-        const range = getCalendarRange(availabilityState.month);
+        const month = fetchMonthCalendar(getCalendarRange(availabilityState.month));
+        const cachedMonth = useCache ? month.hit : null;
+        if (!cachedMonth) setAvailabilityMessage('Loading availability...');
+
         const [calendarAvailability, blackoutData] = await Promise.all([
-            // Scope, duration and room make the month grid answer the same
-            // question the time grid does; with no package chosen yet this
-            // stays the general preview.
-            fetchCalendarAvailability(supabase, {
-                fromDate: range.fromDate,
-                toDate: range.toDate,
-                scope: getSelectedBookingScope(),
-                durationHours: getSelectedDurationHours(),
-                venueId: S.venueId
-            }),
-            fetchBlackoutDates(supabase, availabilityState, true)
+            cachedMonth || fetchCalendarAvailability(supabase, month.params),
+            // Closed dates don't depend on the month, so a navigation reuses them.
+            useCache && availabilityState.blackoutDateColumn !== null
+                ? {
+                    blackoutDateColumn: availabilityState.blackoutDateColumn,
+                    blackoutReasonColumn: availabilityState.blackoutReasonColumn,
+                    closedDates: availabilityState.closedDates,
+                    closedDateReasons: availabilityState.closedDateReasons
+                }
+                : fetchBlackoutDates(supabase, availabilityState, true)
         ]);
+        calendarMonthCache.set(month.key, { at: Date.now(), data: calendarAvailability });
 
         availabilityState.calendarAvailability = calendarAvailability;
         availabilityState.blackoutDateColumn   = blackoutData.blackoutDateColumn;
@@ -2042,6 +2085,7 @@ async function loadAvailabilityCalendar() {
     }
 
     renderAvailabilityCalendar();
+    prefetchNextMonthCalendar();
 }
 
 async function loadSelectedDateAvailability() {
@@ -2049,9 +2093,11 @@ async function loadSelectedDateAvailability() {
     if (!S.eventDate || !selectedScope) { availabilityState.selectedDateAvailability = null; return null; }
 
     try {
+        const requestedDate = S.eventDate;
         const availability = await fetchDateAvailability(supabase, {
-            eventDate: S.eventDate, scope: selectedScope, durationHours: getSelectedDurationHours(), venueId: S.venueId
+            eventDate: requestedDate, scope: selectedScope, durationHours: getSelectedDurationHours(), venueId: S.venueId
         });
+        if (S.eventDate !== requestedDate) return null; // a different date was chosen meanwhile
         availabilityState.selectedDateAvailability = availability;
         setAvailabilityMessage(availability.scopeTaken ? 'This date is fully booked.' : `Selected ${formatDisplayDate(S.eventDate)}.`, availability.scopeTaken);
         return availability;
@@ -3635,6 +3681,7 @@ function renderCateringCart() {
 function rebuildCateringUI() { buildCateringDishBuilder(); }
 
 // ── Time grid ──────────────────────────────────────────────────────────
+let dateClickToken = 0;
 let timeGridRequestToken = 0;
 
 function findAvailableStartTimeRow(timeLabel) {
@@ -4364,12 +4411,12 @@ document.querySelectorAll('.location-card').forEach(c => {
 
 availabilityPrevMonthBtn?.addEventListener('click', async () => {
     availabilityState.month = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth() - 1, 1);
-    await loadAvailabilityCalendar();
+    await loadAvailabilityCalendar({ useCache: true });
 });
 
 availabilityNextMonthBtn?.addEventListener('click', async () => {
     availabilityState.month = new Date(availabilityState.month.getFullYear(), availabilityState.month.getMonth() + 1, 1);
-    await loadAvailabilityCalendar();
+    await loadAvailabilityCalendar({ useCache: true });
 });
 
 contractAgreementTerms?.addEventListener('change', () => {
