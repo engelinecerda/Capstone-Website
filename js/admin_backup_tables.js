@@ -216,6 +216,10 @@ export function validateBundle(bundle) {
 function describeFailure(table, err) {
   const message = err?.message || String(err);
 
+  // The restore function isn't in this database yet.
+  if (err?.code === 'PGRST202' || (/backup_restore_rows/.test(message) && /could not find|does not exist/i.test(message))) {
+    return { table, kind: 'migration', message };
+  }
   if (err?.code === '42501' || /row-level security|permission denied/i.test(message)) {
     return { table, kind: 'blocked', message };
   }
@@ -276,11 +280,17 @@ export async function readAllTables(supabase, onProgress) {
 }
 
 // ─── Restore ─────────────────────────────────────────────────────────────────
+// Rows go back through backup_restore_rows() (20261121_backup_restore_rows.sql),
+// not through the REST upsert: that function writes a batch exactly as saved —
+// no booking rules re-run on history, no updated_at re-stamped, no table
+// permissions in the way — and still enforces foreign keys.
 async function upsertInBatches(supabase, cfg, rows) {
   for (let b = 0; b < rows.length; b += BATCH) {
-    const { error } = await supabase
-      .from(cfg.name)
-      .upsert(rows.slice(b, b + BATCH), { onConflict: conflictTarget(cfg) });
+    const { error } = await supabase.rpc('backup_restore_rows', {
+      p_table:    cfg.name,
+      p_rows:     rows.slice(b, b + BATCH),
+      p_conflict: conflictTarget(cfg)
+    });
 
     if (error) throw error;
   }
@@ -308,7 +318,10 @@ export async function restoreFromBundle(supabase, bundle, onProgress) {
       restored.push(cfg.name);
       if (second.length) secondPass.push({ cfg, rows: second });
     } catch (err) {
-      failures.push(describeFailure(cfg.name, err));
+      const failure = describeFailure(cfg.name, err);
+      failures.push(failure);
+      // Every table would fail the same way: stop rather than report 50 copies.
+      if (failure.kind === 'migration') break;
     }
   }
 
@@ -344,6 +357,9 @@ export async function restoreFromBundle(supabase, bundle, onProgress) {
 // Turns a restore result into one readable sentence for the page banner.
 export function summarizeRestore(result) {
   const parts = [];
+  if (result.failures.some(f => f.kind === 'migration')) {
+    return 'Nothing was restored: apply migration 20261121_backup_restore_rows.sql in the Supabase SQL Editor, then restore again.';
+  }
   const blocked  = result.failures.filter(f => f.kind === 'blocked').map(f => f.table);
   const identity = result.failures.filter(f => f.kind === 'identity').map(f => f.table);
   const failed   = result.failures.filter(f => f.kind === 'failed');
