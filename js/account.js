@@ -1422,6 +1422,27 @@ function buildReservationEmptyState(view) {
     `;
 }
 
+
+// Page numbers to show: always the first and last page and the ones either side
+// of the current page, with a gap marker for what is left out, so a long list
+// stays on one short row (1 … 5 [6] 7 … 39). Short lists show every page.
+function buildPaginationItems(totalPages, currentPage, siblings = 1) {
+    if (totalPages <= 5 + siblings * 2) {
+        return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(2, currentPage - siblings);
+    const end = Math.min(totalPages - 1, currentPage + siblings);
+    const items = [1];
+
+    if (start > 2) items.push(start === 3 ? 2 : 'gap');
+    for (let page = start; page <= end; page++) items.push(page);
+    if (end < totalPages - 1) items.push(end === totalPages - 2 ? totalPages - 1 : 'gap');
+
+    items.push(totalPages);
+    return items;
+}
+
 function renderReservations() {
     if (!reservationsList) return;
 
@@ -1448,13 +1469,16 @@ function renderReservations() {
     const rangeStart = pagedReservations.length ? pageStart + 1 : 0;
     const rangeEnd = pageStart + pagedReservations.length;
 
-    const pageNumberButtons = Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNum) => `
+    const pageNumberButtons = buildPaginationItems(totalPages, state.reservationPage).map((item) => item === 'gap'
+        ? `<button type="button" class="reservation-pagination-btn page-number" disabled aria-hidden="true" tabindex="-1">&hellip;</button>`
+        : `
         <button
             type="button"
-            class="reservation-pagination-btn page-number ${pageNum === state.reservationPage ? 'current' : ''}"
-            data-reservation-page="${pageNum}"
-            ${pageNum === state.reservationPage ? 'aria-current="page"' : ''}
-        >${pageNum}</button>
+            class="reservation-pagination-btn page-number ${item === state.reservationPage ? 'current' : ''}"
+            data-reservation-page="${item}"
+            ${item === state.reservationPage ? 'aria-current="page"' : ''}
+            aria-label="Page ${item}"
+        >${item}</button>
     `).join('');
 
     reservationsList.innerHTML = `
