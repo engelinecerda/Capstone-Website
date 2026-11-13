@@ -10,8 +10,7 @@ import {
 } from './reservation_status.js';
 import { PAGE_SIZE, paginate, renderPagination, getTotalPages } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
-import { setupInactivityLogout } from './super_admin_inactivity.js';
-import { initTableSort, sortRows } from './table_sort.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -35,11 +34,6 @@ const navReviewCount = document.getElementById('navReviewCount');
 
 let reportsFiltered = [];
 let reportsCurrentPage = 1;
-// No default sort: the report keeps the order reservations load in (newest
-// event date first) until a header is clicked.
-const reportsSort = initTableSort(document.querySelector('.reports-table'), {
-    onChange: () => renderReports()
-});
 
 const state = {
     reservations: [],
@@ -189,45 +183,12 @@ function getPackageName(reservation) {
     return reservation?.package?.package_name || reservation?.package_id || 'No package';
 }
 
-function getReservationStatusLabel(reservation) {
-    return getStatusPillMeta(getEffectiveReservationStatus(reservation)).label;
-}
-
-// "1:00 PM" -> minutes since midnight, so Schedule sorts by time of day when
-// two reservations share a date (event_time is free text, not sortable as is).
-function parseEventTimeToMinutes(value) {
-    const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-    if (!match) return null;
-    let hours = Number(match[1]) % 12;
-    if (/pm/i.test(match[3] || '') ) hours += 12;
-    return hours * 60 + Number(match[2]);
-}
-
-// Each getter returns the value to compare; null/'' means "no value" and is
-// always listed last, whichever direction is chosen.
-const REPORT_SORT_GETTERS = {
-    customer: (r) => getCustomerName(r).toLowerCase(),
-    event: (r) => String(r?.event_type || '').toLowerCase(),
-    schedule: (r) => {
-        const date = String(r?.event_date || '').split('T')[0];
-        if (!date) return null;
-        const minutes = parseEventTimeToMinutes(r?.event_time);
-        return `${date}T${String(minutes ?? 0).padStart(5, '0')}`;
-    }
-};
-
-function sortReservations(reservations) {
-    return sortRows(reservations, reportsSort.getSort(), REPORT_SORT_GETTERS);
-}
-
 function getFilteredReservations() {
     const fromValue = reportDateFrom?.value || '';
     const toValue = reportDateTo?.value || '';
     const searchValue = String(reportSearch?.value || '').trim().toLowerCase();
 
-    // Sorted here (not only when drawing the table) so the Excel and PDF
-    // exports come out in the same order as the screen.
-    return sortReservations(state.reservations.filter((reservation) => {
+    return state.reservations.filter((reservation) => {
         const eventDate = String(reservation?.event_date || '').split('T')[0];
         if (fromValue && eventDate && eventDate < fromValue) {
             return false;
@@ -244,12 +205,11 @@ function getFilteredReservations() {
             getCustomerName(reservation),
             getCustomerEmail(reservation),
             reservation?.event_type,
-            getPackageName(reservation),
-            getReservationStatusLabel(reservation)
+            getPackageName(reservation)
         ].join(' ').toLowerCase();
 
         return haystack.includes(searchValue);
-    }));
+    });
 }
 
 function buildSummaryCards(reservations) {
@@ -500,7 +460,7 @@ function buildSummarySheet(workbook, resvRef) {
 async function exportReportsExcel() {
     const filteredReservations = getFilteredReservations();
     if (!filteredReservations.length) {
-        setReportsMessage('Add a date range or adjust the filters so at least one reservation can be exported.', true);
+        setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
         return;
     }
 
@@ -549,6 +509,7 @@ async function exportReportsExcel() {
         URL.revokeObjectURL(url);
 
         setReportsMessage(`Exported ${filteredReservations.length} reservation(s) to Excel.`);
+        await logAudit({ action: 'Exported Reservation Report (Excel)', category: 'reports', details: `Exported ${filteredReservations.length} reservation(s) to ${filename}.` });
     } catch (error) {
         setReportsMessage("Couldn't generate the export — please try again.", true);
     } finally {
@@ -560,7 +521,7 @@ async function exportReportsExcel() {
 async function exportReportsPdf() {
     const filteredReservations = getFilteredReservations();
     if (!filteredReservations.length) {
-        setReportsMessage('Add a date range or adjust the filters so at least one reservation can be exported.', true);
+        setReportsMessage('Add a date range or adjust the search so at least one reservation can be exported.', true);
         return;
     }
     if (state.paymentsUnavailable) {
@@ -614,6 +575,7 @@ async function exportReportsPdf() {
             : new Date().toISOString().slice(0, 10);
         doc.save(`reservation-report_${periodPart}.pdf`);
         setReportsMessage(`Exported ${filteredReservations.length} reservation(s) to PDF.`);
+        await logAudit({ action: 'Exported Reservation Report (PDF)', category: 'reports', details: `Exported ${filteredReservations.length} reservation(s) for ${periodPart}.` });
     } catch (error) {
         setReportsMessage("Couldn't generate the PDF — please try again.", true);
     } finally {
@@ -701,7 +663,6 @@ async function validateAdminSession() {
 
     applyRoleVisibility(profile.role);
     initAdminNav({ role: profile.role });
-    setupInactivityLogout(profile.role);
 
     return session;
 }

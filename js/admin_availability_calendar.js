@@ -14,6 +14,7 @@ import {
 } from './reservation_availability.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { logAudit } from './audit_logger.js';
 
 const calendarMonthLabel = document.getElementById('calendarMonthLabel');
 const prevMonthBtn = document.getElementById('prevMonth');
@@ -456,6 +457,8 @@ async function confirmCloseDate() {
     const { error } = await supabase.from('calendar_blackouts').upsert(payload, { onConflict: dateColumn });
     if (error) throw error;
 
+    await logAudit({ action: 'Closed Availability Date', category: 'availability', details: `${pendingCloseDate}${enteredReason ? ` — ${enteredReason}` : ''}` });
+
     closedDates.add(pendingCloseDate);
     closedDateReasons.set(pendingCloseDate, enteredReason || DEFAULT_CLOSE_REASON);
     const closedIso = pendingCloseDate;
@@ -475,6 +478,8 @@ async function reopenDate(dateIso) {
 
     const { error } = await supabase.from('calendar_blackouts').delete().eq(dateColumn, dateIso);
     if (error) throw error;
+
+    await logAudit({ action: 'Reopened Availability Date', category: 'availability', details: dateIso });
 
     closedDates.delete(dateIso);
     closedDateReasons.delete(dateIso);
@@ -600,7 +605,7 @@ wireBlackoutModal();
 wireDayPanelBookingLinks();
 wireClosedDatesList();
 
-initAutoRefresh(() => loadMonth({ silent: true }), { pollMs: 2 * 60 * 1000 });
+initAutoRefresh(() => loadMonth({ silent: true }));
 
 validateAdminSession({
   onSuccess: async ({ session, profile }) => {

@@ -9,6 +9,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { initAdminNav } from './admin_nav.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { fetchUnseenReservationChanges, markReservationChangesSeen } from './reservation_shared.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarRolePill = document.getElementById('sidebarRolePill');
@@ -114,6 +115,10 @@ fetch(`${API}/health`).catch(() => {});
 async function loadForecast() {
     const res = await fetch(`${API}/forecast`);
     return res.ok ? res.json() : [];
+}
+
+function hasForecastData(data) {
+    return Array.isArray(data) && data.some((row) => row?.yhat !== null && row?.yhat !== undefined);
 }
 
 async function loadPackages() {
@@ -709,6 +714,7 @@ async function loadDashboard({ silent = false } = {}) {
         loadForecast()
             .then(async (data) => {
                 fullData = Array.isArray(data) ? data : [];
+                if (generateForecastBtn) generateForecastBtn.textContent = 'Generate Forecast';
                 if (demandYearSelect && fullData.length) {
                     const years = [...new Set(fullData.map((d) => d.year))].sort();
                     demandYearSelect.innerHTML = '';
@@ -828,13 +834,15 @@ function refreshDemandChart(fresh) {
     }
     const selectedYear = demandYearSelect?.value;
     if (selectedYear) renderDemandChart(selectedYear);
+    if (generateForecastBtn) generateForecastBtn.textContent = 'Generate Forecast';
 }
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 generateForecastBtn?.addEventListener('click', async () => {
+    const isUpdate = hasForecastData(fullData);
     generateForecastBtn.disabled = true;
-    generateForecastBtn.textContent = 'Generating…';
+    generateForecastBtn.textContent = 'Generating Forecast';
 
     try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -880,6 +888,14 @@ generateForecastBtn?.addEventListener('click', async () => {
         const fresh = await loadForecast();
         refreshDemandChart(fresh);
 
+        if (finalStatus?.state === 'done') {
+            await logAudit({
+                action: isUpdate ? 'Updated Forecast' : 'Generated Forecast',
+                category: 'forecast',
+                details: 'Demand forecast generation completed successfully.'
+            });
+        }
+
         setDashboardMessage(
             finalStatus?.state === 'done'
                 ? 'Forecast regenerated successfully.'
@@ -889,7 +905,7 @@ generateForecastBtn?.addEventListener('click', async () => {
         setDashboardMessage(`Forecast generation failed: ${err.message}`, true);
     } finally {
         generateForecastBtn.disabled = false;
-        generateForecastBtn.textContent = 'Update Forecast';
+        generateForecastBtn.textContent = 'Generate Forecast';
     }
 });
 

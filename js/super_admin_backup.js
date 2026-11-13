@@ -11,6 +11,7 @@ import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { BACKUP_TABLES, readAllTables, restoreFromBundle, summarizeRestore, validateBundle } from './admin_backup_tables.js';
+import { logAudit } from './audit_logger.js';
 
 // ─── Google Drive config ──────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID  = '419921262357-ci1j9bi3i9v3hebp11m3077fa0b805pv.apps.googleusercontent.com';
@@ -293,6 +294,7 @@ async function confirmDisconnectGoogleDrive() {
   showDisconnectedUI();
   closeModal(disconnectModal);
   setPageMessage('Google Drive disconnected.', 'success');
+  await logAudit({ action: 'Disconnected Google Drive', category: 'backup', details: 'Disconnected Google Drive backup storage.' });
 
   disconnectOk.disabled     = false;
   disconnectCancel.disabled = false;
@@ -323,6 +325,7 @@ function initGoogleAuth() {
       localStorage.setItem('drive_token_expires_at', String(expiresAt));
 
       await onTokenReady();
+      await logAudit({ action: 'Connected Google Drive', category: 'backup', details: 'Connected Google Drive for backup storage.' });
     }
   });
 }
@@ -544,6 +547,7 @@ confirmBackupOk?.addEventListener('click', async () => {
 
     await loadBackupHistory();
     await enforceRetention();
+    await logAudit({ action: 'Created System Backup', category: 'backup', details: `Created ${uploaded.name}${skipped.length ? `; skipped tables: ${skipped.join(', ')}` : ''}.` });
     closeModal(confirmBackupModal);
     const skippedNote = skipped.length ? ` (${skipped.length} table(s) could not be read and were skipped: ${skipped.join(', ')})` : '';
     setPageMessage(`Backup created and saved to Google Drive: ${uploaded.name}${skippedNote}`, skipped.length ? 'error' : 'success');
@@ -736,6 +740,8 @@ restoreOk?.addEventListener('click', async () => {
 
     onProgress(100, 'Restore complete!');
     const note   = summarizeRestore(result);
+    const restoredName = pendingRestoreFile.name;
+    await logAudit({ action: 'Restored System Backup', category: 'backup', details: `Restored from ${restoredName}; ${result.restored.length} table(s).` });
     const origin = pendingRestoreFile.source === 'local'
       ? `the uploaded file ${pendingRestoreFile.name}`
       : 'the selected backup';
@@ -775,6 +781,7 @@ async function handleDownload(fileId, filename) {
     a.click();
     URL.revokeObjectURL(url);
     setPageMessage('Download started.', 'success');
+    await logAudit({ action: 'Downloaded System Backup', category: 'backup', details: `Downloaded ${filename}.`, entityId: fileId });
 
   } catch (err) {
     setPageMessage(`Download failed: ${err.message}`, 'error');
@@ -788,12 +795,14 @@ async function handleDelete(fileId, filename) {
   try {
     await ensureValidToken();
 
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
       method:  'DELETE',
       headers: { 'Authorization': `Bearer ${driveAccessToken}` }
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     setPageMessage('Backup deleted.', 'success');
+    await logAudit({ action: 'Deleted System Backup', category: 'backup', details: `Deleted ${filename}.`, entityId: fileId });
     await loadBackupHistory();
 
   } catch (err) {
@@ -944,6 +953,7 @@ settingsSave?.addEventListener('click', async () => {
       settings.retentionDays = val;
       updateRetentionRowText();
       setPageMessage('Retention period updated.', 'success');
+      await logAudit({ action: 'Updated Backup Retention', category: 'backup', details: `Retention set to ${val} days.` });
     } catch (err) {
       setPageMessage(`Failed to save retention setting: ${err.message}`, 'error');
       settingsSave.disabled = false;
