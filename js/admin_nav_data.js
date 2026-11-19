@@ -56,7 +56,7 @@ export const ADMIN_NAV = [
     items: [
       { label: 'Users and roles',   href: '/admin/super%20admin/super_admin_accounts', iconKey: 'user-cog' },
       { label: 'Audit trail',       href: '/admin/super%20admin/super_admin_audit',     iconKey: 'history' },
-      { label: 'Backup & Restore',  href: '/admin/super%20admin/super_admin_backup',    iconKey: 'database-backup' },
+      { label: 'Backup',  href: '/admin/super%20admin/super_admin_backup',    iconKey: 'database-backup' },
       { label: 'Announcements',     href: '/admin/maintenance/announcements',           iconKey: 'speakerphone' },
       { label: 'Maintenance Mode',  href: '/admin/maintenance/mode',                     iconKey: 'alert-triangle' },
     ]

@@ -106,6 +106,7 @@ export const NOT_BACKED_UP = {
   login_ip_failure_tracking:   'live lockout state — restoring it could lock people out',
   vision_api_usage:            'monthly API quota counter — restoring would misstate usage',
   reservation_number_counters: 'locked down by RLS (no client access); rebuilt from reservations by backup_resync_sequences()',
+  housekeeping_job_backup:     'copy of the pg_cron jobs saved by 20261122_reduce_background_load.sql, only so its rollback script can restore them',
 };
 
 export const BACKUP_TABLES = BACKUP_TABLE_CONFIG.map(t => t.name);
