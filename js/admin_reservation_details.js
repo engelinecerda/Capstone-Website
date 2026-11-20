@@ -152,18 +152,6 @@ const PAYMENT_TYPE_LABELS = {
   reschedule_fee: 'Reschedule Fee',
   cancellation_fee: 'Cancellation Fee'
 };
-// BUG-01 fix: 'pending' removed — a merely-submitted, not-yet-reviewed
-// reservation must not count toward "this date is already fully booked"
-// when checking whether ANOTHER reservation can be approved (it was
-// blocking admins from approving one of several competing pending
-// requests). Mirrors the DB-level fix in enforce_reservation_capacity()/
-// is_capacity_blocking_reservation_status() (supabase/migrations/
-// 20261005_fix_pending_blocks_capacity.sql).
-const CAPACITY_BLOCKING_STATUSES = new Set([
-  'pending_review', 'for_finalization', 'for_contract_signing',
-  'approved', 'confirmed', 'partially_paid', 'fully_paid', 'rescheduled'
-]);
-
 let adminSession = null;
 let currentRole = null;
 let currentReservation = null;
@@ -475,22 +463,19 @@ function getReservationApprovalState(reservation) {
   return { canApprove: true, reason: '' };
 }
 
+// Daily capacity is NOT checked here. The limit is per scope (Onsite VIP /
+// Onsite Main Hall / Offsite) or per room, set by the admin in Settings ->
+// Buffer & Capacity, and the time-overlap rule sits on top of it. All of that
+// lives in enforce_reservation_capacity() (supabase/migrations/
+// 20261119_onsite_room_sets_booking_scope.sql), which runs when the status is
+// set to 'approved' and rejects with a specific message (e.g. "Off-site has
+// reached its daily booking limit for November 30, 2026."). A copy of the rule
+// here used a fixed "2 reservations per day" across all scopes, so it blocked
+// approvals the database would have allowed.
 async function getApprovalLimitMessage(reservation) {
   const dateKey = formatDateKey(reservation.event_date);
   if (!dateKey) return 'Cannot approve this reservation because it has no event date.';
-
-  const { data, error } = await supabase
-    .from('reservations')
-    .select('reservation_id, status')
-    .eq('event_date', dateKey)
-    .neq('reservation_id', reservation.reservation_id);
-  if (error) throw error;
-
-  const count = (data || []).filter((r) => CAPACITY_BLOCKING_STATUSES.has(String(r.status || '').toLowerCase())).length;
-  if (count < 2) return '';
-
-  const formattedDate = new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-  return `Cannot approve this reservation. ${formattedDate} is already fully booked (maximum 2 reservations per day).`;
+  return '';
 }
 
 /* ---------------------------------------------------------------- */

@@ -4517,7 +4517,7 @@ async function submitDone() {
         if (getSelectedBookingScope() && latestAvail.scopeTaken) {
             availabilityState.selectedDateAvailability = latestAvail;
             buildTimeGrid();
-            throw new Error('This date is fully booked. A maximum of 2 reservations are accepted per day.');
+            throw new Error('This date is fully booked for the selected option. Please choose another date.');
         }
 
         const chosenRow = latestStartTimes.find(r => r.timeLabel === S.time);
