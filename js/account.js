@@ -1346,7 +1346,7 @@ function buildReservationCard(reservation, view) {
                 </div>
                 <div class="reservation-card-header-right">
                     <span class="reservation-total-label">Total</span>
-                    <strong class="reservation-total-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
+                    <strong class="reservation-total-value">${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
                 </div>
             </div>
 
@@ -1605,7 +1605,7 @@ function buildPaymentModuleCard(reservation) {
                             </div>
                             <div class="payment-module-summary-item">
                                 <span class="payment-module-summary-label">Total:</span>
-                                <strong class="payment-module-summary-value">${escapeHtml(formatCurrency(reservation.total_price))}</strong>
+                                <strong class="payment-module-summary-value">${escapeHtml(formatCurrency(balance.totalPrice))}</strong>
                             </div>
                         </div>
                     </div>
