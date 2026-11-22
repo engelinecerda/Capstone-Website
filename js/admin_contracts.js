@@ -1,4 +1,5 @@
 // admin/contracts.js
+import { formatMoney } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -160,7 +161,7 @@ function formatDateTime(value) {
 }
 
 function formatCurrency(value) {
-  return `₱${Number(value || 0).toLocaleString()}`;
+  return formatMoney(value);
 }
 
 function getCustomerInitials(name, email = '') {

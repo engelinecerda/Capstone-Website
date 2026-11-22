@@ -13,6 +13,7 @@
 // js/package_details.js), which owns the gallery/tabs/sticky sidebar that
 // used to live here as an in-page #section-detail panel.
 
+import { formatMoney } from './money.js';
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPageHeader } from './page_content.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
@@ -293,7 +294,7 @@ function activeFilterCount() {
 // SIDEBAR — rendered entirely from facets()
 // ══════════════════════════════════════════════════════════════════════════════
 function formatPeso(n) {
-  return `₱${Number(n || 0).toLocaleString()}`;
+  return formatMoney(n);
 }
 
 function renderSidebar() {
@@ -474,10 +475,20 @@ function packageMatchesFilters(p) {
   return true;
 }
 
+// Alphabetical by package name. `numeric: true` keeps "Eli Coffee Bar 30 pax"
+// ahead of "Eli Coffee Bar 100 pax" instead of sorting digits as text.
+function compareByName(a, b) {
+  return String(a.package_name || '').localeCompare(
+    String(b.package_name || ''), undefined, { numeric: true, sensitivity: 'base' }
+  );
+}
+
 function sortPackages(list) {
   const sorted = list.slice();
   if (sortKey === 'price_asc') sorted.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
   else if (sortKey === 'price_desc') sorted.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+  else if (sortKey === 'name_asc') sorted.sort(compareByName);
+  else if (sortKey === 'name_desc') sorted.sort((a, b) => compareByName(b, a));
   else sorted.sort((a, b) => (b.bookingCount || 0) - (a.bookingCount || 0));
   return sorted;
 }

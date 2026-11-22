@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=68">
-  <link rel="stylesheet" href="/css/styles.css?v=68">
-  <link rel="stylesheet" href="/css/account.css?v=68">
-  <link rel="stylesheet" href="/css/reservation_details.css?v=68">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=71">
+  <link rel="stylesheet" href="/css/styles.css?v=71">
+  <link rel="stylesheet" href="/css/account.css?v=71">
+  <link rel="stylesheet" href="/css/reservation_details.css?v=71">
 </head>
 <body>
 
@@ -73,7 +73,7 @@
 
       <div class="cancel-fee-block">
         <span class="cancel-fee-label">Cancellation Fee</span>
-        <strong class="cancel-fee-amount" id="cancel-fee-amount">&#8369;0</strong>
+        <strong class="cancel-fee-amount" id="cancel-fee-amount">&#8369;0.00</strong>
         <p class="cancel-fee-note">This fee must be paid to complete the cancellation. You will be directed to the Payments section after confirming.</p>
       </div>
 
@@ -108,7 +108,7 @@
 
       <div class="cancel-fee-block">
         <span class="cancel-fee-label">Rescheduling Fee</span>
-        <strong class="cancel-fee-amount" id="reschedule-fee-amount">&#8369;0</strong>
+        <strong class="cancel-fee-amount" id="reschedule-fee-amount">&#8369;0.00</strong>
         <p class="cancel-fee-note">No approval needed — pick a date below and pay this fee to confirm your new date.</p>
       </div>
 
@@ -193,6 +193,28 @@
     </div>
   </div>
 
+  <div class="account-modal-backdrop hidden" id="custom-request-backdrop" aria-hidden="true">
+    <div class="account-modal-card" role="dialog" aria-modal="true" aria-labelledby="custom-request-title">
+      <button type="button" class="account-modal-close" id="custom-request-close" aria-label="Close request dialog">&times;</button>
+      <p class="account-modal-eyebrow">Something Extra</p>
+      <h2 class="account-modal-title" id="custom-request-title">Request Something Else</h2>
+      <p class="account-modal-copy">Tell us what you&rsquo;d like that isn&rsquo;t in your package. We&rsquo;ll send you a price to accept or decline &mdash; nothing is charged until you accept.</p>
+
+      <label class="rd-cr-label" for="custom-request-input">What would you like?</label>
+      <input type="text" id="custom-request-input" class="rd-cr-input" maxlength="120" placeholder="e.g. Extra balloon arch">
+
+      <label class="rd-cr-label" for="custom-request-details">Details <span class="rd-cr-optional">(optional)</span></label>
+      <textarea id="custom-request-details" class="rd-cr-input" rows="3" maxlength="1000" placeholder="Anything that helps us quote it: size, colors, quantity"></textarea>
+
+      <p class="account-modal-message" id="custom-request-message"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="custom-request-dismiss">Go Back</button>
+        <button type="button" class="account-modal-btn primary" id="custom-request-confirm">Send Request</button>
+      </div>
+    </div>
+  </div>
+
   <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
     <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
       <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
@@ -212,6 +234,6 @@
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=68" defer></script>
+  <script src="/js/supabase_health_notice.js?v=71" defer></script>
 </body>
 </html>

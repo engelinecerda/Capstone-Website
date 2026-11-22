@@ -28,6 +28,7 @@ import {
 } from '/js/reservation_availability.js';
 import { loadReservationFormConfig } from '/js/reservation_form_config.js';
 import { buildCustomerPaymentUrl } from '/js/customer_payments.js';
+import { normalizeInclusionOptions, hasRemovableInclusions, optionalCreditTotal, removedCredit, removedOptions } from '/js/package_inclusions.js';
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
@@ -111,6 +112,14 @@ const S = {
     // package allows it; reset to 0 whenever the package/venue selection
     // changes (see resetAdditionalHeads()).
     additionalHeads: 0,
+    // Customizable inclusions (supabase/migrations/20261123_customizable_inclusions.sql)
+    // — ids of the OPTIONAL inclusions the customer unchecked for the selected
+    // package. Reset whenever the package changes; the server recomputes the
+    // credit from the package's own configuration, so only ids are ever sent.
+    removedInclusions: [],
+    // Custom requests typed on the form: [{ title, details }]. Sent after the
+    // reservation is saved (submit_custom_request) so the café can quote them.
+    customRequests: [],
     snackAddon: null,
     offsitePackage: null,
     cateringCart: [],
@@ -186,6 +195,45 @@ function resolveServiceCharge(basePrice, locationType, categoryId) {
 // package/tier price, never add-ons, travel fee, or the catering cart.
 function getPkgDiscount(pkg) {
     return applyDiscount(pkg?.price, pickActiveDiscount(pkg?.discountRows));
+}
+
+// ── Customizable inclusions ────────────────────────────────────────────
+// Package price stays the base. Every optional inclusion the customer unchecks
+// takes its removal credit off the package price, and the discount is then
+// worked out on what is left (after the removals), not on the full price.
+// Add-ons, additional guests and the service charge are unchanged.
+// Cart-priced (menu-priced) packages have no package price to credit against,
+// so they never carry removals.
+function getInclusionOptions(pkg) {
+    return Array.isArray(pkg?.inclusionOptions) ? pkg.inclusionOptions : [];
+}
+
+function getCustomizablePackage() {
+    const pkg = getActivePackage();
+    return pkg && !isMenuPricedPackage(pkg) ? pkg : null;
+}
+
+// Only ids that are still an optional inclusion of this package count — a
+// stale draft or a package edited since can never apply a wrong credit.
+function getRemovedInclusionIds(pkg) {
+    if (!pkg) return [];
+    const optionalIds = new Set(getInclusionOptions(pkg).filter(o => !o.required).map(o => o.id));
+    return (S.removedInclusions || []).filter(id => optionalIds.has(id));
+}
+
+function getInclusionCredit(pkg) {
+    if (!pkg) return 0;
+    return removedCredit(getInclusionOptions(pkg), getRemovedInclusionIds(pkg));
+}
+
+// getPkgDiscount() on the package price AFTER the removals.
+function getPkgDiscountAfterRemovals(pkg) {
+    const adjusted = Math.max(0, Number(pkg?.price || 0) - getInclusionCredit(pkg));
+    return applyDiscount(adjusted, pickActiveDiscount(pkg?.discountRows));
+}
+
+function resetRemovedInclusions() {
+    S.removedInclusions = [];
 }
 
 // Category name → icon (mirrors js/packages.js's getCategoryIcon so the
@@ -415,6 +463,7 @@ function restoreDraft() {
         if (emailEl && S.email) emailEl.value = S.email;
         const reqEl = document.getElementById('requests');
         if (reqEl && S.requests) reqEl.value = S.requests;
+        renderCustomRequests();
 
         if (S.locationType) {
             document.querySelectorAll('.location-card').forEach(c => {
@@ -1256,8 +1305,8 @@ function getSelectedContractPackageLabel() {
 // package.price to discount, add-ons are never discounted.
 function computeContractPreviewDiscount() {
     if (isMenuPricedPackage(getActivePackage())) return getPkgDiscount(null);
-    if (S.locationType === 'onsite') return getPkgDiscount(S.miniPackage);
-    return getPkgDiscount(S.offsitePackage);
+    if (S.locationType === 'onsite') return getPkgDiscountAfterRemovals(S.miniPackage);
+    return getPkgDiscountAfterRemovals(S.offsitePackage);
 }
 
 // Additional Per-Head (supabase/migrations/20261018_additional_per_head.sql)
@@ -1280,6 +1329,7 @@ function computeContractPreviewBase() {
     }
     base += getIncludedMenuExtraCharge(getActivePackage());
     base += computeContractPreviewAdditionalHeadCharge();
+    base -= getInclusionCredit(getCustomizablePackage());
     // Discount reduces the base before the service charge, same ordering
     // as buildSummary() — so the pre-submit contract preview matches the
     // final breakdown the customer sees on the Review step.
@@ -1357,6 +1407,10 @@ function renderContractBody(templateBody, contractData = {}) {
     const charge = computeContractPreviewCharge();
     const discount = computeContractPreviewDiscount();
     const previewAdditionalHeadCharge = computeContractPreviewAdditionalHeadCharge();
+    const previewInclusionPkg = getCustomizablePackage();
+    const previewInclusionCredit = getInclusionCredit(previewInclusionPkg);
+    const previewRemovedInclusions = previewInclusionPkg
+        ? removedOptions(getInclusionOptions(previewInclusionPkg), getRemovedInclusionIds(previewInclusionPkg)) : [];
     const isOffsite = S.locationType === 'offsite';
     const data = {
         customer_name: S.name || 'Customer',
@@ -1375,6 +1429,8 @@ function renderContractBody(templateBody, contractData = {}) {
         additional_heads: previewAdditionalHeadCharge > 0 ? String(S.additionalHeads) : '',
         additional_head_price: previewAdditionalHeadCharge > 0 ? fmtPeso(getSelectedPackageForAdditionalHead()?.pricePerAdditionalHead || 0) : '',
         additional_head_charge: previewAdditionalHeadCharge > 0 ? fmtPeso(previewAdditionalHeadCharge) : '',
+        inclusion_adjustment: previewInclusionCredit > 0 ? fmtPeso(previewInclusionCredit) : '',
+        removed_inclusions: previewRemovedInclusions.map(o => o.name).join(', '),
         guest_count: previewAdditionalHeadCharge > 0
             ? String(Number(getSelectedPackageForAdditionalHead()?.max_guests || S.guestCount) + S.additionalHeads)
             : (S.guestCount || ''),
@@ -2187,7 +2243,7 @@ async function loadPackages() {
     packagesLoadState = 'loading';
     const { data: pkgs, error } = await supabase
         .from('package')
-        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, allow_additional_head, price_per_additional_head, max_additional_heads, package_category(category_name, is_active, sort_order, service_charge_percent)')
+        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, inclusion_options, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, allow_additional_head, price_per_additional_head, max_additional_heads, package_category(category_name, is_active, sort_order, service_charge_percent)')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -2297,6 +2353,8 @@ async function loadPackages() {
             price: p.price,
             desc: p.description || '',
             inclusions: Array.isArray(p.inclusions) ? p.inclusions : [],
+            // Per-inclusion configuration (required / removal credit) — see js/package_inclusions.js
+            inclusionOptions: normalizeInclusionOptions(p.inclusion_options),
             durationHours: Number(p.duration_hours || 0) || null,
             bookingScope: p.booking_scope || null,
             min_guests: p.min_guests ?? null,
@@ -2423,6 +2481,7 @@ async function selectCategory(cat) {
         S.venueId        = null;
         S.comboVenueCapacity = null;
         S.additionalHeads = 0;
+        S.removedInclusions = [];
         S.offsitePackage = null;
         S.snackAddon     = null;
         S.cateringCart   = [];
@@ -2449,6 +2508,7 @@ async function selectCategory(cat) {
     updateSectionLocks();
     buildAddonOrVenueStep();
     buildAdditionalHeadBlock();
+    buildInclusionBlock();
     await refreshAvailabilityForSelectedScope();
 }
 
@@ -2539,6 +2599,17 @@ function buildGuestDurationChips(p) {
     return chips;
 }
 
+// "Customizable · save up to ₱X" tag, so customers can tell BEFORE choosing a
+// package that some of its inclusions can be removed for a lower price.
+function buildCustomizableChip(p) {
+    if (isMenuPricedPackage(p)) return '';
+    const options = getInclusionOptions(p);
+    if (!hasRemovableInclusions(options)) return '';
+    const save = optionalCreditTotal(options);
+    return '<span class="rpkg-chip rpkg-chip--custom"><i class="ti ti-adjustments-horizontal" aria-hidden="true"></i>Customizable' +
+        (save > 0 ? ' &middot; save up to ' + fmtPeso(save) : '') + '</span>';
+}
+
 function buildPkgCardInner(p) {
     const photoHtml = p.coverPhotoUrl
         ? '<img class="rpkg-photo" src="' + escapeHtml(p.coverPhotoUrl) + '" alt="' + escapeHtml(p.label) + '" loading="lazy">'
@@ -2556,7 +2627,7 @@ function buildPkgCardInner(p) {
     } else {
         priceHtml = '<div class="rpkg-price">' + fmtPeso(p.price) + '</div>';
     }
-    const chips = buildGuestDurationChips(p);
+    const chips = buildGuestDurationChips(p) + buildCustomizableChip(p);
     return (
         '<div class="rpkg-media">' + photoHtml +
             '<div class="rpkg-check" aria-hidden="true"><i class="ti ti-check"></i></div>' +
@@ -2600,6 +2671,7 @@ function buildMiniGrid() {
             updateSectionLocks();
             clampGuestCountToSelection();
             resetAdditionalHeads();
+            resetRemovedInclusions();
             await resolveVenueOptionsForPackage(p);
             const cateringEl = document.getElementById('catering-section');
             if (isCateringPackage(p)) {
@@ -2612,6 +2684,8 @@ function buildMiniGrid() {
             }
             buildAddonOrVenueStep();
             buildAdditionalHeadBlock();
+            buildInclusionBlock();
+            scrollToInclusionBlock();
             await refreshAvailabilityForSelectedScope();
         };
         g.appendChild(c);
@@ -2667,6 +2741,7 @@ function buildOffsiteSub(categoryId) {
             updateSectionLocks();
             clampGuestCountToSelection();
             resetAdditionalHeads();
+            resetRemovedInclusions();
             const cateringEl = document.getElementById('catering-section');
             if (isCateringPackage(p)) {
                 cateringEl?.classList.remove('hidden');
@@ -2677,6 +2752,8 @@ function buildOffsiteSub(categoryId) {
                 cateringEl?.classList.add('hidden');
             }
             buildAdditionalHeadBlock();
+            buildInclusionBlock();
+            scrollToInclusionBlock();
             buildAddonOrVenueStep();
             await refreshAvailabilityForSelectedScope();
         };
@@ -2768,6 +2845,7 @@ function buildRoomPickerBlock() {
             S.time = '';
             buildRoomPickerBlock();
             buildAdditionalHeadBlock();
+            buildInclusionBlock();
             await refreshAvailabilityForSelectedScope();
         };
         g.appendChild(c);
@@ -2831,6 +2909,142 @@ function setAdditionalHeads(next) {
     S.additionalHeads = Math.min(Math.max(Math.round(next) || 0, 0), effectiveMax);
     buildAdditionalHeadBlock();
 }
+
+// After a package is picked, bring its inclusion block into view — but only
+// when that package actually has one (otherwise the page stays where it is).
+function scrollToInclusionBlock() {
+    const block = document.getElementById('inclusion-customize-block');
+    if (!block || block.classList.contains('hidden')) return;
+    requestAnimationFrame(() => scrollToSection('inclusion-customize-block'));
+}
+
+// ── "What's included" card ───────────────────────────────────────────────
+// For a selected package with nothing removable, the customize block stays
+// hidden — so show what the package already covers, read-only (check marks,
+// not checkboxes), before the customer asks for extras. Works from the plain
+// inclusion lines every package has; catering packages show it only when they
+// actually list inclusions.
+const INCLUDED_CARD_COLLAPSED_COUNT = 5;   // shown before "Show all" ...
+const INCLUDED_CARD_COLLAPSE_ABOVE  = 6;   // ... when the list is longer than this
+let includedCardExpandedFor = null;        // package id whose full list is open
+
+function getPackageInclusionNames(pkg) {
+    const options = getInclusionOptions(pkg);
+    const names = options.length
+        ? options.map(o => o.name)
+        : (Array.isArray(pkg?.inclusions) ? pkg.inclusions : []);
+    return names.map(n => String(n ?? '').trim()).filter(Boolean);
+}
+
+function buildIncludedCard() {
+    const card = document.getElementById('included-summary-block');
+    if (!card) return;
+
+    const pkg = getActivePackage();
+    const customizable = getCustomizablePackage();   // null for cart-priced catering
+    const hasRemovable = !!customizable && hasRemovableInclusions(getInclusionOptions(customizable));
+    const names = pkg ? getPackageInclusionNames(pkg) : [];
+
+    if (!pkg || hasRemovable || !names.length) {
+        card.classList.add('hidden');
+        card.innerHTML = '';
+        return;
+    }
+
+    const collapsible = names.length > INCLUDED_CARD_COLLAPSE_ABOVE;
+    const expanded = !collapsible || includedCardExpandedFor === (pkg.id ?? pkg.label);
+    const shown = expanded ? names : names.slice(0, INCLUDED_CARD_COLLAPSED_COUNT);
+
+    card.innerHTML =
+        '<h3 class="inclusion-title">What&rsquo;s <em>included</em></h3>' +
+        '<ul class="included-list">' +
+            shown.map(n => '<li><i class="ti ti-check" aria-hidden="true"></i><span>' + escapeHtml(n) + '</span></li>').join('') +
+        '</ul>' +
+        (collapsible
+            ? '<button type="button" class="included-toggle" data-included-toggle aria-expanded="' + expanded + '">' +
+                  (expanded ? 'Show less' : 'Show all ' + names.length) + '</button>'
+            : '') +
+        '<p class="inclusion-summary">Everything here is part of the package.</p>';
+    card.classList.remove('hidden');
+}
+
+document.getElementById('included-summary-block')?.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-included-toggle]')) return;
+    const pkg = getActivePackage();
+    if (!pkg) return;
+    const key = pkg.id ?? pkg.label;
+    includedCardExpandedFor = includedCardExpandedFor === key ? null : key;
+    buildIncludedCard();
+});
+
+function buildInclusionBlock() {
+    buildIncludedCard();
+
+    // The custom request section sits right under this block and shows for ANY
+    // selected package (including ones with nothing removable). Every place that
+    // changes the package already calls this function, so it is kept in sync here.
+    document.getElementById('custom-requests-group')?.classList.toggle('hidden', !getActivePackage());
+
+    const block = document.getElementById('inclusion-customize-block');
+    if (!block) return;
+
+    const pkg = getCustomizablePackage();
+    const options = getInclusionOptions(pkg);
+    if (!pkg || !hasRemovableInclusions(options)) {
+        block.classList.add('hidden');
+        block.innerHTML = '';
+        return;
+    }
+
+    const removed = new Set(getRemovedInclusionIds(pkg));
+    const credit = getInclusionCredit(pkg);
+    const rows = options.map(o => {
+        const isRemoved = !o.required && removed.has(o.id);
+        let chip;
+        if (o.required) chip = '<span class="inclusion-chip inclusion-chip--required"><i class="ti ti-lock" aria-hidden="true"></i> Required</span>';
+        else if (isRemoved) chip = '<span class="inclusion-chip inclusion-chip--removed">Removed' + (o.credit > 0 ? ' &middot; saves ' + fmtPeso(o.credit) : '') + '</span>';
+        else chip = '<span class="inclusion-chip">' + (o.credit > 0 ? '&minus;' + fmtPeso(o.credit) + ' if removed' : 'No price change') + '</span>';
+        return '<label class="inclusion-item' + (o.required ? ' is-required' : '') + (isRemoved ? ' is-removed' : '') + '">' +
+            '<input type="checkbox" data-inclusion-id="' + escapeHtml(o.id) + '"' + (isRemoved ? '' : ' checked') + (o.required ? ' disabled' : '') + '>' +
+            '<span class="inclusion-name">' + escapeHtml(o.name) + '</span>' + chip +
+        '</label>';
+    }).join('');
+
+    const adjusted = Math.max(0, Number(pkg.price || 0) - credit);
+    const maxSave = optionalCreditTotal(options);
+    const savings = removed.size
+        ? '<div class="inclusion-savings">' +
+              '<span><strong>You save ' + fmtPeso(credit) + '</strong> &middot; ' + removed.size + ' inclusion' + (removed.size === 1 ? '' : 's') + ' removed</span>' +
+              '<button type="button" class="inclusion-reset" data-inclusion-reset>Reset to full package</button>' +
+          '</div>'
+        : '';
+    const summary = removed.size
+        ? 'Package price ' + fmtPeso(pkg.price) + ' &rarr; <strong>' + fmtPeso(adjusted) + '</strong> after your changes. Any promo discount is applied to this lower amount.'
+        : 'Uncheck anything you don\u2019t need' + (maxSave > 0 ? ' and save up to ' + fmtPeso(maxSave) : ' and the package price goes down') + '. Required items can\u2019t be removed.';
+
+    block.innerHTML =
+        '<h3 class="inclusion-title">Customize your <em>inclusions</em></h3>' +
+        '<div class="inclusion-list">' + rows + '</div>' +
+        savings +
+        '<p class="inclusion-summary">' + summary + '</p>';
+    block.classList.remove('hidden');
+}
+
+document.getElementById('inclusion-customize-block')?.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-inclusion-reset]')) return;
+    S.removedInclusions = [];
+    buildInclusionBlock();
+});
+
+document.getElementById('inclusion-customize-block')?.addEventListener('change', (e) => {
+    const box = e.target.closest('[data-inclusion-id]');
+    if (!box || box.disabled) return;
+    const id = box.dataset.inclusionId;
+    const next = new Set(S.removedInclusions || []);
+    if (box.checked) next.delete(id); else next.add(id);
+    S.removedInclusions = [...next];
+    buildInclusionBlock();
+});
 
 function buildAdditionalHeadBlock() {
     const block = document.getElementById('additional-head-block');
@@ -3804,6 +4018,85 @@ async function buildTimeGrid() {
 }
 
 // ── Summary ────────────────────────────────────────────────────────────
+// ── Custom requests ────────────────────────────────────────────────────────
+const MAX_CUSTOM_REQUESTS_ON_FORM = 5;
+
+function renderCustomRequests() {
+    const list = document.getElementById('cr-list');
+    const openBtn = document.getElementById('cr-open');
+    if (!list || !openBtn) return;
+    const items = S.customRequests || [];
+    list.innerHTML = items.map((r, i) =>
+        '<div class="cr-item">' +
+            '<div class="cr-item-text"><strong>' + escapeHtml(r.title) + '</strong>' +
+            (r.details ? '<span>' + escapeHtml(r.details) + '</span>' : '') + '</div>' +
+            '<button type="button" class="cr-remove" data-cr-remove="' + i + '" aria-label="Remove request ' + escapeHtml(r.title) + '">&times;</button>' +
+        '</div>').join('');
+    openBtn.classList.toggle('hidden', items.length >= MAX_CUSTOM_REQUESTS_ON_FORM);
+}
+
+function closeCustomRequestForm() {
+    document.getElementById('cr-form')?.classList.add('hidden');
+    document.getElementById('cr-open')?.classList.remove('hidden');
+    renderCustomRequests();
+}
+
+document.getElementById('cr-open')?.addEventListener('click', () => {
+    document.getElementById('cr-form')?.classList.remove('hidden');
+    document.getElementById('cr-open')?.classList.add('hidden');
+    document.getElementById('cr-title')?.focus();
+});
+
+document.getElementById('cr-cancel')?.addEventListener('click', () => {
+    const t = document.getElementById('cr-title'), d = document.getElementById('cr-details');
+    if (t) t.value = '';
+    if (d) d.value = '';
+    closeCustomRequestForm();
+});
+
+document.getElementById('cr-add')?.addEventListener('click', () => {
+    const titleEl = document.getElementById('cr-title');
+    const detailsEl = document.getElementById('cr-details');
+    const title = (titleEl?.value || '').trim();
+    if (!title) { titleEl?.focus(); return; }
+    S.customRequests = [...(S.customRequests || []), { title, details: (detailsEl?.value || '').trim() }]
+        .slice(0, MAX_CUSTOM_REQUESTS_ON_FORM);
+    if (titleEl) titleEl.value = '';
+    if (detailsEl) detailsEl.value = '';
+    closeCustomRequestForm();
+    saveDraft();
+});
+
+document.getElementById('cr-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-cr-remove]');
+    if (!btn) return;
+    S.customRequests = (S.customRequests || []).filter((_, i) => i !== Number(btn.dataset.crRemove));
+    renderCustomRequests();
+    saveDraft();
+});
+
+// Sends each request once the reservation exists. Never throws: the booking is
+// already saved, and a request that fails here can be sent again from the
+// reservation page.
+async function sendCustomRequests(reservationId) {
+    let sent = 0, failed = 0;
+    for (const r of (S.customRequests || [])) {
+        try {
+            const { error } = await supabase.rpc('submit_custom_request', {
+                p_reservation_id: reservationId,
+                p_title: r.title,
+                p_details: r.details || null
+            });
+            if (error) throw error;
+            sent++;
+        } catch (err) {
+            console.error('[reservations] custom request not sent:', err);
+            failed++;
+        }
+    }
+    return { sent, failed };
+}
+
 function buildSummary() {
     const box = document.getElementById('summary-content');
     if (!box) return;
@@ -3847,7 +4140,7 @@ function buildSummary() {
             pkgRows += sr('Package', cateringPkg.label + ' &mdash; ' + fmtPeso(cateringPkg.price), 'package');
             pkgRows += additionalHeadRowHtml;
             total += additionalHeadCharge;
-            discount = getPkgDiscount(cateringPkg);
+            discount = getPkgDiscountAfterRemovals(cateringPkg);
         }
         const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
         const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
@@ -3875,7 +4168,7 @@ function buildSummary() {
             pkgRows += sr('Package', S.miniPackage.label + ' &mdash; ' + fmtPeso(S.miniPackage.price), 'package');
             pkgRows += additionalHeadRowHtml;
             total += additionalHeadCharge;
-            discount = getPkgDiscount(S.miniPackage);
+            discount = getPkgDiscountAfterRemovals(S.miniPackage);
         }
         if (S.snackAddon) {
             total += S.snackAddon.price;
@@ -3888,7 +4181,19 @@ function buildSummary() {
         pkgRows += sr('Package', S.offsitePackage.label, 'package');
         if (S.offsitePackage.price > 0) pkgRows += sr('Price', fmtPeso(S.offsitePackage.price), 'tag');
         pkgRows += additionalHeadRowHtml;
-        discount = getPkgDiscount(S.offsitePackage);
+        discount = getPkgDiscountAfterRemovals(S.offsitePackage);
+    }
+
+    // Customizable inclusions: each removed optional inclusion takes its credit
+    // off the package price. The discount above was already computed on the
+    // price AFTER these removals (getPkgDiscountAfterRemovals).
+    const inclusionPkg = getCustomizablePackage();
+    const removedInclusionList = inclusionPkg
+        ? removedOptions(getInclusionOptions(inclusionPkg), getRemovedInclusionIds(inclusionPkg)) : [];
+    const inclusionCredit = getInclusionCredit(inclusionPkg);
+    if (removedInclusionList.length) {
+        total -= inclusionCredit;
+        pkgRows += sr('Removed inclusions', removedInclusionList.map(o => escapeHtml(o.name)).join(', '), 'list-check');
     }
 
     // Discount reduces the base BEFORE the service charge — the critical
@@ -3903,8 +4208,12 @@ function buildSummary() {
     const discountRowHtml = discount.active
         ? sr('Discount' + (discount.label ? ' (' + discount.label + ')' : ''), '&minus;' + fmtPeso(discount.discountAmount))
         : '';
+    const removedRowHtml = removedInclusionList.length
+        ? sr('Removed inclusions', '&minus;' + fmtPeso(inclusionCredit))
+        : '';
     const pricingRowsHtml = total > 0
-        ? discountRowHtml +
+        ? removedRowHtml +
+          discountRowHtml +
           sr('Subtotal', fmtPeso(discountedTotal)) +
           sr('Service charge (' + charge.pct + '%)', fmtPeso(charge.amount)) +
           totalRow('Total', fmtPeso(charge.total))
@@ -3934,7 +4243,10 @@ function buildSummary() {
         sr('Name',  S.name, 'user') +
         sr('Email', S.email, 'mail') +
         sr('Phone', S.phone, 'phone') +
-        (S.requests ? sr('Requests', S.requests, 'message') : '');
+        (S.requests ? sr('Requests', S.requests, 'message') : '') +
+        ((S.customRequests || []).length
+            ? sr('Custom requests', S.customRequests.map(r => escapeHtml(r.title)).join(', ') + ' &middot; we&rsquo;ll send you a price', 'sparkles')
+            : '');
 
     box.innerHTML =
         '<div class="rs-summary-cards">' +
@@ -4035,6 +4347,7 @@ function populate(id) {
         // Additional Per-Head — reflects S.additionalHeads (e.g. restored
         // from a saved draft) against the now-rendered DOM controls.
         buildAdditionalHeadBlock();
+        buildInclusionBlock();
         // Calendar and time
         updateDateDisplayPlaceholder();
         loadAvailabilityCalendar();
@@ -4390,6 +4703,7 @@ document.querySelectorAll('.location-card').forEach(c => {
             S.venueId         = null;
             S.comboVenueCapacity = null;
             S.additionalHeads = 0;
+            S.removedInclusions = [];
             S.snackAddon      = null;
             S.offsitePackage  = null;
             S.cateringCart    = [];
@@ -4405,6 +4719,7 @@ document.querySelectorAll('.location-card').forEach(c => {
         updateSectionLocks();
         buildAddonOrVenueStep();
         buildAdditionalHeadBlock();
+        buildInclusionBlock();
         refreshAvailabilityForSelectedScope();
     };
 });
@@ -4571,12 +4886,21 @@ async function submitDone() {
             packageId  = S.miniPackage ? S.miniPackage.id : null;
             addOnId    = S.snackAddon  ? S.snackAddon.id  : null;
             totalPrice = (S.miniPackage ? S.miniPackage.price : 0) + (S.snackAddon ? S.snackAddon.price : 0) + additionalHeadCharge + getIncludedMenuExtraCharge(S.miniPackage);
-            discount = getPkgDiscount(S.miniPackage);
+            discount = getPkgDiscountAfterRemovals(S.miniPackage);
         } else {
             packageId  = S.offsitePackage ? S.offsitePackage.id    : null;
             totalPrice = (S.offsitePackage ? S.offsitePackage.price : 0) + additionalHeadCharge + getIncludedMenuExtraCharge(S.offsitePackage);
-            discount = getPkgDiscount(S.offsitePackage);
+            discount = getPkgDiscountAfterRemovals(S.offsitePackage);
         }
+
+        // Customizable inclusions: credits of the optional inclusions the
+        // customer removed come off the package price first; the discount
+        // above was already computed on the price after them. The server
+        // recomputes the credit from the package's own configuration
+        // (apply_reservation_inclusions) — only the removed ids are sent.
+        const inclusionPkg = getCustomizablePackage();
+        const removedInclusionIds = getRemovedInclusionIds(inclusionPkg);
+        totalPrice -= getInclusionCredit(inclusionPkg);
 
         // Discount reduces the base BEFORE the service charge — same
         // ordering as buildSummary(). Snapshotted below alongside
@@ -4633,6 +4957,7 @@ async function submitDone() {
                 additional_heads:        additionalHeads,
                 additional_head_price:   additionalHeads > 0 ? additionalHeadPrice : null,
                 additional_head_charge:  additionalHeadCharge,
+                removed_inclusion_ids:   removedInclusionIds,
                 total_price:      totalPrice,
                 service_charge_percent: serviceCharge.pct,
                 service_charge_amount:  serviceCharge.amount,
@@ -4650,6 +4975,10 @@ async function submitDone() {
             .single();
 
         if (insertError) {
+            // The package's inclusions changed after the customer chose them.
+            if (/removed inclusions|Inclusions cannot be removed/i.test(insertError.message || '')) {
+                throw new Error('This package\u2019s inclusions were just updated. Please review your inclusion choices and try again.');
+            }
             // The price-floor trigger's raw wording means nothing to a customer.
             if (/total price cannot be less/i.test(insertError.message || '')) {
                 throw new Error('We couldn\u2019t confirm the price for this package. Please review your selections and try again, or contact us if it keeps happening.');
@@ -4692,6 +5021,18 @@ async function submitDone() {
             throw new Error(contractResult?.error || 'We could not finalize your signed contract. Please try again.');
         }
 
+        let customRequestNote = '';
+        if ((S.customRequests || []).length) {
+            nextBtn.textContent = 'Sending your requests...';
+            const outcome = await sendCustomRequests(reservation.reservation_id);
+            if (outcome.sent) {
+                customRequestNote += '<p style="margin:16px auto 0;max-width:460px;padding:12px 14px;background:#F1F8F2;border:1px solid #CFE5D3;border-radius:10px;color:#2E7D4F;font-size:13.5px;line-height:1.6;text-align:left;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:6px;"></i>We received your ' + (outcome.sent === 1 ? 'custom request' : outcome.sent + ' custom requests') + '. We\u2019ll send you a price on your reservation page &mdash; you only pay if you accept.</p>';
+            }
+            if (outcome.failed) {
+                customRequestNote += '<p style="margin:12px auto 0;max-width:460px;padding:12px 14px;background:#FFF6E5;border:1px solid #F0D9A8;border-radius:10px;color:#6B3A1F;font-size:13.5px;line-height:1.6;text-align:left;">' + (outcome.failed === 1 ? 'One request' : outcome.failed + ' requests') + ' couldn\u2019t be sent. You can add ' + (outcome.failed === 1 ? 'it' : 'them') + ' again from your reservation page.</p>';
+            }
+        }
+
         // Order matters: lock BEFORE clearing, so a pagehide/visibilitychange
         // firing in the gap between these two lines still hits the guard in
         // saveDraft() rather than racing clearDraft() itself.
@@ -4712,6 +5053,7 @@ async function submitDone() {
             'Reservation Number: <strong style="color:#6B3A1F;">' + (contractResult.reservation_number || '') + '</strong><br>' +
             'Your reservation is <strong style="color:#6B3A1F;">under review</strong>.<br>' +
             'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.</p>' +
+            customRequestNote +
             '<p style="margin:16px auto 0;max-width:460px;padding:12px 14px;background:#FFF6E5;border:1px solid #F0D9A8;border-radius:10px;color:#6B3A1F;font-size:13.5px;line-height:1.6;text-align:left;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:6px;"></i><strong>Please note:</strong> your reservation must be approved before you can request to reschedule or cancel it.</p>' +
             '<p style="margin-top:14px;"><a href="' + contractResult.contract_url + '" target="_blank" rel="noopener noreferrer" class="dl-btn" style="text-decoration:none;">Download your signed contract</a></p>' +
             '<p style="margin-top:22px;padding-top:22px;border-top:1px solid #EFE8DC;color:#777;font-size:14px;">Enjoyed booking with us?<br>' +
@@ -4730,6 +5072,7 @@ async function submitDone() {
 }
 
 // ── Initialize ─────────────────────────────────────────────────────────
+renderCustomRequests();
 syncSelectedDate('');
 await loadReservationRules();
 await loadServiceChargeSettings();
@@ -4809,6 +5152,7 @@ if (hasUrlPackage) {
         // customer manually reselected a package card.
         clampGuestCountToSelection();
         buildAdditionalHeadBlock();
+        buildInclusionBlock();
         setTimeout(() => scrollToSection('sub-guests-type'), 120);
     }
     finishInit();

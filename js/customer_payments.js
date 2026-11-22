@@ -1,3 +1,4 @@
+import { formatMoney } from './money.js';
 import { getCancellationFee as getSharedCancellationFee, getRescheduleFee as getSharedRescheduleFee, isCancellationFeeOwed, isRescheduleFeeOwed, isExtensionFeeOwed, isAdditionalHeadFeeOwed } from './reservation_shared.js';
 
 const CLOUDINARY_CONFIG = {
@@ -265,7 +266,7 @@ function safeFormatDate(formatDate, value) {
 }
 
 function safeFormatCurrency(value) {
-    return `₱${Number(value || 0).toLocaleString()}`;
+    return formatMoney(value);
 }
 
 function isMissingColumnError(error, tableName, columnName) {

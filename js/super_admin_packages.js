@@ -6,6 +6,8 @@
 // public.venue, public.package_venue, public.package_photo.
 // Image host: Cloudinary (cloud dgneg418t, preset eli_coffee_packages).
 
+import './money_inputs.js';
+import { moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -18,8 +20,10 @@ import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeIm
 import { computeDiscountStatus, pickActiveDiscount, applyDiscount } from './package_discount_helpers.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { showToast } from './admin_toast.js';
+import { normalizeInclusionOptions, serializeInclusionOptions, newInclusionId } from './package_inclusions.js';
 import { cateringSectionHint } from './catering_section_hints.js';
 import { clampNumberInput } from './numeric_input.js';
+import { enableDragReorder } from './drag_reorder.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -29,6 +33,7 @@ const VENUE_TABLE = 'venue';
 const PACKAGE_VENUE_TABLE = 'package_venue';
 const PACKAGE_PHOTO_TABLE = 'package_photo';
 const BADGE_TABLE = 'badge';
+const INCLUSION_TABLE = 'inclusion_catalog';
 const PACKAGE_BADGE_TABLE = 'package_badge';
 const PACKAGE_DISCOUNT_TABLE = 'package_discount';
 const CATERING_CATEGORY_TABLE = 'catering_dish_category';
@@ -47,7 +52,9 @@ let allVenues             = [];
 let editingVenueId        = null;
 let pendingDeleteAction   = null;   // { scope, id, mode: 'delete'|'archive'|'blocked' }
 let pkgPhotos             = [];     // [{ photo_id?, image_url?, file?, alt_text, is_cover, sort_order }]
-let pkgInclusions         = [];     // [string, ...]
+let pkgInclusions         = [];     // [{ id, name, required, credit, catalogId }, ...] — see js/package_inclusions.js
+let allInclusionCatalog   = [];     // inclusion_catalog rows (admin sees active + archived)
+let editingInclusionId    = null;   // inclusion_id being edited in the Inclusions view, null = add mode
 let pkgVenueIds           = new Set();
 
 // Inventory rebuild: rail/toolbar/health-strip state
@@ -104,6 +111,8 @@ const categoryRail         = document.getElementById('categoryRail');
 const inventoryGrid        = document.getElementById('inventoryGrid');
 const inventoryListWrap    = document.getElementById('inventoryListWrap');
 const inventoryListBody    = document.getElementById('inventoryListBody');
+const inventoryListTable   = document.getElementById('inventoryListTable');
+const inventoryReorderHint = document.getElementById('inventoryReorderHint');
 const addCategoryBtn       = document.getElementById('addCategoryBtn');
 const addPackageBtn        = document.getElementById('addPackageBtn');
 const openVenuesBtn        = document.getElementById('openVenuesBtn');
@@ -266,7 +275,6 @@ const venueModalMessage   = document.getElementById('venueModalMessage');
 const venueName           = document.getElementById('venueName');
 const venueCapacity       = document.getElementById('venueCapacity');
 const venueDescription    = document.getElementById('venueDescription');
-const venueSortOrder      = document.getElementById('venueSortOrder');
 const venueMappedPackagesField = document.getElementById('venueMappedPackagesField');
 const venueMappedPackagesList  = document.getElementById('venueMappedPackagesList');
 
@@ -288,11 +296,38 @@ const badgeTypeModalClose     = document.getElementById('badgeTypeModalClose');
 const badgeTypeModalCancel    = document.getElementById('badgeTypeModalCancel');
 const badgeTypeModalSave      = document.getElementById('badgeTypeModalSave');
 const badgeTypeModalSaveLabel = document.getElementById('badgeTypeModalSaveLabel');
+
+// ─── DOM: Inclusions catalog View + Modal, and the package form's catalog picker ──
+const inclusionsView                    = document.getElementById('inclusionsView');
+const openInclusionsBtn                 = document.getElementById('openInclusionsBtn');
+const backToCategoriesFromInclusionsBtn = document.getElementById('backToCategoriesFromInclusionsBtn');
+const addInclusionBtn                   = document.getElementById('addInclusionBtn');
+const inclusionsPageMessage             = document.getElementById('inclusionsPageMessage');
+const archivedInclusionsSection         = document.getElementById('archivedInclusionsSection');
+const activeInclusionsBody              = document.getElementById('activeInclusionsBody');
+const archivedInclusionsBody            = document.getElementById('archivedInclusionsBody');
+const inclusionModal          = document.getElementById('inclusionModal');
+const inclusionModalTitle     = document.getElementById('inclusionModalTitle');
+const inclusionModalSub       = document.getElementById('inclusionModalSub');
+const inclusionModalClose     = document.getElementById('inclusionModalClose');
+const inclusionModalCancel    = document.getElementById('inclusionModalCancel');
+const inclusionModalSave      = document.getElementById('inclusionModalSave');
+const inclusionModalSaveLabel = document.getElementById('inclusionModalSaveLabel');
+const inclusionModalMessage   = document.getElementById('inclusionModalMessage');
+const inclusionNameInput      = document.getElementById('inclusionNameInput');
+const inclusionPriceInput     = document.getElementById('inclusionPriceInput');
+const pkgAddFromCatalogEl     = document.getElementById('pkgAddFromCatalog');
+const pkgInclusionsCheckEl    = document.getElementById('pkgInclusionsCheck');
+const pkgPreviewInclusionsBtn = document.getElementById('pkgPreviewInclusionsBtn');
+const inclusionPreviewModal   = document.getElementById('inclusionPreviewModal');
+const inclusionPreviewTitle   = document.getElementById('inclusionPreviewTitle');
+const inclusionPreviewBody    = document.getElementById('inclusionPreviewBody');
+
+const pesoText = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const badgeTypeModalMessage   = document.getElementById('badgeTypeModalMessage');
 const badgeTypeLabelInput     = document.getElementById('badgeTypeLabelInput');
 const badgeTypeVariantSelect  = document.getElementById('badgeTypeVariantSelect');
 const badgeTypeScopeSelect    = document.getElementById('badgeTypeScopeSelect');
-const badgeTypeSortOrder      = document.getElementById('badgeTypeSortOrder');
 
 // ─── DOM: Catering Menu View + Category Modal + Dish Drawer ───────────────────
 const openCateringMenuBtn                 = document.getElementById('openCateringMenuBtn');
@@ -322,7 +357,6 @@ const cateringCategoryModalMessage   = document.getElementById('cateringCategory
 const cateringCatName        = document.getElementById('cateringCatName');
 const cateringCatIcon        = document.getElementById('cateringCatIcon');
 const cateringCatTag         = document.getElementById('cateringCatTag');
-const cateringCatSortOrder   = document.getElementById('cateringCatSortOrder');
 const cateringCatRequired    = document.getElementById('cateringCatRequired');
 const cateringPrice20        = document.getElementById('cateringPrice20');
 const cateringPrice30        = document.getElementById('cateringPrice30');
@@ -353,9 +387,6 @@ clampNumberInput(pkgMaxAdditionalHeads, { min: 0, max: 9999, decimals: 0 });
 clampNumberInput(pkgExtensionPrice, { min: 0, max: 100000, decimals: 2 });
 clampNumberInput(discPercentOffInput, { min: 0.01, max: 100, decimals: 2 });
 clampNumberInput(venueCapacity, { min: 1, max: 9999, decimals: 0 });
-clampNumberInput(venueSortOrder, { min: 0, max: 9999, decimals: 0 });
-clampNumberInput(badgeTypeSortOrder, { min: 0, max: 9999, decimals: 0 });
-clampNumberInput(cateringCatSortOrder, { min: 0, max: 9999, decimals: 0 });
 clampNumberInput(cateringPrice20, { min: 0, max: 1000000, decimals: 2 });
 clampNumberInput(cateringPrice30, { min: 0, max: 1000000, decimals: 2 });
 clampNumberInput(cateringPrice40, { min: 0, max: 1000000, decimals: 2 });
@@ -466,6 +497,7 @@ function hideAllViews() {
   inventoryView.style.display    = 'none';
   venueView.style.display        = 'none';
   badgeTypesView.style.display   = 'none';
+  inclusionsView.style.display   = 'none';
   cateringMenuView.style.display = 'none';
 }
 
@@ -486,6 +518,12 @@ function showBadgeTypesView() {
   renderBadgeTypesTables();
 }
 
+function showInclusionsView() {
+  hideAllViews();
+  inclusionsView.style.display = '';
+  renderInclusionTables();
+}
+
 async function showCateringMenuView() {
   hideAllViews();
   cateringMenuView.style.display = '';
@@ -496,6 +534,8 @@ openVenuesBtn.addEventListener('click', showVenueView);
 backToCategoriesFromVenuesBtn.addEventListener('click', showInventoryView);
 openBadgeTypesBtn.addEventListener('click', showBadgeTypesView);
 backToCategoriesFromBadgeTypesBtn.addEventListener('click', showInventoryView);
+openInclusionsBtn.addEventListener('click', showInclusionsView);
+backToCategoriesFromInclusionsBtn.addEventListener('click', showInventoryView);
 openCateringMenuBtn.addEventListener('click', showCateringMenuView);
 backToCategoriesFromCateringBtn.addEventListener('click', showInventoryView);
 
@@ -531,7 +571,8 @@ async function loadInventory() {
       { data: badgeDefs, error: badgeErr },
       { data: packageBadgeRows, error: pkgBadgeErr },
       { data: bestSellerRows, error: bestSellerErr },
-      { data: discountRows, error: discountErr }
+      { data: discountRows, error: discountErr },
+      { data: inclusionRows, error: inclusionErr }
     ] = await Promise.all([
       supabase.from(CATEGORY_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
       supabase.from('package').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
@@ -555,6 +596,7 @@ async function loadInventory() {
       // computeDiscountStatus() derives the live status from the window,
       // not from what's fetched here.
       supabase.from(PACKAGE_DISCOUNT_TABLE).select('*').order('created_at', { ascending: false }),
+      supabase.from(INCLUSION_TABLE).select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
     ]);
     if (catErr) throw catErr;
     if (pkgErr) throw pkgErr;
@@ -564,11 +606,15 @@ async function loadInventory() {
     if (pkgBadgeErr) throw pkgBadgeErr;
     if (bestSellerErr) throw bestSellerErr;
     if (discountErr) throw discountErr;
+    // Not fatal: the catalog is an optional extra, so the rest of Inventory still
+    // loads if the table isn't there yet (migration not run).
+    if (inclusionErr) console.warn('Inclusions catalog unavailable:', inclusionErr.message);
 
     allCategories = cats || [];
     allPackages   = pkgs || [];
     allVenues     = venues || [];
     allBadgeDefs  = badgeDefs || [];
+    allInclusionCatalog = inclusionRows || [];
 
     allPackageVenueCounts = new Map();
     (venueMaps || []).forEach(row => {
@@ -660,6 +706,11 @@ function renderCategoryRail() {
 
   const activeCount = allPackages.filter(p => p.is_active).length;
   const uncatCount  = allPackages.filter(p => p.is_active && !p.package_category_id).length;
+  // "Uncategorised" is a virtual bucket (packages with no category), not a real
+  // category row, so it can't be deleted. Instead it is hidden while no package
+  // (active or archived) is uncategorised, and returns on its own if one appears.
+  const showUncat = allPackages.some(p => !p.package_category_id);
+  if (!showUncat && selectedRailCategoryId === 'uncategorised') selectedRailCategoryId = null;
 
   const allItem = `
     <button type="button" class="rail-item ${selectedRailCategoryId === null ? 'active' : ''}" data-rail-id="all">
@@ -711,7 +762,7 @@ function renderCategoryRail() {
       <span class="rail-count">${uncatCount}</span>
     </button>`;
 
-  categoryRail.innerHTML = allItem + catItems + uncatItem;
+  categoryRail.innerHTML = allItem + catItems + (showUncat ? uncatItem : '');
 }
 
 categoryRail.addEventListener('click', (e) => {
@@ -844,9 +895,6 @@ function buildCardMenu(pkg) {
     : [
         { action: 'duplicate', label: 'Duplicate' },
         ...(isAddon ? [] : [{ action: 'badges', label: 'Badges' }, { action: 'discount', label: 'Discount' }]),
-        { divider: true },
-        { action: 'move-up', label: 'Move up' },
-        { action: 'move-down', label: 'Move down' },
         { divider: true },
         { action: 'archive', label: 'Archive' },
         { action: 'delete', label: 'Delete', destructive: true },
@@ -996,16 +1044,20 @@ function buildPkgCard(pkg) {
     ? `<img class="pkg-card-photo" src="${escapeHtml(photo)}" alt="${escapeHtml(pkg.package_name)}" loading="lazy">`
     : `<div class="pkg-card-photo-empty">No photo</div>`;
 
+  const dragHandle = inventoryReorderOn && !isArchived
+    ? `<button type="button" class="pkg-card-icon-btn drag-handle" data-drag-handle title="Drag to reorder" aria-label="Reorder ${escapeHtml(pkg.package_name)}. Drag, or press the arrow keys">⋮⋮</button>`
+    : '';
   const inlineAction = isArchived
     ? `<button type="button" class="pkg-card-icon-btn" data-pkg-action="restore" data-id="${pkg.package_id}" aria-label="Restore ${escapeHtml(pkg.package_name)}">↺</button>`
     : `<button type="button" class="pkg-card-icon-btn" data-pkg-action="edit" data-id="${pkg.package_id}" aria-label="Edit ${escapeHtml(pkg.package_name)}">✎</button>`;
 
   return `
-    <div class="pkg-card ${isArchived ? 'is-archived' : ''}" data-package-id="${pkg.package_id}">
+    <div class="pkg-card ${isArchived ? 'is-archived' : ''} ${inventoryReorderOn ? 'reorder-row' : ''}" data-package-id="${pkg.package_id}">
       <div class="pkg-card-photo-wrap">
         ${photoHtml}
         <div class="pkg-card-flags">${flags.join('')}</div>
         <div class="pkg-card-actions">
+          ${dragHandle}
           ${inlineAction}
           ${buildCardMenu(pkg)}
         </div>
@@ -1035,7 +1087,8 @@ function buildPkgListRow(pkg) {
     ? `<button type="button" class="action-btn edit" data-pkg-action="restore" data-id="${pkg.package_id}">Restore</button>`
     : `<button type="button" class="action-btn edit" data-pkg-action="edit" data-id="${pkg.package_id}">Edit</button>`;
 
-  return `<tr>
+  return `<tr class="${inventoryReorderOn ? 'reorder-row' : ''}">
+    ${dragHandleCell(!inventoryReorderOn, pkg.package_name)}
     <td>
       <div class="pkg-cell">
         ${buildPkgThumb(pkg)}
@@ -1092,18 +1145,24 @@ function getFilteredInventory() {
     return true;
   })
     // Bug fix: this used to return in raw allPackages array order. Adding
-    // a package (unshift, wrong position) or using Move up/down in the
-    // Inventory list (which only swaps sort_order values on the package
-    // objects via getCategorySiblings, not their position in allPackages)
+    // a package (unshift, wrong position) or reordering (which changes
+    // sort_order on the package objects, not their position in allPackages)
     // both left the grid/list showing stale order until the next full
-    // reload — Move up/down looked like it silently did nothing. Sorting
-    // here, the same way the initial query does, makes render correct
-    // regardless of how the array got mutated beforehand.
+    // reload. Sorting here, the same way the initial query does, makes
+    // render correct regardless of how the array got mutated beforehand.
     .sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
 }
 
 function renderInventory() {
   const filtered = getFilteredInventory();
+
+  // Drag handles only when there is something to reorder and the rows are one
+  // category's (see PACKAGE: REORDER).
+  const reorder = inventoryReorderState();
+  inventoryReorderOn = reorder.enabled && filtered.length > 1;
+  inventoryListTable.classList.toggle('reorder-on', inventoryReorderOn);
+  inventoryReorderHint.textContent = !reorder.enabled && filtered.length > 1 ? reorder.hint : '';
+  inventoryReorderHint.hidden = !inventoryReorderHint.textContent;
 
   if (viewMode === 'grid') {
     inventoryGrid.classList.remove('hidden');
@@ -1302,7 +1361,7 @@ function openConfirmArchiveCategory(catId) {
   if (!cat) return;
   pendingAction = { scope: 'category', type: 'archive', id: catId };
   confirmTitle.textContent = 'Archive Category';
-  confirmCopy.textContent  = `Are you sure you want to archive "${cat.category_name}"? It and its packages will no longer be visible to customers.`;
+  confirmCopy.textContent  = `Are you sure you want to archive "${cat.category_name}"? Its packages will be archived too, and none of them will be visible to customers.`;
   confirmOk.textContent    = 'Archive';
   confirmOk.className      = 'btn-danger';
   setModalMsg(confirmMessage, '');
@@ -1549,34 +1608,194 @@ pkgPhotoInput.addEventListener('change', async () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE: INCLUSIONS (structured list, in-modal state)
 // ═══════════════════════════════════════════════════════════════════════════════
+// ── Customer preview ────────────────────────────────────────────────────
+// Mirrors the "Customize your inclusions" block on the reservation form,
+// built from the rows currently in the form (saved or not), so the admin can
+// see what customers will see and try the checkboxes before saving.
+let inclusionPreviewRemoved = new Set();
+
+function renderInclusionPreview() {
+  const price = Number(pkgPrice.value) || 0;
+  const rows = pkgInclusions.filter(i => i.name.trim());
+  const optional = rows.filter(i => !i.required);
+
+  if (!optional.length) {
+    inclusionPreviewBody.innerHTML = '<p class="incprev-empty">No optional inclusions yet, so customers won’t see this section. Switch <strong>Required</strong> off for an inclusion to let customers remove it.</p>';
+    return;
+  }
+
+  const credit = optional.filter(i => inclusionPreviewRemoved.has(i.id)).reduce((sum, i) => sum + (Number(i.credit) || 0), 0);
+  const maxSave = optional.reduce((sum, i) => sum + (Number(i.credit) || 0), 0);
+  const removedCount = optional.filter(i => inclusionPreviewRemoved.has(i.id)).length;
+
+  const list = rows.map(i => {
+    const isRemoved = !i.required && inclusionPreviewRemoved.has(i.id);
+    let chip;
+    if (i.required) chip = '<span class="incprev-chip">Required</span>';
+    else if (isRemoved) chip = `<span class="incprev-chip incprev-chip--removed">Removed${i.credit > 0 ? ' · saves ' + pesoText(i.credit) : ''}</span>`;
+    else chip = `<span class="incprev-chip">${i.credit > 0 ? '−' + pesoText(i.credit) + ' if removed' : 'No price change'}</span>`;
+    return `<label class="incprev-item${i.required ? ' is-required' : ''}${isRemoved ? ' is-removed' : ''}">
+      <input type="checkbox" data-prev-id="${escapeHtml(i.id)}" ${isRemoved ? '' : 'checked'} ${i.required ? 'disabled' : ''}>
+      <span class="incprev-name">${escapeHtml(i.name.trim())}</span>${chip}</label>`;
+  }).join('');
+
+  const savings = removedCount
+    ? `<div class="incprev-savings"><span><strong>You save ${pesoText(credit)}</strong> · ${removedCount} inclusion${removedCount === 1 ? '' : 's'} removed</span>
+         <button type="button" class="incprev-reset" data-prev-reset>Reset to full package</button></div>`
+    : '';
+  const summary = removedCount
+    ? `Package price ${pesoText(price)} → <strong>${pesoText(Math.max(0, price - credit))}</strong> after the customer’s changes.`
+    : `Uncheck anything you don’t need${maxSave > 0 ? ' and save up to ' + pesoText(maxSave) : ''}. Required items can’t be removed.`;
+
+  inclusionPreviewBody.innerHTML = `<div class="incprev"><h3 class="incprev-title">Customize your <em>inclusions</em></h3>
+    <div class="incprev-list">${list}</div>${savings}<p class="incprev-summary">${summary}</p></div>`;
+}
+
+function openInclusionPreview() {
+  inclusionPreviewRemoved = new Set();
+  inclusionPreviewTitle.textContent = pkgName.value.trim() ? `Customer preview: ${pkgName.value.trim()}` : 'Customer preview';
+  renderInclusionPreview();
+  openModal(inclusionPreviewModal);
+}
+
+pkgPreviewInclusionsBtn.addEventListener('click', openInclusionPreview);
+document.getElementById('inclusionPreviewClose').addEventListener('click', () => closeModal(inclusionPreviewModal));
+document.getElementById('inclusionPreviewDone').addEventListener('click', () => closeModal(inclusionPreviewModal));
+inclusionPreviewModal.addEventListener('click', e => { if (e.target === inclusionPreviewModal) closeModal(inclusionPreviewModal); });
+inclusionPreviewBody.addEventListener('change', (e) => {
+  const box = e.target.closest('[data-prev-id]');
+  if (!box || box.disabled) return;
+  if (box.checked) inclusionPreviewRemoved.delete(box.dataset.prevId); else inclusionPreviewRemoved.add(box.dataset.prevId);
+  renderInclusionPreview();
+});
+inclusionPreviewBody.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-prev-reset]')) return;
+  inclusionPreviewRemoved = new Set();
+  renderInclusionPreview();
+});
+
+function blankInclusionRow() {
+  return { id: newInclusionId(), name: '', required: true, credit: 0, catalogId: null };
+}
+
+// Rows for the form. A package that has never been configured keeps its plain
+// text lines, which become REQUIRED inclusions (nothing removable) until the
+// admin decides otherwise — so saving an old package never changes what its
+// customers can do.
+function inclusionRowsFromPackage(pkg) {
+  const catalogIds = new Set(allInclusionCatalog.map(c => c.inclusion_id));
+  const options = normalizeInclusionOptions(pkg.inclusion_options);
+  if (options.length) {
+    // A catalog item deleted since this was saved keeps its row as free text.
+    return options.map(o => (o.catalogId && !catalogIds.has(o.catalogId)) ? { ...o, catalogId: null } : o);
+  }
+  return (Array.isArray(pkg.inclusions) ? pkg.inclusions : [])
+    .map(t => String(t || '').trim())
+    .filter(Boolean)
+    .map(name => ({ id: newInclusionId(), name, required: true, credit: 0, catalogId: null }));
+}
+
 function renderPkgInclusionsList() {
   if (!pkgInclusions.length) {
     pkgInclusionsListEl.innerHTML = '<p class="modal-hint">No inclusions yet — add at least one.</p>';
   } else {
     pkgInclusionsListEl.innerHTML = pkgInclusions.map((item, index) => `
-      <div class="inclusion-row" data-index="${index}">
-        <button type="button" class="reorder-btn" data-inclusion-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
-        <button type="button" class="reorder-btn" data-inclusion-action="down" ${index === pkgInclusions.length - 1 ? 'disabled' : ''}>↓</button>
-        <input type="text" data-inclusion-index="${index}" value="${escapeHtml(item)}" placeholder="e.g. 3-hour venue use" maxlength="200">
-        <button type="button" data-inclusion-action="remove" title="Remove">✕</button>
+      <div class="inclusion-row inclusion-row--cfg" data-index="${index}">
+        <div class="inclusion-row-top">
+          <button type="button" class="drag-handle" data-drag-handle title="Drag to reorder" aria-label="Reorder inclusion. Drag, or press the up and down arrow keys">⋮⋮</button>
+          <input type="text" data-inclusion-index="${index}" value="${escapeHtml(item.name)}" placeholder="e.g. 3-hour venue use" maxlength="200" ${item.catalogId ? 'readonly' : ''} aria-label="Inclusion name">
+          <button type="button" data-inclusion-action="remove" title="Remove" aria-label="Remove inclusion">✕</button>
+        </div>
+        <div class="inclusion-row-cfg">
+          ${item.catalogId ? '<span class="inclusion-tag">Catalog</span><button type="button" class="inclusion-link-btn" data-inclusion-action="unlink">Unlink</button>' : ''}
+          <label class="inclusion-required"><input type="checkbox" data-inclusion-required ${item.required ? 'checked' : ''}> Required</label>
+          ${item.required
+            ? '<span class="inclusion-locked">Customers can’t remove this</span>'
+            : `<label class="inclusion-credit">Removal credit ₱ <input type="number" min="0" step="0.01" data-inclusion-credit data-money value="${moneyInputValue(item.credit)}" aria-label="Removal credit in pesos"></label>`}
+        </div>
       </div>
     `).join('');
   }
+  renderPkgInclusionCheck();
+  renderPkgCatalogSelect();
   updateUnsavedBanner();
 }
 
+// The package form's own sanity check on the optional credits — the database
+// enforces the same rule, this just says so before the admin hits Save.
+function renderPkgInclusionCheck() {
+  if (!pkgInclusionsCheckEl) return;
+  const price = Number(pkgPrice.value) || 0;
+  const optional = pkgInclusions.filter(i => !i.required && i.name.trim());
+  const total = optional.reduce((sum, i) => sum + (Number(i.credit) || 0), 0);
+  let text, bad = false;
+  if (!optional.length) {
+    text = 'No optional inclusions yet, so customers can’t remove anything from this package.';
+  } else if (total > price) {
+    bad = true;
+    text = `Optional credits total ${pesoText(total)}, which is more than the package price of ${pesoText(price)}. Lower a credit before saving.`;
+  } else {
+    text = `Optional credits total ${pesoText(total)} of ${pesoText(price)}. The lowest a customer can pay is ${pesoText(price - total)} before the discount.`;
+  }
+  pkgInclusionsCheckEl.textContent = text;
+  pkgInclusionsCheckEl.classList.toggle('inclusion-check--bad', bad);
+}
+
+function renderPkgCatalogSelect() {
+  if (!pkgAddFromCatalogEl) return;
+  const used = new Set(pkgInclusions.map(i => i.catalogId).filter(Boolean));
+  const available = allInclusionCatalog
+    .filter(c => c.is_active && !used.has(c.inclusion_id))
+    .sort(compareInclusionOrder);
+  pkgAddFromCatalogEl.innerHTML =
+    `<option value="">${allInclusionCatalog.some(c => c.is_active) ? '+ Add from catalog' : 'No catalog items yet'}</option>` +
+    available.map(c => `<option value="${c.inclusion_id}">${escapeHtml(c.name)} (${pesoText(c.price)})</option>`).join('');
+  pkgAddFromCatalogEl.disabled = !available.length;
+}
+
 pkgAddInclusionBtn.addEventListener('click', () => {
-  pkgInclusions.push('');
+  pkgInclusions.push(blankInclusionRow());
   renderPkgInclusionsList();
   renderActivationChecklist();
   pkgInclusionsListEl.querySelector(`[data-inclusion-index="${pkgInclusions.length - 1}"]`)?.focus();
 });
 
-pkgInclusionsListEl.addEventListener('input', (e) => {
-  const input = e.target.closest('[data-inclusion-index]');
-  if (!input) return;
-  pkgInclusions[Number(input.dataset.inclusionIndex)] = input.value;
+pkgAddFromCatalogEl.addEventListener('change', () => {
+  const item = allInclusionCatalog.find(c => c.inclusion_id === pkgAddFromCatalogEl.value);
+  if (!item) return;
+  pkgInclusions.push({ id: newInclusionId(), name: item.name, required: false, credit: Number(item.price) || 0, catalogId: item.inclusion_id });
+  renderPkgInclusionsList();
   renderActivationChecklist();
+});
+
+pkgPrice.addEventListener('input', renderPkgInclusionCheck);
+
+pkgInclusionsListEl.addEventListener('input', (e) => {
+  const row = e.target.closest('[data-index]');
+  const item = row ? pkgInclusions[Number(row.dataset.index)] : null;
+  if (!item) return;
+  if (e.target.matches('[data-inclusion-index]')) {
+    item.name = e.target.value;
+    renderActivationChecklist();
+  } else if (e.target.matches('[data-inclusion-credit]')) {
+    const n = Number(e.target.value);
+    item.credit = Number.isFinite(n) && n > 0 ? n : 0;
+    renderPkgInclusionCheck();
+  }
+});
+
+pkgInclusionsListEl.addEventListener('change', (e) => {
+  if (!e.target.matches('[data-inclusion-required]')) return;
+  const item = pkgInclusions[Number(e.target.closest('[data-index]').dataset.index)];
+  if (!item) return;
+  item.required = e.target.checked;
+  if (item.required) {
+    item.credit = 0;
+  } else if (!item.credit && item.catalogId) {
+    // Start from the catalog price so the admin only adjusts what differs.
+    item.credit = Number(allInclusionCatalog.find(c => c.inclusion_id === item.catalogId)?.price) || 0;
+  }
+  renderPkgInclusionsList();
 });
 
 pkgInclusionsListEl.addEventListener('click', (e) => {
@@ -1585,10 +1804,23 @@ pkgInclusionsListEl.addEventListener('click', (e) => {
   const index = Number(btn.closest('[data-index]').dataset.index);
   const action = btn.dataset.inclusionAction;
   if (action === 'remove') pkgInclusions.splice(index, 1);
-  if (action === 'up' && index > 0) [pkgInclusions[index - 1], pkgInclusions[index]] = [pkgInclusions[index], pkgInclusions[index - 1]];
-  if (action === 'down' && index < pkgInclusions.length - 1) [pkgInclusions[index + 1], pkgInclusions[index]] = [pkgInclusions[index], pkgInclusions[index + 1]];
+  if (action === 'unlink' && pkgInclusions[index]) pkgInclusions[index].catalogId = null;
   renderPkgInclusionsList();
   renderActivationChecklist();
+});
+
+// Drag a row by its ⋮⋮ handle. The new order lives in pkgInclusions and is
+// saved with the rest of the package when Save Changes is pressed.
+enableDragReorder({
+  container: pkgInclusionsListEl,
+  rowSelector: '.inclusion-row--cfg',
+  handleSelector: '[data-drag-handle]',
+  onReorder: (from, to) => {
+    const [moved] = pkgInclusions.splice(from, 1);
+    pkgInclusions.splice(to, 0, moved);
+    renderPkgInclusionsList();
+    renderActivationChecklist();
+  },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1861,11 +2093,11 @@ function getActivationBlockers() {
   const blockers = [];
   if (!pkgPhotos.length) blockers.push('At least one photo');
   if (pkgPhotos.some(p => !p.alt_text || !p.alt_text.trim())) blockers.push('Alt text on every photo');
-  if (!pkgInclusions.some(i => i.trim())) blockers.push('At least one inclusion');
+  if (!pkgInclusions.some(i => i.name.trim())) blockers.push('At least one inclusion');
   const isAddon = pkgType.value === 'add on';
   const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
   if (!isAddon && isOnsite && pkgVenueIds.size === 0) blockers.push('At least one venue mapping (onsite package)');
-  if (!isAddon && (!pkgPrice.value || Number(pkgPrice.value) <= 0)) blockers.push('A price greater than ₱0');
+  if (!isAddon && (!pkgPrice.value || Number(pkgPrice.value) <= 0)) blockers.push('A price greater than ₱0.00');
   return blockers;
 }
 
@@ -1874,12 +2106,12 @@ function renderActivationChecklist() {
   const items = [
     { label: 'At least one photo', met: pkgPhotos.length > 0 },
     { label: 'Alt text on every photo', met: pkgPhotos.length > 0 && pkgPhotos.every(p => p.alt_text && p.alt_text.trim()) },
-    { label: 'At least one inclusion', met: pkgInclusions.some(i => i.trim()) },
+    { label: 'At least one inclusion', met: pkgInclusions.some(i => i.name.trim()) },
   ];
   const isAddon = pkgType.value === 'add on';
   const isOnsite = pkgLocationType.value === 'onsite' || pkgLocationType.value === 'both';
   if (!isAddon && isOnsite) items.push({ label: 'At least one venue mapping', met: pkgVenueIds.size > 0 });
-  if (!isAddon) items.push({ label: 'Price greater than ₱0', met: Number(pkgPrice.value) > 0 });
+  if (!isAddon) items.push({ label: 'Price greater than ₱0.00', met: Number(pkgPrice.value) > 0 });
 
   pkgActivationChecklist.innerHTML = items.map(item => `
     <div class="checklist-item ${item.met ? 'met' : 'unmet'}">${item.met ? '✓' : '○'} ${escapeHtml(item.label)}</div>
@@ -1942,15 +2174,15 @@ async function openEditPackageModal(packageId) {
   pkgName.value           = pkg.package_name || '';
   pkgType.value           = pkg.package_type || '';
   pkgDescription.value    = pkg.description || '';
-  pkgPrice.value          = pkg.price ?? '';
+  pkgPrice.value          = moneyInputValue(pkg.price);
   pkgMinGuests.value      = pkg.min_guests ?? '';
   pkgMaxGuests.value      = pkg.max_guests ?? pkg.guest_capacity ?? '';
   pkgAllowAdditionalHeadToggle.checked = !!pkg.allow_additional_head;
-  pkgPricePerAdditionalHead.value = pkg.price_per_additional_head ?? '';
+  pkgPricePerAdditionalHead.value = moneyInputValue(pkg.price_per_additional_head);
   pkgMaxAdditionalHeads.value     = pkg.max_additional_heads ?? '';
   pkgMaxQuantity.value    = pkg.max_quantity ?? 1;
   pkgDuration.value       = pkg.duration_hours ?? '';
-  pkgExtensionPrice.value = pkg.extension_price ?? '';
+  pkgExtensionPrice.value = moneyInputValue(pkg.extension_price);
   pkgLocationType.value   = pkg.location_type || '';
   pkgLocationPrevValue    = pkg.location_type || '';
   setPkgBookingScopeValue(pkg.booking_scope);
@@ -1959,9 +2191,7 @@ async function openEditPackageModal(packageId) {
 
   populateCategorySelect(pkg.package_category_id);
 
-  pkgInclusions = Array.isArray(pkg.inclusions) && pkg.inclusions.length
-    ? [...pkg.inclusions]
-    : [];
+  pkgInclusions = inclusionRowsFromPackage(pkg);
   renderPkgInclusionsList();
 
   setModalMsg(pkgModalMessage, 'Loading photos and venues…', 'success');
@@ -2025,6 +2255,11 @@ function validatePackageForm() {
     return 'A valid duration in hours is required.';
   if (pkgType.value === 'main' && !getPkgBookingScopeValue().length)
     return 'Booking Scope is required for Main packages — it determines which reservations block each other on the calendar.';
+  const optionalCreditTotal = pkgInclusions
+    .filter(i => i.name.trim() && !i.required)
+    .reduce((sum, i) => sum + (Number(i.credit) || 0), 0);
+  if (optionalCreditTotal > Number(pkgPrice.value))
+    return `Optional inclusion credits (${pesoText(optionalCreditTotal)}) can’t add up to more than the package price (${pesoText(Number(pkgPrice.value))}).`;
   // Bug fix: renderActivationChecklist() no longer auto-unchecks "Active"
   // when a blocker appears (see that function for why), so this is now the
   // single place that actually enforces the activation checklist at save
@@ -2050,7 +2285,8 @@ pkgModalSave.addEventListener('click', async () => {
 
   try {
     const maxGuests = parseInt(pkgMaxGuests.value, 10);
-    const cleanInclusions = pkgInclusions.map(i => i.trim()).filter(Boolean);
+    const cleanRows = pkgInclusions.map(i => ({ ...i, name: i.name.trim() })).filter(i => i.name);
+    const cleanInclusions = cleanRows.map(i => i.name);
 
     const payload = {
       package_name:       pkgName.value.trim(),
@@ -2062,6 +2298,9 @@ pkgModalSave.addEventListener('click', async () => {
       max_guests:         maxGuests,
       max_quantity:       pkgType.value === 'add on' ? (parseInt(pkgMaxQuantity.value, 10) || 1) : 1,
       inclusions:         cleanInclusions,
+      // Per-inclusion configuration; the database re-validates it and derives
+      // package.inclusions from it (20261123_customizable_inclusions.sql).
+      inclusion_options:  serializeInclusionOptions(cleanRows),
       duration_hours:     parseInt(pkgDuration.value, 10),
       extension_price:    pkgExtensionPrice.value !== '' ? Number(pkgExtensionPrice.value) : null,
       location_type:      pkgLocationType.value || null,
@@ -2324,6 +2563,24 @@ deleteModalOk.addEventListener('click', async () => {
       renderBadgeTypesTables();
       renderInventory();
 
+    } else if (scope === 'inclusion') {
+      const item = allInclusionCatalog.find(c => c.inclusion_id === id);
+      if (mode === 'archive') {
+        const { error } = await supabase.from(INCLUSION_TABLE).update({ is_active: false }).eq('inclusion_id', id);
+        if (error) throw error;
+        const idx = allInclusionCatalog.findIndex(c => c.inclusion_id === id);
+        if (idx !== -1) allInclusionCatalog[idx] = { ...allInclusionCatalog[idx], is_active: false };
+        await logAudit({ action: 'Archived Inclusion', category: 'package', details: `Archived (in use): ${item?.name}`, entityId: id });
+        setMessage(inclusionsPageMessage, 'Inclusion archived.', 'success');
+      } else {
+        const { error } = await supabase.from(INCLUSION_TABLE).delete().eq('inclusion_id', id);
+        if (error) throw error;
+        allInclusionCatalog = allInclusionCatalog.filter(c => c.inclusion_id !== id);
+        await logAudit({ action: 'Deleted Inclusion', category: 'package', details: `Deleted inclusion: ${item?.name}`, entityId: id });
+        setMessage(inclusionsPageMessage, 'Inclusion deleted.', 'success');
+      }
+      renderInclusionTables();
+
     } else if (scope === 'catering-category') {
       const cat = allCateringCategories.find(c => c.category_id === id);
       // catering_dish rows cascade automatically (ON DELETE CASCADE, see
@@ -2388,15 +2645,40 @@ confirmOk.addEventListener('click', async () => {
       if (count === 0) throw new Error('No rows updated — check database permissions.');
       const idx = allCategories.findIndex(c => c.package_category_id === id);
       if (idx !== -1) allCategories[idx] = { ...allCategories[idx], is_active: isActive };
+
+      // Archiving a category also archives every still-active package under it.
+      // Restoring a category does NOT bring packages back: some may have been
+      // archived on purpose before, so the admin restores those individually.
+      let cascadedCount = 0;
+      if (type === 'archive') {
+        const { error: pkgErr, count: pkgCount } = await supabase
+          .from('package')
+          .update({ is_active: false }, { count: 'exact' })
+          .eq('package_category_id', id)
+          .eq('is_active', true);
+        if (pkgErr) throw pkgErr;
+        cascadedCount = pkgCount || 0;
+        allPackages = allPackages.map(p =>
+          p.package_category_id === id && p.is_active !== false ? { ...p, is_active: false } : p
+        );
+      }
+
       await logAudit({
         action:   type === 'archive' ? 'Archived Category' : 'Restored Category',
         category: 'package',
-        details:  `Category ${type === 'archive' ? 'archived' : 'restored'}: ${cat?.category_name}`,
+        details:  `Category ${type === 'archive' ? 'archived' : 'restored'}: ${cat?.category_name}` +
+                  (cascadedCount ? ` (also archived ${cascadedCount} package${cascadedCount === 1 ? '' : 's'})` : ''),
         entityId: id
       });
       renderCategoryRail();
       renderInventory();
-      setMessage(inventoryPageMessage, type === 'archive' ? 'Category archived.' : 'Category restored.', 'success');
+      setMessage(
+        inventoryPageMessage,
+        type === 'archive'
+          ? (cascadedCount ? `Category archived along with ${cascadedCount} package${cascadedCount === 1 ? '' : 's'}.` : 'Category archived.')
+          : 'Category restored. Its packages stay archived until you restore them.',
+        'success'
+      );
     }
 
     if (scope === 'package') {
@@ -2441,6 +2723,26 @@ confirmOk.addEventListener('click', async () => {
       });
       renderVenueTables();
       setMessage(venuePageMessage, type === 'archive' ? 'Venue archived.' : 'Venue restored.', 'success');
+    }
+
+    if (scope === 'inclusion') {
+      const item = allInclusionCatalog.find(c => c.inclusion_id === id);
+      const { error, count } = await supabase
+        .from(INCLUSION_TABLE)
+        .update({ is_active: isActive }, { count: 'exact' })
+        .eq('inclusion_id', id);
+      if (error) throw error;
+      if (count === 0) throw new Error('No rows updated — check database permissions.');
+      const idx = allInclusionCatalog.findIndex(c => c.inclusion_id === id);
+      if (idx !== -1) allInclusionCatalog[idx] = { ...allInclusionCatalog[idx], is_active: isActive };
+      await logAudit({
+        action:   type === 'archive' ? 'Archived Inclusion' : 'Restored Inclusion',
+        category: 'package',
+        details:  `Inclusion ${type === 'archive' ? 'archived' : 'restored'}: ${item?.name}`,
+        entityId: id
+      });
+      renderInclusionTables();
+      setMessage(inclusionsPageMessage, type === 'archive' ? 'Inclusion archived.' : 'Inclusion restored.', 'success');
     }
 
     if (scope === 'badge-type') {
@@ -2996,45 +3298,58 @@ function trapFocus(container) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PACKAGE: REORDER (move up/down among active siblings in the same category —
-// this directly drives display order on the customer Packages page)
+// PACKAGE: REORDER — drag a package by its ⋮⋮ handle, in the card grid or the
+// list. Order is kept per category and directly drives the display order on the
+// customer Packages page, so dragging is only offered while the screen shows
+// ONE category's active packages (no search, no health filter). Otherwise
+// the rows come from several categories mixed together and a drop would be
+// ambiguous. The Packages / Add-ons filter is fine: hidden ones keep their place.
 // ═══════════════════════════════════════════════════════════════════════════════
-function getCategorySiblings(pkg) {
+let inventoryReorderOn = false;   // set by renderInventory() for the rows it draws
+
+function inventoryReorderState() {
+  if (healthFilterActive || selectedStatus !== 'active') return { enabled: false, hint: '' };
+  if (!selectedRailCategoryId) return { enabled: false, hint: 'Pick a category on the left to drag its packages into order.' };
+  if (inventorySearchInput.value.trim()) return { enabled: false, hint: 'Clear the search to drag packages into order.' };
+  return { enabled: true, hint: '' };
+}
+
+// Every active package of the selected category, in the order it is displayed.
+function reorderableCategoryPackages() {
   return allPackages
-    .filter(p => p.package_category_id === pkg.package_category_id && p.is_active)
+    .filter(p => p.is_active && (selectedRailCategoryId === 'uncategorised'
+      ? !p.package_category_id
+      : p.package_category_id === selectedRailCategoryId))
     .sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
 }
 
-async function movePackage(packageId, direction) {
-  const pkg = allPackages.find(p => p.package_id === packageId);
-  if (!pkg || !pkg.is_active) return;
-
-  const siblings = getCategorySiblings(pkg);
-  const index = siblings.findIndex(p => p.package_id === packageId);
-  const targetIndex = index + direction;
-  if (index === -1 || targetIndex < 0 || targetIndex >= siblings.length) return;
-
-  [siblings[index], siblings[targetIndex]] = [siblings[targetIndex], siblings[index]];
-
-  setMessage(inventoryPageMessage, 'Reordering…');
-  try {
-    await Promise.all(siblings.map((p, i) => {
-      if (p.sort_order === i) return Promise.resolve();
-      p.sort_order = i;
-      return supabase.from('package').update({ sort_order: i }).eq('package_id', p.package_id);
-    }));
-    await logAudit({
-      action: 'Reordered Packages',
-      category: 'package',
-      details: `Moved "${pkg.package_name}" ${direction < 0 ? 'up' : 'down'}`,
-      entityId: packageId
-    });
-    setMessage(inventoryPageMessage, 'Order updated.', 'success');
-    renderInventory();
-  } catch (err) {
-    setMessage(inventoryPageMessage, `Failed to reorder: ${err.message}`, 'error');
-  }
+function reorderPackage(from, to) {
+  commitDragReorder({
+    items: reorderableCategoryPackages(),
+    isMember: p => !selectedKind || p.package_type === selectedKind,   // what the Packages / Add-ons filter shows
+    from, to,
+    table: 'package', idField: 'package_id', nameOf: p => p.package_name, auditAction: 'Reordered Packages',
+    rerender: renderInventory,
+    reload: async () => {
+      const { data } = await supabase.from('package').select('package_id, sort_order');
+      (data || []).forEach(r => {
+        const pkg = allPackages.find(p => p.package_id === r.package_id);
+        if (pkg) pkg.sort_order = r.sort_order;
+      });
+      renderInventory();
+    },
+    onError: err => setMessage(inventoryPageMessage, `Couldn't reorder: ${err.message}`, 'error'),
+  });
 }
+
+enableDragReorder({
+  container: inventoryGrid, rowSelector: '.pkg-card.reorder-row', handleSelector: '[data-drag-handle]',
+  layout: 'grid', onReorder: reorderPackage,
+});
+enableDragReorder({
+  container: inventoryListBody, rowSelector: 'tr.reorder-row', handleSelector: '[data-drag-handle]',
+  onReorder: reorderPackage,
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PACKAGE ACTION DISPATCH (shared by card kebab, list-row kebab)
@@ -3050,8 +3365,59 @@ function handlePkgTableAction(e) {
   if (pkgAction === 'discount')  openDiscountModal(id);
   if (pkgAction === 'delete')    openConfirmDeletePackage(id);
   if (pkgAction === 'duplicate') duplicatePackage(id);
-  if (pkgAction === 'move-up')   movePackage(id, -1);
-  if (pkgAction === 'move-down') movePackage(id, 1);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DRAG-TO-REORDER (shared by Venues, Badge types, Catering categories, Dishes)
+// js/drag_reorder.js reports "row `from` was dropped at `to`"; this applies it.
+// ═══════════════════════════════════════════════════════════════════════════════
+let reorderWriteChain = Promise.resolve();   // saves run one after another, in drop order
+
+// New items go to the end of their list (there is no Sort Order field any more).
+function nextSortOrder(list) {
+  return list.reduce((max, r) => Math.max(max, Number(r.sort_order) || 0), -1) + 1;
+}
+
+// items     the FULL list, in the order it is displayed (it is reordered in place)
+// isMember  which items are draggable rows (e.g. active ones); `from` / `to` are
+//           positions among those rows. Items that are not members (archived
+//           ones, the automatic Best Seller badge) keep their place in the list.
+// The whole list is then numbered 0..n-1, so ties and gaps can never make a drop
+// look like it did nothing. Only rows whose number changed are written.
+function commitDragReorder({ items, isMember, from, to, table, idField, nameOf, auditAction, rerender, reload, onError }) {
+  const members = items.filter(isMember);
+  if (from === to || from < 0 || to < 0 || from >= members.length || to >= members.length) return;
+  const [moved] = members.splice(from, 1);
+  members.splice(to, 0, moved);
+  let k = 0;
+  const next = items.map(item => (isMember(item) ? members[k++] : item));
+  const changed = [];
+  next.forEach((item, order) => {
+    if (Number(item.sort_order) !== order) { item.sort_order = order; changed.push(item); }
+  });
+  items.splice(0, items.length, ...next);
+  rerender();
+  if (!changed.length) return;
+
+  reorderWriteChain = reorderWriteChain.then(async () => {
+    try {
+      const results = await Promise.all(changed.map(item =>
+        supabase.from(table).update({ sort_order: item.sort_order }).eq(idField, item[idField])));
+      const failed = results.find(r => r.error);
+      if (failed) throw failed.error;
+      await logAudit({ action: auditAction, category: 'package', details: `Moved "${nameOf(moved)}" to position ${to + 1}`, entityId: moved[idField] });
+    } catch (err) {
+      onError(err);
+      try { await reload(); } catch (_) { /* the error message above is already showing */ }
+    }
+  });
+}
+
+// Leading cell with the ⋮⋮ handle. Archived rows get an empty cell so columns line up.
+function dragHandleCell(isArchived, name) {
+  return isArchived
+    ? '<td class="drag-cell"></td>'
+    : `<td class="drag-cell"><button type="button" class="drag-handle" data-drag-handle title="Drag to reorder" aria-label="Reorder ${escapeHtml(name)}. Drag, or press the up and down arrow keys">⋮⋮</button></td>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3106,14 +3472,14 @@ function buildVenueRow(venue) {
         <button class="action-btn danger" data-venue-action="delete" data-id="${venue.venue_id}">Delete</button>
       </div>`;
 
-  return `<tr>
+  return `<tr class="${isArchived ? '' : 'reorder-row'}">
+    ${dragHandleCell(isArchived, venue.name)}
     <td>
       <div class="pkg-name">${escapeHtml(venue.name)}</div>
       ${venue.description ? `<div class="pkg-id">${escapeHtml(venue.description)}</div>` : ''}
     </td>
     <td>${venue.capacity} pax</td>
     <td><span class="count-pill">${venue._mappedCount || 0} package${venue._mappedCount === 1 ? '' : 's'}</span></td>
-    <td>${venue.sort_order}</td>
     <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
     <td>${actions}</td>
   </tr>`;
@@ -3146,6 +3512,20 @@ function handleVenueTableAction(e) {
 activeVenueBody.addEventListener('click', handleVenueTableAction);
 archivedVenueBody.addEventListener('click', handleVenueTableAction);
 
+// Drag a venue by its ⋮⋮ handle. This sets the order customers see venues in.
+enableDragReorder({
+  container: activeVenueBody,
+  rowSelector: 'tr.reorder-row',
+  handleSelector: '[data-drag-handle]',
+  onReorder: (from, to) => commitDragReorder({
+    items: allVenues, isMember: v => v.is_active, from, to,
+    table: VENUE_TABLE, idField: 'venue_id', nameOf: v => v.name, auditAction: 'Reordered Venues',
+    rerender: renderVenueTables,
+    reload: loadVenues,
+    onError: err => setMessage(venuePageMessage, `Couldn't reorder: ${err.message}`, 'error'),
+  }),
+});
+
 function openAddVenueModal() {
   editingVenueId = null;
   venueModalTitle.textContent = 'Add New Venue';
@@ -3154,7 +3534,6 @@ function openAddVenueModal() {
   venueName.value = '';
   venueCapacity.value = '';
   venueDescription.value = '';
-  venueSortOrder.value = '0';
   venueMappedPackagesField.style.display = 'none';
   setModalMsg(venueModalMessage, '');
   openModal(venueModal);
@@ -3171,7 +3550,6 @@ async function openEditVenueModal(venueId) {
   venueName.value = venue.name || '';
   venueCapacity.value = venue.capacity ?? '';
   venueDescription.value = venue.description || '';
-  venueSortOrder.value = venue.sort_order ?? 0;
 
   setModalMsg(venueModalMessage, '');
   openModal(venueModal);
@@ -3204,7 +3582,6 @@ venueModalSave.addEventListener('click', async () => {
       name,
       capacity,
       description: venueDescription.value.trim() || null,
-      sort_order: parseInt(venueSortOrder.value, 10) || 0,
     };
 
     if (editingVenueId) {
@@ -3220,6 +3597,7 @@ venueModalSave.addEventListener('click', async () => {
       setMessage(venuePageMessage, 'Venue updated successfully.', 'success');
     } else {
       payload.is_active = true;
+      payload.sort_order = nextSortOrder(allVenues);   // new venues go to the end; drag to move them
       const { data, error } = await supabase.from(VENUE_TABLE).insert(payload).select().single();
       if (error) throw error;
       data._mappedCount = 0;
@@ -3362,23 +3740,26 @@ function buildBadgeTypeRow(badge) {
         <button class="action-btn danger" data-badgetype-action="delete" data-id="${badge.badge_id}">Delete</button>
       </div>`;
 
-  return `<tr>
+  return `<tr class="${isArchived ? '' : 'reorder-row'}">
+    ${dragHandleCell(isArchived, badge.label)}
     <td><span class="pkg-badge-chip pkg-badge-chip--${escapeHtml(badge.variant)}">${escapeHtml(badge.label)}</span></td>
     <td>${SCOPE_LABELS[badge.unique_scope] || 'No limit'}</td>
     <td><span class="count-pill">${usage} package${usage === 1 ? '' : 's'}</span></td>
-    <td>${badge.sort_order}</td>
     <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
     <td>${actions}</td>
   </tr>`;
 }
 
+// Display order of badge types: sort_order, then newest first. The automatic
+// Best Seller badge is part of this order too (it decides which two badges a
+// package card shows) even though it is not listed in the table.
+function badgeDefsInOrder() {
+  return [...allBadgeDefs].sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
+}
+
 function renderBadgeTypesTables() {
-  const manageable = manageableBadgeTypes();
-  // Bug fix: same class of bug as Categories/Packages above — adding a
-  // badge type (push, wrong position) or editing one's Order left the
-  // table showing stale order until reload, since this rendered raw
-  // array order instead of sorting by sort_order.
-  const sorted = [...manageable].sort((a, b) => (a.sort_order - b.sort_order) || (new Date(b.created_at) - new Date(a.created_at)));
+  const manageable = badgeDefsInOrder().filter(b => b.badge_key !== 'best_seller');
+  const sorted = manageable;
   const active = sorted.filter(b => b.is_active);
   const archived = sorted.filter(b => !b.is_active);
 
@@ -3405,6 +3786,28 @@ function handleBadgeTypeTableAction(e) {
 activeBadgeTypesBody.addEventListener('click', handleBadgeTypeTableAction);
 archivedBadgeTypesBody.addEventListener('click', handleBadgeTypeTableAction);
 
+// Drag a badge type by its ⋮⋮ handle. The order decides which badges a package
+// card shows first (it shows at most two).
+enableDragReorder({
+  container: activeBadgeTypesBody,
+  rowSelector: 'tr.reorder-row',
+  handleSelector: '[data-drag-handle]',
+  onReorder: (from, to) => commitDragReorder({
+    items: badgeDefsInOrder(),
+    isMember: b => b.badge_key !== 'best_seller' && b.is_active,
+    from, to,
+    table: BADGE_TABLE, idField: 'badge_id', nameOf: b => b.label, auditAction: 'Reordered Badge Types',
+    rerender: () => { renderBadgeTypesTables(); renderInventory(); },
+    reload: async () => {
+      const { data } = await supabase.from(BADGE_TABLE).select('*');
+      if (data) allBadgeDefs = data;
+      renderBadgeTypesTables();
+      renderInventory();
+    },
+    onError: err => setMessage(badgeTypesPageMessage, `Couldn't reorder: ${err.message}`, 'error'),
+  }),
+});
+
 function openAddBadgeTypeModal() {
   editingBadgeTypeId = null;
   badgeTypeModalTitle.textContent = 'Add New Badge Type';
@@ -3413,7 +3816,6 @@ function openAddBadgeTypeModal() {
   badgeTypeLabelInput.value = '';
   badgeTypeVariantSelect.value = 'neutral';
   badgeTypeScopeSelect.value = '';
-  badgeTypeSortOrder.value = '0';
   setModalMsg(badgeTypeModalMessage, '');
   openModal(badgeTypeModal);
 }
@@ -3429,7 +3831,6 @@ function openEditBadgeTypeModal(badgeId) {
   badgeTypeLabelInput.value = badge.label || '';
   badgeTypeVariantSelect.value = badge.variant || 'neutral';
   badgeTypeScopeSelect.value = badge.unique_scope || '';
-  badgeTypeSortOrder.value = badge.sort_order ?? 0;
   setModalMsg(badgeTypeModalMessage, '');
   openModal(badgeTypeModal);
 }
@@ -3447,7 +3848,6 @@ badgeTypeModalSave.addEventListener('click', async () => {
       label,
       variant: badgeTypeVariantSelect.value,
       unique_scope: badgeTypeScopeSelect.value || null,
-      sort_order: parseInt(badgeTypeSortOrder.value, 10) || 0,
     };
 
     if (editingBadgeTypeId) {
@@ -3459,6 +3859,7 @@ badgeTypeModalSave.addEventListener('click', async () => {
       setMessage(badgeTypesPageMessage, 'Badge type updated successfully.', 'success');
     } else {
       payload.badge_key = slugifyBadgeKey(label);
+      payload.sort_order = nextSortOrder(allBadgeDefs);   // new types go to the end; drag to move them
       payload.is_assignable = true;
       payload.is_active = true;
       const { data, error } = await supabase.from(BADGE_TABLE).insert(payload).select().single();
@@ -3531,6 +3932,244 @@ function openConfirmDeleteBadgeType(badgeId) {
     pendingDeleteAction = { scope: 'badge-type', id: badgeId, mode: 'delete' };
     deleteModalTitle.textContent = 'Delete Badge Type';
     deleteModalCopy.textContent  = `Delete "${badge.label}"? This can't be undone.`;
+    deleteModalOk.textContent    = 'Delete';
+  }
+  deleteModalOk.disabled = false;
+  setModalMsg(deleteModalMessage, '');
+  openModal(deleteModal);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INCLUSIONS CATALOG (inclusion_catalog) — reusable items admins add to a
+// package's Inclusions list. A package row copies the name and starts its
+// removal credit at the catalog price; after that the package owns its own
+// credit, so editing the catalog never reprices an existing package.
+// ═══════════════════════════════════════════════════════════════════════════════
+function countInclusionUsage(inclusionId) {
+  return allPackages.filter(p => normalizeInclusionOptions(p.inclusion_options).some(o => o.catalogId === inclusionId)).length;
+}
+
+// The catalog's order is set by dragging rows on the Inclusions screen. It is
+// the order of the table AND of the "+ Add from catalog" list in Edit Package.
+// Ties (every item starts at 0) fall back to alphabetical.
+function compareInclusionOrder(a, b) {
+  return ((Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+    || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+}
+
+function inclusionsInOrder(isActive) {
+  return allInclusionCatalog.filter(c => !!c.is_active === isActive).sort(compareInclusionOrder);
+}
+
+// New items go to the end of the list.
+function nextInclusionSortOrder() {
+  return allInclusionCatalog.reduce((max, c) => Math.max(max, Number(c.sort_order) || 0), -1) + 1;
+}
+
+function buildInclusionRow(item) {
+  const isArchived = !item.is_active;
+  const usage = countInclusionUsage(item.inclusion_id);
+  const actions = `<div class="action-cell">
+      <button class="action-btn edit" data-inclusion-table-action="edit" data-id="${item.inclusion_id}">Edit</button>
+      ${isArchived
+        ? `<button class="action-btn restore" data-inclusion-table-action="restore" data-id="${item.inclusion_id}">Restore</button>`
+        : `<button class="action-btn archive" data-inclusion-table-action="archive" data-id="${item.inclusion_id}">Archive</button>`}
+      <button class="action-btn danger" data-inclusion-table-action="delete" data-id="${item.inclusion_id}">Delete</button>
+    </div>`;
+  // Only active rows can be dragged; archived rows keep an empty cell so the columns line up.
+  const handleCell = isArchived
+    ? '<td class="drag-cell"></td>'
+    : `<td class="drag-cell"><button type="button" class="drag-handle" data-drag-handle title="Drag to reorder" aria-label="Reorder ${escapeHtml(item.name)}. Drag, or press the up and down arrow keys">⋮⋮</button></td>`;
+  return `<tr class="${isArchived ? '' : 'inc-row'}">
+    ${handleCell}
+    <td>${escapeHtml(item.name)}</td>
+    <td>${pesoText(item.price)}</td>
+    <td><span class="count-pill">${usage} package${usage === 1 ? '' : 's'}</span></td>
+    <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
+    <td>${actions}</td>
+  </tr>`;
+}
+
+function renderInclusionTables() {
+  const active = inclusionsInOrder(true);
+  const archived = inclusionsInOrder(false);
+
+  activeInclusionsBody.innerHTML = active.length
+    ? active.map(buildInclusionRow).join('')
+    : '<tr class="empty-row"><td colspan="6">No inclusions yet. Add one so it can be picked from a package.</td></tr>';
+
+  archivedInclusionsSection.style.display = archived.length ? '' : 'none';
+  archivedInclusionsBody.innerHTML = archived.map(buildInclusionRow).join('');
+}
+
+function handleInclusionTableAction(e) {
+  const btn = e.target.closest('[data-inclusion-table-action]');
+  if (!btn) return;
+  const { inclusionTableAction, id } = btn.dataset;
+  if (inclusionTableAction === 'edit')    openEditInclusionModal(id);
+  if (inclusionTableAction === 'archive') openConfirmArchiveInclusion(id);
+  if (inclusionTableAction === 'restore') openConfirmRestoreInclusion(id);
+  if (inclusionTableAction === 'delete')  openConfirmDeleteInclusion(id);
+}
+
+activeInclusionsBody.addEventListener('click', handleInclusionTableAction);
+archivedInclusionsBody.addEventListener('click', handleInclusionTableAction);
+
+// Drag a row by its ⋮⋮ handle (or ArrowUp / ArrowDown on the focused handle).
+enableDragReorder({
+  container: activeInclusionsBody,
+  rowSelector: 'tr.inc-row',
+  handleSelector: '[data-drag-handle]',
+  onReorder: reorderInclusion,
+});
+
+// Move one active item to a new position, then number the whole active list
+// 0..n-1 so ties (new items all start equal) can never leave the order
+// ambiguous. The table updates straight away; only rows whose number actually
+// changes are written, and the screen is reloaded from the database on failure.
+async function reorderInclusion(from, to) {
+  const list = inclusionsInOrder(true);
+  if (from < 0 || to < 0 || from >= list.length || to >= list.length || from === to) return;
+
+  const reordered = [...list];
+  const [moved] = reordered.splice(from, 1);
+  reordered.splice(to, 0, moved);
+  const changed = reordered
+    .map((item, order) => ({ item, order }))
+    .filter(({ item, order }) => item.sort_order !== order);
+  changed.forEach(({ item, order }) => { item.sort_order = order; });
+  renderInclusionTables();
+
+  try {
+    const results = await Promise.all(changed.map(({ item, order }) =>
+      supabase.from(INCLUSION_TABLE).update({ sort_order: order }).eq('inclusion_id', item.inclusion_id)));
+    const failed = results.find(r => r.error);
+    if (failed) throw failed.error;
+    await logAudit({ action: 'Reordered Inclusions', category: 'package', details: `Moved "${moved.name}" to position ${to + 1}`, entityId: moved.inclusion_id });
+  } catch (err) {
+    setMessage(inclusionsPageMessage, `Couldn't reorder: ${err.message}`, 'error');
+    // Some rows may have saved; show what the database actually has.
+    const { data } = await supabase.from(INCLUSION_TABLE).select('*');
+    if (data) allInclusionCatalog = data;
+    renderInclusionTables();
+  }
+}
+
+function openAddInclusionModal() {
+  editingInclusionId = null;
+  inclusionModalTitle.textContent = 'Add inclusion';
+  inclusionModalSub.textContent = 'A reusable item admins can add to any package';
+  inclusionModalSaveLabel.textContent = 'Add inclusion';
+  inclusionNameInput.value = '';
+  inclusionPriceInput.value = '0.00';
+  setModalMsg(inclusionModalMessage, '');
+  openModal(inclusionModal);
+}
+
+function openEditInclusionModal(inclusionId) {
+  const item = allInclusionCatalog.find(c => c.inclusion_id === inclusionId);
+  if (!item) return;
+  editingInclusionId = inclusionId;
+  inclusionModalTitle.textContent = 'Edit inclusion';
+  inclusionModalSub.textContent = 'Packages already using this item keep their own name and credit';
+  inclusionModalSaveLabel.textContent = 'Save Changes';
+  inclusionNameInput.value = item.name || '';
+  inclusionPriceInput.value = moneyInputValue(item.price ?? 0);
+  setModalMsg(inclusionModalMessage, '');
+  openModal(inclusionModal);
+}
+
+inclusionModalSave.addEventListener('click', async () => {
+  const name = inclusionNameInput.value.trim();
+  const price = Number(inclusionPriceInput.value);
+  if (!name) { setModalMsg(inclusionModalMessage, 'A name is required.'); return; }
+  if (inclusionPriceInput.value === '' || !Number.isFinite(price) || price < 0) { setModalMsg(inclusionModalMessage, 'A price of ₱0.00 or more is required.'); return; }
+
+  inclusionModalSave.disabled = true;
+  inclusionModalSaveLabel.textContent = 'Saving…';
+  setModalMsg(inclusionModalMessage, '');
+
+  try {
+    const payload = { name, price };
+
+    if (editingInclusionId) {
+      const { data, error } = await supabase.from(INCLUSION_TABLE).update(payload).eq('inclusion_id', editingInclusionId).select().single();
+      if (error) throw error;
+      const idx = allInclusionCatalog.findIndex(c => c.inclusion_id === editingInclusionId);
+      if (idx !== -1) allInclusionCatalog[idx] = { ...allInclusionCatalog[idx], ...data };
+      await logAudit({ action: 'Updated Inclusion', category: 'package', details: `Inclusion updated: ${name}`, entityId: editingInclusionId });
+      setMessage(inclusionsPageMessage, 'Inclusion updated successfully.', 'success');
+    } else {
+      const { data, error } = await supabase.from(INCLUSION_TABLE).insert({ ...payload, sort_order: nextInclusionSortOrder(), is_active: true }).select().single();
+      if (error) throw error;
+      allInclusionCatalog.push(data);
+      await logAudit({ action: 'Added Inclusion', category: 'package', details: `New inclusion created: ${name}`, entityId: data.inclusion_id });
+      setMessage(inclusionsPageMessage, 'Inclusion added successfully.', 'success');
+    }
+
+    renderInclusionTables();
+    closeModal(inclusionModal);
+  } catch (err) {
+    setModalMsg(inclusionModalMessage, err.code === '23505'
+      ? 'An inclusion with that name already exists.'
+      : `Failed to save: ${err.message}`);
+  } finally {
+    inclusionModalSave.disabled = false;
+    inclusionModalSaveLabel.textContent = editingInclusionId ? 'Save Changes' : 'Add inclusion';
+  }
+});
+
+addInclusionBtn.addEventListener('click', openAddInclusionModal);
+inclusionModalClose.addEventListener('click',  () => closeModal(inclusionModal));
+inclusionModalCancel.addEventListener('click', () => closeModal(inclusionModal));
+inclusionModal.addEventListener('click', e => { if (e.target === inclusionModal) closeModal(inclusionModal); });
+
+function openConfirmArchiveInclusion(inclusionId) {
+  const item = allInclusionCatalog.find(c => c.inclusion_id === inclusionId);
+  if (!item) return;
+  const usage = countInclusionUsage(inclusionId);
+  pendingAction = { scope: 'inclusion', type: 'archive', id: inclusionId };
+  confirmTitle.textContent = 'Archive Inclusion';
+  confirmCopy.textContent  = usage
+    ? `Archive "${item.name}"? ${usage} package${usage === 1 ? '' : 's'} already use it and will keep it, but it can't be added to anything new until restored.`
+    : `Archive "${item.name}"? It will no longer be selectable when editing a package.`;
+  confirmOk.textContent    = 'Archive';
+  confirmOk.className      = 'btn-danger';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+function openConfirmRestoreInclusion(inclusionId) {
+  const item = allInclusionCatalog.find(c => c.inclusion_id === inclusionId);
+  if (!item) return;
+  pendingAction = { scope: 'inclusion', type: 'restore', id: inclusionId };
+  confirmTitle.textContent = 'Restore Inclusion';
+  confirmCopy.textContent  = `Restore "${item.name}" and make it selectable in packages again?`;
+  confirmOk.textContent    = 'Restore';
+  confirmOk.className      = 'btn-primary';
+  setModalMsg(confirmMessage, '');
+  openModal(confirmModal);
+}
+
+// Packages keep their own copy of a catalog item's name and credit, so a
+// delete never changes a package or a booking. It is still blocked while a
+// package uses the item, to avoid orphaning the "Catalog" link on its row.
+function openConfirmDeleteInclusion(inclusionId) {
+  const item = allInclusionCatalog.find(c => c.inclusion_id === inclusionId);
+  if (!item) return;
+  const usage = countInclusionUsage(inclusionId);
+
+  deleteReassignField.classList.add('hidden');
+
+  if (usage > 0) {
+    pendingDeleteAction = { scope: 'inclusion', id: inclusionId, mode: 'archive' };
+    deleteModalTitle.textContent = 'Archive Instead';
+    deleteModalCopy.textContent  = `${usage} package${usage === 1 ? '' : 's'} currently use "${item.name}". Archive it instead — they'll keep it, but it can't be added to anything new.`;
+    deleteModalOk.textContent    = 'Archive';
+  } else {
+    pendingDeleteAction = { scope: 'inclusion', id: inclusionId, mode: 'delete' };
+    deleteModalTitle.textContent = 'Delete Inclusion';
+    deleteModalCopy.textContent  = `Delete "${item.name}"? This can't be undone.`;
     deleteModalOk.textContent    = 'Delete';
   }
   deleteModalOk.disabled = false;
@@ -3654,12 +4293,12 @@ function buildCateringCategoryRow(cat) {
         <button class="action-btn danger" data-catering-action="delete" data-id="${cat.category_id}">Delete</button>
       </div>`;
 
-  return `<tr>
+  return `<tr class="${isArchived ? '' : 'reorder-row'}">
+    ${dragHandleCell(isArchived, cat.name)}
     <td>${cat.icon ? cat.icon + ' ' : ''}${escapeHtml(cat.name)} <span class="category-pill">${CATERING_TAG_LABELS[cat.tag] || cat.tag}</span></td>
     <td>${cat.is_required ? 'Required' : 'Optional'}</td>
     <td><span class="count-pill">${activeDishCount} dish${activeDishCount === 1 ? '' : 'es'}</span></td>
     <td>${cateringPriceSummary(cat)}</td>
-    <td>${cat.sort_order}</td>
     <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
     <td>${actions}</td>
   </tr>`;
@@ -3998,6 +4637,22 @@ function handleCateringCategoryTableAction(e) {
 activeCateringBody.addEventListener('click', handleCateringCategoryTableAction);
 archivedCateringBody.addEventListener('click', handleCateringCategoryTableAction);
 
+// Drag a category by its ⋮⋮ handle. Categories belong to one package, so this
+// only reorders the categories of the package being edited, and the order is
+// the order customers see the buffet sections in.
+enableDragReorder({
+  container: activeCateringBody,
+  rowSelector: 'tr.reorder-row',
+  handleSelector: '[data-drag-handle]',
+  onReorder: (from, to) => commitDragReorder({
+    items: allCateringCategories, isMember: c => c.is_active, from, to,
+    table: CATERING_CATEGORY_TABLE, idField: 'category_id', nameOf: c => c.name, auditAction: 'Reordered Catering Categories',
+    rerender: () => { renderCateringTables(); renderCateringRestrictions(); },
+    reload: loadCateringMenu,
+    onError: err => setMessage(cateringPageMessage, `Couldn't reorder: ${err.message}`, 'error'),
+  }),
+});
+
 // ─── Category Modal: Add / Edit ────────────────────────────────────────────────
 function openAddCateringCategoryModal() {
   if (!cateringMenuActivePackageId) return; // guarded by the disabled button too
@@ -4009,7 +4664,6 @@ function openAddCateringCategoryModal() {
   cateringCatName.value = '';
   cateringCatIcon.value = '';
   cateringCatTag.value = 'main';
-  cateringCatSortOrder.value = '0';
   cateringCatRequired.checked = true;
   cateringPrice20.value = '';
   cateringPrice30.value = '';
@@ -4030,12 +4684,11 @@ function openEditCateringCategoryModal(categoryId) {
   cateringCatName.value = cat.name || '';
   cateringCatIcon.value = cat.icon || '';
   cateringCatTag.value = cat.tag || 'main';
-  cateringCatSortOrder.value = cat.sort_order ?? 0;
   cateringCatRequired.checked = !!cat.is_required;
-  cateringPrice20.value = cat.price_20 ?? 0;
-  cateringPrice30.value = cat.price_30 ?? 0;
-  cateringPrice40.value = cat.price_40 ?? 0;
-  cateringPrice50.value = cat.price_50 ?? 0;
+  cateringPrice20.value = moneyInputValue(cat.price_20 ?? 0);
+  cateringPrice30.value = moneyInputValue(cat.price_30 ?? 0);
+  cateringPrice40.value = moneyInputValue(cat.price_40 ?? 0);
+  cateringPrice50.value = moneyInputValue(cat.price_50 ?? 0);
   setModalMsg(cateringCategoryModalMessage, '');
   openModal(cateringCategoryModal);
 }
@@ -4060,7 +4713,6 @@ cateringCategoryModalSave.addEventListener('click', async () => {
       icon: cateringCatIcon.value.trim() || null,
       tag: cateringCatTag.value,
       is_required: cateringCatRequired.checked,
-      sort_order: parseInt(cateringCatSortOrder.value, 10) || 0,
       price_20: prices[0], price_30: prices[1], price_40: prices[2], price_50: prices[3],
     };
 
@@ -4075,6 +4727,7 @@ cateringCategoryModalSave.addEventListener('click', async () => {
       if (!cateringMenuActivePackageId) throw new Error('No catering package selected.');
       payload.is_active = true;
       payload.package_id = cateringMenuActivePackageId;
+      payload.sort_order = nextSortOrder(allCateringCategories);   // new categories go to the end; drag to move them
       const { data, error } = await supabase.from(CATERING_CATEGORY_TABLE).insert(payload).select().single();
       if (error) throw error;
       allCateringCategories.push(data);
@@ -4187,20 +4840,14 @@ function renderCateringDishDrawerList() {
     cateringDishDrawerList.innerHTML = '<p class="modal-hint">No dishes yet — add one below.</p>';
     return;
   }
-  cateringDishDrawerList.innerHTML = dishes.map((dish, index) => `
+  cateringDishDrawerList.innerHTML = dishes.map(dish => `
     <div class="inclusion-row ${!dish.is_active ? 'is-archived-dish' : ''}" data-dish-id="${dish.dish_id}">
-      <button type="button" class="reorder-btn" data-dish-action="up" ${index === 0 ? 'disabled' : ''}>↑</button>
-      <button type="button" class="reorder-btn" data-dish-action="down" ${index === dishes.length - 1 ? 'disabled' : ''}>↓</button>
+      <button type="button" class="drag-handle" data-drag-handle title="Drag to reorder" aria-label="Reorder ${escapeHtml(dish.name)}. Drag, or press the up and down arrow keys">⋮⋮</button>
       <input type="text" data-dish-name-input value="${escapeHtml(dish.name)}" placeholder="Dish name" maxlength="150">
       <button type="button" class="dish-toggle-btn ${dish.is_active ? 'is-active' : 'is-hidden'}" data-dish-action="toggle" title="${dish.is_active ? 'Hide from customers' : 'Show to customers'}">${dish.is_active ? '●' : '○'}</button>
       <button type="button" data-dish-action="remove" title="Delete dish">✕</button>
     </div>
   `).join('');
-}
-
-async function persistDishOrder(dishes) {
-  // Swap-only reorder writes just the two touched rows, not the whole list.
-  await Promise.all(dishes.map(d => supabase.from(CATERING_DISH_TABLE).update({ sort_order: d.sort_order }).eq('dish_id', d.dish_id)));
 }
 
 cateringDishDrawerList.addEventListener('click', async (e) => {
@@ -4228,20 +4875,28 @@ cateringDishDrawerList.addEventListener('click', async (e) => {
       dish.is_active = nextActive;
       renderCateringDishDrawerList();
     }
-
-    if (action === 'up' || action === 'down') {
-      const siblings = dishesForCategory(cateringDishDrawerCategoryId);
-      const idx = siblings.findIndex(d => d.dish_id === dishId);
-      const swapWith = action === 'up' ? idx - 1 : idx + 1;
-      if (swapWith < 0 || swapWith >= siblings.length) return;
-      const a = siblings[idx], b = siblings[swapWith];
-      const tmp = a.sort_order; a.sort_order = b.sort_order; b.sort_order = tmp;
-      await persistDishOrder([a, b]);
-      renderCateringDishDrawerList();
-    }
   } catch (err) {
     setModalMsg(cateringDishDrawerMessage, `Failed: ${err.message}`);
   }
+});
+
+// Drag a dish by its ⋮⋮ handle. Hidden dishes stay in the list and can be moved too.
+enableDragReorder({
+  container: cateringDishDrawerList,
+  rowSelector: '.inclusion-row[data-dish-id]',
+  handleSelector: '[data-drag-handle]',
+  onReorder: (from, to) => commitDragReorder({
+    items: dishesForCategory(cateringDishDrawerCategoryId), isMember: () => true, from, to,
+    table: CATERING_DISH_TABLE, idField: 'dish_id',
+    nameOf: d => `${d.name} (${cateringDishDrawerCategoryName})`, auditAction: 'Reordered Catering Dishes',
+    rerender: renderCateringDishDrawerList,
+    reload: async () => {
+      const { data } = await supabase.from(CATERING_DISH_TABLE).select('*').order('sort_order', { ascending: true });
+      if (data) allCateringDishes = data;
+      renderCateringDishDrawerList();
+    },
+    onError: err => setModalMsg(cateringDishDrawerMessage, `Couldn't reorder: ${err.message}`),
+  }),
 });
 
 cateringDishDrawerList.addEventListener('change', async (e) => {
@@ -4295,12 +4950,15 @@ cateringNewDishInput.addEventListener('keydown', (e) => { if (e.key === 'Enter')
 // ═══════════════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  // The customer preview sits on top of the package form, so Esc closes only it.
+  if (!inclusionPreviewModal.classList.contains('hidden')) { closeModal(inclusionPreviewModal); return; }
   if (!categoryModal.classList.contains('hidden')) attemptCloseCategoryModal();
   if (!packageModal.classList.contains('hidden'))  attemptClosePackageModal();
   if (!confirmModal.classList.contains('hidden'))  closeModal(confirmModal);
   if (!venueModal.classList.contains('hidden'))    closeModal(venueModal);
   if (!badgeModal.classList.contains('hidden'))    closeModal(badgeModal);
   if (!badgeTypeModal.classList.contains('hidden')) closeModal(badgeTypeModal);
+  if (!inclusionModal.classList.contains('hidden')) closeModal(inclusionModal);
   if (!discountModal.classList.contains('hidden')) closeModal(discountModal);
   if (!deleteModal.classList.contains('hidden'))   closeModal(deleteModal);
   if (!cateringCategoryModal.classList.contains('hidden')) closeModal(cateringCategoryModal);

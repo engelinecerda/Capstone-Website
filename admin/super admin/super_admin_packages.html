@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=68">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=68">
-  <link rel="stylesheet" href="/css/super_admin_packages.css?v=68">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=68">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=71">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=71">
+  <link rel="stylesheet" href="/css/super_admin_packages.css?v=71">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=71">
 </head>
 <body>
 
@@ -63,6 +63,7 @@
           <div class="header-btn-group">
             <button type="button" class="btn-cancel" id="openVenuesBtn">Venues</button>
             <button type="button" class="btn-cancel" id="openBadgeTypesBtn">Badge Types</button>
+            <button type="button" class="btn-cancel" id="openInclusionsBtn">Inclusions</button>
             <button type="button" class="btn-cancel" id="openCateringMenuBtn">Catering Menu</button>
             <button type="button" class="btn-cancel" id="addCategoryBtn">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -119,12 +120,14 @@
 
           <!-- Content: grid (default) or list, same filtered data -->
           <div class="inventory-content">
+            <p class="reorder-hint" id="inventoryReorderHint" hidden></p>
             <div class="inventory-grid" id="inventoryGrid"></div>
 
             <div class="table-wrap hidden" id="inventoryListWrap">
               <table class="pkg-table" id="inventoryListTable">
                 <thead>
                   <tr>
+                    <th class="drag-col"><span class="sr-only">Reorder</span></th>
                     <th>Package</th>
                     <th>Category</th>
                     <th>Price</th>
@@ -133,7 +136,7 @@
                   </tr>
                 </thead>
                 <tbody id="inventoryListBody">
-                  <tr class="empty-row"><td colspan="5">Loading packages...</td></tr>
+                  <tr class="empty-row"><td colspan="6">Loading packages...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -176,10 +179,10 @@
             <table class="pkg-table">
               <thead>
                 <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
                   <th>Venue</th>
                   <th>Capacity</th>
                   <th>Mapped packages</th>
-                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -201,10 +204,10 @@
             <table class="pkg-table">
               <thead>
                 <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
                   <th>Venue</th>
                   <th>Capacity</th>
                   <th>Mapped packages</th>
-                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -252,10 +255,10 @@
             <table class="pkg-table">
               <thead>
                 <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
                   <th>Badge</th>
                   <th>Uniqueness</th>
                   <th>In use</th>
-                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -277,10 +280,10 @@
             <table class="pkg-table">
               <thead>
                 <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
                   <th>Badge</th>
                   <th>Uniqueness</th>
                   <th>In use</th>
-                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -288,6 +291,80 @@
               <tbody id="archivedBadgeTypesBody">
                 <tr class="empty-row"><td colspan="6">No archived badge types.</td></tr>
               </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================= -->
+      <!-- ========== INCLUSIONS CATALOG VIEW =========== -->
+      <!-- ============================================= -->
+      <div id="inclusionsView" style="display:none;">
+        <div class="breadcrumb-bar">
+          <button type="button" class="btn-back" id="backToCategoriesFromInclusionsBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            Back to Inventory
+          </button>
+        </div>
+
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Inclusions</h1>
+            <p class="page-sub">Reusable items you can add to any package from its Inclusions list. Changing a price here doesn&rsquo;t change the credits already set inside packages.</p>
+          </div>
+          <button type="button" class="btn-primary" id="addInclusionBtn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add inclusion
+          </button>
+        </div>
+
+        <p class="page-message" id="inclusionsPageMessage"></p>
+
+        <div class="card" id="activeInclusionsSection">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Active inclusions</h2>
+              <p class="section-sub">Selectable from any package&rsquo;s Inclusions list.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="pkg-table">
+              <thead>
+                <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
+                  <th>Inclusion</th>
+                  <th>Price</th>
+                  <th>In use</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="activeInclusionsBody">
+                <tr class="empty-row"><td colspan="6">Loading inclusions...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="archivedInclusionsSection" style="display:none;">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Archived inclusions</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="pkg-table">
+              <thead>
+                <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
+                  <th>Inclusion</th>
+                  <th>Price</th>
+                  <th>In use</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="archivedInclusionsBody"></tbody>
             </table>
           </div>
         </div>
@@ -357,11 +434,11 @@
             <table class="pkg-table">
               <thead>
                 <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
                   <th>Category</th>
                   <th>Required</th>
                   <th>Dishes</th>
                   <th>Price (20 / 30 / 40 / 50 pax)</th>
-                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -383,11 +460,11 @@
             <table class="pkg-table">
               <thead>
                 <tr>
+                  <th class="drag-col"><span class="sr-only">Reorder</span></th>
                   <th>Category</th>
                   <th>Required</th>
                   <th>Dishes</th>
                   <th>Price (20 / 30 / 40 / 50 pax)</th>
-                  <th>Order</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -497,14 +574,20 @@
         <!-- Inclusions (structured, repeatable list — not the description) -->
         <div class="modal-field">
           <label class="modal-label">Inclusions *</label>
+          <span class="modal-hint">Turn on <strong>Required</strong> for anything the customer can&rsquo;t remove. Optional inclusions appear as checkboxes on the reservation form, and the removal credit is taken off the price when a customer unchecks one.</span>
           <div id="pkgInclusionsList" class="inclusions-list"></div>
-          <button type="button" class="btn-cancel" id="pkgAddInclusionBtn" style="font-size:12px;padding:6px 12px;">+ Add item</button>
+          <div class="inclusion-add-bar">
+            <button type="button" class="btn-cancel" id="pkgAddInclusionBtn" style="font-size:12px;padding:6px 12px;">+ Add item</button>
+            <select id="pkgAddFromCatalog" class="modal-input modal-select inclusion-catalog-select" aria-label="Add an inclusion from the catalog"></select>
+            <button type="button" class="btn-cancel" id="pkgPreviewInclusionsBtn" style="font-size:12px;padding:6px 12px;">Preview customer view</button>
+          </div>
+          <p class="inclusion-check" id="pkgInclusionsCheck" aria-live="polite"></p>
         </div>
 
         <div class="modal-row modal-row-three">
           <div class="modal-field">
             <label class="modal-label" for="pkgPrice">Price (₱) *</label>
-            <input type="number" id="pkgPrice" class="modal-input" placeholder="3999" min="0" max="1000000" step="0.01">
+            <input type="number" id="pkgPrice" class="modal-input" data-money placeholder="3999.00" min="0" max="1000000" step="0.01">
             <span class="field-error hidden" id="pkgPriceError"></span>
           </div>
           <div class="modal-field">
@@ -537,12 +620,12 @@
             <input type="checkbox" id="pkgAllowAdditionalHeadToggle">
             <span>Allow additional guests beyond Max Guests</span>
           </label>
-          <span class="modal-hint">Lets a customer add guests above the Max Guests cap at a per-person price — e.g. an All-In package for 50 pax, +&#8369;200 per extra guest.</span>
+          <span class="modal-hint">Lets a customer add guests above the Max Guests cap at a per-person price — e.g. an All-In package for 50 pax, +&#8369;200.00 per extra guest.</span>
         </div>
         <div class="modal-row" id="pkgAdditionalHeadFields" style="display:none;">
           <div class="modal-field">
             <label class="modal-label" for="pkgPricePerAdditionalHead">Price per Additional Head (&#8369;) *</label>
-            <input type="number" id="pkgPricePerAdditionalHead" class="modal-input" placeholder="200" min="0" max="100000" step="0.01">
+            <input type="number" id="pkgPricePerAdditionalHead" class="modal-input" data-money placeholder="200.00" min="0" max="100000" step="0.01">
             <span class="field-error hidden" id="pkgPricePerAdditionalHeadError"></span>
           </div>
           <div class="modal-field">
@@ -555,7 +638,7 @@
         <div class="modal-row">
           <div class="modal-field">
             <label class="modal-label" for="pkgExtensionPrice">Extension Price (₱/hr)</label>
-            <input type="number" id="pkgExtensionPrice" class="modal-input" placeholder="800" min="0" max="100000" step="0.01">
+            <input type="number" id="pkgExtensionPrice" class="modal-input" data-money placeholder="800.00" min="0" max="100000" step="0.01">
             <span class="modal-hint">Leave blank if no extension rate applies.</span>
           </div>
           <div class="modal-field" id="pkgLocationField">
@@ -777,13 +860,6 @@
           <label class="modal-label" for="venueDescription">Description</label>
           <textarea id="venueDescription" class="modal-textarea" rows="2" placeholder="E.g., second floor, garden-facing" maxlength="500"></textarea>
         </div>
-        <div class="modal-field">
-          <div class="modal-label-row">
-            <label class="modal-label" for="venueSortOrder">Sort Order</label>
-            <span class="info-tip" tabindex="0" role="img" aria-label="Sets where this item appears in its list. Lower numbers show first (1 appears before 2). Leave it at 0 if you have no preference." data-tip="Sets where this item appears in its list. Lower numbers show first (1 appears before 2). Leave it at 0 if you have no preference.">?</span>
-          </div>
-          <input type="number" id="venueSortOrder" class="modal-input" value="0" min="0" max="9999">
-        </div>
         <div class="modal-field" id="venueMappedPackagesField" style="display:none;">
           <label class="modal-label">Packages mapped to this venue</label>
           <div id="venueMappedPackagesList" class="checklist-list"></div>
@@ -819,23 +895,14 @@
           <label class="modal-label" for="badgeTypeLabelInput">Label *</label>
           <input type="text" id="badgeTypeLabelInput" class="modal-input" placeholder="E.g., Limited Slots" maxlength="60">
         </div>
-        <div class="modal-row">
-          <div class="modal-field">
-            <label class="modal-label" for="badgeTypeVariantSelect">Colour</label>
-            <select id="badgeTypeVariantSelect" class="modal-input modal-select">
-              <option value="pending">Gold</option>
-              <option value="approved">Green</option>
-              <option value="info">Blue</option>
-              <option value="neutral">Grey</option>
-            </select>
-          </div>
-          <div class="modal-field">
-            <div class="modal-label-row">
-              <label class="modal-label" for="badgeTypeSortOrder">Sort Order</label>
-              <span class="info-tip" tabindex="0" role="img" aria-label="Sets where this item appears in its list. Lower numbers show first (1 appears before 2). Leave it at 0 if you have no preference." data-tip="Sets where this item appears in its list. Lower numbers show first (1 appears before 2). Leave it at 0 if you have no preference.">?</span>
-            </div>
-            <input type="number" id="badgeTypeSortOrder" class="modal-input" value="0" min="0" max="9999">
-          </div>
+        <div class="modal-field">
+          <label class="modal-label" for="badgeTypeVariantSelect">Colour</label>
+          <select id="badgeTypeVariantSelect" class="modal-input modal-select">
+            <option value="pending">Gold</option>
+            <option value="approved">Green</option>
+            <option value="info">Blue</option>
+            <option value="neutral">Grey</option>
+          </select>
         </div>
         <div class="modal-field">
           <label class="modal-label" for="badgeTypeScopeSelect">Uniqueness</label>
@@ -853,6 +920,66 @@
           <button type="button" class="btn-primary" id="badgeTypeModalSave">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span id="badgeTypeModalSaveLabel">Add Badge Type</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CUSTOMER PREVIEW OF A PACKAGE'S INCLUSIONS ── -->
+  <div class="modal-overlay hidden" id="inclusionPreviewModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="inclusionPreviewTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="inclusionPreviewTitle">Customer preview</h2>
+          <p class="modal-sub">How this package&rsquo;s inclusions look on the reservation form. Try the checkboxes.</p>
+        </div>
+        <button type="button" class="modal-close" id="inclusionPreviewClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="inclusionPreviewBody"></div>
+        <p class="modal-hint" style="margin-top:12px">Unsaved changes are included. Promo discounts aren&rsquo;t shown here; on the form they apply to the lower price.</p>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-actions">
+          <button type="button" class="btn-cancel" id="inclusionPreviewDone">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INCLUSION ADD / EDIT MODAL ── -->
+  <div class="modal-overlay hidden" id="inclusionModal" aria-hidden="true">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="inclusionModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="inclusionModalTitle">Add inclusion</h2>
+          <p class="modal-sub" id="inclusionModalSub">A reusable item admins can add to any package</p>
+        </div>
+        <button type="button" class="modal-close" id="inclusionModalClose" aria-label="Close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label" for="inclusionNameInput">Name *</label>
+          <input type="text" id="inclusionNameInput" class="modal-input" placeholder="E.g., Karaoke use" maxlength="200">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="inclusionPriceInput">Price (₱) *</label>
+          <input type="number" id="inclusionPriceInput" class="modal-input" data-money value="0.00" min="0" step="0.01">
+          <span class="modal-hint">Used as the starting removal credit when this item is added to a package.</span>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-stacked">
+        <p class="modal-message hidden" id="inclusionModalMessage"></p>
+        <div class="modal-footer-actions">
+          <button type="button" class="btn-cancel" id="inclusionModalCancel">Cancel</button>
+          <button type="button" class="btn-primary" id="inclusionModalSave">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span id="inclusionModalSaveLabel">Add inclusion</span>
           </button>
         </div>
       </div>
@@ -882,27 +1009,18 @@
             <input type="text" id="cateringCatIcon" class="modal-input" placeholder="Leave blank for none" maxlength="8">
           </div>
         </div>
-        <div class="modal-row">
-          <div class="modal-field">
-            <label class="modal-label" for="cateringCatTag">Selection Group *</label>
-            <select id="cateringCatTag" class="modal-input modal-select">
-              <option value="main">Main dish (customer picks one main-tagged category)</option>
-              <option value="vegetable">Vegetable</option>
-              <option value="pasta">Pasta</option>
-              <option value="dessert">Dessert</option>
-              <option value="rice">Rice</option>
-              <option value="drinks">Drinks</option>
-              <option value="addon">Other add-on</option>
-            </select>
-            <span class="modal-hint">Checkout requires a selection from any group marked "Required" below (Main dish always needs at least one, up to the package's configured max).</span>
-          </div>
-          <div class="modal-field">
-            <div class="modal-label-row">
-              <label class="modal-label" for="cateringCatSortOrder">Sort Order</label>
-              <span class="info-tip" tabindex="0" role="img" aria-label="Sets where this item appears in its list. Lower numbers show first (1 appears before 2). Leave it at 0 if you have no preference." data-tip="Sets where this item appears in its list. Lower numbers show first (1 appears before 2). Leave it at 0 if you have no preference.">?</span>
-            </div>
-            <input type="number" id="cateringCatSortOrder" class="modal-input" value="0" min="0" max="9999">
-          </div>
+        <div class="modal-field">
+          <label class="modal-label" for="cateringCatTag">Selection Group *</label>
+          <select id="cateringCatTag" class="modal-input modal-select">
+            <option value="main">Main dish (customer picks one main-tagged category)</option>
+            <option value="vegetable">Vegetable</option>
+            <option value="pasta">Pasta</option>
+            <option value="dessert">Dessert</option>
+            <option value="rice">Rice</option>
+            <option value="drinks">Drinks</option>
+            <option value="addon">Other add-on</option>
+          </select>
+          <span class="modal-hint">Checkout requires a selection from any group marked "Required" below (Main dish always needs at least one, up to the package's configured max).</span>
         </div>
         <div class="modal-field">
           <label class="pkg-active-toggle-label">
@@ -913,10 +1031,10 @@
         <div class="modal-field">
           <label class="modal-label">Price per pax bracket *</label>
           <div class="modal-row modal-row-four">
-            <input type="number" id="cateringPrice20" class="modal-input" placeholder="20 pax" min="0" max="1000000" step="0.01">
-            <input type="number" id="cateringPrice30" class="modal-input" placeholder="30 pax" min="0" max="1000000" step="0.01">
-            <input type="number" id="cateringPrice40" class="modal-input" placeholder="40 pax" min="0" max="1000000" step="0.01">
-            <input type="number" id="cateringPrice50" class="modal-input" placeholder="50 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice20" class="modal-input" data-money placeholder="20 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice30" class="modal-input" data-money placeholder="30 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice40" class="modal-input" data-money placeholder="40 pax" min="0" max="1000000" step="0.01">
+            <input type="number" id="cateringPrice50" class="modal-input" data-money placeholder="50 pax" min="0" max="1000000" step="0.01">
           </div>
         </div>
       </div>
@@ -993,6 +1111,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/super_admin_packages.js"></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=68" defer></script>
+  <script src="/js/supabase_health_notice.js?v=71" defer></script>
 </body>
 </html>

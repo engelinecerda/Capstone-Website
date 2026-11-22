@@ -29,6 +29,7 @@ export const BACKUP_TABLE_CONFIG = [
   // ── Packages & catalogue ─────────────────────────────────────────────────
   { name: 'package_category',              pk: 'package_category_id' },
   { name: 'package',                       pk: 'package_id' },
+  { name: 'inclusion_catalog',             pk: 'inclusion_id' },
   { name: 'package_tier',                  pk: 'tier_id' },
   { name: 'venue',                         pk: 'venue_id' },
   { name: 'package_venue',                 pk: ['package_id', 'venue_id'] },
@@ -87,6 +88,9 @@ export const BACKUP_TABLE_CONFIG = [
   { name: 'reservation_additional_head_requests', pk: 'additional_head_request_id' },
   { name: 'receipts',                      pk: 'receipt_id' },
   { name: 'reservation_charges',           pk: 'charge_id' },
+  // After reservation_charges and inclusion_catalog: it references both (the
+  // charge an accepted request created, and the catalog item it was matched to).
+  { name: 'reservation_custom_requests',   pk: 'request_id' },
   { name: 'reservation_cancellations',     pk: 'cancellation_id' },
   { name: 'reviews',                       pk: 'review_id' },
   { name: 'reservation_forecast',          pk: 'forecast_id' },
@@ -106,7 +110,6 @@ export const NOT_BACKED_UP = {
   login_ip_failure_tracking:   'live lockout state — restoring it could lock people out',
   vision_api_usage:            'monthly API quota counter — restoring would misstate usage',
   reservation_number_counters: 'locked down by RLS (no client access); rebuilt from reservations by backup_resync_sequences()',
-  housekeeping_job_backup:     'copy of the pg_cron jobs saved by 20261122_reduce_background_load.sql, only so its rollback script can restore them',
 };
 
 export const BACKUP_TABLES = BACKUP_TABLE_CONFIG.map(t => t.name);

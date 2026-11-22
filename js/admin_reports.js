@@ -1,3 +1,4 @@
+import { formatMoney, formatMoneyNumber } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { populatePortalIdentity, verifyMultiRoleSession } from './admin_auth.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
@@ -94,17 +95,9 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-// Matches how currency reads elsewhere in the admin portal: no ".00" tacked
-// onto whole amounts ("₱16,999", not "₱16,999.00"), but exactly two
-// decimal places — rounded, not truncated — whenever there are cents
-// ("₱8,798.90", not "₱8,798.9").
+// Every amount ends in exactly two decimals ("₱16,999.00", "₱8,798.90").
 function formatCurrency(value) {
-    const amount = Number(value || 0);
-    const hasCents = Math.round(amount * 100) % 100 !== 0;
-    return `₱${amount.toLocaleString('en-PH', {
-        minimumFractionDigits: hasCents ? 2 : 0,
-        maximumFractionDigits: 2
-    })}`;
+    return formatMoney(value);
 }
 
 function formatDate(value) {
@@ -241,7 +234,7 @@ function buildSummaryCards(reservations) {
         { label: 'Cancelled', value: totals.cancelled, copy: 'Cancelled reservations within the selected range.' },
         { label: 'Declined', value: totals.declined, copy: 'Reservations that were declined.' },
         { label: 'Rescheduled', value: totals.rescheduled, copy: 'Reservations currently marked as rescheduled.' },
-        { label: 'Payments Collected', value: state.paymentsUnavailable ? 'Unavailable' : `₱${totals.totalPaid.toLocaleString()}`, copy: 'Total approved payments across the filtered reservations.' }
+        { label: 'Payments Collected', value: state.paymentsUnavailable ? 'Unavailable' : formatCurrency(totals.totalPaid), copy: 'Total approved payments across the filtered reservations.' }
     ];
 }
 
@@ -555,7 +548,7 @@ async function exportReportsPdf() {
                 ? `${eventDate.toLocaleDateString('en-PH')}${reservation?.event_time ? ` ${reservation.event_time}` : ''}`
                 : '—';
             const status = formatStatusLabel(getEffectiveReservationStatus(reservation));
-            const total = Number(reservation?.total_price || 0).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            const total = formatMoneyNumber(reservation?.total_price);
             return [getCustomerName(reservation), reservation?.event_type || 'Reservation', schedule,
                 getPackageName(reservation), status, `₱${total}`];
         });

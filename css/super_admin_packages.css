@@ -1611,3 +1611,184 @@
 @media (max-width: 560px) {
   .modal-row.modal-row-four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* ── Customizable inclusions (package form) ─────────────────────────────── */
+.inclusion-row--cfg {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--input-border);
+}
+.inclusion-row--cfg:first-child { border-top: 0; padding-top: 0; }
+.inclusion-row-top { display: flex; align-items: center; gap: 6px; }
+.inclusion-row-top input[type="text"] { flex: 1; min-width: 0; }
+.inclusion-row-top input[readonly] { opacity: 0.8; }
+.inclusion-row-cfg {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-left: 58px; /* lines up under the name input, past the two arrow buttons */
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.inclusion-required, .inclusion-credit { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
+.inclusion-credit { cursor: default; }
+.inclusion-credit input[type="number"] {
+  width: 96px;
+  padding: 5px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--input-bg);
+  color: var(--text);
+}
+.inclusion-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--success-bg, #e3f1e5);
+  color: var(--success, #1a7f4b);
+}
+.inclusion-row .inclusion-link-btn {
+  width: auto;
+  height: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  text-decoration: underline;
+  color: var(--muted);
+}
+.inclusion-row .inclusion-link-btn:hover { background: none; color: var(--text); }
+.inclusion-add-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.inclusion-catalog-select { width: auto; min-width: 190px; font-size: 12px; padding: 6px 10px; }
+.inclusion-check {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  background: var(--success-bg, #e3f1e5);
+  color: var(--success, #1a7f4b);
+}
+.inclusion-check:empty { display: none; }
+.inclusion-check--bad { background: var(--danger-bg, #fbe9e6); color: var(--danger, #9a3b2e); }
+
+/* ── Customer preview of inclusions (Edit Package) ──────────────────────── */
+.incprev-title { margin: 0 0 12px; font-size: 18px; font-weight: 600; color: var(--text); }
+.incprev-title em { font-style: italic; }
+.incprev-list { display: flex; flex-direction: column; gap: 8px; }
+.incprev-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  cursor: pointer;
+}
+.incprev-item input[type="checkbox"] { width: 18px; height: 18px; flex: none; }
+.incprev-item.is-required { cursor: default; opacity: 0.85; }
+.incprev-item.is-removed .incprev-name { text-decoration: line-through; color: var(--muted); }
+.incprev-name { flex: 1; min-width: 0; font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.incprev-chip { flex: none; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.incprev-chip--removed { color: var(--danger, #9a3b2e); }
+.incprev-savings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--success-bg, #e3f1e5);
+  font-size: 13.5px;
+  color: var(--text);
+}
+.incprev-reset {
+  background: none;
+  border: 0;
+  padding: 2px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  color: var(--text);
+  cursor: pointer;
+}
+.incprev-summary { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.incprev-empty { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+/* ── Drag-to-reorder (js/drag_reorder.js) ───────────────────────────────────
+   The ⋮⋮ handle sits at the left of each row (Inclusions catalog table and the
+   inclusion rows in Edit Package). touch-action:none on the handle lets a
+   finger drag the row instead of scrolling the page. */
+.pkg-table .drag-col, .pkg-table .drag-cell { width: 44px; padding-right: 0; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.drag-handle,
+.inclusion-row .drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 30px;
+  padding: 0;
+  border: 0.5px solid var(--btn-secondary-border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -2px;     /* pull the two dots columns together */
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+}
+.drag-handle:hover, .inclusion-row .drag-handle:hover { color: var(--text); background: var(--btn-secondary-hover); }
+.drag-handle:active { cursor: grabbing; }
+.drag-handle:focus-visible { outline: 2px solid var(--input-focus); outline-offset: 2px; }
+
+body.is-drag-reordering, body.is-drag-reordering * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+
+.is-dragging { opacity: 0.45; }
+/* The line showing where the row will land. Table cells take the line on their
+   own box-shadow because a <tr> can't draw one under border-collapse. */
+.inclusion-row--cfg.drop-before { box-shadow: 0 -2px 0 0 var(--btn-primary-bg); }
+.inclusion-row--cfg.drop-after  { box-shadow: 0 2px 0 0 var(--btn-primary-bg); }
+tr.drop-before > td { box-shadow: inset 0 2px 0 0 var(--btn-primary-bg); }
+tr.drop-after  > td { box-shadow: inset 0 -2px 0 0 var(--btn-primary-bg); }
+
+
+/* ── Package drag-to-reorder (list + card grid) ──────────────────────────────
+   The handle column only exists while dragging is available (one category's
+   active packages are showing); renderInventory() toggles .reorder-on. */
+#inventoryListTable:not(.reorder-on) .drag-col,
+#inventoryListTable:not(.reorder-on) .drag-cell { display: none; }
+.reorder-hint { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
+.reorder-hint[hidden] { display: none; }
+
+/* On a card the handle is one of the photo's overlay buttons (shown on hover /
+   focus with Edit and the ⋮ menu), so it takes their look, not the list one. */
+.pkg-card-actions .drag-handle {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255,255,255,.92);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.pkg-card-actions .drag-handle:hover { background: #fff; }
+/* Cards sit side by side, so the drop line is vertical: a bar in the gap
+   before or after the card. box-shadow because the card clips its own overflow. */
+.pkg-card.drop-before { box-shadow: -6px 0 0 0 var(--btn-primary-bg); }
+.pkg-card.drop-after  { box-shadow: 6px 0 0 0 var(--btn-primary-bg); }

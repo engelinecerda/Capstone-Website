@@ -29,7 +29,8 @@ export function clampNumberInput(el, { min, max, decimals = 0 } = {}) {
     num = Math.round(num * factor) / factor;
     if (Number.isFinite(effectiveMin)) num = Math.max(effectiveMin, num);
     if (Number.isFinite(effectiveMax)) num = Math.min(effectiveMax, num);
-    el.value = String(num);
+    // Money fields (data-money) always show two decimals: 10 -> 10.00.
+    el.value = el.hasAttribute('data-money') ? num.toFixed(2) : String(num);
   });
 }
 

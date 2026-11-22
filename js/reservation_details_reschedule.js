@@ -6,6 +6,7 @@
 // account.html, same account.css styling) directly on reservation-details.html
 // so the customer stays on the reservation. The calendar / time-slot / submit
 // logic mirrors js/account.js's reschedule modal — keep the two in step.
+import { formatMoney } from './money.js';
 import {
     fetchAvailableStartTimes,
     fetchBlackoutDates,
@@ -342,7 +343,7 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         if (currentValueEl) {
             currentValueEl.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
         }
-        if (feeAmountEl) feeAmountEl.textContent = `₱${getRescheduleFee(getPageData()?.paymentRules).toLocaleString()}`;
+        if (feeAmountEl) feeAmountEl.textContent = formatMoney(getRescheduleFee(getPageData()?.paymentRules));
         applyPolicyOverride();
 
         setMessage('Loading availability...');

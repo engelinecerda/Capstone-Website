@@ -13,10 +13,10 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"></noscript>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="/css/super_admin_only.css?v=68">
-  <link rel="stylesheet" href="/css/manager-theme.css?v=68">
-  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=68">
-  <link rel="stylesheet" href="/css/admin_sidebar.css?v=68">
+  <link rel="stylesheet" href="/css/super_admin_only.css?v=71">
+  <link rel="stylesheet" href="/css/manager-theme.css?v=71">
+  <link rel="stylesheet" href="/css/admin_reservation_details.css?v=71">
+  <link rel="stylesheet" href="/css/admin_sidebar.css?v=71">
 </head>
 <body>
   <aside class="sidebar">
@@ -137,6 +137,13 @@
               </div>
               <div class="dl-grid-2col" id="bookingDetailsGrid"></div>
               <div class="dl-rows" id="bookingDetailsRows"></div>
+            </section>
+
+            <section class="card hidden" id="customRequestsCard">
+              <div class="card-head-row">
+                <h2 class="card-title">Custom requests <span class="status-pill" id="customRequestsPill"></span></h2>
+              </div>
+              <div class="cr-admin-list" id="customRequestsList"></div>
             </section>
 
             <section class="card details-card-flex">
@@ -334,7 +341,7 @@
         <p class="record-payment-helper">Only methods where the café issues the receipt are listed here.</p>
 
         <label class="record-payment-field-label" for="recordPaymentAmountInput">Amount received</label>
-        <input id="recordPaymentAmountInput" class="record-payment-input" type="number" min="0.01" max="1000000" step="0.01" placeholder="0.00" required />
+        <input id="recordPaymentAmountInput" class="record-payment-input" data-money type="number" min="0.01" max="1000000" step="0.01" placeholder="0.00" required />
         <p class="record-payment-inline-warning hidden" id="recordPaymentAmountWarning"></p>
 
         <label class="record-payment-field-label" for="recordPaymentDateInput">Actual payment date</label>
@@ -428,7 +435,7 @@
         <input id="addChargeLabelInput" class="record-payment-input" type="text" placeholder="e.g. Custom balloon arch" maxlength="200" required />
 
         <label class="record-payment-field-label" for="addChargeAmountInput">Amount</label>
-        <input id="addChargeAmountInput" class="record-payment-input" type="number" min="0.01" max="1000000" step="0.01" placeholder="0.00" required />
+        <input id="addChargeAmountInput" class="record-payment-input" data-money type="number" min="0.01" max="1000000" step="0.01" placeholder="0.00" required />
         <p class="record-payment-helper">The final agreed amount — this is added to the balance exactly as entered.</p>
 
         <label class="record-payment-field-label" for="addChargeNoteInput">Note <span class="record-payment-optional">(optional)</span></label>
@@ -444,9 +451,64 @@
     </div>
   </div>
 
+  <div class="modal-backdrop hidden" id="customRequestModal" aria-hidden="true">
+    <div class="modal-card assignment-modal-card" role="dialog" aria-modal="true" aria-labelledby="customRequestModalTitle">
+      <div class="assignment-modal-header">
+        <div>
+          <h2 class="assignment-modal-title" id="customRequestModalTitle">Send quote</h2>
+          <p class="assignment-modal-subtitle" id="customRequestModalSubtitle"></p>
+        </div>
+        <button type="button" class="assignment-modal-close" id="customRequestModalClose" aria-label="Close dialog">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="assignment-modal-body">
+        <div class="assignment-context-block">
+          <span class="record-payment-context-label">Customer&rsquo;s request</span>
+          <p class="assignment-context-main" id="customRequestContextTitle"></p>
+          <p class="assignment-context-sub" id="customRequestContextDetails"></p>
+        </div>
+
+        <div id="crQuoteFields">
+          <label class="record-payment-field-label" for="crCatalogSelect">Match a catalog item <span class="record-payment-optional">(optional)</span></label>
+          <select id="crCatalogSelect" class="record-payment-input"></select>
+          <p class="record-payment-helper">Picking one fills in its catalog price. You can still change the price below.</p>
+
+          <label class="record-payment-field-label" for="crPriceInput">Price</label>
+          <input id="crPriceInput" class="record-payment-input" data-money type="number" min="0.01" max="1000000" step="0.01" placeholder="0.00" />
+          <p class="record-payment-helper">The customer sees this price and chooses to accept or decline. If they accept, it is added to their balance as a charge.</p>
+
+          <label class="record-payment-field-label" for="crNoteInput">Message to the customer <span class="record-payment-optional">(optional)</span></label>
+          <textarea id="crNoteInput" class="record-payment-textarea" rows="2" maxlength="1000" placeholder="e.g. Includes setup and takedown"></textarea>
+        </div>
+
+        <div id="crDeclineFields" class="hidden">
+          <label class="record-payment-field-label" for="crReasonInput">Reason <span class="record-payment-optional">(optional)</span></label>
+          <textarea id="crReasonInput" class="record-payment-textarea" rows="2" maxlength="1000" placeholder="Shown to the customer"></textarea>
+        </div>
+
+        <div id="crPromoteFields" class="hidden">
+          <label class="record-payment-field-label" for="crCatalogNameInput">Catalog name</label>
+          <input id="crCatalogNameInput" class="record-payment-input" type="text" maxlength="200" />
+          <label class="record-payment-field-label" for="crCatalogPriceInput">Catalog price</label>
+          <input id="crCatalogPriceInput" class="record-payment-input" data-money type="number" min="0" max="1000000" step="0.01" />
+          <p class="record-payment-helper">Adds this to Inventory &rarr; Inclusions so it can be picked from any package.</p>
+        </div>
+
+        <p class="modal-message" id="customRequestMessage"></p>
+      </div>
+
+      <div class="assignment-modal-footer">
+        <button type="button" class="header-action-btn" id="customRequestCancelBtn">Cancel</button>
+        <button type="button" class="header-action-btn primary" id="customRequestSaveBtn">Send quote</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
-  <script type="module" src="../js/admin_reservation_details.js?v=68"></script>
+  <script type="module" src="../js/admin_reservation_details.js?v=71"></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=68" defer></script>
+  <script src="/js/supabase_health_notice.js?v=71" defer></script>
 </body>
 </html>

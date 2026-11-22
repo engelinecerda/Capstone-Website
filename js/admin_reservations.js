@@ -1,3 +1,4 @@
+import { formatMoney } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -131,7 +132,7 @@ function formatReservationTime(timeValue) {
 }
 
 function formatCurrency(value) {
-  return `₱${Number(value || 0).toLocaleString()}`;
+  return formatMoney(value);
 }
 
 // The status shown for a reservation (confirmed -> approved, an event that
@@ -325,6 +326,13 @@ function renderTable(list) {
     const pay = paymentStatus(res);
     const status = formatStatusPill(getEffectiveReservationStatus(res));
     const staffSummary = getStaffSummary(res.reservation_id);
+    // The customer removed optional inclusions from this package, so the price
+    // is lower than the package's list price. Shown on every row so it is seen
+    // BEFORE approving (details: the booking's Inclusions row).
+    const removedCount = Number(res.inclusions_removed) || 0;
+    const customizedTag = removedCount > 0
+      ? `<span class="customized-tag" title="The customer removed ${removedCount} inclusion${removedCount === 1 ? '' : 's'} from this package.">Customized · −${escapeHtml(formatCurrency(res.inclusion_adjustment))}</span>`
+      : '';
     return `
       <tr class="reservation-row" data-reservation-id="${res.reservation_id}">
         <td data-label="Customer">
@@ -340,6 +348,7 @@ function renderTable(list) {
           <div class="reservation-customer-copy">
             ${res.reservation_number ? `<span class="table-reservation-number">${escapeHtml(res.reservation_number)}</span>` : ''}
             <span class="table-main">${escapeHtml(pkg)}</span>
+            ${customizedTag}
           </div>
         </td>
         <td data-label="Event Schedule">

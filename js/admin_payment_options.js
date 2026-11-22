@@ -1,4 +1,6 @@
 // admin_payment_options.js
+import './money_inputs.js';
+import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -480,7 +482,7 @@ function populatePaymentTypeRow(row) {
 
   if (code === 'reservation_fee') {
     const flatEl = document.getElementById('pt-reservation_fee-flat');
-    if (flatEl) flatEl.value = row.flat_amount ?? '';
+    if (flatEl) flatEl.value = moneyInputValue(row.flat_amount);
   } else if (code === 'down_payment') {
     const percentEl = document.getElementById('pt-down_payment-percent');
     if (percentEl) percentEl.value = row.percent_of_total ?? '';
@@ -488,7 +490,7 @@ function populatePaymentTypeRow(row) {
     const percentEl = document.getElementById('pt-partial_payment-percent');
     const floorEl = document.getElementById('pt-partial_payment-floor');
     if (percentEl) percentEl.value = row.percent_of_total ?? '';
-    if (floorEl) floorEl.value = row.min_amount ?? '';
+    if (floorEl) floorEl.value = moneyInputValue(row.min_amount);
   }
 }
 
@@ -611,9 +613,9 @@ function populatePaymentRulesFields(config) {
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
   if (proofWindow) proofWindow.value = config.proof_of_payment_window_days ?? '';
   if (currency) currency.value = config.currency ?? 'PHP';
-  if (cancelOnsite) cancelOnsite.value = config.cancellation_fee_onsite ?? '';
-  if (cancelOffsite) cancelOffsite.value = config.cancellation_fee_offsite ?? '';
-  if (rescheduleFee) rescheduleFee.value = config.reschedule_fee ?? '';
+  if (cancelOnsite) cancelOnsite.value = moneyInputValue(config.cancellation_fee_onsite);
+  if (cancelOffsite) cancelOffsite.value = moneyInputValue(config.cancellation_fee_offsite);
+  if (rescheduleFee) rescheduleFee.value = moneyInputValue(config.reschedule_fee);
 }
 
 function readPaymentRulesFields() {
@@ -688,8 +690,8 @@ async function savePaymentRules() {
 
   showSettingsConfirm(
     'Change Payment Rules',
-    `${oldConfig.max_installments} installments, ${oldConfig.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${oldConfig.cancellation_fee_onsite}/₱${oldConfig.cancellation_fee_offsite}, reschedule fee ₱${oldConfig.reschedule_fee}`,
-    `${config.max_installments} installments, ${config.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ₱${config.cancellation_fee_onsite}/₱${config.cancellation_fee_offsite}, reschedule fee ₱${config.reschedule_fee}`,
+    `${oldConfig.max_installments} installments, ${oldConfig.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ${formatMoney(oldConfig.cancellation_fee_onsite)}/${formatMoney(oldConfig.cancellation_fee_offsite)}, reschedule fee ${formatMoney(oldConfig.reschedule_fee)}`,
+    `${config.max_installments} installments, ${config.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ${formatMoney(config.cancellation_fee_onsite)}/${formatMoney(config.cancellation_fee_offsite)}, reschedule fee ${formatMoney(config.reschedule_fee)}`,
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
@@ -822,17 +824,17 @@ function updateWorkedExample(globalPctOverride, appliesOffsiteOverride) {
   if (exampleEl) {
     const { charge, total, deposit } = computeWorkedExample(base, pct);
     exampleEl.textContent =
-      `Onsite — on a ₱${base.toLocaleString()} package, a ${pct}% service charge adds ₱${charge.toLocaleString()} ` +
-      `for a ₱${total.toLocaleString()} total; a 50% deposit is ₱${deposit.toLocaleString()}.`;
+      `Onsite — on a ${formatMoney(base)} package, a ${pct}% service charge adds ${formatMoney(charge)} ` +
+      `for a ${formatMoney(total)} total; a 50% deposit is ${formatMoney(deposit)}.`;
   }
 
   if (offsiteExampleEl) {
     const offsitePct = appliesOffsite ? pct : 0;
     const { charge, total, deposit } = computeWorkedExample(base, offsitePct);
     offsiteExampleEl.textContent = appliesOffsite
-      ? `Offsite (toggle on) — the same ₱${base.toLocaleString()} package is charged the same ${offsitePct}%, adding ₱${charge.toLocaleString()} ` +
-        `for a ₱${total.toLocaleString()} total; a 50% deposit is ₱${deposit.toLocaleString()}.`
-      : `Offsite (toggle off) — the same ₱${base.toLocaleString()} package is charged 0% service charge, so the total stays ₱${total.toLocaleString()}; a 50% deposit is ₱${deposit.toLocaleString()}.`;
+      ? `Offsite (toggle on) — the same ${formatMoney(base)} package is charged the same ${offsitePct}%, adding ${formatMoney(charge)} ` +
+        `for a ${formatMoney(total)} total; a 50% deposit is ${formatMoney(deposit)}.`
+      : `Offsite (toggle off) — the same ${formatMoney(base)} package is charged 0% service charge, so the total stays ${formatMoney(total)}; a 50% deposit is ${formatMoney(deposit)}.`;
   }
 }
 

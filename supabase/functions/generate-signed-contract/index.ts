@@ -786,6 +786,7 @@ Deno.serve(async (req: Request) => {
         service_charge_percent, service_charge_amount,
         discount_percent, discount_amount, discount_label,
         additional_heads, additional_head_price, additional_head_charge,
+        inclusion_adjustment, inclusion_snapshot,
         package_id, package:package_id ( package_name )
       `)
       .eq('reservation_id', reservation_id)
@@ -885,6 +886,12 @@ Deno.serve(async (req: Request) => {
       additional_heads: reservation.additional_heads > 0 ? String(reservation.additional_heads) : '',
       additional_head_price: reservation.additional_heads > 0 ? formatCurrency(reservation.additional_head_price || 0) : '',
       additional_head_charge: reservation.additional_heads > 0 ? formatCurrency(reservation.additional_head_charge || 0) : '',
+      // Customizable inclusions: blank unless the customer removed something,
+      // so a template line using these only prints for bookings that need it.
+      inclusion_adjustment: Number(reservation.inclusion_adjustment) > 0 ? formatCurrency(reservation.inclusion_adjustment) : '',
+      removed_inclusions: Array.isArray(reservation.inclusion_snapshot)
+        ? reservation.inclusion_snapshot.filter((i: { removed?: boolean }) => i?.removed).map((i: { name?: string }) => i.name).join(', ')
+        : '',
       guest_count: String(reservation.guest_count || ''),
       contact_email: reservation.contact_email || '',
       contact_phone: reservation.contact_phone || '',

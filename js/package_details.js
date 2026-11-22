@@ -6,6 +6,7 @@
 // renderInclusionsCard, renderAreaCard, renderPolicyCard. The lightbox is
 // unaffected. This page still owns its own URL/fetch and loading/not-found
 // states a toggled-visibility panel never needed.
+import { formatMoney } from './money.js';
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
@@ -239,13 +240,13 @@ function renderPackageDetail(pkg) {
        <p class="pkg-detail-price-note">Customized pricing available</p>`;
   } else if (discount?.active) {
     pkgDetailPricing.innerHTML = `<p class="pkg-detail-price pkg-detail-price--discounted">
-         <s class="pkg-detail-price-original">₱${discount.listPrice.toLocaleString()}</s>
-         ₱${discount.discountedPrice.toLocaleString()}
+         <s class="pkg-detail-price-original">${formatMoney(discount.listPrice)}</s>
+         ${formatMoney(discount.discountedPrice)}
          <span class="pkg-detail-price-off">&minus;${discount.percentOff}%</span>
        </p>
        <p class="pkg-detail-price-note">${discount.label ? esc(discount.label) + ' &middot; ' : ''}Inclusive of setup</p>`;
   } else {
-    pkgDetailPricing.innerHTML = `<p class="pkg-detail-price">₱${price.toLocaleString()}</p>
+    pkgDetailPricing.innerHTML = `<p class="pkg-detail-price">${formatMoney(price)}</p>
        <p class="pkg-detail-price-note">Inclusive of setup</p>`;
   }
 
@@ -461,7 +462,7 @@ function renderPolicyCard(pkg, loc) {
     rows.push({
       icon: 'ti-file-text',
       label: 'Downpayment required',
-      value: `${depositPct}% (₱${amount.toLocaleString()})`
+      value: `${depositPct}% (${formatMoney(amount)})`
     });
   }
 
@@ -490,7 +491,7 @@ function renderPolicyCard(pkg, loc) {
     rows.push({
       icon: 'ti-calendar-x',
       label: 'Cancellation fee',
-      value: `₱${Number(cancelFee).toLocaleString()}${suffix}`
+      value: `${formatMoney(cancelFee)}${suffix}`
     });
   }
 
@@ -499,7 +500,7 @@ function renderPolicyCard(pkg, loc) {
     rows.push({
       icon: 'ti-calendar-repeat',
       label: 'Reschedule fee',
-      value: `₱${Number(rescheduleFee).toLocaleString()}, subject to availability`
+      value: `${formatMoney(rescheduleFee)}, subject to availability`
     });
   }
 
@@ -508,7 +509,7 @@ function renderPolicyCard(pkg, loc) {
     rows.push({
       icon: 'ti-clock',
       label: 'Duration & extensions',
-      value: `₱${extensionPrice.toLocaleString()} per additional hour`
+      value: `${formatMoney(extensionPrice)} per additional hour`
     });
   }
 

@@ -90,6 +90,14 @@ const additionalHeadModalConfirm    = document.getElementById('additional-head-m
 const additionalHeadModalBody       = document.getElementById('additional-head-modal-body');
 const additionalHeadModalMessage    = document.getElementById('additional-head-modal-message');
 
+const customRequestBackdrop = document.getElementById('custom-request-backdrop');
+const customRequestClose    = document.getElementById('custom-request-close');
+const customRequestDismiss  = document.getElementById('custom-request-dismiss');
+const customRequestConfirm  = document.getElementById('custom-request-confirm');
+const customRequestInput    = document.getElementById('custom-request-input');
+const customRequestDetails  = document.getElementById('custom-request-details');
+const customRequestMessage  = document.getElementById('custom-request-message');
+
 const submissionFeedbackBackdrop = document.getElementById('submission-feedback-backdrop');
 const submissionFeedbackClose    = document.getElementById('submission-feedback-close');
 const submissionFeedbackDismiss  = document.getElementById('submission-feedback-dismiss');
@@ -195,6 +203,7 @@ async function loadPageData() {
             package_id,
             add_on_id,
             total_price,
+            inclusion_snapshot,
             special_requests,
             menu_selections,
             status,
@@ -220,7 +229,7 @@ async function loadPageData() {
     // page queries, and either being unavailable (migration not yet
     // applied, temporary outage) must never take down the whole
     // reservation details page.
-    const [contract, paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
+    const [contract, paymentsByReservationId, reschedulesByReservationId, extensionsByReservationId, additionalHeadRequestsByReservationId, chargesByReservationId, customRequests, cancellationInfo, review, reservationRules, paymentRules, policyBodies] = await Promise.all([
         fetchContract(reservationId),
         fetchSharedPayments(supabase, [reservationId]),
         fetchSharedRescheduleRequests(supabase, [reservationId]),
@@ -233,6 +242,16 @@ async function loadPageData() {
             console.error('[reservation_details] failed to load manual reservation charges:', error);
             return {};
         }),
+        // Best-effort too: if the custom requests table isn't there yet (migration
+        // not applied) the rest of the page must still load.
+        supabase.from('reservation_custom_requests')
+            .select('request_id, title, details, status, quoted_price, quote_note, declined_by, decline_reason, created_at')
+            .eq('reservation_id', reservationId)
+            .order('created_at', { ascending: false })
+            .then(({ data, error }) => {
+                if (error) { console.error('[reservation_details] failed to load custom requests:', error); return []; }
+                return data || [];
+            }),
         fetchCancellationInfo(reservationId),
         fetchReview(reservationId),
         loadReservationRules(supabase),
@@ -248,6 +267,7 @@ async function loadPageData() {
         extensions: extensionsByReservationId[reservationId] || [],
         additionalHeadRequests: additionalHeadRequestsByReservationId[reservationId] || [],
         charges: chargesByReservationId[reservationId] || [],
+        customRequests,
         paymentsByReservationId,
         chargesByReservationId,
         cancellationInfo,
@@ -439,11 +459,23 @@ function buildMenuSelectionsHtml(selections) {
     ).join('');
 }
 
+// Customizable inclusions: what you kept and removed, as frozen on the booking.
+function buildInclusionsHtml(snapshot) {
+    if (!Array.isArray(snapshot) || !snapshot.length) return '';
+    const kept = snapshot.filter(i => i && !i.removed);
+    const removed = snapshot.filter(i => i && i.removed);
+    const parts = [];
+    if (kept.length) parts.push(`<div><strong>Included:</strong> ${escapeHtml(kept.map(i => i.name).join(', '))}</div>`);
+    if (removed.length) parts.push(`<div><strong>Removed:</strong> ${escapeHtml(removed.map(i => `${i.name} (−${formatCurrency(i.credit)})`).join(', '))}</div>`);
+    return parts.join('');
+}
+
 function buildEventDetailsPanel(reservation) {
     const addOnName = getReservationAddOnName(reservation);
     const specialRequests = String(reservation.special_requests || '').trim();
     const menuHtml = buildMenuSelectionsHtml(reservation.menu_selections);
-    const hasOptionalContent = Boolean(addOnName) || Boolean(specialRequests) || Boolean(menuHtml);
+    const inclusionsHtml = buildInclusionsHtml(reservation.inclusion_snapshot);
+    const hasOptionalContent = Boolean(addOnName) || Boolean(specialRequests) || Boolean(menuHtml) || Boolean(inclusionsHtml);
 
     return `
         <section class="rd-panel">
@@ -485,6 +517,12 @@ function buildEventDetailsPanel(reservation) {
                     <div class="rd-dl-row rd-dl-row-wrap">
                         <dt><i class="ti ti-tools-kitchen-2" aria-hidden="true"></i> Menu selections</dt>
                         <dd>${menuHtml}</dd>
+                    </div>
+                ` : ''}
+                ${inclusionsHtml ? `
+                    <div class="rd-dl-row rd-dl-row-wrap">
+                        <dt><i class="ti ti-list-check" aria-hidden="true"></i> Inclusions</dt>
+                        <dd>${inclusionsHtml}</dd>
                     </div>
                 ` : ''}
                 ${specialRequests ? `
@@ -942,6 +980,80 @@ function buildAdditionalHeadSection(reservation, additionalHeadRequests, effecti
     `;
 }
 
+// ── Custom requests ────────────────────────────────────────────────────────
+// Things the customer asked for that are not in the package. The café sets a
+// price (quoted); accepting it adds it to the balance as a charge.
+function getCustomRequestStatusMeta(request) {
+    const status = String(request.status || '').toLowerCase();
+    if (status === 'quoted')   return { key: 'pending',   label: 'Quote ready' };
+    if (status === 'accepted') return { key: 'approved',  label: 'Accepted' };
+    if (status === 'declined') return { key: 'cancelled', label: request.declined_by === 'customer' ? 'Closed by you' : 'Not available' };
+    return { key: 'pending', label: 'Waiting for a quote' };
+}
+
+function canMakeCustomRequest(reservation, effectiveStatus) {
+    if (['cancelled', 'declined', 'completed'].includes(effectiveStatus)) return false;
+    if (['cancellation_requested', 'cancellation_approved'].includes(String(reservation.status || '').toLowerCase())) return false;
+    const eventDate = String(reservation.event_date || '').slice(0, 10);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    return !eventDate || eventDate >= today;
+}
+
+function buildCustomRequestItem(request) {
+    const status = String(request.status || '').toLowerCase();
+    const meta = getCustomRequestStatusMeta(request);
+    let body = '';
+    if (status === 'quoted') {
+        body = `
+            <p class="rd-cr-quote">Quoted at <strong>${escapeHtml(formatCurrency(request.quoted_price))}</strong></p>
+            ${request.quote_note ? `<p class="rd-cr-note">${escapeHtml(request.quote_note)}</p>` : ''}
+            <p class="rd-cr-hint">Accepting adds this to your balance. You can pay it with the rest of your reservation.</p>
+            <div class="rd-cr-actions">
+                <button type="button" class="rd-btn-outline rd-cr-accept" data-action="accept-custom-request" data-request-id="${escapeHtml(request.request_id)}">Accept ${escapeHtml(formatCurrency(request.quoted_price))}</button>
+                <button type="button" class="rd-cr-link" data-action="decline-custom-request" data-request-id="${escapeHtml(request.request_id)}">Decline</button>
+            </div>`;
+    } else if (status === 'accepted') {
+        body = `<p class="rd-cr-quote">${escapeHtml(formatCurrency(request.quoted_price))} &middot; added to your balance</p>`;
+    } else if (status === 'declined') {
+        body = request.declined_by === 'customer'
+            ? '<p class="rd-cr-hint">You closed this request.</p>'
+            : `<p class="rd-cr-hint">We can&rsquo;t take this one on.${request.decline_reason ? ' ' + escapeHtml(request.decline_reason) : ''}</p>`;
+    } else {
+        body = `
+            <p class="rd-cr-hint">We&rsquo;ll send you a price soon.</p>
+            <div class="rd-cr-actions">
+                <button type="button" class="rd-cr-link" data-action="decline-custom-request" data-request-id="${escapeHtml(request.request_id)}">Withdraw request</button>
+            </div>`;
+    }
+    return `
+        <div class="rd-cr-item">
+            <div class="rd-cr-item-head">
+                <strong class="rd-cr-item-title">${escapeHtml(request.title)}</strong>
+                <span class="res-status ${escapeHtml(meta.key)}">${escapeHtml(meta.label)}</span>
+            </div>
+            ${request.details ? `<p class="rd-cr-details">${escapeHtml(request.details)}</p>` : ''}
+            ${body}
+        </div>`;
+}
+
+function buildCustomRequestsSection(reservation, requests, effectiveStatus) {
+    const list = requests || [];
+    const canRequest = canMakeCustomRequest(reservation, effectiveStatus);
+    if (!list.length && !canRequest) return '';
+
+    return `
+        <section class="rd-panel rd-cr-card">
+            <div class="rd-reschedule-card-head">
+                <h2 class="rd-panel-title">Custom requests</h2>
+                ${canRequest ? '<button type="button" class="rd-btn-outline" data-action="open-custom-request">Request something else</button>' : ''}
+            </div>
+            ${list.length
+                ? `<div class="rd-cr-list">${list.map(buildCustomRequestItem).join('')}</div>`
+                : '<p class="rd-cr-hint">Need something that isn&rsquo;t in your package? Tell us and we&rsquo;ll send you a price. Nothing is charged until you accept.</p>'}
+        </section>
+    `;
+}
+
 function buildReviewRow(effectiveStatus, review, reservationId) {
     if (effectiveStatus !== 'completed') return '';
 
@@ -1078,6 +1190,7 @@ function render() {
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules, rescheduleBlockReason)}
         ${buildExtensionSection(reservation, extensions, effectiveStatus)}
         ${buildAdditionalHeadSection(reservation, additionalHeadRequests, effectiveStatus)}
+        ${buildCustomRequestsSection(reservation, pageData?.customRequests, effectiveStatus)}
         ${buildReviewRow(effectiveStatus, review, reservation.reservation_id)}
     `;
 }
@@ -1109,7 +1222,7 @@ function applyPolicyOverride(elId, settingKey) {
 function openCancelModal() {
     if (!pageData?.reservation) return;
     const fee = getCancellationFee(pageData.reservation, pageData.paymentRules);
-    if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    if (cancelFeeAmount) cancelFeeAmount.textContent = formatCurrency(fee);
     if (cancelReasonInput) cancelReasonInput.value = '';
     applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
     setCancelModalMessage('');
@@ -1507,6 +1620,105 @@ async function submitAdditionalHeadRequest() {
     }
 }
 
+// ── Custom request modal + responses ─────────────────────────────────────
+function setCustomRequestMessage(message, isError = false) {
+    if (!customRequestMessage) return;
+    customRequestMessage.textContent = message || '';
+    customRequestMessage.className = 'account-modal-message' + (isError ? ' error' : '');
+}
+
+function openCustomRequestModal() {
+    if (customRequestInput) customRequestInput.value = '';
+    if (customRequestDetails) customRequestDetails.value = '';
+    setCustomRequestMessage('');
+    customRequestConfirm?.removeAttribute('disabled');
+    customRequestBackdrop?.classList.remove('hidden');
+    customRequestBackdrop?.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
+    customRequestInput?.focus();
+}
+
+function closeCustomRequestModal() {
+    customRequestBackdrop?.classList.add('hidden');
+    customRequestBackdrop?.setAttribute('aria-hidden', 'true');
+    setCustomRequestMessage('');
+    unlockBodyScroll();
+}
+
+async function submitCustomRequest() {
+    const title = customRequestInput?.value.trim() || '';
+    const details = customRequestDetails?.value.trim() || '';
+    if (!title) {
+        setCustomRequestMessage('Tell us what you would like to request.', true);
+        return;
+    }
+
+    customRequestConfirm?.setAttribute('disabled', 'true');
+    setCustomRequestMessage('Sending your request…');
+    try {
+        const { error } = await supabase.rpc('submit_custom_request', {
+            p_reservation_id: reservationId,
+            p_title: title,
+            p_details: details || null
+        });
+        if (error) throw error;
+        closeCustomRequestModal();
+        await loadPageData();
+        render();
+        openSubmissionFeedbackModal({
+            eyebrow: 'Request Sent',
+            title: 'We Got Your Request',
+            copy: 'We’ll review it and send you a price here on this page. You only pay if you accept.'
+        });
+    } catch (error) {
+        customRequestConfirm?.removeAttribute('disabled');
+        setCustomRequestMessage(error.message || 'We couldn’t send your request. Please try again.', true);
+    }
+}
+
+// Accept a quote (it becomes a charge on the balance) or close a request.
+async function respondToCustomRequest(button, action) {
+    const requestId = button.dataset.requestId;
+    if (!requestId || button.disabled) return;
+    const request = (pageData?.customRequests || []).find(r => r.request_id === requestId);
+    const question = action === 'accept'
+        ? `Accept “${request?.title || 'this request'}” for ${formatCurrency(request?.quoted_price)}? It will be added to your balance.`
+        : (request?.status === 'quoted'
+            ? 'Decline this quote? You can send a new request any time.'
+            : 'Withdraw this request?');
+    if (!window.confirm(question)) return;
+
+    button.disabled = true;
+    try {
+        const { error } = action === 'accept'
+            ? await supabase.rpc('accept_custom_request', { p_request_id: requestId })
+            : await supabase.rpc('decline_custom_request', { p_request_id: requestId });
+        if (error) throw error;
+        await loadPageData();
+        render();
+        if (action === 'accept') {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Quote Accepted',
+                title: 'Added to Your Balance',
+                copy: 'The amount is now part of your reservation balance. You can pay it with the rest.'
+            });
+        }
+    } catch (error) {
+        button.disabled = false;
+        window.alert(error.message || 'Something went wrong. Please try again.');
+    }
+}
+
+customRequestClose?.addEventListener('click', closeCustomRequestModal);
+customRequestDismiss?.addEventListener('click', closeCustomRequestModal);
+customRequestConfirm?.addEventListener('click', submitCustomRequest);
+customRequestBackdrop?.addEventListener('click', (event) => {
+    if (event.target === customRequestBackdrop) closeCustomRequestModal();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !customRequestBackdrop?.classList.contains('hidden')) closeCustomRequestModal();
+});
+
 // Reschedule modal — lives on this page (js/reservation_details_reschedule.js)
 // so "Request reschedule" no longer sends the customer to My reservations.
 const rescheduleModal = initRescheduleModal({
@@ -1548,6 +1760,23 @@ pageContainer?.addEventListener('click', async (event) => {
     const additionalHeadTriggerBtn = event.target.closest('[data-action="open-additional-head"]');
     if (additionalHeadTriggerBtn) {
         openAdditionalHeadModal();
+        return;
+    }
+
+    if (event.target.closest('[data-action="open-custom-request"]')) {
+        openCustomRequestModal();
+        return;
+    }
+
+    const acceptCustomBtn = event.target.closest('[data-action="accept-custom-request"]');
+    if (acceptCustomBtn) {
+        respondToCustomRequest(acceptCustomBtn, 'accept');
+        return;
+    }
+
+    const declineCustomBtn = event.target.closest('[data-action="decline-custom-request"]');
+    if (declineCustomBtn) {
+        respondToCustomRequest(declineCustomBtn, 'decline');
         return;
     }
 

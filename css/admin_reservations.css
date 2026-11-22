@@ -1606,3 +1606,18 @@ body {
     border-radius: 0 0 12px 12px;
   }
 }
+/* Customizable inclusions: flag on bookings where the customer removed items */
+.customized-tag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #8a4b12;
+  background: #fbefdc;
+  border: 1px solid #efd5ad;
+  white-space: nowrap;
+}

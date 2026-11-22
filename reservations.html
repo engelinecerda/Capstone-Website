@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=68" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=68"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=71"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
     <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
@@ -20,11 +20,11 @@
          content on first paint. Only genuinely non-critical assets above
          (webfonts, icon font, Leaflet map CSS) and the JS-injected
          announcement banner below stay async. -->
-    <link rel="stylesheet" href="/css/styles.css?v=68">
-    <link rel="stylesheet" href="/css/reservations.css?v=68">
-    <link rel="stylesheet" href="/css/home.css?v=68">
-    <link rel="preload" as="style" href="/css/announcement_banner.css?v=68" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=68"></noscript>
+    <link rel="stylesheet" href="/css/styles.css?v=71">
+    <link rel="stylesheet" href="/css/reservations.css?v=71">
+    <link rel="stylesheet" href="/css/home.css?v=71">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=71"></noscript>
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -157,6 +157,37 @@
                         </div>
                     </div>
 
+                    <!-- Customizable inclusions — only shown once the selected package has
+                         at least one optional inclusion (admin-configured in Inventory).
+                         Required items are locked; unchecking an optional one takes its
+                         removal credit off the package price. -->
+                    <!-- "What's included": a read-only list for a selected package that has NO
+                         optional inclusions (so the customize block below stays hidden), so the
+                         customer can see what is already covered before asking for extras. -->
+                    <div id="included-summary-block" class="included-card hidden" aria-live="polite"></div>
+
+                    <div id="inclusion-customize-block" class="inclusion-customize hidden" aria-live="polite"></div>
+
+                    <!-- Custom requests: things that aren't in the package. Shown for every
+                         selected package, directly under the inclusions block when that is
+                         visible (and under the package list when it isn't). Each request is
+                         quoted by the café; the customer accepts or declines the price on
+                         their reservation page. Nothing is charged until accepted. -->
+                    <div class="cr-group hidden" id="custom-requests-group">
+                        <h3 class="inclusion-title">Need something that <em>isn&rsquo;t included</em>? <span class="res-field-optional">(Optional)</span></h3>
+                        <p class="cr-help">Tell us what you&rsquo;d like and we&rsquo;ll send you a price to accept or decline. Nothing is charged until you accept.</p>
+                        <div class="cr-list" id="cr-list"></div>
+                        <div class="cr-form hidden" id="cr-form">
+                            <input class="res-input" type="text" id="cr-title" maxlength="120" placeholder="e.g., Extra balloon arch" aria-label="What would you like?">
+                            <textarea class="res-input" id="cr-details" maxlength="1000" rows="2" placeholder="Details that help us quote it (optional)" aria-label="Request details"></textarea>
+                            <div class="cr-form-actions">
+                                <button type="button" class="cr-btn" id="cr-add">Add request</button>
+                                <button type="button" class="cr-link" id="cr-cancel">Cancel</button>
+                            </div>
+                        </div>
+                        <button type="button" class="cr-open" id="cr-open"><i class="ti ti-plus" aria-hidden="true"></i> Request something else</button>
+                    </div>
+
                     <!-- Catering builder — shown for ANY selected package (onsite or
                          offsite) that's catering-flagged, independent of location type,
                          so it lives outside both onsite-section/offsite-section. -->
@@ -179,14 +210,14 @@
                                     </div>
                                     <div class="cart-header-right">
                                         <button type="button" class="cart-clear-all-btn" id="catering-cart-clear-all" style="display:none">Remove all</button>
-                                        <span class="cart-running-total" id="catering-cart-running-total">&#8369;0</span>
+                                        <span class="cart-running-total" id="catering-cart-running-total">&#8369;0.00</span>
                                     </div>
                                 </div>
                                 <div class="cart-empty-state" id="catering-cart-empty">No dishes selected yet</div>
                                 <div id="catering-tray-rows"></div>
                                 <div class="cart-footer" id="catering-cart-footer" style="display:none">
                                     <span class="cart-footer-left" id="catering-cart-footer-count">0 dishes selected</span>
-                                    <span class="cart-footer-right" id="catering-tray-total">&#8369;0</span>
+                                    <span class="cart-footer-right" id="catering-tray-total">&#8369;0.00</span>
                                 </div>
                             </div>
                             <div class="validation-notice" id="catering-validation-notice">
@@ -719,12 +750,12 @@
     })();
     </script>
 
-    <script type="module" src="/js/footer_content.js?v=68"></script>
+    <script type="module" src="/js/footer_content.js?v=71"></script>
     <script type="module" src="/js/announcement_banner.js"></script>
 
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=68" defer></script>
+  <script src="/js/supabase_health_notice.js?v=71" defer></script>
 </body>
 </html>

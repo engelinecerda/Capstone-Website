@@ -38,6 +38,8 @@ export const TOKEN_INFO = {
   additional_heads: 'Number of additional guests booked beyond the package\'s Max Guests, frozen at booking time — blank if none',
   additional_head_price: 'Per-head price (₱) charged for each additional guest, frozen at booking time — blank if none',
   additional_head_charge: 'Total charge (₱) for additional guests, frozen at booking time — blank if none',
+  inclusion_adjustment: 'Total (₱) taken off the package price for inclusions the customer removed, frozen at booking time — blank if none removed',
+  removed_inclusions: 'Names of the optional inclusions the customer removed, comma-separated — blank if none removed',
 };
 
 export const SAMPLE_RESERVATION = {
@@ -65,6 +67,8 @@ export const SAMPLE_RESERVATION = {
   additional_heads: '5',
   additional_head_price: '₱200.00',
   additional_head_charge: '₱1,000.00',
+  inclusion_adjustment: '₱500.00',
+  removed_inclusions: 'Karaoke use',
 };
 
 export const TOKEN_REGEX = /\{\{\s*(\w+)\s*\}\}/g;

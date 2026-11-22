@@ -2051,7 +2051,7 @@ function openCancelModal(reservationId) {
 
     state.cancelModal.reservationId = reservationId;
     const fee = getCancellationFee(reservation, state.paymentRules);
-    if (cancelFeeAmount) cancelFeeAmount.textContent = `₱${fee.toLocaleString()}`;
+    if (cancelFeeAmount) cancelFeeAmount.textContent = formatCurrency(fee);
     if (cancelReasonInput) cancelReasonInput.value = '';
     applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
     setCancelModalMessage('');

@@ -8,6 +8,7 @@
 // relocated here and re-exported for admin_payments.js's own approve flow
 // to keep using).
 
+import { formatMoney } from './money.js';
 import { logAudit } from './audit_logger.js';
 
 const CLOUDINARY_CONFIG = {
@@ -242,7 +243,7 @@ async function auditRecordedPayment(paymentId, { numericAmount, paymentMethodLab
   await logAudit({
     action: 'Recorded In-Cafe Payment',
     category: 'payment',
-    details: `${confirmedExisting ? 'Confirmed pending payment as paid' : 'Recorded payment'} of \u20B1${Number(numericAmount).toLocaleString()}`
+    details: `${confirmedExisting ? 'Confirmed pending payment as paid' : 'Recorded payment'} of ${formatMoney(numericAmount)}`
       + (paymentMethodLabel ? ` via ${paymentMethodLabel}` : '')
       + (reservationNumber ? ` for reservation ${reservationNumber}` : ''),
     entityId: paymentId

@@ -1,4 +1,4 @@
-@import url('./admin_reservations.css?v=68');
+@import url('./admin_reservations.css?v=71');
 
 /* ============================================================
    Hidden-state overrides.
@@ -1418,3 +1418,13 @@
 .record-payment-file-remove:hover {
   color: #A32D2D;
 }
+/* ── Custom requests (customizable inclusions, phase 2) ─────────────────── */
+.cr-admin-list { display: flex; flex-direction: column; gap: 12px; }
+.cr-admin-item { padding: 14px 16px; border: 1px solid var(--border, #E5DBCC); border-radius: 12px; background: var(--surface, #fff); }
+.cr-admin-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cr-admin-head strong { font-size: 14.5px; overflow-wrap: anywhere; }
+.cr-admin-details { margin: 6px 0 0; font-size: 13.5px; color: var(--muted-2, #7C6E61); white-space: pre-line; overflow-wrap: anywhere; }
+.cr-admin-meta { margin: 6px 0 0; font-size: 12px; color: var(--muted-2, #7C6E61); }
+.cr-admin-line { margin: 8px 0 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.cr-admin-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.cr-admin-tag { font-size: 12px; font-weight: 600; color: var(--muted-2, #7C6E61); }

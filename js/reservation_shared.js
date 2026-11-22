@@ -6,6 +6,8 @@
 // page-specific state object, so it works the same regardless of which
 // page fetched the data.
 
+import { formatMoney } from './money.js';
+
 export const BUSINESS_TIME_ZONE = 'Asia/Manila';
 
 export const PAYMENT_TYPE_META = {
@@ -64,7 +66,7 @@ export function escapeHtml(value) {
 }
 
 export function formatCurrency(value) {
-    return `₱${Number(value || 0).toLocaleString()}`;
+    return formatMoney(value);
 }
 
 export function formatDate(value) {

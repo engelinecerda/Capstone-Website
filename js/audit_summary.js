@@ -16,6 +16,8 @@
 // the IDs in the capacity, per-event-type and contract-template entries into
 // names.
 
+import { formatMoney } from './money.js';
+
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SCOPE_LABELS = {
     onsite_vip: 'Onsite — VIP',
@@ -49,7 +51,7 @@ function plural(n, word) {
 function peso(value) {
     const n = Number(value);
     if (!Number.isFinite(n)) return String(value);
-    return '₱' + n.toLocaleString('en-PH', { maximumFractionDigits: 2 });
+    return formatMoney(n);
 }
 
 function onOff(flag) {

@@ -1,3 +1,5 @@
+import './money_inputs.js';
+import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -215,7 +217,7 @@ async function validateAdmin() {
 }
 
 function formatCurrency(value) {
-  return `₱${Number(value || 0).toLocaleString()}`;
+  return formatMoney(value);
 }
 
 function formatDate(value) {
@@ -930,7 +932,7 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
   // into a rejection above), so the entry always matches what was stored.
   const reviewedReservationNumber = getReservation(payment.reservation_id)?.reservation_number;
   const reviewedPaymentType = String(payment.payment_type || 'payment').replace(/_/g, ' ');
-  const reviewedAmount = `\u20B1${Number(payment.amount || 0).toLocaleString()}`;
+  const reviewedAmount = formatCurrency(payment.amount);
   await logAudit({
     action: nextStatus === 'approved' ? 'Approved Payment' : 'Rejected Payment',
     category: 'payment',
@@ -1412,7 +1414,7 @@ async function openRecordPaymentModalForPayment(paymentId) {
   recordPaymentContextName.textContent = `${reservation.contact_name || 'Customer'} · ${reservation.package?.package_name || 'Reservation'}`;
   recordPaymentContextDate.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
   recordPaymentContextBalance.textContent = formatCurrency(outstanding);
-  if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? outstanding : '';
+  if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? moneyInputValue(outstanding) : '';
 
   const plannedArrival = payment.cash_payment_date;
   if (plannedArrival) {

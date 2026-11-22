@@ -1,3 +1,4 @@
+import { formatMoney, formatMoneyNumber, moneyInputValue } from './money.js';
 import { customerSupabase as supabase } from './supabase.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import {
@@ -228,7 +229,7 @@ function escapeHtml(value) {
 }
 
 function formatCurrency(value) {
-    return `₱${Number(value || 0).toLocaleString()}`;
+    return formatMoney(value);
 }
 
 function formatFileSize(bytes) {
@@ -699,7 +700,7 @@ function renderCustomAmountPanel(reservation, option) {
                 type="text"
                 inputmode="decimal"
                 autocomplete="off"
-                placeholder="e.g. ${escapeHtml(option.minAmount)}"
+                placeholder="e.g. ${escapeHtml(formatMoneyNumber(option.minAmount))}"
                 data-field="customAmount"
                 value="${escapeHtml(raw)}"
                 maxlength="12"
@@ -1706,6 +1707,17 @@ paymentApp?.addEventListener('input', (event) => {
             input.setSelectionRange(pos, pos);
         }
     }
+});
+
+// Typed "10" becomes "10.00" once the field loses focus. Only the field's text
+// and stored value change (no re-render), so a click on another button that
+// caused the blur still lands normally.
+paymentApp?.addEventListener('focusout', (event) => {
+    if (event.target.dataset?.field !== 'customAmount') return;
+    const formatted = moneyInputValue(event.target.value);
+    if (formatted === '' || formatted === event.target.value) return;
+    event.target.value = formatted;
+    state.form.customAmount = formatted;
 });
 
 paymentApp?.addEventListener('change', (event) => {

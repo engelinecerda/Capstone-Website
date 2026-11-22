@@ -1,3 +1,5 @@
+import './money_inputs.js';
+import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -90,6 +92,12 @@ const voidChargeConfirmModal = document.getElementById('voidChargeConfirmModal')
 const voidChargeConfirmCopy = document.getElementById('voidChargeConfirmCopy');
 const voidChargeCancelBtn = document.getElementById('voidChargeCancelBtn');
 const voidChargeConfirmBtn = document.getElementById('voidChargeConfirmBtn');
+const customRequestsCard = document.getElementById('customRequestsCard');
+const customRequestsList = document.getElementById('customRequestsList');
+const customRequestsPill = document.getElementById('customRequestsPill');
+const customRequestModal = document.getElementById('customRequestModal');
+const customRequestSaveBtn = document.getElementById('customRequestSaveBtn');
+const customRequestMessage = document.getElementById('customRequestMessage');
 const addChargeModal = document.getElementById('addChargeModal');
 const addChargeModalClose = document.getElementById('addChargeModalClose');
 const addChargeCancelBtn = document.getElementById('addChargeCancelBtn');
@@ -154,6 +162,10 @@ const PAYMENT_TYPE_LABELS = {
 };
 let adminSession = null;
 let currentRole = null;
+let currentCustomRequests = [];   // reservation_custom_requests rows for this reservation
+let customRequestCatalog = [];    // active inclusion_catalog items a quote can be matched to
+let activeCustomRequest = null;   // request the open dialog is about
+let customRequestMode = 'quote';  // 'quote' | 'decline' | 'promote'
 let currentReservation = null;
 let currentPaymentSummary = null;
 let staffDirectory = [];
@@ -204,7 +216,7 @@ function formatTimeOfDay(value) {
 }
 
 function formatCurrency(value) {
-  return `₱${Number(value || 0).toLocaleString()}`;
+  return formatMoney(value);
 }
 
 function formatDateTime(value) {
@@ -575,6 +587,8 @@ async function fetchReservationDetail(idParam) {
     special_requests,
     menu_selections,
     total_price,
+    inclusion_adjustment,
+    inclusion_snapshot,
     created_at,
     booking_scope,
     package:package_id ( package_name, duration_hours, booking_scope )
@@ -863,6 +877,23 @@ function buildMenuSelectionsHtml(selections) {
   ).join('');
 }
 
+// Customizable inclusions: what the customer kept and removed, as frozen on the
+// booking (reservations.inclusion_snapshot). Empty when the package had no
+// optional inclusions, so older bookings show nothing new.
+function buildInclusionsHtml(snapshot) {
+  if (!Array.isArray(snapshot) || !snapshot.length) return '';
+  const kept = snapshot.filter(i => i && !i.removed);
+  const removed = snapshot.filter(i => i && i.removed);
+  const parts = [];
+  if (kept.length) parts.push(`<div><strong>Included:</strong> ${escapeHtml(kept.map(i => i.name).join(', '))}</div>`);
+  if (removed.length) {
+    const total = removed.reduce((sum, i) => sum + Number(i.credit || 0), 0);
+    parts.push(`<div><strong>Removed by customer:</strong> ${escapeHtml(removed.map(i => `${i.name} (−${formatCurrency(i.credit)})`).join(', '))}</div>`);
+    parts.push(`<div><strong>Taken off the package price:</strong> ${escapeHtml(formatCurrency(total))}</div>`);
+  }
+  return parts.join('');
+}
+
 function renderBookingDetails() {
   const reservation = currentReservation;
   bookingDetailsGrid.innerHTML = [
@@ -889,6 +920,9 @@ function renderBookingDetails() {
     dlRow('Address', reservation.venue_location || 'No address provided', { full: true, muted: !reservation.venue_location }),
     ...(buildMenuSelectionsHtml(reservation.menu_selections)
       ? [dlRow('Menu selections', buildMenuSelectionsHtml(reservation.menu_selections), { full: true, raw: true })]
+      : []),
+    ...(buildInclusionsHtml(reservation.inclusion_snapshot)
+      ? [dlRow('Inclusions', buildInclusionsHtml(reservation.inclusion_snapshot), { full: true, raw: true })]
       : []),
     dlRow('Special requests', reservation.special_requests || 'None provided', { full: true, muted: !reservation.special_requests }),
     dlRow('Created', formatDateTime(reservation.created_at))
@@ -1312,7 +1346,7 @@ async function openRecordPaymentModal() {
   if (recordPaymentContextBalance) {
     recordPaymentContextBalance.textContent = formatCurrency(outstanding);
   }
-  if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? outstanding : '';
+  if (recordPaymentAmountInput) recordPaymentAmountInput.value = outstanding > 0 ? moneyInputValue(outstanding) : '';
 
   if (recordPaymentTargetPayment && recordPaymentPlannedNote) {
     const plannedArrival = recordPaymentTargetPayment.cash_payment_date;
@@ -1697,6 +1731,7 @@ function renderStaffAssignment() {
 function renderAll() {
   renderStickyHeader();
   renderBookingDetails();
+  renderCustomRequests();
   renderPayment();
   renderContract();
   renderStaffAssignment();
@@ -1725,6 +1760,191 @@ function showContent() {
 /* Reload-in-place                                                    */
 /* ---------------------------------------------------------------- */
 
+// Custom requests the customer sent for this reservation. Best-effort: if the
+// table isn't there yet (migration not applied) the rest of the page still works.
+async function loadCustomRequests() {
+  const id = currentReservation?.reservation_id;
+  if (!id) return;
+  const [requests, catalog] = await Promise.all([
+    supabase.from('reservation_custom_requests').select('*').eq('reservation_id', id).order('created_at', { ascending: false }),
+    supabase.from('inclusion_catalog').select('inclusion_id, name, price').eq('is_active', true).order('sort_order').order('name')
+  ]);
+  currentCustomRequests = requests.error ? [] : (requests.data || []);
+  customRequestCatalog = catalog.error ? [] : (catalog.data || []);
+}
+
+const CUSTOM_REQUEST_PILL = {
+  pending:  { key: 'pending',   label: 'Needs a quote' },
+  quoted:   { key: 'requested', label: 'Quoted, waiting for customer' },
+  accepted: { key: 'approved',  label: 'Accepted' },
+  declined: { key: 'cancelled', label: 'Declined' }
+};
+
+function renderCustomRequests() {
+  if (!customRequestsCard) return;
+  if (!currentCustomRequests.length) {
+    customRequestsCard.classList.add('hidden');
+    return;
+  }
+  customRequestsCard.classList.remove('hidden');
+
+  const open = currentCustomRequests.filter(r => r.status === 'pending' || r.status === 'quoted').length;
+  const needQuote = currentCustomRequests.filter(r => r.status === 'pending').length;
+  customRequestsPill.textContent = needQuote ? `${needQuote} need${needQuote === 1 ? 's' : ''} a quote` : (open ? `${open} open` : 'All closed');
+  customRequestsPill.className = 'status-pill ' + (needQuote ? 'pending' : (open ? 'requested' : ''));
+
+  // Managers act on requests; the admin role is read-only on this page (same as
+  // "Add charge"), except for adding a request to the catalog.
+  const isLive = !['cancelled', 'declined', 'completed'].includes(getEffectiveReservationStatus(currentReservation));
+  const canAct = currentRole !== 'admin' && isLive;
+
+  customRequestsList.innerHTML = currentCustomRequests.map(r => {
+    const pill = CUSTOM_REQUEST_PILL[r.status] || CUSTOM_REQUEST_PILL.pending;
+    const open = r.status === 'pending' || r.status === 'quoted';
+    let info = '';
+    if (r.status === 'quoted') info = `<p class="cr-admin-line">Quoted <strong>${escapeHtml(formatCurrency(r.quoted_price))}</strong>${r.quote_note ? ` &middot; ${escapeHtml(r.quote_note)}` : ''}</p>`;
+    if (r.status === 'accepted') info = `<p class="cr-admin-line">Accepted at <strong>${escapeHtml(formatCurrency(r.quoted_price))}</strong>. Added to the balance as a charge (see Manual charges).</p>`;
+    if (r.status === 'declined') info = `<p class="cr-admin-line">${r.declined_by === 'customer' ? 'Closed by the customer' : 'Declined'}${r.decline_reason ? `: ${escapeHtml(r.decline_reason)}` : ''}</p>`;
+
+    const buttons = [];
+    if (canAct && open) {
+      buttons.push(`<button type="button" class="header-action-btn primary" data-cr-action="quote" data-request-id="${escapeHtml(r.request_id)}">${r.status === 'quoted' ? 'Change quote' : 'Send quote'}</button>`);
+      buttons.push(`<button type="button" class="header-action-btn" data-cr-action="decline" data-request-id="${escapeHtml(r.request_id)}">Decline</button>`);
+    }
+    if (currentRole === 'admin' && (r.status === 'quoted' || r.status === 'accepted') && !r.catalog_id) {
+      buttons.push(`<button type="button" class="header-action-btn" data-cr-action="promote" data-request-id="${escapeHtml(r.request_id)}">Add to catalog</button>`);
+    }
+    if (r.catalog_id) buttons.push('<span class="cr-admin-tag">In catalog</span>');
+
+    return `<div class="cr-admin-item">
+      <div class="cr-admin-head"><strong>${escapeHtml(r.title)}</strong><span class="status-pill ${pill.key}">${escapeHtml(pill.label)}</span></div>
+      ${r.details ? `<p class="cr-admin-details">${escapeHtml(r.details)}</p>` : ''}
+      <p class="cr-admin-meta">Requested ${escapeHtml(formatDateTime(r.created_at))}</p>
+      ${info}
+      ${buttons.length ? `<div class="cr-admin-actions">${buttons.join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function setCustomRequestMessage(message, isError = false) {
+  if (!customRequestMessage) return;
+  customRequestMessage.textContent = message || '';
+  customRequestMessage.classList.toggle('error', isError);
+}
+
+function openCustomRequestModal(requestId, mode) {
+  const request = currentCustomRequests.find(r => r.request_id === requestId);
+  if (!request) return;
+  activeCustomRequest = request;
+  customRequestMode = mode;
+
+  document.getElementById('customRequestContextTitle').textContent = request.title;
+  document.getElementById('customRequestContextDetails').textContent = request.details || 'No extra details.';
+  document.getElementById('crQuoteFields').classList.toggle('hidden', mode !== 'quote');
+  document.getElementById('crDeclineFields').classList.toggle('hidden', mode !== 'decline');
+  document.getElementById('crPromoteFields').classList.toggle('hidden', mode !== 'promote');
+
+  const titles = { quote: request.status === 'quoted' ? 'Change quote' : 'Send quote', decline: 'Decline request', promote: 'Add to catalog' };
+  const subtitles = {
+    quote: 'The customer chooses to accept or decline this price',
+    decline: 'The customer is told this request can’t be taken on',
+    promote: 'Make this a reusable item for packages'
+  };
+  document.getElementById('customRequestModalTitle').textContent = titles[mode];
+  document.getElementById('customRequestModalSubtitle').textContent = subtitles[mode];
+  customRequestSaveBtn.textContent = mode === 'quote' ? 'Send quote' : (mode === 'decline' ? 'Decline request' : 'Add to catalog');
+  customRequestSaveBtn.removeAttribute('disabled');
+
+  if (mode === 'quote') {
+    const select = document.getElementById('crCatalogSelect');
+    select.innerHTML = '<option value="">None</option>' + customRequestCatalog
+      .map(c => `<option value="${escapeHtml(c.inclusion_id)}">${escapeHtml(c.name)} (${escapeHtml(formatCurrency(c.price))})</option>`).join('');
+    select.value = request.catalog_id && customRequestCatalog.some(c => c.inclusion_id === request.catalog_id) ? request.catalog_id : '';
+    document.getElementById('crPriceInput').value = moneyInputValue(request.quoted_price);
+    document.getElementById('crNoteInput').value = request.quote_note || '';
+  }
+  if (mode === 'decline') document.getElementById('crReasonInput').value = '';
+  if (mode === 'promote') {
+    document.getElementById('crCatalogNameInput').value = request.title;
+    document.getElementById('crCatalogPriceInput').value = moneyInputValue(request.quoted_price);
+  }
+
+  setCustomRequestMessage('');
+  customRequestModal.classList.remove('hidden');
+  customRequestModal.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
+}
+
+function closeCustomRequestModal() {
+  customRequestModal.classList.add('hidden');
+  customRequestModal.setAttribute('aria-hidden', 'true');
+  unlockBodyScroll();
+  activeCustomRequest = null;
+}
+
+async function saveCustomRequestAction() {
+  const request = activeCustomRequest;
+  if (!request) return;
+  let call, flash, audit;
+
+  if (customRequestMode === 'quote') {
+    const price = Number(document.getElementById('crPriceInput').value);
+    if (!Number.isFinite(price) || price <= 0) { setCustomRequestMessage('Enter a price greater than zero.', true); return; }
+    const note = document.getElementById('crNoteInput').value.trim() || null;
+    const catalogId = document.getElementById('crCatalogSelect').value || null;
+    call = () => supabase.rpc('quote_custom_request', { p_request_id: request.request_id, p_price: price, p_note: note, p_catalog_id: catalogId });
+    flash = 'Quote sent. The customer can now accept or decline it.';
+    audit = { action: 'Quoted Custom Request', details: `Quoted “${request.title}” at ${formatCurrency(price)}` };
+  } else if (customRequestMode === 'decline') {
+    const reason = document.getElementById('crReasonInput').value.trim() || null;
+    call = () => supabase.rpc('decline_custom_request', { p_request_id: request.request_id, p_reason: reason });
+    flash = 'Request declined. The customer was notified.';
+    audit = { action: 'Declined Custom Request', details: `Declined “${request.title}”${reason ? ` — ${reason}` : ''}` };
+  } else {
+    const name = document.getElementById('crCatalogNameInput').value.trim();
+    const price = Number(document.getElementById('crCatalogPriceInput').value);
+    if (!name) { setCustomRequestMessage('Enter a name for the catalog item.', true); return; }
+    if (!Number.isFinite(price) || price < 0) { setCustomRequestMessage('Enter a price of ₱0.00 or more.', true); return; }
+    call = () => supabase.rpc('promote_custom_request_to_catalog', { p_request_id: request.request_id, p_name: name, p_price: price });
+    flash = 'Added to Inventory → Inclusions.';
+    audit = { action: 'Added Inclusion From Request', details: `Added “${name}” (${formatCurrency(price)}) to the inclusions catalog from a custom request` };
+  }
+
+  customRequestSaveBtn.setAttribute('disabled', 'true');
+  setCustomRequestMessage('Saving...');
+  try {
+    const { error } = await call();
+    if (error) throw error;
+    await logAudit({ category: 'reservation', entityId: currentReservation.reservation_id, ...audit });
+    closeCustomRequestModal();
+    await loadCustomRequests();
+    renderCustomRequests();
+    setFlashMessage(flash, false);
+  } catch (error) {
+    customRequestSaveBtn.removeAttribute('disabled');
+    setCustomRequestMessage(error.message || 'Something went wrong. Please try again.', true);
+  }
+}
+
+function wireCustomRequests() {
+  customRequestsList?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-cr-action]');
+    if (btn) openCustomRequestModal(btn.dataset.requestId, btn.dataset.crAction);
+  });
+  document.getElementById('customRequestModalClose')?.addEventListener('click', closeCustomRequestModal);
+  document.getElementById('customRequestCancelBtn')?.addEventListener('click', closeCustomRequestModal);
+  customRequestSaveBtn?.addEventListener('click', saveCustomRequestAction);
+  customRequestModal?.addEventListener('click', (event) => { if (event.target === customRequestModal) closeCustomRequestModal(); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && customRequestModal && !customRequestModal.classList.contains('hidden')) closeCustomRequestModal();
+  });
+  // Picking a catalog item pre-fills the price (still editable).
+  document.getElementById('crCatalogSelect')?.addEventListener('change', (event) => {
+    const item = customRequestCatalog.find(c => c.inclusion_id === event.target.value);
+    if (item) document.getElementById('crPriceInput').value = moneyInputValue(item.price);
+  });
+}
+
 async function reloadAndRender(flashText, isError = false) {
   const reservation = await fetchReservationDetail(currentReservation.reservation_id);
   if (!reservation) {
@@ -1734,6 +1954,7 @@ async function reloadAndRender(flashText, isError = false) {
   currentReservation = reservation;
   currentPaymentSummary = await fetchPaymentSummary(reservation.reservation_id).catch(() => null);
   await loadStaffData();
+  await loadCustomRequests().catch(() => {});
   renderAll();
   setFlashMessage(flashText || '', isError);
 }
@@ -2127,6 +2348,7 @@ async function init() {
     currentReservation = reservation;
     currentPaymentSummary = await fetchPaymentSummary(reservation.reservation_id).catch(() => null);
     await loadStaffData();
+    await loadCustomRequests().catch(() => {});
     renderAll();
     showContent();
   } catch (error) {
@@ -2140,6 +2362,7 @@ wireApprovalPrompt();
 wireReceiptViewer();
 wireRecordPaymentModal();
 wireAddChargeModal();
+wireCustomRequests();
 wireSignatureCheckPanel();
 wireStickyHeaderScroll();
 wireBreadcrumb();
