@@ -32,6 +32,7 @@ import { normalizeInclusionOptions, hasRemovableInclusions, optionalCreditTotal,
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
+import { computeTransportFee, describeTransportFee, branchesWithCoords } from '/js/transport_fee.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 import { attachPhoneMask } from '/js/phone_format.js';
 import { attachNameGuard, attachEmailGuard, attachIntegerGuard, attachPhonePasteNormalizer, validatePersonName, validateEmailAddress, validatePhoneNumber } from '/js/input_validation.js';
@@ -131,6 +132,9 @@ const S = {
     eventType: '',
     eventTypeOther: '',
     venueLocation: '',
+    // {lat, lng} of the pin on the offsite venue map, read from the map when
+    // the customer moves past the venue step (null for onsite / no pin yet).
+    venuePin: null,
     eventDate: '',
     time: '',
     name: '', phone: '', email: '', requests: '',
@@ -188,6 +192,53 @@ function resolveServiceCharge(basePrice, locationType, categoryId) {
     const amount = Math.round(basePrice * pct) / 100;
     return { pct, amount, total: basePrice + amount };
 }
+
+// ── Transport fee (offsite) ────────────────────────────────────────────
+// Per-km fee from the nearest branch to the venue pin (see js/transport_fee.js).
+// Settings come from payment_rules; the branches are the active
+// business_location rows that have map coordinates. Added to the total AFTER
+// the discount and the service charge, so neither applies to it. Onsite
+// bookings, a switched-off fee, a missing pin or branches without
+// coordinates all resolve to a 0.00 fee.
+let TRANSPORT_RULES = {};
+let TRANSPORT_BRANCHES = [];
+
+function resolveTransport() {
+    if (S.locationType !== 'offsite') return computeTransportFee({}, null, []);
+    return computeTransportFee(TRANSPORT_RULES, S.venuePin, TRANSPORT_BRANCHES);
+}
+
+function isTransportFeeActive() {
+    return TRANSPORT_RULES.transport_fee_enabled === true && branchesWithCoords(TRANSPORT_BRANCHES).length > 0;
+}
+
+async function loadTransportFeeSettings() {
+    try {
+        const { data } = await supabase
+            .from('business_location')
+            .select('name, branch_tag, latitude, longitude')
+            .eq('is_active', true);
+        TRANSPORT_BRANCHES = data || [];
+    } catch { TRANSPORT_BRANCHES = []; }
+}
+
+// Live "estimated transport fee" line under the venue map.
+function refreshVenueTransportHint() {
+    const el = document.getElementById('venue-transport-hint');
+    if (!el) return;
+    if (S.locationType !== 'offsite' || !isTransportFeeActive()) { el.classList.add('hidden'); return; }
+    const pin = window.getVenuePin ? window.getVenuePin() : null;
+    if (!pin) {
+        el.textContent = 'A transport fee applies to offsite venues, based on the distance from our nearest branch. Drop a pin on the map to see yours.';
+        el.classList.remove('hidden');
+        return;
+    }
+    const result = computeTransportFee(TRANSPORT_RULES, pin, TRANSPORT_BRANCHES);
+    el.textContent = 'Estimated transport fee: ' + fmtPeso(result.fee) + ' \u2014 ' + describeTransportFee(result) + '.';
+    el.classList.remove('hidden');
+}
+
+document.addEventListener('venuepinchange', refreshVenueTransportHint);
 
 // Re-evaluated against the current clock every time it's called (not
 // cached from page-load) — a promo's window could open or close mid-session
@@ -607,6 +658,8 @@ async function loadServiceChargeSettings() {
             GLOBAL_SERVICE_CHARGE_PCT = Number(parsed.service_charge_percent);
         }
         SERVICE_CHARGE_APPLIES_OFFSITE = !!parsed.service_charge_applies_offsite;
+        // The transport_* keys live in the same blob (see js/transport_fee.js).
+        TRANSPORT_RULES = parsed || {};
     } catch {
         // Keep the 10% / offsite-off fallback.
     }
@@ -1412,6 +1465,7 @@ function renderContractBody(templateBody, contractData = {}) {
     const previewRemovedInclusions = previewInclusionPkg
         ? removedOptions(getInclusionOptions(previewInclusionPkg), getRemovedInclusionIds(previewInclusionPkg)) : [];
     const isOffsite = S.locationType === 'offsite';
+    const previewTransport = resolveTransport();
     const data = {
         customer_name: S.name || 'Customer',
         package_name: getSelectedContractPackageLabel() || 'Selected Package',
@@ -1420,7 +1474,7 @@ function renderContractBody(templateBody, contractData = {}) {
         event_time: S.time || 'TBD',
         venue: S.locationType === 'offsite' ? (S.venueLocation || 'Customer-provided venue') : 'ELI Coffee Events Cafe Binangonan (Onsite)',
         reservation_number: 'Assigned upon submission',
-        total_price: fmtPeso(charge.total),
+        total_price: fmtPeso(charge.total + previewTransport.fee),
         service_charge_percent: String(charge.pct),
         service_charge_amount: fmtPeso(charge.amount),
         discount_percent: discount.active ? String(discount.percentOff) : '',
@@ -1429,6 +1483,8 @@ function renderContractBody(templateBody, contractData = {}) {
         additional_heads: previewAdditionalHeadCharge > 0 ? String(S.additionalHeads) : '',
         additional_head_price: previewAdditionalHeadCharge > 0 ? fmtPeso(getSelectedPackageForAdditionalHead()?.pricePerAdditionalHead || 0) : '',
         additional_head_charge: previewAdditionalHeadCharge > 0 ? fmtPeso(previewAdditionalHeadCharge) : '',
+        transport_fee: previewTransport.applies ? fmtPeso(previewTransport.fee) : '',
+        transport_distance_km: previewTransport.applies ? String(previewTransport.distanceKm) : '',
         inclusion_adjustment: previewInclusionCredit > 0 ? fmtPeso(previewInclusionCredit) : '',
         removed_inclusions: previewRemovedInclusions.map(o => o.name).join(', '),
         guest_count: previewAdditionalHeadCharge > 0
@@ -3129,6 +3185,7 @@ function buildAddonOrVenueStep() {
         setTimeout(() => {
             if (window.initVenueMap) window.initVenueMap();
             if (window.venueMap) window.venueMap.invalidateSize();
+            refreshVenueTransportHint();
         }, 150);
     }
 }
@@ -4202,6 +4259,9 @@ function buildSummary() {
     // folded silently into a lower package price.
     const discountedTotal = total - discount.discountAmount;
     const charge = resolveServiceCharge(discountedTotal, S.locationType, S.categoryId);
+    // Transport fee (offsite): added after the discount and service charge,
+    // so neither applies to it. Zero/absent for onsite or when switched off.
+    const transport = resolveTransport();
     // Subtotal/Service charge/Discount/Total are the receipt-style lines of
     // the Total card — deliberately icon-less (unlike every Event/Contact
     // row) so that card reads as a plain receipt, not another field list.
@@ -4216,7 +4276,8 @@ function buildSummary() {
           discountRowHtml +
           sr('Subtotal', fmtPeso(discountedTotal)) +
           sr('Service charge (' + charge.pct + '%)', fmtPeso(charge.amount)) +
-          totalRow('Total', fmtPeso(charge.total))
+          (transport.applies ? sr('Transport fee (' + transport.distanceKm + ' km)', fmtPeso(transport.fee)) : '') +
+          totalRow('Total', fmtPeso(charge.total + transport.fee))
         : totalRow('Total', 'Contact for quote');
 
     const locStr   = S.locationType === 'onsite' ? 'Onsite &mdash; ELI Coffee' : 'Offsite' + (S.venueLocation ? ' &mdash; ' + S.venueLocation : '');
@@ -4446,6 +4507,16 @@ function validate(n) {
                 scrollToSection('sub-addon-venue'); return false;
             }
             S.venueLocation = venueVal;
+            // The transport fee is measured from the pin, so when it is on
+            // the customer must have dropped one (an address typed by hand
+            // has no position to measure from).
+            S.venuePin = window.getVenuePin ? window.getVenuePin() : null;
+            if (isTransportFeeActive() && !S.venuePin) {
+                showWarningModal('Please click the map (or search an address) to drop a pin on your venue. We use the pin to work out the transport fee.');
+                scrollToSection('sub-addon-venue'); return false;
+            }
+        } else {
+            S.venuePin = null;
         }
 
         // 1D — Room pick (onsite only, and only when the package maps to
@@ -4917,6 +4988,12 @@ async function submitDone() {
         const serviceCharge = resolveServiceCharge(totalPrice, S.locationType, S.categoryId);
         totalPrice = serviceCharge.total;
 
+        // Offsite transport fee (per km from the nearest branch to the pin):
+        // added AFTER the discount and service charge, frozen on the
+        // reservation with the pin and distance it was priced from.
+        const transport = resolveTransport();
+        totalPrice = Math.round((totalPrice + transport.fee) * 100) / 100;
+
         const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;
 
         // Final guest count = base pax (this package's Max Guests) +
@@ -4951,6 +5028,10 @@ async function submitDone() {
                 guest_count:      finalGuestCount,
                 location_type:    S.locationType,
                 venue_location:   S.venueLocation || null,
+                venue_latitude:   S.locationType === 'offsite' && S.venuePin ? Math.round(S.venuePin.lat * 1e6) / 1e6 : null,
+                venue_longitude:  S.locationType === 'offsite' && S.venuePin ? Math.round(S.venuePin.lng * 1e6) / 1e6 : null,
+                transport_distance_km: transport.applies ? transport.distanceKm : null,
+                transport_fee:    transport.fee,
                 venue_id:         S.locationType === 'onsite' ? (S.venueId || null) : null,
                 package_id:       packageId,
                 add_on_id:        addOnId,
@@ -5076,6 +5157,7 @@ renderCustomRequests();
 syncSelectedDate('');
 await loadReservationRules();
 await loadServiceChargeSettings();
+await loadTransportFeeSettings();
 await loadEventTypes();
 await loadPackages();
 

@@ -311,6 +311,78 @@
         </div>
       </div>
 
+      <!-- Transport Fee -->
+      <div class="card" id="transport-fee">
+        <p class="card-title">Transport Fee (offsite)</p>
+        <p class="card-sub">A per-kilometre fee added to offsite bookings, based on the distance from the nearest branch to the venue pin the customer drops on the booking map. Shown to customers as its own line. It is added after the discount and the service charge, so neither applies to it. Onsite bookings are never charged.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Charge a transport fee on offsite bookings</p>
+            <p class="pr-row-desc">When on, customers must drop a pin on the map for offsite venues so the distance can be measured.</p>
+          </div>
+          <div class="pr-row-control">
+            <label class="pm2-toggle">
+              <input type="checkbox" id="tf-enabled">
+              <span class="pm2-toggle-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Free distance</p>
+            <p class="pr-row-desc">No fee for venues within this many kilometres of the nearest branch.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="tf-free-km" min="0" max="500" step="0.5" value="10">
+            <span class="field-note" style="margin:0;">km</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Rate per kilometre</p>
+            <p class="pr-row-desc">Charged for every kilometre beyond the free distance.</p>
+          </div>
+          <div class="pr-row-control">
+            <span class="field-note" style="margin:0;">&#8369;</span>
+            <input type="number" class="pr-input-inline" id="tf-rate" data-money min="0" max="100000" step="0.01" value="30.00">
+            <span class="field-note" style="margin:0;">per km</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Maximum transport fee</p>
+            <p class="pr-row-desc">Optional ceiling for very far venues. Leave empty for no limit.</p>
+          </div>
+          <div class="pr-row-control">
+            <span class="field-note" style="margin:0;">&#8369;</span>
+            <input type="number" class="pr-input-inline" id="tf-max-fee" data-money min="0" max="1000000" step="0.01" placeholder="No limit">
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Road distance factor</p>
+            <p class="pr-row-desc">Distance is measured in a straight line, then multiplied by this to approximate real roads. 1.30 means roads are about 30% longer than a straight line.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="tf-road-factor" min="1" max="3" step="0.05" value="1.30">
+            <button type="button" class="action-btn view" id="tf-save-btn">Save</button>
+          </div>
+        </div>
+        <p class="form-message" id="tf-msg"></p>
+
+        <p class="pr-row-desc" id="tf-origin-note" style="margin-top:14px;"></p>
+
+        <div class="sc-example-box">
+          <p class="sc-example-title">Worked example</p>
+          <p class="sc-example-text" id="tf-example-text"></p>
+        </div>
+      </div>
+
     </section>
   </main>
 

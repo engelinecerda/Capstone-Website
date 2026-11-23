@@ -251,6 +251,8 @@ const BASE_CUSTOMER_RESERVATION_SELECT = `
     package_id,
     add_on_id,
     total_price,
+    transport_fee,
+    transport_distance_km,
     special_requests,
     status,
     created_at,

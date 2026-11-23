@@ -67,6 +67,11 @@ const locationModalMessage = document.getElementById('locationModalMessage');
 const locationTagInput     = document.getElementById('locationTagInput');
 const locationNameInput    = document.getElementById('locationNameInput');
 const locationAddressInput = document.getElementById('locationAddressInput');
+const locationLatInput     = document.getElementById('locationLatInput');
+const locationLngInput     = document.getElementById('locationLngInput');
+const locationFindOnMapBtn = document.getElementById('locationFindOnMapBtn');
+const locationFindHint     = document.getElementById('locationFindHint');
+const LOCATION_FIND_HINT_DEFAULT = locationFindHint ? locationFindHint.textContent : '';
 const locationHoursInput   = document.getElementById('locationHoursInput');
 const locationHoursOpen    = document.getElementById('locationHoursOpen');
 const locationHoursClose   = document.getElementById('locationHoursClose');
@@ -130,6 +135,11 @@ async function loadAll() {
 // ═══════════════════════════════════════════════════════════════════════════
 // LOCATIONS
 // ═══════════════════════════════════════════════════════════════════════════
+function hasCoords(loc) {
+  return loc && loc.latitude !== null && loc.latitude !== undefined && loc.longitude !== null && loc.longitude !== undefined
+    && Number.isFinite(Number(loc.latitude)) && Number.isFinite(Number(loc.longitude));
+}
+
 function renderLocations() {
   if (!locations.length) {
     locationList.innerHTML = '<p class="location-empty">No locations yet. Add your first branch.</p>';
@@ -146,6 +156,7 @@ function renderLocations() {
         <div class="location-admin-name">${escapeHtml(loc.name)}</div>
         <div class="location-admin-address">${escapeHtml(loc.address)}</div>
         ${loc.hours_label ? `<div class="location-admin-hours">${escapeHtml(loc.hours_label)}</div>` : ''}
+        <div class="location-admin-hours">${hasCoords(loc) ? `Map location set (${Number(loc.latitude).toFixed(4)}, ${Number(loc.longitude).toFixed(4)})` : 'No map location yet &mdash; needed for the transport fee'}</div>
       </div>
       <div class="location-admin-actions">
         <button type="button" class="btn-icon-xs" data-toggle-location="${loc.id}" aria-label="${loc.is_active ? 'Deactivate' : 'Activate'} ${escapeHtml(loc.name)}">${loc.is_active ? '●' : '○'}</button>
@@ -210,10 +221,40 @@ function openLocationModal(id) {
   locationTagInput.value = loc?.branch_tag || '';
   locationNameInput.value = loc?.name || '';
   locationAddressInput.value = loc?.address || '';
+  locationLatInput.value = hasCoords(loc) ? Number(loc.latitude) : '';
+  locationLngInput.value = hasCoords(loc) ? Number(loc.longitude) : '';
+  locationFindHint.textContent = LOCATION_FIND_HINT_DEFAULT;
   fillHoursFields(loc?.hours_label);
   setModalMsg(locationModalMessage, '');
   openModal(locationModal);
 }
+
+// Fills latitude/longitude from the address using OpenStreetMap's Nominatim
+// (the same service the customer booking map already uses). The admin can
+// still correct the numbers by hand.
+locationFindOnMapBtn.addEventListener('click', async () => {
+  const query = locationAddressInput.value.trim();
+  if (!query) { setModalMsg(locationModalMessage, 'Type the address first, then look it up.'); return; }
+  setModalMsg(locationModalMessage, '');
+  locationFindOnMapBtn.disabled = true;
+  locationFindHint.textContent = 'Looking up the address…';
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ph&q=' + encodeURIComponent(query);
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const results = await res.json();
+    if (!Array.isArray(results) || !results.length) {
+      locationFindHint.textContent = 'No match for that address. Try a shorter one (street and city), or paste the coordinates from Google Maps.';
+      return;
+    }
+    locationLatInput.value = Number(results[0].lat).toFixed(6);
+    locationLngInput.value = Number(results[0].lon).toFixed(6);
+    locationFindHint.textContent = 'Found: ' + results[0].display_name + '. Check that this is the right spot.';
+  } catch {
+    locationFindHint.textContent = 'The lookup failed. Check your connection, or paste the coordinates from Google Maps.';
+  } finally {
+    locationFindOnMapBtn.disabled = false;
+  }
+});
 
 locationModalSave.addEventListener('click', async () => {
   const name = locationNameInput.value.trim();
@@ -231,6 +272,20 @@ locationModalSave.addEventListener('click', async () => {
     ? `${hoursDays ? `${hoursDays} · ` : ''}${to12Hour(hoursOpen)} – ${to12Hour(hoursClose)}`
     : hoursDays;
 
+  const latRaw = locationLatInput.value.trim();
+  const lngRaw = locationLngInput.value.trim();
+  if (!!latRaw !== !!lngRaw) {
+    setModalMsg(locationModalMessage, 'Set both latitude and longitude, or leave both empty.');
+    return;
+  }
+  const latitude = latRaw ? Number(latRaw) : null;
+  const longitude = lngRaw ? Number(lngRaw) : null;
+  if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+      || !Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+    setModalMsg(locationModalMessage, 'Latitude must be between -90 and 90, and longitude between -180 and 180.');
+    return;
+  }
+
   locationModalSave.disabled = true;
   try {
     const payload = {
@@ -238,6 +293,8 @@ locationModalSave.addEventListener('click', async () => {
       name,
       address,
       hours_label: hoursLabel || null,
+      latitude: latitude === null ? null : Math.round(latitude * 1e6) / 1e6,
+      longitude: longitude === null ? null : Math.round(longitude * 1e6) / 1e6,
       updated_at: new Date().toISOString()
     };
 

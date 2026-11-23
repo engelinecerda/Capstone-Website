@@ -109,6 +109,19 @@
     line-height: 1.5;
 }
 
+.venue-transport-hint {
+    margin: 10px 0 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #faf5ec;
+    border: 1px solid #eadfcb;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #4a3520;
+}
+
+.venue-transport-hint.hidden { display: none; }
+
 .venue-search-row {
     display: flex;
     gap: 8px;

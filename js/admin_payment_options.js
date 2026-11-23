@@ -1,5 +1,6 @@
 // admin_payment_options.js
 import './money_inputs.js';
+import { readTransportRules, computeTransportFee, describeTransportFee, branchesWithCoords, TRANSPORT_DEFAULTS } from './transport_fee.js';
 import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
@@ -580,6 +581,7 @@ async function ptSaveType(code) {
 // currentPaymentRulesConfig caches whatever was last loaded from the DB so
 // savePaymentRules() below can pass those two fields straight through
 // unchanged instead of wiping them out on every save from this page.
+const TRANSPORT_RULE_KEYS = ['transport_fee_enabled', 'transport_free_km', 'transport_rate_per_km', 'transport_max_fee', 'transport_road_factor'];
 const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,
@@ -593,6 +595,13 @@ const DEFAULT_PAYMENT_RULES = {
   // an admin deliberately turns this on — the café has not confirmed
   // offsite should be charged, so this must never default to true.
   service_charge_applies_offsite: false,
+  // Transport fee (offsite) — owned by the Transport Fee card further down;
+  // savePaymentRules() passes these straight through (see TRANSPORT_RULE_KEYS).
+  transport_fee_enabled: false,
+  transport_free_km: TRANSPORT_DEFAULTS.freeKm,
+  transport_rate_per_km: TRANSPORT_DEFAULTS.ratePerKm,
+  transport_max_fee: null,
+  transport_road_factor: TRANSPORT_DEFAULTS.roadFactor,
   cancellation_min_notice_days: null,
   cancellation_request_window_days: null
 };
@@ -687,6 +696,8 @@ async function savePaymentRules() {
   config.cancellation_request_window_days = oldConfig.cancellation_request_window_days ?? null;
   config.service_charge_percent = oldConfig.service_charge_percent;
   config.service_charge_applies_offsite = !!oldConfig.service_charge_applies_offsite;
+  // The Transport Fee card owns these — keep whatever is saved.
+  for (const key of TRANSPORT_RULE_KEYS) config[key] = oldConfig[key];
 
   showSettingsConfirm(
     'Change Payment Rules',
@@ -914,6 +925,129 @@ async function saveOffsiteToggle() {
   updateWorkedExample(Number(document.getElementById('sc-global-percent')?.value), appliesOffsite);
 }
 
+// ── Transport fee (offsite) ──────────────────────────────────────────────────
+// Same system_settings.payment_rules blob as everything above; this card
+// owns the five transport_* keys. Branch coordinates (the measuring points)
+// are set per branch in Business profile.
+let transportBranches = [];
+
+function setTfMsg(msg, isError = false) {
+  const el = document.getElementById('tf-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('error', isError);
+  el.classList.toggle('success', !isError && !!msg);
+}
+
+function readTransportFields() {
+  const maxRaw = document.getElementById('tf-max-fee')?.value ?? '';
+  return {
+    transport_fee_enabled: !!document.getElementById('tf-enabled')?.checked,
+    transport_free_km: Number(document.getElementById('tf-free-km')?.value),
+    transport_rate_per_km: Number(document.getElementById('tf-rate')?.value),
+    transport_max_fee: maxRaw === '' ? null : Number(maxRaw),
+    transport_road_factor: Number(document.getElementById('tf-road-factor')?.value)
+  };
+}
+
+function validateTransportFields(v) {
+  if (!Number.isFinite(v.transport_free_km) || v.transport_free_km < 0 || v.transport_free_km > 500) return 'Free distance must be between 0 and 500 km.';
+  if (!Number.isFinite(v.transport_rate_per_km) || v.transport_rate_per_km < 0 || v.transport_rate_per_km > 100000) return 'Rate per kilometre must be a valid amount (0.00 or more).';
+  if (v.transport_max_fee !== null && (!Number.isFinite(v.transport_max_fee) || v.transport_max_fee < 0)) return 'Maximum transport fee must be 0.00 or more, or left empty for no limit.';
+  if (!Number.isFinite(v.transport_road_factor) || v.transport_road_factor < 1 || v.transport_road_factor > 3) return 'Road distance factor must be between 1 and 3.';
+  return '';
+}
+
+function updateTransportExample() {
+  const exampleEl = document.getElementById('tf-example-text');
+  if (!exampleEl) return;
+  const v = readTransportFields();
+  if (validateTransportFields(v)) { exampleEl.textContent = ''; return; }
+  const rules = readTransportRules(v);
+  // Straight-line distance that lands the road distance 15 km past the free
+  // allowance, so the example always shows a real charge.
+  const targetRoadKm = rules.freeKm + 15;
+  const straightKm = Math.round((targetRoadKm / rules.roadFactor) * 10) / 10;
+  const origin = branchesWithCoords(transportBranches)[0];
+  // Fake pin due north of the first branch by `straightKm` (1 degree latitude ~ 111.19 km).
+  const baseLat = origin ? Number(origin.latitude) : 14.4647;
+  const baseLng = origin ? Number(origin.longitude) : 121.1925;
+  const sampleBranches = [{ name: origin?.name || 'the nearest branch', latitude: baseLat, longitude: baseLng }];
+  const result = computeTransportFee({ ...v, transport_fee_enabled: true }, { lat: baseLat + straightKm / 111.19, lng: baseLng }, sampleBranches);
+  const where = `A venue about ${straightKm} km away in a straight line is about ${result.distanceKm} km by road from ${result.originName}`;
+  const maths = result.billableKm > 0
+    ? `${rules.freeKm} km free, then ${result.billableKm} km × ${formatMoney(rules.ratePerKm)}`
+    : `within the ${rules.freeKm} km free distance`;
+  exampleEl.textContent = `${where}: ${maths} = transport fee ${formatMoney(result.fee)}${result.capped ? ' (capped at the maximum)' : ''}.`
+    + (v.transport_fee_enabled ? '' : ' The fee is currently switched off, so customers are not charged.');
+}
+
+async function loadTransportFeeSection() {
+  const { data: setting } = await supabase
+    .from('system_settings').select('setting_value').eq('setting_key', 'payment_rules').maybeSingle();
+  let parsed = {};
+  if (setting?.setting_value) { try { parsed = JSON.parse(setting.setting_value); } catch { /* defaults */ } }
+  const rules = readTransportRules(parsed);
+
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const enabledEl = document.getElementById('tf-enabled');
+  if (enabledEl) enabledEl.checked = rules.enabled;
+  setVal('tf-free-km', rules.freeKm);
+  setVal('tf-rate', moneyInputValue(rules.ratePerKm));
+  setVal('tf-max-fee', rules.maxFee === null ? '' : moneyInputValue(rules.maxFee));
+  setVal('tf-road-factor', rules.roadFactor.toFixed(2));
+
+  const { data: branches } = await supabase
+    .from('business_location').select('name, branch_tag, latitude, longitude, is_active').eq('is_active', true).order('sort_order', { ascending: true });
+  transportBranches = branches || [];
+  const usable = branchesWithCoords(transportBranches);
+  const note = document.getElementById('tf-origin-note');
+  if (note) {
+    if (usable.length) {
+      note.textContent = 'Distance is measured from the nearest of: ' + usable.map((b) => b.name).join(', ') + '.'
+        + (usable.length < transportBranches.length ? ' Branches without a map location are ignored — set one in Business profile → Edit branch.' : '');
+      note.style.color = '';
+    } else {
+      note.textContent = 'No active branch has a map location yet, so no transport fee can be charged. Open Business profile, edit a branch and set its map location.';
+      note.style.color = '#b3261e';
+    }
+  }
+  updateTransportExample();
+}
+
+async function saveTransportFee() {
+  const values = readTransportFields();
+  const problem = validateTransportFields(values);
+  if (problem) { setTfMsg(problem, true); return; }
+
+  const { data: current } = await supabase
+    .from('system_settings').select('setting_value').eq('setting_key', 'payment_rules').maybeSingle();
+  let config = { ...DEFAULT_PAYMENT_RULES };
+  if (current?.setting_value) {
+    try { config = { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) }; } catch { /* use default */ }
+  }
+  Object.assign(config, values);
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('system_settings')
+    .upsert(
+      { setting_key: 'payment_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+      { onConflict: 'setting_key' }
+    );
+  if (error) { setTfMsg('Failed to save: ' + error.message, true); return; }
+
+  await logAudit({
+    action: 'Updated Transport Fee',
+    category: 'payment_config',
+    details: values.transport_fee_enabled
+      ? `Transport fee on: first ${values.transport_free_km} km free, ${formatMoney(values.transport_rate_per_km)} per km after that, ${values.transport_max_fee === null ? 'no maximum' : 'maximum ' + formatMoney(values.transport_max_fee)}, road factor ${values.transport_road_factor}`
+      : 'Transport fee turned off'
+  });
+  setTfMsg('Saved.');
+  updateTransportExample();
+}
+
 async function saveCategoryOverride(row) {
   const categoryId = row.dataset.categoryId;
   const input = row.querySelector('.sc-override-input');
@@ -962,6 +1096,10 @@ function wireNumericInputClamps() {
   clampNumberInput(document.getElementById('pr-cancellation-fee-offsite'), { min: 0, max: 1000000, decimals: 2 });
   clampNumberInput(document.getElementById('pr-reschedule-fee'), { min: 0, max: 1000000, decimals: 2 });
   clampNumberInput(document.getElementById('sc-global-percent'), { min: 0, max: 100, decimals: 1 });
+  clampNumberInput(document.getElementById('tf-free-km'), { min: 0, max: 500, decimals: 1 });
+  clampNumberInput(document.getElementById('tf-rate'), { min: 0, max: 100000, decimals: 2 });
+  clampNumberInput(document.getElementById('tf-max-fee'), { min: 0, max: 1000000, decimals: 2 });
+  clampNumberInput(document.getElementById('tf-road-factor'), { min: 1, max: 3, decimals: 2 });
   clampNumberInput(document.getElementById('pm2CashWindowDays'), { min: 0, max: 365, decimals: 0 });
 }
 
@@ -993,6 +1131,7 @@ async function init() {
   await loadPaymentTypes();
   await loadPaymentRules();
   await loadServiceChargeSection();
+  await loadTransportFeeSection();
 
   document.querySelectorAll('.pt-save-btn').forEach((btn) => {
     btn.addEventListener('click', () => ptSaveType(btn.dataset.code));
@@ -1025,6 +1164,9 @@ async function init() {
   document.getElementById('sc-save-global-btn')?.addEventListener('click', saveGlobalServiceCharge);
   document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());
   document.getElementById('sc-save-offsite-btn')?.addEventListener('click', saveOffsiteToggle);
+  document.getElementById('tf-save-btn')?.addEventListener('click', saveTransportFee);
+  ['tf-free-km', 'tf-rate', 'tf-max-fee', 'tf-road-factor'].forEach((id) => document.getElementById(id)?.addEventListener('input', updateTransportExample));
+  document.getElementById('tf-enabled')?.addEventListener('change', updateTransportExample);
   // Live-preview the effect immediately on toggle, before the admin saves —
   // same "see it before committing" behaviour the global-percent input
   // already has above.

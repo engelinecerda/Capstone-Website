@@ -203,6 +203,8 @@ async function loadPageData() {
             package_id,
             add_on_id,
             total_price,
+            transport_fee,
+            transport_distance_km,
             inclusion_snapshot,
             special_requests,
             menu_selections,
@@ -597,13 +599,15 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
     // (balance.totalPrice) — otherwise, once a charge exists, this row's
     // label would silently stop matching what it shows.
     const activeCharges = (charges || []).filter((charge) => !charge.voided);
+    // Offsite transport fee: already inside total_price, shown as its own line.
+    const transportFeeAmount = Math.min(Number(reservation?.transport_fee || 0), balance.basePackagePrice);
     const chargeLines = activeCharges.map((charge) => `
                 <div class="rd-receipt-row">
                     <span>${escapeHtml(charge.label)}</span>
                     <span>${escapeHtml(formatCurrency(charge.amount))}</span>
                 </div>
     `).join('');
-    const chargesTotalRow = activeCharges.length ? `
+    const chargesTotalRow = (activeCharges.length || transportFeeAmount > 0) ? `
                 <div class="rd-receipt-row">
                     <span>Total</span>
                     <span>${escapeHtml(formatCurrency(balance.totalPrice))}</span>
@@ -618,8 +622,13 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                 ${isCancelledReservation ? '' : `
                 <div class="rd-receipt-row">
                     <span>Package total</span>
-                    <span>${escapeHtml(formatCurrency(balance.basePackagePrice))}</span>
+                    <span>${escapeHtml(formatCurrency(balance.basePackagePrice - transportFeeAmount))}</span>
                 </div>
+                ${transportFeeAmount > 0 ? `
+                <div class="rd-receipt-row">
+                    <span>Transport fee${reservation.transport_distance_km ? ` (${escapeHtml(String(Number(reservation.transport_distance_km)))} km)` : ''}</span>
+                    <span>${escapeHtml(formatCurrency(transportFeeAmount))}</span>
+                </div>` : ''}
                 ${chargeLines}
                 ${chargesTotalRow}
                 <div class="rd-receipt-row">

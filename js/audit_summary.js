@@ -168,6 +168,11 @@ function paymentRules(details) {
     if (!isBlank(c.service_charge_percent)) {
         parts.push(`service charge ${c.service_charge_percent}%${c.service_charge_applies_offsite ? ' (also applied offsite)' : ' (onsite only)'}`);
     }
+    if (typeof c.transport_fee_enabled === 'boolean') {
+        parts.push(c.transport_fee_enabled
+            ? `transport fee on (first ${c.transport_free_km ?? 0} km free, then ${peso(c.transport_rate_per_km ?? 0)} per km${isBlank(c.transport_max_fee) ? '' : `, max ${peso(c.transport_max_fee)}`})`
+            : 'transport fee off');
+    }
     return parts.length ? `${parts.join('; ').replace(/^./, (c) => c.toUpperCase())}.` : null;
 }
 

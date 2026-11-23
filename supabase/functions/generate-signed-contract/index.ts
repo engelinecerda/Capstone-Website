@@ -89,7 +89,7 @@ function mergeTemplate(template: string, data: Record<string, string>): string {
 // Fallback Reservation Summary rows — used only if the contract_field table
 // is empty/unreachable. Mirrors the seed data in
 // 20260730_contract_template_structure.sql exactly.
-const DEFAULT_SUMMARY_FIELDS: { token: string; label: string }[] = [
+const DEFAULT_SUMMARY_FIELDS: SummaryField[] = [
   { token: 'reservation_number', label: 'Reservation Number' },
   { token: 'customer_name', label: 'Client Name' },
   { token: 'event_type', label: 'Event Type' },
@@ -787,6 +787,7 @@ Deno.serve(async (req: Request) => {
         discount_percent, discount_amount, discount_label,
         additional_heads, additional_head_price, additional_head_charge,
         inclusion_adjustment, inclusion_snapshot,
+        transport_fee, transport_distance_km,
         package_id, package:package_id ( package_name )
       `)
       .eq('reservation_id', reservation_id)
@@ -886,6 +887,10 @@ Deno.serve(async (req: Request) => {
       additional_heads: reservation.additional_heads > 0 ? String(reservation.additional_heads) : '',
       additional_head_price: reservation.additional_heads > 0 ? formatCurrency(reservation.additional_head_price || 0) : '',
       additional_head_charge: reservation.additional_heads > 0 ? formatCurrency(reservation.additional_head_charge || 0) : '',
+      // Offsite transport fee: blank unless a distance-based fee was priced
+      // for this booking (onsite, or the fee was off at booking time).
+      transport_fee: reservation.transport_distance_km != null ? formatCurrency(reservation.transport_fee || 0) : '',
+      transport_distance_km: reservation.transport_distance_km != null ? String(Number(reservation.transport_distance_km)) : '',
       // Customizable inclusions: blank unless the customer removed something,
       // so a template line using these only prints for bookings that need it.
       inclusion_adjustment: Number(reservation.inclusion_adjustment) > 0 ? formatCurrency(reservation.inclusion_adjustment) : '',

@@ -312,6 +312,7 @@
                                 <label for="venue-address-details" class="venue-details-label">Additional address details <small>(house/unit no., lot/block no., building name, landmark &mdash; optional but recommended)</small></label>
                                 <input type="text" id="venue-address-details" class="res-input" placeholder="e.g., Unit 4B, Lot 7 Blk 2, near the yellow gate" maxlength="300">
                             </div>
+                            <p class="venue-transport-hint hidden" id="venue-transport-hint" role="status"></p>
                             <input type="hidden" id="venue-location" value="">
                         </div>
                     </div>
@@ -676,10 +677,26 @@
                 marker.on('dragend', function () {
                     var pos = marker.getLatLng();
                     reverseGeocode(pos.lat, pos.lng);
+                    announceVenuePin();
                 });
             }
             map.panTo([lat, lng]);
             if (doReverseGeocode) reverseGeocode(lat, lng);
+            announceVenuePin();
+        }
+
+        // The pinned position, for reservations.js (the offsite transport fee
+        // is measured from it). null until the customer has dropped a pin.
+        function getVenuePin() {
+            if (!marker) return null;
+            var pos = marker.getLatLng();
+            return { lat: pos.lat, lng: pos.lng };
+        }
+        window.getVenuePin = getVenuePin;
+
+        // Tells reservations.js the pin moved so it can refresh the fee hint.
+        function announceVenuePin() {
+            document.dispatchEvent(new CustomEvent('venuepinchange', { detail: getVenuePin() }));
         }
 
         // venue-pinned-label is an editable <textarea> (not read-only text) so the

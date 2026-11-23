@@ -965,12 +965,20 @@ function renderActionableCard(reservation) {
     const balance = getActiveBalance(reservation);
     const activeCharges = getReservationCharges(state.bundle.chargesByReservationId, reservation.reservation_id)
         .filter((charge) => !charge.voided);
-    const chargesBreakdown = activeCharges.length ? `
+    // The offsite transport fee is already inside total_price (basePackagePrice);
+    // it is pulled out here so the customer sees it as its own line.
+    const transportFee = Math.min(Number(reservation.transport_fee || 0), balance.basePackagePrice);
+    const chargesBreakdown = (activeCharges.length || transportFee > 0) ? `
         <div class="payment-dl">
             <div class="payment-dl-row">
                 <span>Package total</span>
-                <strong>${escapeHtml(formatCurrency(balance.basePackagePrice))}</strong>
+                <strong>${escapeHtml(formatCurrency(balance.basePackagePrice - transportFee))}</strong>
             </div>
+            ${transportFee > 0 ? `
+            <div class="payment-dl-row">
+                <span>Transport fee${reservation.transport_distance_km ? ` (${escapeHtml(String(Number(reservation.transport_distance_km)))} km)` : ''}</span>
+                <strong>${escapeHtml(formatCurrency(transportFee))}</strong>
+            </div>` : ''}
             ${activeCharges.map((charge) => `
                 <div class="payment-dl-row">
                     <span>${escapeHtml(charge.label)}</span>
