@@ -1688,6 +1688,35 @@
         }
         .signature-status.error { color: #b42318; }
 
+        /* Valid ID upload (inside Step 2, under the signature pad). Reuses the
+           signature pad's dashed frame so the two read as one step. */
+        .id-verify { margin-top: 20px; padding-top: 18px; border-top: 1px solid #EADFCB; }
+        .id-verify.hidden { display: none; }
+        .id-verify-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #3E2418; }
+        .id-verify-help { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; color: #756559; }
+        .id-verify-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        .id-verify-drop {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; box-sizing: border-box; min-height: 56px; padding: 12px 16px;
+            border: 1px dashed #D8C9AE; border-radius: 8px; background: #fff;
+            color: #6B5A47; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer;
+        }
+        .id-verify-drop i { font-size: 18px; }
+        .id-verify-drop:hover, .id-verify-drop:focus-visible { border-color: #B8A88F; color: #3E2418; outline: none; }
+        .id-verify-drop.hidden { display: none; }
+        .id-verify-preview { display: flex; align-items: center; gap: 12px; }
+        .id-verify-preview.hidden { display: none; }
+        .id-verify-preview img {
+            width: 96px; height: 64px; object-fit: cover; flex: none;
+            border: 1px solid #D8C9AE; border-radius: 6px; background: #fff;
+        }
+        .id-verify-preview-meta { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; font-size: 12.5px; color: #6B5A47; }
+        .id-verify-preview-meta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .id-verify-preview-meta .signature-clear-btn { margin-top: 6px; }
+        .id-verify-status { min-height: 18px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: #756559; }
+        .id-verify-status.error { color: #b42318; }
+        .id-verify-status.is-success { color: #2E7D4F; }
+
         @media (max-width: 480px) {
             .contract-viewer { max-height: 150px; }
             .signature-canvas-wrap { height: 110px; }

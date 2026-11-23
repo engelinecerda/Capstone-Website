@@ -155,6 +155,18 @@ const S = {
 // Guest count is validated against the selected package's min_guests/max_guests.
 const GUEST_COUNT_VALIDATION_ENABLED = true;
 
+// Valid-ID signature check (Contract step). The customer uploads a photo of a
+// valid ID and, at Submit, the `verify-id-signature` Edge Function compares
+// the signature on it with the drawn e-signature — a mismatch blocks the
+// reservation until they re-sign or re-upload. Set to false to switch the
+// whole check off (the ID upload hides and "Type instead" comes back).
+// A typed signature can't be compared with handwriting, so while this is on
+// the signature must be drawn.
+const ID_VERIFICATION_ENABLED = true;
+const ID_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;   // raw file the customer picks
+const ID_UPLOAD_MAX_EDGE_PX = 1600;             // resized before it is sent
+const ID_UPLOAD_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 // ── Event types cache (populated by loadEventTypes) ────────────────────
 let eventTypesCache = [];
 
@@ -294,6 +306,18 @@ function scheduleTransportQuote() {
 }
 
 document.addEventListener('venuepinchange', scheduleTransportQuote);
+
+// Address lookups for the venue map (reservations.html) go through the
+// geocode-address edge function, because OpenStreetMap's Nominatim refuses
+// requests straight from some browsers/networks. Resolves to the function's
+// response, or null when it can't be reached (the page then tries Nominatim
+// directly as a last resort).
+window.invokeGeocode = async function (body) {
+    try {
+        const { data, error } = await supabase.functions.invoke('geocode-address', { body });
+        return !error && data && data.success ? data : null;
+    } catch { return null; }
+};
 
 // Re-evaluated against the current clock every time it's called (not
 // cached from page-load) — a promo's window could open or close mid-session
@@ -621,6 +645,14 @@ const signatureTypeInput      = document.getElementById('signature-type-input');
 const signatureTypePreview    = document.getElementById('signature-type-preview');
 const sigModeDrawBtn          = document.getElementById('sig-mode-draw');
 const sigModeTypeBtn          = document.getElementById('sig-mode-type');
+const idVerifyBlock           = document.getElementById('id-verify-block');
+const idUploadInput           = document.getElementById('id-upload-input');
+const idUploadTrigger         = document.getElementById('id-upload-trigger');
+const idUploadPreview         = document.getElementById('id-upload-preview');
+const idUploadThumb           = document.getElementById('id-upload-thumb');
+const idUploadName            = document.getElementById('id-upload-name');
+const idUploadRemove          = document.getElementById('id-upload-remove');
+const idVerifyStatus          = document.getElementById('id-verify-status');
 const signatureCapturedBadge  = document.getElementById('signature-captured-badge');
 const signatureGuidePlaceholder = document.getElementById('signature-guide-placeholder');
 const policyModalBackdrop     = document.getElementById('policy-modal-backdrop');
@@ -1242,6 +1274,7 @@ function initSignaturePad() {
     signatureState.pad.addEventListener('endStroke', () => {
         S.contractSignatureDrawData = signatureState.pad.toData();
         refreshContractGatingUI();
+        setIdVerifyStatus('');
     });
     resizeSignatureCanvas();
     window.addEventListener('resize', resizeSignatureCanvas);
@@ -1390,6 +1423,154 @@ async function getSignatureDataUrl() {
     if (!text) return null;
     try { await document.fonts.load('56px "Dancing Script"'); } catch { /* fall back to default font */ }
     return renderTypedSignatureToDataUrl(text);
+}
+
+// ── Valid ID signature check ───────────────────────────────────────────
+// The customer uploads a photo of a valid ID in Step 2. Nothing is sent
+// until Submit: submitDone() calls verifyIdSignatureOrThrow() before the
+// reservation row is inserted, so a signature mismatch never creates a
+// reservation. The ID is never stored — it goes to the `verify-id-signature`
+// Edge Function, which returns only a verdict.
+const idState = {
+    file: null,         // File the customer picked
+    dataUrl: null,      // resized JPEG actually sent (built on first check)
+    objectUrl: null,    // thumbnail preview URL
+    verifiedKey: ''     // fingerprint of the ID + signature pair that last passed
+};
+
+function setIdVerifyStatus(msg, kind = '') {
+    if (!idVerifyStatus) return;
+    idVerifyStatus.textContent = msg;
+    idVerifyStatus.classList.toggle('error', kind === 'error');
+    idVerifyStatus.classList.toggle('is-success', kind === 'success');
+}
+
+function getIdFileError(file) {
+    if (!ID_UPLOAD_ALLOWED_TYPES.includes(file.type)) return 'Please upload your ID as a JPG, PNG or WEBP photo.';
+    if (!file.size) return 'That file is empty. Please choose another photo.';
+    if (file.size > ID_UPLOAD_MAX_BYTES) return 'That photo is too large. Please upload one under 10 MB.';
+    return null;
+}
+
+function clearIdFile() {
+    if (idState.objectUrl) URL.revokeObjectURL(idState.objectUrl);
+    idState.file = null;
+    idState.dataUrl = null;
+    idState.objectUrl = null;
+    idState.verifiedKey = '';
+    if (idUploadInput) idUploadInput.value = '';
+    if (idUploadThumb) idUploadThumb.removeAttribute('src');
+    idUploadPreview?.classList.add('hidden');
+    idUploadTrigger?.classList.remove('hidden');
+    setIdVerifyStatus('');
+}
+
+function setIdFile(file) {
+    const problem = getIdFileError(file);
+    if (problem) {
+        clearIdFile();
+        setIdVerifyStatus(problem, 'error');
+        return;
+    }
+    clearIdFile();
+    idState.file = file;
+    idState.objectUrl = URL.createObjectURL(file);
+    if (idUploadThumb) idUploadThumb.src = idState.objectUrl;
+    if (idUploadName) idUploadName.textContent = file.name;
+    idUploadPreview?.classList.remove('hidden');
+    idUploadTrigger?.classList.add('hidden');
+}
+
+// Phone photos are several MB; the comparison doesn't need that. Scales the
+// long edge down to ID_UPLOAD_MAX_EDGE_PX and re-encodes as JPEG (also what
+// strips a PNG/WEBP down to a predictable type for the Edge Function).
+function resizeIdImage(file) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const scale = Math.min(1, ID_UPLOAD_MAX_EDGE_PX / Math.max(img.naturalWidth, img.naturalHeight));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
+        img.src = url;
+    });
+}
+
+// Cheap string fingerprint (FNV-1a) — only used to tell whether the ID /
+// signature pair changed since the last passing check, so a retry after an
+// unrelated Submit error doesn't spend another vision call.
+function fingerprintString(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16) + ':' + str.length;
+}
+
+function scrollIdVerifyIntoView() {
+    idVerifyBlock?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Shows the message under the ID upload, scrolls to it, and returns an Error
+// for submitDone()'s catch (which shows it in the warning modal too).
+function failIdCheck(message) {
+    setIdVerifyStatus(message, 'error');
+    scrollIdVerifyIntoView();
+    const err = new Error(message);
+    err.modalTitle = 'ID signature check';
+    return err;
+}
+
+const ID_VERDICT_MESSAGES = {
+    mismatch: 'The signature on your ID doesn\u2019t match the signature you drew. Please clear and sign again, or upload a different photo of your ID.',
+    no_id_signature: 'We couldn\u2019t find a signature on that photo. Please upload a clear photo of a valid ID that shows your signature.',
+    unclear_id: 'Your ID photo is too blurry, dark or cropped to read. Please upload a clearer photo.',
+    unclear_signature: 'Your drawn signature is too small or unclear to compare. Please clear it and sign again.'
+};
+
+async function verifyIdSignatureOrThrow(signatureDataUrl) {
+    if (!ID_VERIFICATION_ENABLED) return;
+    if (!idState.file) throw failIdCheck('Please upload a photo of your valid ID before submitting.');
+
+    let idDataUrl = idState.dataUrl;
+    if (!idDataUrl) {
+        try {
+            idDataUrl = await resizeIdImage(idState.file);
+        } catch {
+            throw failIdCheck('We couldn\u2019t read that photo. Please upload your ID again.');
+        }
+        idState.dataUrl = idDataUrl;
+    }
+
+    const key = fingerprintString(idDataUrl) + '|' + fingerprintString(signatureDataUrl);
+    if (key === idState.verifiedKey) return;   // this exact pair already passed
+
+    setIdVerifyStatus('Checking your signature against your ID\u2026');
+    const { data, error } = await supabase.functions.invoke('verify-id-signature', {
+        body: { id_image_data_url: idDataUrl, signature_data_url: signatureDataUrl }
+    });
+
+    // Service trouble (timeout, quota, outage) is not a mismatch — say so,
+    // and keep blocking: the customer can simply press Submit again.
+    if (error || !data?.success) {
+        throw failIdCheck('We couldn\u2019t check your ID right now. Please try again in a moment.');
+    }
+    if (data.verdict === 'match') {
+        idState.verifiedKey = key;
+        setIdVerifyStatus('Signature matches your ID.', 'success');
+        return;
+    }
+    throw failIdCheck(ID_VERDICT_MESSAGES[data.verdict] || ID_VERDICT_MESSAGES.mismatch);
 }
 
 // ── Contract template (in-app, dynamically merged) ─────────────────────
@@ -1665,7 +1846,7 @@ function applyOrResetContractProgress() {
     signatureState.agreementViewMethod = S.contractAgreementViewMethod || '';
     signatureState.agreementViewedAt = signatureState.agreementViewMethod ? new Date().toISOString() : '';
 
-    if (S.contractSignatureMode === 'type') {
+    if (S.contractSignatureMode === 'type' && !ID_VERIFICATION_ENABLED) {
         setSignatureMode('type');
         if (signatureTypeInput) signatureTypeInput.value = S.contractSignatureTypedText || '';
         if (signatureTypePreview) signatureTypePreview.textContent = (S.contractSignatureTypedText || '').trim();
@@ -4640,6 +4821,11 @@ function validate(n) {
             setSignatureStatus(signatureState.mode === 'draw' ? 'Please sign to continue.' : 'Please type your name to continue.', true);
             return false;
         }
+        if (ID_VERIFICATION_ENABLED && !idState.file) {
+            setIdVerifyStatus('Please upload a photo of your valid ID to continue.', 'error');
+            scrollIdVerifyIntoView();
+            return false;
+        }
         if (!contractAgreementTerms?.checked) {
             setContractPolicyMessage('Please agree to the Terms & Conditions and Data Privacy Policy before submitting.', 'error'); return false;
         }
@@ -4915,6 +5101,7 @@ signatureClearBtn?.addEventListener('click', () => {
     setSignatureGuidePlaceholderVisible(signatureGuidePlaceholder, true);
     refreshContractGatingUI();
     setSignatureStatus('');
+    setIdVerifyStatus('');
 });
 signatureTypeInput?.addEventListener('input', () => {
     const text = signatureTypeInput.value.trim();
@@ -4924,6 +5111,19 @@ signatureTypeInput?.addEventListener('input', () => {
     refreshContractGatingUI();
     setSignatureStatus('');
 });
+// Valid-ID upload (see "Valid ID signature check" above).
+if (ID_VERIFICATION_ENABLED) {
+    idVerifyBlock?.classList.remove('hidden');
+    // Handwriting can only be compared with handwriting, so Draw is the only
+    // way to sign while the check is on.
+    sigModeDrawBtn?.parentElement?.classList.add('hidden');
+}
+idUploadTrigger?.addEventListener('click', () => idUploadInput?.click());
+idUploadInput?.addEventListener('change', () => {
+    const file = idUploadInput.files?.[0];
+    if (file) setIdFile(file);
+});
+idUploadRemove?.addEventListener('click', clearIdFile);
 policyButtons.forEach(btn => btn.addEventListener('click', () => openPolicyModal(btn.dataset.policy)));
 policyModalClose?.addEventListener('click', closePolicyModal);
 policyModalDismiss?.addEventListener('click', closePolicyModal);
@@ -4988,6 +5188,15 @@ async function submitDone() {
         if (!signatureDataUrl) throw new Error('Please sign the contract before submitting.');
         const signerName = getSignerName();
         const signatureType = signatureState.mode === 'draw' ? 'drawn' : 'typed';
+
+        // Before anything is written: the signature on the uploaded ID must
+        // match the one just drawn. A mismatch throws here, so no reservation
+        // row exists yet — the customer re-signs or re-uploads and resubmits.
+        if (ID_VERIFICATION_ENABLED) {
+            nextBtn.textContent = 'Checking your ID...';
+            await verifyIdSignatureOrThrow(signatureDataUrl);
+            nextBtn.textContent = 'Submitting...';
+        }
 
         let packageId  = null;
         let addOnId    = null;
@@ -5207,7 +5416,7 @@ async function submitDone() {
         window.scrollTo({ top: 0, behavior: 'auto' });
 
     } catch (err) {
-        showWarningModal(err.message, 'Something went wrong', 'error');
+        showWarningModal(err.message, err.modalTitle || 'Something went wrong', 'error');
         nextBtn.disabled = false; nextBtn.textContent = 'Submit';
     }
 }

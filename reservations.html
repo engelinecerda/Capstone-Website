@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=72" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=72"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=71"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
     <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
@@ -20,11 +20,11 @@
          content on first paint. Only genuinely non-critical assets above
          (webfonts, icon font, Leaflet map CSS) and the JS-injected
          announcement banner below stay async. -->
-    <link rel="stylesheet" href="/css/styles.css?v=72">
-    <link rel="stylesheet" href="/css/reservations.css?v=72">
-    <link rel="stylesheet" href="/css/home.css?v=72">
-    <link rel="preload" as="style" href="/css/announcement_banner.css?v=72" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=72"></noscript>
+    <link rel="stylesheet" href="/css/styles.css?v=71">
+    <link rel="stylesheet" href="/css/reservations.css?v=71">
+    <link rel="stylesheet" href="/css/home.css?v=71">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=71"></noscript>
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -482,6 +482,29 @@
                         </div>
 
                         <p class="signature-status" id="signature-status" aria-live="polite"></p>
+
+                        <!-- Valid ID upload (js/reservations.js: ID_VERIFICATION_ENABLED).
+                             Shown only while the feature flag is on. The signature on
+                             this ID is compared with the one drawn above at submit. -->
+                        <div class="id-verify hidden" id="id-verify-block">
+                            <h4 class="id-verify-title">Upload a valid ID</h4>
+                            <p class="id-verify-help">Upload a clear photo of a government-issued ID that shows your signature. We compare it with the signature you drew above before your reservation is submitted. Your ID photo is only used for this check and is not stored.</p>
+                            <input type="file" id="id-upload-input" class="id-verify-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of your valid ID">
+                            <button type="button" class="id-verify-drop" id="id-upload-trigger">
+                                <i class="ti ti-id" aria-hidden="true"></i>
+                                <span id="id-upload-label">Choose a photo of your ID</span>
+                            </button>
+                            <div class="id-verify-preview hidden" id="id-upload-preview">
+                                <img id="id-upload-thumb" alt="Preview of your uploaded ID">
+                                <div class="id-verify-preview-meta">
+                                    <span id="id-upload-name"></span>
+                                    <button type="button" class="signature-clear-btn" id="id-upload-remove">
+                                        <i class="ti ti-trash" aria-hidden="true"></i> Remove
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="id-verify-status" id="id-verify-status" aria-live="polite"></p>
+                        </div>
                     </div>
 
                     <hr class="rs-contract-divider">
@@ -816,12 +839,12 @@
     })();
     </script>
 
-    <script type="module" src="/js/footer_content.js?v=72"></script>
+    <script type="module" src="/js/footer_content.js?v=71"></script>
     <script type="module" src="/js/announcement_banner.js"></script>
 
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=72" defer></script>
+  <script src="/js/supabase_health_notice.js?v=71" defer></script>
 </body>
 </html>
