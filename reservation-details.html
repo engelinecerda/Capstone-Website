@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=72">
-  <link rel="stylesheet" href="/css/styles.css?v=72">
-  <link rel="stylesheet" href="/css/account.css?v=72">
-  <link rel="stylesheet" href="/css/reservation_details.css?v=72">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=71">
+  <link rel="stylesheet" href="/css/styles.css?v=71">
+  <link rel="stylesheet" href="/css/account.css?v=71">
+  <link rel="stylesheet" href="/css/reservation_details.css?v=71">
 </head>
 <body>
 
@@ -215,6 +215,49 @@
     </div>
   </div>
 
+  <!-- Signature-check retry: re-upload ID / sign again (js/id_signature_retry.js).
+       Lives outside #reservation-details-page so auto-refresh never wipes a half-filled form. -->
+  <div class="account-modal-backdrop hidden" id="idretry-backdrop" aria-hidden="true">
+    <div class="account-modal-card" role="dialog" aria-modal="true" aria-labelledby="idretry-title">
+      <button type="button" class="account-modal-close" id="idretry-close" aria-label="Close signature check dialog">&times;</button>
+      <p class="account-modal-eyebrow">Signature Check</p>
+      <h2 class="account-modal-title" id="idretry-title">Re-upload Your ID</h2>
+      <p class="account-modal-copy" id="idretry-copy"></p>
+
+      <div class="idretry-field">
+        <span class="idretry-label">Photo of your valid ID</span>
+        <input type="file" id="idretry-file" class="idretry-file-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of your valid ID">
+        <button type="button" class="rd-btn-outline" id="idretry-pick"><i class="ti ti-upload" aria-hidden="true"></i> Choose a photo</button>
+        <div class="idretry-preview hidden" id="idretry-preview">
+          <img id="idretry-thumb" alt="Preview of your uploaded ID">
+          <div class="idretry-preview-meta">
+            <span id="idretry-filename"></span>
+            <button type="button" class="idretry-link-btn" id="idretry-remove">Remove</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="idretry-field hidden" id="idretry-sign-block">
+        <span class="idretry-label">Sign here</span>
+        <div class="idretry-canvas-wrap">
+          <canvas id="idretry-canvas" class="idretry-canvas" aria-label="Draw your signature"></canvas>
+        </div>
+        <button type="button" class="idretry-link-btn" id="idretry-clear">Clear signature</button>
+        <label class="idretry-agree">
+          <input type="checkbox" id="idretry-agree">
+          <span>This is my signature, and I agree to the same contract terms I accepted when I booked, signed electronically.</span>
+        </label>
+      </div>
+
+      <p class="account-modal-message" id="idretry-message" aria-live="polite"></p>
+
+      <div class="account-modal-actions">
+        <button type="button" class="account-modal-btn secondary" id="idretry-dismiss">Go Back</button>
+        <button type="button" class="account-modal-btn primary" id="idretry-confirm">Check My ID</button>
+      </div>
+    </div>
+  </div>
+
   <div class="account-modal-backdrop hidden" id="submission-feedback-backdrop" aria-hidden="true">
     <div class="account-modal-card submission-feedback-card" role="dialog" aria-modal="true" aria-labelledby="submission-feedback-title">
       <button type="button" class="account-modal-close" id="submission-feedback-close" aria-label="Close submission confirmation">x</button>
@@ -229,11 +272,12 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js" defer></script>
   <script type="module" src="/js/navbar.js"></script>
   <script type="module" src="/js/reservation_details.js"></script>
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=72" defer></script>
+  <script src="/js/supabase_health_notice.js?v=71" defer></script>
 </body>
 </html>

@@ -259,6 +259,26 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
+    // Contracts submitted with an ID photo are approved (or kept pending) by
+    // the ID-vs-signature comparison in generate-signed-contract /
+    // verify-id-signature, never by this "is there handwriting" scan — it
+    // would approve any scribble, including one that doesn't match the ID.
+    // id_check_status is NULL only for contracts with no ID check (older rows,
+    // or ID verification switched off in js/reservations.js).
+    const { data: idGoverned } = await supabase
+      .from('reservation_contracts')
+      .select('id_check_status')
+      .eq('reservation_id', reservation_id)
+      .maybeSingle();
+    if (idGoverned?.id_check_status) {
+      console.log('verify-contract skipped: contract is governed by the ID check', { reservation_id });
+      return jsonResponse({
+        verified: false,
+        skipped: true,
+        reason: 'This contract is verified by the ID signature check.',
+      });
+    }
+
     const imageUrl = toImageUrl(contract_url, page_count ?? 1);
     const { signed, confidence, detectedLabels } = await detectSignature(imageUrl, supabase);
 

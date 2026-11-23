@@ -222,6 +222,8 @@ const PRESENTATION_BY_TITLE: Record<string, Presentation> = {
   'Reschedule Hold Expired':     { eyebrow: 'Reschedule',   ctaLabel: 'View reservation' },
   'Cancellation Finalized':      { eyebrow: 'Cancellation', ctaLabel: 'View reservation' },
   'Contract Rejected':           { eyebrow: 'Contract',     ctaLabel: 'View contract' },
+  'Signature Check Needed':      { eyebrow: 'Contract',     ctaLabel: 'Fix signature check' },
+  'Contract Needs Manual Review': { eyebrow: 'Contract',     ctaLabel: 'View reservation' },
   'Reschedule Request Declined': { eyebrow: 'Reschedule',   ctaLabel: 'View reservation' },
   'Your password was changed':   { eyebrow: 'Security',     ctaLabel: 'View Details' },
 }

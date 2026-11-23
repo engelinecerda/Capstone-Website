@@ -1,5 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PDFDocument, StandardFonts, rgb, degrees } from 'https://esm.sh/pdf-lib@1.17.1';
+import {
+  applyIdCheckResult,
+  compareIdAndSignature,
+  MAX_ID_BYTES,
+  MAX_ID_CHECK_ATTEMPTS,
+  MAX_SIGNATURE_BYTES,
+  parseDataUrl,
+  RETRYABLE_VERDICTS,
+  recordIdCheckError,
+  type Verdict,
+} from '../_shared/id_signature_check.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -732,9 +743,13 @@ Deno.serve(async (req: Request) => {
   let agreement_view_method: string | undefined;
   let agreement_viewed_at: string | undefined;
   let time_zone = DEFAULT_TIME_ZONE;
+  let id_image_data_url: unknown;
+  let resign = false;
 
   try {
     const body = await req.json();
+    id_image_data_url = body.id_image_data_url;
+    resign = body.resign === true;
     reservation_id = body.reservation_id;
     signature_data_url = body.signature_data_url;
     signer_name = String(body.signer_name || '').trim();
@@ -746,9 +761,12 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, error: 'Invalid JSON body.' }, 400);
   }
 
+  // A re-sign (resign: true) reuses the agreement-view record from the
+  // customer's original signing — the contract text they read is unchanged —
+  // so those two fields are only required for a first submission.
   if (
     !reservation_id || !signature_data_url || !signer_name || !signature_type ||
-    !agreement_view_method || !agreement_viewed_at
+    (!resign && (!agreement_view_method || !agreement_viewed_at))
   ) {
     return jsonResponse(
       {
@@ -764,7 +782,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, error: 'signature_type must be "drawn" or "typed".' }, 400);
   }
 
-  if (!['scrolled_inline', 'opened_full_view'].includes(agreement_view_method)) {
+  if (!resign && !['scrolled_inline', 'opened_full_view'].includes(agreement_view_method as string)) {
     return jsonResponse(
       { success: false, error: 'agreement_view_method must be "scrolled_inline" or "opened_full_view".' },
       400,
@@ -777,11 +795,46 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+  // ID-vs-signature check (see supabase/functions/_shared/id_signature_check.ts).
+  // When the browser sends the customer's ID photo, the signature on it is
+  // compared with the e-signature right after the contract is created:
+  //   match    -> contract verified
+  //   no match -> contract stays pending, the customer is notified and can
+  //               re-upload their ID or re-sign (resign: true, below)
+  // With no ID photo the contract is created exactly as before (the legacy
+  // verify-contract scan / manual review applies).
+  const wantsIdCheck = id_image_data_url !== undefined && id_image_data_url !== null;
+  const idImage = wantsIdCheck
+    ? parseDataUrl(id_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES)
+    : null;
+  const sigImage = wantsIdCheck
+    ? parseDataUrl(signature_data_url, ['image/png'], MAX_SIGNATURE_BYTES)
+    : null;
+  if (wantsIdCheck && (!idImage || !sigImage)) {
+    return jsonResponse({ success: false, error: 'A valid ID image and signature image are required.' }, 400);
+  }
+  if (resign && !wantsIdCheck) {
+    return jsonResponse({ success: false, error: 'Re-signing requires a photo of your ID.' }, 400);
+  }
+
+  // The ID check spends vision quota and re-signing replaces a contract, so
+  // both need a real signed-in user who owns the reservation (checked below).
+  let callerId: string | null = null;
+  if (wantsIdCheck) {
+    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+    if (!token) return jsonResponse({ success: false, error: 'Please sign in to continue.' }, 401);
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
+      return jsonResponse({ success: false, error: 'Please sign in to continue.' }, 401);
+    }
+    callerId = userData.user.id;
+  }
+
   try {
     const { data: reservation, error: reservationError } = await supabase
       .from('reservations')
       .select(`
-        reservation_id, reservation_number, event_type, event_date, event_time, guest_count, location_type,
+        reservation_id, reservation_number, user_id, event_type, event_date, event_time, guest_count, location_type,
         venue_location, contact_name, contact_email, contact_phone, total_price,
         service_charge_percent, service_charge_amount,
         discount_percent, discount_amount, discount_label,
@@ -797,6 +850,102 @@ Deno.serve(async (req: Request) => {
     if (!reservation) {
       return jsonResponse({ success: false, error: `No reservation found for reservation_id ${reservation_id}.` }, 404);
     }
+
+    if (wantsIdCheck && reservation.user_id !== callerId) {
+      return jsonResponse({ success: false, error: `No reservation found for reservation_id ${reservation_id}.` }, 404);
+    }
+
+    // ── Re-sign: only for a contract still pending after a failed ID check ──
+    if (resign) {
+      const { data: pending } = await supabase
+        .from('reservation_contracts')
+        .select('review_status, id_check_status, id_check_attempts')
+        .eq('reservation_id', reservation.reservation_id)
+        .maybeSingle();
+
+      if (!pending) {
+        return jsonResponse({ success: false, error: 'No contract found for this reservation.' }, 404);
+      }
+      if (pending.review_status !== 'pending_review') {
+        return jsonResponse({ success: false, error: 'This contract has already been reviewed.' }, 409);
+      }
+      const retryable = [...RETRYABLE_VERDICTS, 'error'] as string[];
+      if (!pending.id_check_status || !retryable.includes(pending.id_check_status)) {
+        return jsonResponse({ success: false, error: 'This contract doesn\u2019t need to be signed again.' }, 409);
+      }
+      if (Number(pending.id_check_attempts ?? 0) >= MAX_ID_CHECK_ATTEMPTS) {
+        return jsonResponse(
+          {
+            success: false,
+            error: 'You\u2019ve used all automatic checks. Our team will review your contract by hand.',
+            attempts_left: 0,
+          },
+          429,
+        );
+      }
+
+      // Printed name + agreement-view record carry over from the original
+      // signing (what the customer actually read and signed as).
+      const { data: priorSignature } = await supabase
+        .from('contract_signatures')
+        .select('signer_name, agreement_view_method, agreement_viewed_at')
+        .eq('reservation_id', reservation.reservation_id)
+        .eq('signer_role', 'customer')
+        .order('signed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!priorSignature?.agreement_view_method || !priorSignature?.agreement_viewed_at) {
+        return jsonResponse(
+          { success: false, error: 'The original signing record is incomplete. Please contact us.' },
+          409,
+        );
+      }
+      signer_name = priorSignature.signer_name || signer_name;
+      agreement_view_method = priorSignature.agreement_view_method;
+      agreement_viewed_at = priorSignature.agreement_viewed_at;
+
+      // Compare FIRST. A signature that still doesn't match never replaces
+      // anything, so no PDF is built for it.
+      let verdict: Verdict;
+      try {
+        verdict = await compareIdAndSignature(idImage!, sigImage!);
+      } catch (checkError) {
+        console.error('resign id check failed', { reservation_id, error: String((checkError as Error).message) });
+        return jsonResponse(
+          { success: false, error: 'We could not check your ID right now. Please try again.' },
+          502,
+        );
+      }
+      if (verdict !== 'match') {
+        const result = await applyIdCheckResult(supabase, {
+          reservationId: reservation.reservation_id,
+          reservationNumber: reservation.reservation_number,
+          userId: reservation.user_id,
+          verdict,
+          notify: false,
+        });
+        return jsonResponse({
+          success: true,
+          verdict,
+          verified: false,
+          attempts_left: result.attemptsLeft,
+        });
+      }
+    }
+
+    // First submission: start the comparison now so it runs while the PDF is
+    // being built. A service failure is captured (not thrown) and recorded
+    // after the contract exists.
+    const initialCheck: Promise<{ verdict?: Verdict; failed?: boolean }> | null =
+      wantsIdCheck && !resign
+        ? compareIdAndSignature(idImage!, sigImage!).then(
+          (verdict) => ({ verdict }),
+          (checkError) => {
+            console.error('id check failed', { reservation_id, error: String((checkError as Error).message) });
+            return { failed: true };
+          },
+        )
+        : null;
 
     const { data: template } = await supabase
       .from('contract_templates')
@@ -921,7 +1070,7 @@ Deno.serve(async (req: Request) => {
     const signatureBytes = base64ToBytes(signature_data_url);
 
     const { url: signatureUrl } = await uploadToCloudinary(signatureBytes, {
-      filename: `signature-${reservationNumber}.png`,
+      filename: `signature-${reservationNumber}${resign ? `-resign-${Date.now()}` : ''}.png`,
       folder: 'contracts/signatures',
       resourceType: 'image',
     });
@@ -956,10 +1105,52 @@ Deno.serve(async (req: Request) => {
     // page (where drawSignatureSection always places the signature) instead
     // of assuming it's on page 1.
     const { url: contractUrl, pages: contractPageCount } = await uploadToCloudinary(pdfBytes, {
-      filename: `contract-${reservationNumber}.pdf`,
+      filename: `contract-${reservationNumber}${resign ? `-resign-${Date.now()}` : ''}.pdf`,
       folder: 'contracts',
       resourceType: 'image',
     });
+
+    // ── Re-sign: swap the new PDF + signature into the pending contract ─────
+    if (resign) {
+      const { error: replaceError } = await supabase.rpc('replace_pending_contract', {
+        p_reservation_id: reservation.reservation_id,
+        p_contract_url: contractUrl,
+        p_rendered_body: mergedBody,
+        p_page_count: contractPageCount ?? null,
+      });
+      if (replaceError) throw replaceError;
+
+      // Keep the earlier signature rows as history; readers take the latest.
+      const { error: resignSignatureError } = await supabase
+        .from('contract_signatures')
+        .insert({
+          reservation_id: reservation.reservation_id,
+          signer_role: 'customer',
+          signer_name,
+          signature_type,
+          signature_image_url: signatureUrl,
+          agreement_view_method,
+          agreement_viewed_at,
+        });
+      if (resignSignatureError) throw resignSignatureError;
+
+      const result = await applyIdCheckResult(supabase, {
+        reservationId: reservation.reservation_id,
+        reservationNumber: reservationNumber,
+        userId: reservation.user_id,
+        verdict: 'match',
+        notify: false,
+      });
+
+      return jsonResponse({
+        success: true,
+        verdict: 'match',
+        verified: result.verified,
+        attempts_left: result.attemptsLeft,
+        contract_url: contractUrl,
+        reservation_number: reservationNumber,
+      });
+    }
 
     const { data: existingContract, error: existingContractError } = await supabase
       .from('reservation_contracts')
@@ -988,6 +1179,10 @@ Deno.serve(async (req: Request) => {
       verified_date: null,
       review_notes: null,
       reviewed_at: null,
+      // 'checking' tells verify-contract (fired by the insert trigger) to stand
+      // aside: approval for this contract comes from the ID comparison below,
+      // not from "is there handwriting on the page".
+      id_check_status: initialCheck ? 'checking' : null,
     };
 
     const { error: contractInsertError } = await supabase
@@ -1010,10 +1205,38 @@ Deno.serve(async (req: Request) => {
 
     if (signatureInsertError) throw signatureInsertError;
 
+    // ── ID check outcome ────────────────────────────────────────────────────
+    // The booking and contract already exist either way. Match -> verified;
+    // anything else -> stays pending and the customer is notified.
+    let idCheck: Record<string, unknown> | undefined;
+    if (initialCheck) {
+      const outcome = await initialCheck;
+      if (outcome.verdict) {
+        const result = await applyIdCheckResult(supabase, {
+          reservationId: reservation.reservation_id,
+          reservationNumber,
+          userId: reservation.user_id,
+          verdict: outcome.verdict,
+          notify: true,
+        });
+        idCheck = {
+          verdict: outcome.verdict,
+          verified: result.verified,
+          attempts_left: result.attemptsLeft,
+        };
+      } else {
+        // Service trouble, not a mismatch: a person reviews it; the customer
+        // isn't told their signature failed.
+        await recordIdCheckError(supabase, reservation.reservation_id);
+        idCheck = { verdict: 'error', verified: false };
+      }
+    }
+
     return jsonResponse({
       success: true,
       contract_url: contractUrl,
       reservation_number: reservationNumber,
+      ...(idCheck ? { id_check: idCheck } : {}),
     });
   } catch (error) {
     console.error('generate-signed-contract error', { reservation_id, error: String((error as Error).message) });

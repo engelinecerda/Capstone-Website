@@ -156,10 +156,13 @@ const S = {
 const GUEST_COUNT_VALIDATION_ENABLED = true;
 
 // Valid-ID signature check (Contract step). The customer uploads a photo of a
-// valid ID and, at Submit, the `verify-id-signature` Edge Function compares
-// the signature on it with the drawn e-signature — a mismatch blocks the
-// reservation until they re-sign or re-upload. Set to false to switch the
-// whole check off (the ID upload hides and "Type instead" comes back).
+// valid ID and submits it together with the drawn e-signature. The reservation
+// is always created; `generate-signed-contract` then compares the signature on
+// the ID with the e-signature: a match approves the contract, a mismatch keeps
+// it pending and the customer is notified and asked to re-upload their ID or
+// re-sign from their reservation page (js/reservation_details.js). Set to false
+// to switch the whole check off (the ID upload hides, "Type instead" comes back,
+// and contracts follow the legacy scan / manual review).
 // A typed signature can't be compared with handwriting, so while this is on
 // the signature must be drawn.
 const ID_VERIFICATION_ENABLED = true;
@@ -1427,15 +1430,16 @@ async function getSignatureDataUrl() {
 
 // ── Valid ID signature check ───────────────────────────────────────────
 // The customer uploads a photo of a valid ID in Step 2. Nothing is sent
-// until Submit: submitDone() calls verifyIdSignatureOrThrow() before the
-// reservation row is inserted, so a signature mismatch never creates a
-// reservation. The ID is never stored — it goes to the `verify-id-signature`
-// Edge Function, which returns only a verdict.
+// until Submit: submitDone() sends the resized ID with the e-signature to
+// `generate-signed-contract`, which creates the reservation's contract and
+// compares the two signatures. The reservation is never blocked by the
+// result — a mismatch just leaves the contract pending (see the success
+// screen and js/reservation_details.js). The ID is never stored; only the
+// verdict is.
 const idState = {
     file: null,         // File the customer picked
     dataUrl: null,      // resized JPEG actually sent (built on first check)
-    objectUrl: null,    // thumbnail preview URL
-    verifiedKey: ''     // fingerprint of the ID + signature pair that last passed
+    objectUrl: null     // thumbnail preview URL
 };
 
 function setIdVerifyStatus(msg, kind = '') {
@@ -1457,7 +1461,6 @@ function clearIdFile() {
     idState.file = null;
     idState.dataUrl = null;
     idState.objectUrl = null;
-    idState.verifiedKey = '';
     if (idUploadInput) idUploadInput.value = '';
     if (idUploadThumb) idUploadThumb.removeAttribute('src');
     idUploadPreview?.classList.add('hidden');
@@ -1505,18 +1508,6 @@ function resizeIdImage(file) {
     });
 }
 
-// Cheap string fingerprint (FNV-1a) — only used to tell whether the ID /
-// signature pair changed since the last passing check, so a retry after an
-// unrelated Submit error doesn't spend another vision call.
-function fingerprintString(str) {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 0x01000193);
-    }
-    return (h >>> 0).toString(16) + ':' + str.length;
-}
-
 function scrollIdVerifyIntoView() {
     idVerifyBlock?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -1527,50 +1518,57 @@ function failIdCheck(message) {
     setIdVerifyStatus(message, 'error');
     scrollIdVerifyIntoView();
     const err = new Error(message);
-    err.modalTitle = 'ID signature check';
+    err.modalTitle = 'ID upload';
     return err;
 }
 
-const ID_VERDICT_MESSAGES = {
-    mismatch: 'The signature on your ID doesn\u2019t match the signature you drew. Please clear and sign again, or upload a different photo of your ID.',
-    no_id_signature: 'We couldn\u2019t find a signature on that photo. Please upload a clear photo of a valid ID that shows your signature.',
-    unclear_id: 'Your ID photo is too blurry, dark or cropped to read. Please upload a clearer photo.',
-    unclear_signature: 'Your drawn signature is too small or unclear to compare. Please clear it and sign again.'
+// What the success screen says when the signature check didn't pass. The
+// server sends the same wording in the notification.
+const ID_CHECK_REASONS = {
+    mismatch: 'The signature on your ID doesn\u2019t match the signature you drew.',
+    no_id_signature: 'We couldn\u2019t find a signature on your ID photo.',
+    unclear_id: 'Your ID photo is too blurry, dark or cropped to read.',
+    unclear_signature: 'Your drawn signature is too small or unclear to compare.'
 };
 
-async function verifyIdSignatureOrThrow(signatureDataUrl) {
-    if (!ID_VERIFICATION_ENABLED) return;
+// The resized ID photo that goes to the server with the signature (null when
+// the check is switched off). Nothing is checked here — the comparison runs
+// server-side after the reservation is saved.
+async function getIdImageForSubmit() {
+    if (!ID_VERIFICATION_ENABLED) return null;
     if (!idState.file) throw failIdCheck('Please upload a photo of your valid ID before submitting.');
 
-    let idDataUrl = idState.dataUrl;
-    if (!idDataUrl) {
+    if (!idState.dataUrl) {
         try {
-            idDataUrl = await resizeIdImage(idState.file);
+            idState.dataUrl = await resizeIdImage(idState.file);
         } catch {
             throw failIdCheck('We couldn\u2019t read that photo. Please upload your ID again.');
         }
-        idState.dataUrl = idDataUrl;
+    }
+    return idState.dataUrl;
+}
+
+// The note under "Reservation Submitted!" about how the signature check went.
+function buildIdCheckNoteHtml(idCheck, reservationId) {
+    if (!idCheck) return '';
+    const box = 'margin:16px auto 0;max-width:460px;padding:12px 14px;border-radius:10px;font-size:13.5px;line-height:1.6;text-align:left;';
+
+    if (idCheck.verified) {
+        return '<p style="' + box + 'background:#F1F8F2;border:1px solid #CFE5D3;color:#2E7D4F;"><i class="ti ti-shield-check" aria-hidden="true" style="margin-right:6px;"></i><strong>Signature verified.</strong> It matches the signature on your ID, so your contract has been approved.</p>';
     }
 
-    const key = fingerprintString(idDataUrl) + '|' + fingerprintString(signatureDataUrl);
-    if (key === idState.verifiedKey) return;   // this exact pair already passed
-
-    setIdVerifyStatus('Checking your signature against your ID\u2026');
-    const { data, error } = await supabase.functions.invoke('verify-id-signature', {
-        body: { id_image_data_url: idDataUrl, signature_data_url: signatureDataUrl }
-    });
-
-    // Service trouble (timeout, quota, outage) is not a mismatch — say so,
-    // and keep blocking: the customer can simply press Submit again.
-    if (error || !data?.success) {
-        throw failIdCheck('We couldn\u2019t check your ID right now. Please try again in a moment.');
+    const reason = ID_CHECK_REASONS[idCheck.verdict];
+    if (!reason) {
+        // The check itself couldn't run — not the customer's doing.
+        return '<p style="' + box + 'background:#FFF6E5;border:1px solid #F0D9A8;color:#6B3A1F;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:6px;"></i><strong>Your contract is pending.</strong> We couldn\u2019t run the automatic signature check just now, so our team will verify it by hand.</p>';
     }
-    if (data.verdict === 'match') {
-        idState.verifiedKey = key;
-        setIdVerifyStatus('Signature matches your ID.', 'success');
-        return;
-    }
-    throw failIdCheck(ID_VERDICT_MESSAGES[data.verdict] || ID_VERDICT_MESSAGES.mismatch);
+
+    const fixUrl = '/reservation-details?reservation_id=' + encodeURIComponent(reservationId);
+    return '<div style="' + box + 'background:#FFF6E5;border:1px solid #F0D9A8;color:#6B3A1F;">' +
+        '<p style="margin:0 0 6px;"><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:6px;"></i><strong>Your contract is pending \u2014 signature didn\u2019t match.</strong></p>' +
+        '<p style="margin:0 0 10px;">' + reason + ' Your reservation was submitted, but your contract stays pending until your signature matches your ID. You can re-upload your ID or sign again.</p>' +
+        '<a href="' + fixUrl + '" class="dl-btn" style="text-decoration:none;display:inline-block;">Re-upload ID or re-sign</a>' +
+        '</div>';
 }
 
 // ── Contract template (in-app, dynamically merged) ─────────────────────
@@ -5189,14 +5187,11 @@ async function submitDone() {
         const signerName = getSignerName();
         const signatureType = signatureState.mode === 'draw' ? 'drawn' : 'typed';
 
-        // Before anything is written: the signature on the uploaded ID must
-        // match the one just drawn. A mismatch throws here, so no reservation
-        // row exists yet — the customer re-signs or re-uploads and resubmits.
-        if (ID_VERIFICATION_ENABLED) {
-            nextBtn.textContent = 'Checking your ID...';
-            await verifyIdSignatureOrThrow(signatureDataUrl);
-            nextBtn.textContent = 'Submitting...';
-        }
+        // The ID photo is only prepared here (resized, required). It is sent
+        // with the signature after the reservation is saved; the comparison
+        // happens server-side and never blocks the booking — a mismatch keeps
+        // the contract pending and prompts a re-upload / re-sign afterwards.
+        const idImageDataUrl = await getIdImageForSubmit();
 
         let packageId  = null;
         let addOnId    = null;
@@ -5357,6 +5352,9 @@ async function submitDone() {
             body: {
                 reservation_id: reservation.reservation_id,
                 signature_data_url: signatureDataUrl,
+                // Compared with the signature on the ID right after the
+                // contract is created (null when the check is switched off).
+                id_image_data_url: idImageDataUrl,
                 signer_name: signerName,
                 signature_type: signatureType,
                 agreement_view_method: signatureState.agreementViewMethod,
@@ -5403,6 +5401,7 @@ async function submitDone() {
             'Reservation Number: <strong style="color:#6B3A1F;">' + (contractResult.reservation_number || '') + '</strong><br>' +
             'Your reservation is <strong style="color:#6B3A1F;">under review</strong>.<br>' +
             'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.</p>' +
+            buildIdCheckNoteHtml(contractResult.id_check, reservation.reservation_id) +
             customRequestNote +
             '<p style="margin:16px auto 0;max-width:460px;padding:12px 14px;background:#FFF6E5;border:1px solid #F0D9A8;border-radius:10px;color:#6B3A1F;font-size:13.5px;line-height:1.6;text-align:left;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:6px;"></i><strong>Please note:</strong> your reservation must be approved before you can request to reschedule or cancel it.</p>' +
             '<p style="margin-top:14px;"><a href="' + contractResult.contract_url + '" target="_blank" rel="noopener noreferrer" class="dl-btn" style="text-decoration:none;">Download your signed contract</a></p>' +

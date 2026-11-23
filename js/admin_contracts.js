@@ -564,6 +564,11 @@ const SIGNATURE_CHECK_ICON = {
 // handlePerformVerifyContract below.
 function getSignatureCheckState(contract) {
   const note = String(contract.contract?.review_notes || '');
+  // ID-vs-signature comparison (supabase/functions/_shared/id_signature_check.ts)
+  // — its review_notes wording is matched here, so keep the two in sync.
+  if (/signature on the customer.s ID matches/i.test(note)) return 'id-matched';
+  if (/ID check could not complete/i.test(note)) return 'id-error';
+  if (/^ID check:/i.test(note)) return 'id-mismatch';
   if (/signature detected/i.test(note)) return 'detected';
   if (/no .*signature detected|not detected/i.test(note)) return 'not-detected';
   return 'not-scanned';
@@ -573,6 +578,21 @@ function renderSignatureCheckPanel(contract) {
   const state = getSignatureCheckState(contract);
 
   const copy = {
+    'id-matched': {
+      icon: SIGNATURE_CHECK_ICON.detected,
+      title: 'Signature matches the customer’s ID — verified automatically',
+      sub: 'The e-signature was compared with the signature on the ID they uploaded.'
+    },
+    'id-mismatch': {
+      icon: SIGNATURE_CHECK_ICON.alert,
+      title: 'Signature did not match the customer’s ID',
+      sub: 'The contract is kept pending. The customer was asked to re-upload their ID or sign again. You can still verify it manually.'
+    },
+    'id-error': {
+      icon: SIGNATURE_CHECK_ICON.alert,
+      title: 'ID signature check could not run',
+      sub: 'The automatic comparison failed. Open the contract and verify manually if needed.'
+    },
     detected: {
       icon: SIGNATURE_CHECK_ICON.detected,
       title: 'Signature detected — verified automatically',
@@ -590,7 +610,9 @@ function renderSignatureCheckPanel(contract) {
     }
   }[state];
 
-  contractSignaturePanel.className = `signature-check-panel state-${state}`;
+  // The ID-check states reuse the existing panel styling.
+  const cssState = { 'id-matched': 'detected', 'id-mismatch': 'not-detected', 'id-error': 'not-scanned' }[state] || state;
+  contractSignaturePanel.className = `signature-check-panel state-${cssState}`;
   contractSignaturePanel.innerHTML = `
     <span class="signature-check-icon">${copy.icon}</span>
     <span class="signature-check-copy">

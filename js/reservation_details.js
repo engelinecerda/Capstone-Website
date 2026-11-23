@@ -50,6 +50,7 @@ import { loadPolicyBodies, renderPolicyText } from './policy_text.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { initRescheduleModal } from './reservation_details_reschedule.js';
+import { initIdRetryModal, getIdCheckState } from './id_signature_retry.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -129,13 +130,15 @@ function isReservationContractsColumnMissing(error, columnName) {
 async function fetchContract(id) {
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, id_check_status, id_check_attempts')
         .eq('reservation_id', id)
         .maybeSingle();
 
     if (error) {
         if (
-            isReservationContractsColumnMissing(error, 'review_status')
+            isReservationContractsColumnMissing(error, 'id_check_status')
+            || isReservationContractsColumnMissing(error, 'id_check_attempts')
+            || isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
             || isReservationContractsColumnMissing(error, 'reviewed_at')
         ) {
@@ -415,6 +418,19 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
         };
     }
 
+    // The signature on the customer's ID didn't match their e-signature, so
+    // the contract is waiting on THEM (not on our team).
+    const idCheck = getIdCheckState(contractMeta?.contract);
+    if (!verificationDone && idCheck) {
+        return {
+            tone: 'amber',
+            icon: 'alert-triangle',
+            body: idCheck.canRetry
+                ? `Your contract is pending: ${idCheck.reason} ${idCheck.nextStep}`
+                : 'Your contract is pending. Our team will review your signature by hand \u2014 no action needed from you right now.'
+        };
+    }
+
     if (!verificationDone) {
         return {
             tone: 'amber',
@@ -436,6 +452,41 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
         icon: 'info-circle',
         body: balance.helperText || 'Your contract is verified. Complete your payment to confirm this booking.'
     };
+}
+
+// Shown inside the "Signed contract" box while the contract is pending because
+// the signature on the customer's ID didn't match (or the check couldn't run).
+// The buttons open the retry modal (js/id_signature_retry.js).
+function buildIdCheckPrompt(contract) {
+    const check = getIdCheckState(contract);
+    if (!check) return '';
+
+    if (!check.canRetry) {
+        return `
+            <div class="rd-idcheck">
+                <p class="rd-idcheck-title"><i class="ti ti-info-circle" aria-hidden="true"></i> Our team will review your signature</p>
+                <p class="rd-idcheck-copy">You\u2019ve used all the automatic checks. We\u2019ll verify your contract by hand \u2014 no action needed from you.</p>
+            </div>
+        `;
+    }
+
+    const isServiceError = check.status === 'error';
+    return `
+        <div class="rd-idcheck">
+            <p class="rd-idcheck-title"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${isServiceError ? 'Signature check didn\u2019t run' : 'Signature didn\u2019t match your ID'}</p>
+            <p class="rd-idcheck-copy">${escapeHtml(check.reason)} Your contract stays pending until it passes. ${escapeHtml(check.nextStep)}</p>
+            <div class="rd-idcheck-actions">
+                <button type="button" class="rd-btn-outline" data-action="open-id-retry" data-mode="reupload">
+                    <i class="ti ti-id" aria-hidden="true"></i> ${isServiceError ? 'Try the check again' : 'Re-upload my ID'}
+                </button>
+                ${isServiceError ? '' : `
+                <button type="button" class="rd-btn-outline" data-action="open-id-retry" data-mode="resign">
+                    <i class="ti ti-signature" aria-hidden="true"></i> Sign again
+                </button>`}
+            </div>
+            <p class="rd-idcheck-left">${check.attemptsLeft} automatic ${check.attemptsLeft === 1 ? 'check' : 'checks'} left</p>
+        </div>
+    `;
 }
 
 function contractBadgeClass(contractMeta) {
@@ -682,6 +733,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                 ` : `
                     <p class="rd-inline-note">Your signed contract will appear here once submitted.</p>
                 `}
+                ${buildIdCheckPrompt(contract)}
             </div>
 
             ${showPaymentCta ? `
@@ -1740,6 +1792,35 @@ const rescheduleModal = initRescheduleModal({
     }
 });
 
+// Signature-check retry (re-upload ID / re-sign) — js/id_signature_retry.js.
+const idRetryModal = initIdRetryModal({
+    supabase,
+    getPageData: () => pageData,
+    onChanged: async () => {
+        try {
+            await loadPageData();
+            render();
+        } catch (error) {
+            console.error('[reservation_details] refresh after ID check failed:', error);
+        }
+    },
+    onVerified: (opts = {}) => {
+        if (opts.manualReview) {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Contract',
+                title: 'Our Team Will Review It',
+                copy: 'We couldn\u2019t automatically match your signature, so our team will verify your contract by hand. No action is needed from you.'
+            });
+            return;
+        }
+        openSubmissionFeedbackModal({
+            eyebrow: 'Contract',
+            title: 'Signature Verified',
+            copy: 'Your signature matches your ID, so your contract has been approved.'
+        });
+    }
+});
+
 pageContainer?.addEventListener('click', async (event) => {
     const payBtn = event.target.closest('.rd-pay-cta');
     if (payBtn && !payBtn.disabled) {
@@ -1751,6 +1832,12 @@ pageContainer?.addEventListener('click', async (event) => {
     const cancelTriggerBtn = event.target.closest('[data-action="open-cancel"]');
     if (cancelTriggerBtn) {
         openCancelModal();
+        return;
+    }
+
+    const idRetryBtn = event.target.closest('[data-action="open-id-retry"]');
+    if (idRetryBtn) {
+        idRetryModal.open(idRetryBtn.dataset.mode);
         return;
     }
 
