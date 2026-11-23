@@ -39,7 +39,7 @@ export const TOKEN_INFO = {
   additional_head_price: 'Per-head price (₱) charged for each additional guest, frozen at booking time — blank if none',
   additional_head_charge: 'Total charge (₱) for additional guests, frozen at booking time — blank if none',
   transport_fee: 'Offsite transport fee (₱) for this booking, frozen at booking time — blank for onsite bookings or when no fee applied',
-  transport_distance_km: 'Road distance (km) from the nearest branch to the venue used to price the transport fee, frozen at booking time — blank if no fee applied',
+  transport_distance_km: 'Road distance (km) from the Binangonan branch to the venue used to price the transport fee, frozen at booking time — blank if no fee applied',
   inclusion_adjustment: 'Total (₱) taken off the package price for inclusions the customer removed, frozen at booking time — blank if none removed',
   removed_inclusions: 'Names of the optional inclusions the customer removed, comma-separated — blank if none removed',
 };

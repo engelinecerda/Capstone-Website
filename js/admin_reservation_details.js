@@ -924,7 +924,7 @@ function renderBookingDetails() {
     dlRow('Address', reservation.venue_location || 'No address provided', { full: true, muted: !reservation.venue_location }),
     // Offsite transport fee frozen at booking time (already inside the reservation total).
     ...(reservation.transport_distance_km != null
-      ? [dlRow('Transport fee', `${formatCurrency(reservation.transport_fee)} (${Number(reservation.transport_distance_km)} km by road from the nearest branch)`, { full: true })]
+      ? [dlRow('Transport fee', `${formatCurrency(reservation.transport_fee)} (${Number(reservation.transport_distance_km)} km by road from the Binangonan branch)`, { full: true })]
       : []),
     ...(buildMenuSelectionsHtml(reservation.menu_selections)
       ? [dlRow('Menu selections', buildMenuSelectionsHtml(reservation.menu_selections), { full: true, raw: true })]

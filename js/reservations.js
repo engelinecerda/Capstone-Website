@@ -244,7 +244,7 @@ function refreshVenueTransportHint() {
     if (S.locationType !== 'offsite' || !isTransportFeeActive()) { el.classList.add('hidden'); return; }
     const pin = window.getVenuePin ? window.getVenuePin() : null;
     if (!pin) {
-        el.textContent = 'A transport fee applies to offsite venues, based on the distance from our nearest branch. Drop a pin on the map to see yours.';
+        el.textContent = 'A transport fee applies to offsite venues, based on the distance from our Binangonan branch. Drop a pin on the map to see yours.';
         el.classList.remove('hidden');
         return;
     }
