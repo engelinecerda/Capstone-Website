@@ -3,6 +3,11 @@
 // pin and by Payment Settings (admin_payment_options.js) for the live example,
 // so both always do the same maths.
 //
+// NOTE: the booking form gets the real road distance from the
+// calculate-transport-fee edge function (OpenRouteService). The distance
+// maths below is the fallback used when that function can't be reached, and
+// powers the Payment Settings example; the fee rule itself is the same in both.
+//
 // Rule (per-km): the distance from the NEAREST branch to the venue pin is
 // measured in a straight line, multiplied by a road factor (roads are longer
 // than the crow flies), and rounded to 0.1 km. The first `freeKm` are free;

@@ -135,6 +135,8 @@ const S = {
     // {lat, lng} of the pin on the offsite venue map, read from the map when
     // the customer moves past the venue step (null for onsite / no pin yet).
     venuePin: null,
+    // Server-priced transport fee for the current pin: { key, result }.
+    transportQuote: null,
     eventDate: '',
     time: '',
     name: '', phone: '', email: '', requests: '',
@@ -203,9 +205,22 @@ function resolveServiceCharge(basePrice, locationType, categoryId) {
 let TRANSPORT_RULES = {};
 let TRANSPORT_BRANCHES = [];
 
+// The fee is priced by the calculate-transport-fee edge function (real road
+// distance from OpenRouteService). The result is cached against the pin it
+// was priced for; if the function can't be reached, the local straight-line
+// estimate (js/transport_fee.js) is used instead so booking never blocks.
+function transportQuoteKey(pin) {
+    return Number(pin.lat).toFixed(5) + ',' + Number(pin.lng).toFixed(5);
+}
+
+function getTransportQuoteFor(pin) {
+    if (!pin || !S.transportQuote) return null;
+    return S.transportQuote.key === transportQuoteKey(pin) ? S.transportQuote.result : null;
+}
+
 function resolveTransport() {
     if (S.locationType !== 'offsite') return computeTransportFee({}, null, []);
-    return computeTransportFee(TRANSPORT_RULES, S.venuePin, TRANSPORT_BRANCHES);
+    return getTransportQuoteFor(S.venuePin) || computeTransportFee(TRANSPORT_RULES, S.venuePin, TRANSPORT_BRANCHES);
 }
 
 function isTransportFeeActive() {
@@ -233,12 +248,52 @@ function refreshVenueTransportHint() {
         el.classList.remove('hidden');
         return;
     }
-    const result = computeTransportFee(TRANSPORT_RULES, pin, TRANSPORT_BRANCHES);
-    el.textContent = 'Estimated transport fee: ' + fmtPeso(result.fee) + ' \u2014 ' + describeTransportFee(result) + '.';
+    const result = getTransportQuoteFor(pin);
+    if (!result) {
+        el.textContent = 'Calculating your transport fee\u2026';
+        el.classList.remove('hidden');
+        return;
+    }
+    el.textContent = 'Estimated transport fee: ' + fmtPeso(result.fee) + ' \u2014 ' + describeTransportFee(result) +
+        (result.method === 'estimate' ? ' (approximate)' : '') + '.';
     el.classList.remove('hidden');
 }
 
-document.addEventListener('venuepinchange', refreshVenueTransportHint);
+// Asks the server to price the current pin. Debounced, because dragging the
+// pin fires many events; a sequence number drops answers for an old pin.
+let transportQuoteTimer = null;
+let transportQuoteSeq = 0;
+function scheduleTransportQuote() {
+    clearTimeout(transportQuoteTimer);
+    const pin = window.getVenuePin ? window.getVenuePin() : null;
+    if (S.locationType !== 'offsite' || !isTransportFeeActive() || !pin) {
+        transportQuoteSeq++;
+        S.transportQuote = null;
+        refreshVenueTransportHint();
+        return;
+    }
+    if (getTransportQuoteFor(pin)) { refreshVenueTransportHint(); return; }
+    S.transportQuote = null;
+    refreshVenueTransportHint();
+    const seq = ++transportQuoteSeq;
+    transportQuoteTimer = setTimeout(async () => {
+        let result = null;
+        try {
+            const { data, error } = await supabase.functions.invoke('calculate-transport-fee', {
+                body: { lat: pin.lat, lng: pin.lng }
+            });
+            if (!error && data && data.success && data.result) result = data.result;
+        } catch { /* fall back to the local estimate below */ }
+        if (!result) {
+            result = { ...computeTransportFee(TRANSPORT_RULES, pin, TRANSPORT_BRANCHES), method: 'estimate' };
+        }
+        if (seq !== transportQuoteSeq) return;
+        S.transportQuote = { key: transportQuoteKey(pin), result };
+        refreshVenueTransportHint();
+    }, 400);
+}
+
+document.addEventListener('venuepinchange', scheduleTransportQuote);
 
 // Re-evaluated against the current clock every time it's called (not
 // cached from page-load) — a promo's window could open or close mid-session
@@ -3185,7 +3240,7 @@ function buildAddonOrVenueStep() {
         setTimeout(() => {
             if (window.initVenueMap) window.initVenueMap();
             if (window.venueMap) window.venueMap.invalidateSize();
-            refreshVenueTransportHint();
+            scheduleTransportQuote();
         }, 150);
     }
 }
@@ -4513,6 +4568,11 @@ function validate(n) {
             S.venuePin = window.getVenuePin ? window.getVenuePin() : null;
             if (isTransportFeeActive() && !S.venuePin) {
                 showWarningModal('Please click the map (or search an address) to drop a pin on your venue. We use the pin to work out the transport fee.');
+                scrollToSection('sub-addon-venue'); return false;
+            }
+            if (isTransportFeeActive() && !getTransportQuoteFor(S.venuePin)) {
+                scheduleTransportQuote();
+                showWarningModal('We are still calculating your transport fee. Please wait a moment and click Next again.');
                 scrollToSection('sub-addon-venue'); return false;
             }
         } else {

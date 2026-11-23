@@ -213,15 +213,21 @@
           <span class="modal-hint">Type the days, then pick the opening and closing time. Shown to customers as, e.g., “Daily · 1:00 PM – 10:00 PM”. Leave the times empty to save the text as typed.</span>
         </div>
         <div class="modal-field">
-          <label class="modal-label" for="locationLatInput">Map location <small>(used to measure the offsite transport fee)</small></label>
-          <div class="modal-row">
-            <input type="number" id="locationLatInput" class="modal-input" placeholder="Latitude, e.g., 14.464700" step="any" min="-90" max="90" aria-label="Latitude">
-            <input type="number" id="locationLngInput" class="modal-input" placeholder="Longitude, e.g., 121.192500" step="any" min="-180" max="180" aria-label="Longitude">
+          <label class="modal-label" for="locationFindOnMapBtn">Pin on map <small>(used to measure the offsite transport fee)</small></label>
+          <div class="hours-input-row">
+            <button type="button" class="btn-outline-sm" id="locationFindOnMapBtn">Find address on map</button>
+            <button type="button" class="btn-outline-sm" id="locationClearPinBtn">Remove pin</button>
+            <span class="location-pin-status" id="locationPinStatus" aria-live="polite">No pin placed yet.</span>
           </div>
-          <div class="hours-input-row" style="margin-top:8px;">
-            <button type="button" class="btn-outline-sm" id="locationFindOnMapBtn">Find from address</button>
-            <span class="modal-hint" id="locationFindHint" style="margin:0;">Looks up the address above. Check the numbers, or paste them from Google Maps (right-click the spot). Leave both empty to skip.</span>
-          </div>
+          <div id="locationPinMap" class="location-pin-map" role="application" aria-label="Map for placing the branch pin"></div>
+          <span class="modal-hint" id="locationFindHint">Click “Find address on map” to place the pin from the address above, or click the map yourself. Drag the pin to fine-tune it. Leave it unplaced to skip.</span>
+          <details class="location-coords-manual">
+            <summary>Enter coordinates manually (optional)</summary>
+            <div class="modal-row">
+              <input type="number" id="locationLatInput" class="modal-input" placeholder="Latitude, e.g., 14.464700" step="any" min="-90" max="90" aria-label="Latitude">
+              <input type="number" id="locationLngInput" class="modal-input" placeholder="Longitude, e.g., 121.192500" step="any" min="-180" max="180" aria-label="Longitude">
+            </div>
+          </details>
         </div>
         <p class="modal-message hidden" id="locationModalMessage"></p>
       </div>

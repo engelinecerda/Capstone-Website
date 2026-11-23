@@ -72,6 +72,9 @@ const locationLngInput     = document.getElementById('locationLngInput');
 const locationFindOnMapBtn = document.getElementById('locationFindOnMapBtn');
 const locationFindHint     = document.getElementById('locationFindHint');
 const LOCATION_FIND_HINT_DEFAULT = locationFindHint ? locationFindHint.textContent : '';
+const locationClearPinBtn  = document.getElementById('locationClearPinBtn');
+const locationPinStatus    = document.getElementById('locationPinStatus');
+const locationPinMapEl     = document.getElementById('locationPinMap');
 const locationHoursInput   = document.getElementById('locationHoursInput');
 const locationHoursOpen    = document.getElementById('locationHoursOpen');
 const locationHoursClose   = document.getElementById('locationHoursClose');
@@ -221,36 +224,132 @@ function openLocationModal(id) {
   locationTagInput.value = loc?.branch_tag || '';
   locationNameInput.value = loc?.name || '';
   locationAddressInput.value = loc?.address || '';
-  locationLatInput.value = hasCoords(loc) ? Number(loc.latitude) : '';
-  locationLngInput.value = hasCoords(loc) ? Number(loc.longitude) : '';
   locationFindHint.textContent = LOCATION_FIND_HINT_DEFAULT;
   fillHoursFields(loc?.hours_label);
   setModalMsg(locationModalMessage, '');
   openModal(locationModal);
+  initLocationPin(hasCoords(loc) ? { lat: Number(loc.latitude), lng: Number(loc.longitude) } : null);
 }
 
-// Fills latitude/longitude from the address using OpenStreetMap's Nominatim
-// (the same service the customer booking map already uses). The admin can
-// still correct the numbers by hand.
+// ── Branch pin picker ──────────────────────────────────────────────────────
+// Admins place a pin on a map instead of typing latitude/longitude. The pin
+// writes into the (now optional, collapsed) number inputs, so the save
+// handler below is unchanged. Leaflet is already loaded on this page.
+const PIN_DEFAULT_CENTER = [14.5794, 121.1878];
+const PIN_DEFAULT_ZOOM = 11;
+const PIN_PLACED_ZOOM = 17;
+let locationPinMap = null;
+let locationPinMarker = null;
+
+function updatePinStatus() {
+  locationPinStatus.textContent = locationPinMarker
+    ? 'Pin placed. Drag it to adjust.'
+    : 'No pin placed yet.';
+  locationClearPinBtn.disabled = !locationPinMarker;
+}
+
+function ensureLocationPinMap() {
+  if (locationPinMap) return;
+  locationPinMap = L.map(locationPinMapEl, { center: PIN_DEFAULT_CENTER, zoom: PIN_DEFAULT_ZOOM });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(locationPinMap);
+  locationPinMap.on('click', (e) => setLocationPin(e.latlng.lat, e.latlng.lng));
+}
+
+function setLocationPin(lat, lng, zoom) {
+  const latR = Math.round(lat * 1e6) / 1e6;
+  const lngR = Math.round(lng * 1e6) / 1e6;
+  locationLatInput.value = latR;
+  locationLngInput.value = lngR;
+  if (!locationPinMarker) {
+    locationPinMarker = L.marker([latR, lngR], { draggable: true, title: 'Drag to adjust the pin' }).addTo(locationPinMap);
+    locationPinMarker.on('dragend', () => {
+      const p = locationPinMarker.getLatLng();
+      setLocationPin(p.lat, p.lng);
+    });
+  } else {
+    locationPinMarker.setLatLng([latR, lngR]);
+  }
+  if (zoom) locationPinMap.setView([latR, lngR], zoom);
+  updatePinStatus();
+}
+
+function clearLocationPin() {
+  if (locationPinMarker) { locationPinMap.removeLayer(locationPinMarker); locationPinMarker = null; }
+  locationLatInput.value = '';
+  locationLngInput.value = '';
+  updatePinStatus();
+}
+
+function initLocationPin(coords) {
+  ensureLocationPinMap();
+  clearLocationPin();
+  locationPinMap.setView(PIN_DEFAULT_CENTER, PIN_DEFAULT_ZOOM);
+  if (coords) setLocationPin(coords.lat, coords.lng, PIN_PLACED_ZOOM);
+  // The modal was hidden while the map was created, so Leaflet needs to
+  // re-measure its container once the modal is visible.
+  setTimeout(() => {
+    locationPinMap.invalidateSize();
+    if (locationPinMarker) locationPinMap.setView(locationPinMarker.getLatLng(), PIN_PLACED_ZOOM);
+  }, 120);
+}
+
+// If the admin types coordinates by hand, move the pin to match.
+function syncPinFromInputs() {
+  const latRaw = locationLatInput.value.trim();
+  const lngRaw = locationLngInput.value.trim();
+  if (!latRaw || !lngRaw) return;
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+  setLocationPin(lat, lng, PIN_PLACED_ZOOM);
+}
+locationLatInput.addEventListener('change', syncPinFromInputs);
+locationLngInput.addEventListener('change', syncPinFromInputs);
+locationClearPinBtn.addEventListener('click', () => {
+  clearLocationPin();
+  locationFindHint.textContent = LOCATION_FIND_HINT_DEFAULT;
+});
+
+// Places the pin from the address using OpenStreetMap's Nominatim (the same
+// service the customer booking map uses). Detailed addresses ("2nd Floor,
+// Pearl Building, ...") often have no exact match, so if the full address
+// fails it retries with the leading parts removed.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function geocodeAddress(address) {
+  const parts = address.replace(/[.\s]+$/, '').split(',').map((p) => p.trim()).filter(Boolean);
+  for (let drop = 0; drop <= 3 && parts.length - drop >= 2; drop++) {
+    if (drop > 0) await sleep(1100); // Nominatim allows ~1 request per second
+    const q = parts.slice(drop).join(', ');
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ph&q=' + encodeURIComponent(q);
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const results = await res.json();
+    if (Array.isArray(results) && results.length) return { hit: results[0], approximate: drop > 0 };
+  }
+  return null;
+}
+
 locationFindOnMapBtn.addEventListener('click', async () => {
   const query = locationAddressInput.value.trim();
-  if (!query) { setModalMsg(locationModalMessage, 'Type the address first, then look it up.'); return; }
+  if (!query) { setModalMsg(locationModalMessage, 'Type the address first, then click “Find address on map”.'); return; }
   setModalMsg(locationModalMessage, '');
   locationFindOnMapBtn.disabled = true;
   locationFindHint.textContent = 'Looking up the address…';
   try {
-    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ph&q=' + encodeURIComponent(query);
-    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-    const results = await res.json();
-    if (!Array.isArray(results) || !results.length) {
-      locationFindHint.textContent = 'No match for that address. Try a shorter one (street and city), or paste the coordinates from Google Maps.';
+    const found = await geocodeAddress(query);
+    if (!found) {
+      locationFindHint.textContent = 'We couldn’t find that address. Click the map to place the pin yourself.';
       return;
     }
-    locationLatInput.value = Number(results[0].lat).toFixed(6);
-    locationLngInput.value = Number(results[0].lon).toFixed(6);
-    locationFindHint.textContent = 'Found: ' + results[0].display_name + '. Check that this is the right spot.';
+    setLocationPin(Number(found.hit.lat), Number(found.hit.lon), found.approximate ? 16 : PIN_PLACED_ZOOM);
+    locationFindHint.textContent = (found.approximate
+      ? 'Placed near the street or area, since the exact building wasn’t found. '
+      : 'Pin placed. ')
+      + 'If it isn’t on the right spot, click the map or drag the pin.';
   } catch {
-    locationFindHint.textContent = 'The lookup failed. Check your connection, or paste the coordinates from Google Maps.';
+    locationFindHint.textContent = 'The lookup failed. Check your connection, or click the map to place the pin yourself.';
   } finally {
     locationFindOnMapBtn.disabled = false;
   }
