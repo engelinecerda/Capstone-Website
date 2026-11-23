@@ -7,7 +7,7 @@ import { initAutoRefresh } from './auto_refresh.js';
   const link = document.createElement('link');
   link.id = 'notif-stylesheet';
   link.rel = 'stylesheet';
-  link.href = '/css/notifications.css?v=71';
+  link.href = '/css/notifications.css?v=72';
   document.head.appendChild(link);
 })();
 

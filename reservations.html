@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=71"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=72" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=72"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
     <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
@@ -20,11 +20,11 @@
          content on first paint. Only genuinely non-critical assets above
          (webfonts, icon font, Leaflet map CSS) and the JS-injected
          announcement banner below stay async. -->
-    <link rel="stylesheet" href="/css/styles.css?v=71">
-    <link rel="stylesheet" href="/css/reservations.css?v=71">
-    <link rel="stylesheet" href="/css/home.css?v=71">
-    <link rel="preload" as="style" href="/css/announcement_banner.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=71"></noscript>
+    <link rel="stylesheet" href="/css/styles.css?v=72">
+    <link rel="stylesheet" href="/css/reservations.css?v=72">
+    <link rel="stylesheet" href="/css/home.css?v=72">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=72" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=72"></noscript>
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -722,32 +722,81 @@
             combineVenueLocation();
         }
 
+        // Turns a pin into a readable address. Nominatim sometimes returns
+        // nothing for a spot at the finest zoom (or is briefly rate limited),
+        // so a failed or empty lookup is retried once at a coarser zoom
+        // (street/area level) before falling back to raw coordinates. The
+        // sequence number drops answers for a pin that has since moved.
+        var reverseSeq = 0;
+
+        function reverseLookup(lat, lng, zoom) {
+            return fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&zoom=' + zoom, { headers: { 'Accept-Language': 'en' } })
+                .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.display_name) console.warn('Address lookup returned no address (zoom ' + zoom + '):', d);
+                    return d && d.display_name ? d.display_name : null;
+                })
+                .catch(function (err) { console.warn('Address lookup failed (zoom ' + zoom + '):', err); return null; });
+        }
+
         function reverseGeocode(lat, lng) {
+            var seq = ++reverseSeq;
             setVenueAddress('Looking up address…');
-            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json', { headers: { 'Accept-Language': 'en' } })
-                .then(function (r) { return r.json(); })
-                .then(function (d) { setVenueAddress(d.display_name || (lat.toFixed(5) + ', ' + lng.toFixed(5))); })
-                .catch(function () { setVenueAddress(lat.toFixed(5) + ', ' + lng.toFixed(5)); });
+            var fallbackText = lat.toFixed(5) + ', ' + lng.toFixed(5);
+            // 1) our own server (reliable), 2) Nominatim straight from the browser.
+            var viaServer = window.invokeGeocode
+                ? window.invokeGeocode({ mode: 'reverse', lat: lat, lng: lng }).then(function (d) { return d && d.found ? d.display_name : null; })
+                : Promise.resolve(null);
+            viaServer
+                .then(function (name) {
+                    if (name) return name;
+                    return reverseLookup(lat, lng, 18).then(function (n) {
+                        if (n) return n;
+                        return new Promise(function (resolve) { setTimeout(resolve, 1100); })
+                            .then(function () { return reverseLookup(lat, lng, 16); });
+                    });
+                })
+                .then(function (name) {
+                    if (seq !== reverseSeq) return;
+                    setVenueAddress(name || fallbackText);
+                });
         }
 
         function searchAddress(query) {
             if (!query.trim()) return;
             setVenueAddress('Searching…');
             var cfg = getMapConfig();
+            var fullQuery = query + ', Rizal, Philippines';
             var viewbox = cfg.sw_lng+','+cfg.sw_lat+','+cfg.ne_lng+','+cfg.ne_lat;
-            var url = 'https://nominatim.openstreetmap.org/search'
-                + '?q=' + encodeURIComponent(query + ', Rizal, Philippines')
-                + '&format=json&limit=1&viewbox=' + viewbox + '&bounded=1&countrycodes=ph';
 
-            fetch(url, { headers: { 'Accept-Language': 'en' } })
-                .then(function (r) { return r.json(); })
-                .then(function (results) {
-                    if (!results.length) { setVenueAddress('No results found in Rizal. Try a more specific address.'); return; }
-                    var r = results[0];
-                    placeMarker(parseFloat(r.lat), parseFloat(r.lon), false);
-                    setVenueAddress(r.display_name);
+            function show(lat, lng, name) {
+                placeMarker(lat, lng, false);
+                setVenueAddress(name);
+            }
+            function viaBrowser() {
+                var url = 'https://nominatim.openstreetmap.org/search'
+                    + '?q=' + encodeURIComponent(fullQuery)
+                    + '&format=json&limit=1&viewbox=' + viewbox + '&bounded=1&countrycodes=ph';
+                return fetch(url, { headers: { 'Accept-Language': 'en' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (results) {
+                        if (!results.length) { setVenueAddress('No results found in Rizal. Try a more specific address.'); return; }
+                        show(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+                    })
+                    .catch(function () { setVenueAddress('Search failed. Please try again.'); });
+            }
+
+            var viaServer = window.invokeGeocode
+                ? window.invokeGeocode({
+                    mode: 'search', query: fullQuery,
+                    bounds: { sw_lat: cfg.sw_lat, sw_lng: cfg.sw_lng, ne_lat: cfg.ne_lat, ne_lng: cfg.ne_lng }
                 })
-                .catch(function () { setVenueAddress('Search failed. Please try again.'); });
+                : Promise.resolve(null);
+            viaServer.then(function (d) {
+                if (!d) return viaBrowser();              // server unreachable: try the browser route
+                if (!d.found) { setVenueAddress('No results found in Rizal. Try a more specific address.'); return; }
+                show(d.lat, d.lng, d.display_name);
+            });
         }
 
         // Wire up search controls once DOM is ready (script is at bottom of body)
@@ -767,12 +816,12 @@
     })();
     </script>
 
-    <script type="module" src="/js/footer_content.js?v=71"></script>
+    <script type="module" src="/js/footer_content.js?v=72"></script>
     <script type="module" src="/js/announcement_banner.js"></script>
 
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=71" defer></script>
+  <script src="/js/supabase_health_notice.js?v=72" defer></script>
 </body>
 </html>
