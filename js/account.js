@@ -1,5 +1,13 @@
 import { customerSupabase as supabase } from './supabase.js';
-import { showFeedbackModal } from './feedback_modal.js';
+import { showFeedbackModal, showConfirmModal } from './feedback_modal.js';
+import {
+    getIdFileError,
+    resizeIdImage,
+    fetchValidIdStatus,
+    getValidIdPreviewUrl,
+    saveValidId,
+    removeValidId
+} from './valid_id.js';
 import { validatePassword } from './password_rules.js';
 import {
     buildCustomerPaymentUrl,
@@ -2729,6 +2737,120 @@ function wireChangePasswordCard() {
     });
 }
 
+// ── Valid ID (saved on the profile, used to verify contract signatures) ──
+// js/valid_id.js owns storage; this only drives the card in account.html.
+function wireValidIdCard() {
+    const body = document.querySelector('#valid-id-card .valid-id-body');
+    const input = document.getElementById('valid-id-input');
+    const emptyEl = document.getElementById('valid-id-empty');
+    const savedEl = document.getElementById('valid-id-saved');
+    const thumb = document.getElementById('valid-id-thumb');
+    const dateEl = document.getElementById('valid-id-date');
+    const msg = document.getElementById('valid-id-msg');
+    if (!body || !input) return;
+
+    function setBusy(busy) {
+        body.classList.toggle('is-busy', busy);
+        input.disabled = busy;
+    }
+
+    async function render() {
+        let status;
+        try {
+            status = await fetchValidIdStatus(supabase, user.id);
+        } catch (error) {
+            console.error('[account] valid ID status failed:', error);
+            setFormMessage(msg, 'Unable to load your valid ID right now.', 'error');
+            emptyEl.hidden = false;
+            savedEl.hidden = true;
+            return;
+        }
+
+        if (!status.hasId) {
+            emptyEl.hidden = false;
+            savedEl.hidden = true;
+            thumb.removeAttribute('src');
+            return;
+        }
+
+        emptyEl.hidden = true;
+        savedEl.hidden = false;
+        dateEl.textContent = status.uploadedAt ? `Saved ${formatDate(status.uploadedAt)}` : '';
+        try {
+            thumb.src = await getValidIdPreviewUrl(supabase, user.id);
+        } catch (error) {
+            // The flag says there is an ID but the file can't be read.
+            console.error('[account] valid ID preview failed:', error);
+            thumb.removeAttribute('src');
+            setFormMessage(msg, 'We couldn\u2019t show your saved ID. Try replacing it with a new photo.', 'warning');
+        }
+    }
+
+    async function handleFile(file) {
+        const problem = getIdFileError(file);
+        if (problem) {
+            setFormMessage(msg, problem, 'error');
+            return;
+        }
+        setBusy(true);
+        setFormMessage(msg, 'Saving your ID\u2026');
+        try {
+            const dataUrl = await resizeIdImage(file);
+            await saveValidId(supabase, user.id, dataUrl);
+            setFormMessage(msg, 'Your valid ID was saved.', 'success');
+            await render();
+        } catch (error) {
+            console.error('[account] valid ID save failed:', error);
+            const unreadable = error?.message === 'unreadable image';
+            setFormMessage(
+                msg,
+                unreadable
+                    ? 'We couldn\u2019t read that photo. Please choose another one.'
+                    : 'We couldn\u2019t save your ID. Please try again.',
+                'error'
+            );
+        } finally {
+            setBusy(false);
+            input.value = '';
+        }
+    }
+
+    async function handleRemove() {
+        const confirmed = await showConfirmModal({
+            title: 'Remove your valid ID?',
+            message: 'Your saved ID will be deleted. You\u2019ll need to upload one again to verify the signature on your next contract.',
+            confirmText: 'Remove ID',
+            cancelText: 'Keep it',
+            destructive: true
+        });
+        if (!confirmed) return;
+
+        setBusy(true);
+        setFormMessage(msg, 'Removing your ID\u2026');
+        try {
+            await removeValidId(supabase, user.id);
+            setFormMessage(msg, 'Your valid ID was removed.', 'success');
+            await render();
+        } catch (error) {
+            console.error('[account] valid ID remove failed:', error);
+            setFormMessage(msg, 'We couldn\u2019t remove your ID. Please try again.', 'error');
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    const pick = () => { setFormMessage(msg, ''); input.click(); };
+    document.getElementById('valid-id-upload-btn')?.addEventListener('click', pick);
+    document.getElementById('valid-id-replace-btn')?.addEventListener('click', pick);
+    document.getElementById('valid-id-remove-btn')?.addEventListener('click', handleRemove);
+    input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file) handleFile(file);
+    });
+
+    return render();
+}
+
 function wireDeleteAccount() {
     document.getElementById('delete-account-btn')?.addEventListener('click', () => {
         // Deletion requires admin-level API access; direct users to contact support.
@@ -2756,7 +2878,8 @@ wireDeleteAccount();
 
 await Promise.all([
     loadProfile(),
-    loadReservations()
+    loadReservations(),
+    wireValidIdCard()
 ]);
 
 initAutoRefresh(() => loadReservations({ silent: true }));

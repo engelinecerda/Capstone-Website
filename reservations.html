@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Dancing+Script:wght@600;700&display=swap"></noscript>
-    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=71"></noscript>
+    <link rel="preload" as="style" href="/css/tabler-icons-local.css?v=72" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/tabler-icons-local.css?v=72"></noscript>
     <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
     <!-- Critical, page-defining CSS (navbar/hero/reservation layout) loads
@@ -20,11 +20,11 @@
          content on first paint. Only genuinely non-critical assets above
          (webfonts, icon font, Leaflet map CSS) and the JS-injected
          announcement banner below stay async. -->
-    <link rel="stylesheet" href="/css/styles.css?v=71">
-    <link rel="stylesheet" href="/css/reservations.css?v=71">
-    <link rel="stylesheet" href="/css/home.css?v=71">
-    <link rel="preload" as="style" href="/css/announcement_banner.css?v=71" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=71"></noscript>
+    <link rel="stylesheet" href="/css/styles.css?v=72">
+    <link rel="stylesheet" href="/css/reservations.css?v=72">
+    <link rel="stylesheet" href="/css/home.css?v=72">
+    <link rel="preload" as="style" href="/css/announcement_banner.css?v=72" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/announcement_banner.css?v=72"></noscript>
     <style>.hidden { display: none !important; }</style>
 </head>
 <body>
@@ -483,24 +483,35 @@
 
                         <p class="signature-status" id="signature-status" aria-live="polite"></p>
 
-                        <!-- Valid ID upload (js/reservations.js: ID_VERIFICATION_ENABLED).
-                             Shown only while the feature flag is on. The signature on
-                             this ID is compared with the one drawn above at submit. -->
+                        <!-- Valid ID (js/reservations.js: ID_VERIFICATION_ENABLED).
+                             Shown only while the feature flag is on. The ID is kept on the
+                             customer's My Profile and its signature is compared with the
+                             one drawn above at submit.
+                             - ID already on the profile  -> only the "ID on file" note shows
+                             - no ID on the profile       -> upload it here; it is saved to My Profile -->
                         <div class="id-verify hidden" id="id-verify-block">
-                            <h4 class="id-verify-title">Upload a valid ID</h4>
-                            <p class="id-verify-help">Upload a clear photo of a government-issued ID that shows your signature. When you submit, we compare it with the signature you drew above: if they match, your contract is approved right away; if not, your contract stays pending and we&rsquo;ll ask you to re-upload your ID or sign again. Your ID photo is only used for this check and is not stored.</p>
-                            <input type="file" id="id-upload-input" class="id-verify-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of your valid ID">
-                            <button type="button" class="id-verify-drop" id="id-upload-trigger">
-                                <i class="ti ti-id" aria-hidden="true"></i>
-                                <span id="id-upload-label">Choose a photo of your ID</span>
-                            </button>
-                            <div class="id-verify-preview hidden" id="id-upload-preview">
-                                <img id="id-upload-thumb" alt="Preview of your uploaded ID">
-                                <div class="id-verify-preview-meta">
-                                    <span id="id-upload-name"></span>
-                                    <button type="button" class="signature-clear-btn" id="id-upload-remove">
-                                        <i class="ti ti-trash" aria-hidden="true"></i> Remove
-                                    </button>
+                            <h4 class="id-verify-title">Valid ID</h4>
+
+                            <div class="id-verify-saved hidden" id="id-verify-saved">
+                                <p class="id-verify-help"><i class="ti ti-circle-check" aria-hidden="true"></i> <strong>Your valid ID is on file.</strong> We&rsquo;ll compare the signature on it with the one you drew above when you submit. You can replace or remove your ID anytime in <a href="/account" target="_blank" rel="noopener">My Profile</a>.</p>
+                            </div>
+
+                            <div id="id-upload-area">
+                                <p class="id-verify-help">Upload a clear photo of a government-issued ID that shows your signature. When you submit, we compare it with the signature you drew above: if they match, your contract is approved right away; if not, your contract stays pending and we&rsquo;ll ask you to replace your ID or sign again.</p>
+                                <p class="id-verify-help id-verify-save-note"><i class="ti ti-lock" aria-hidden="true"></i> Your ID will be saved privately to your <strong>My Profile</strong>, so you won&rsquo;t need to upload it again. You can also upload it there, and replace or remove it anytime.</p>
+                                <input type="file" id="id-upload-input" class="id-verify-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of your valid ID">
+                                <button type="button" class="id-verify-drop" id="id-upload-trigger">
+                                    <i class="ti ti-id" aria-hidden="true"></i>
+                                    <span id="id-upload-label">Choose a photo of your ID</span>
+                                </button>
+                                <div class="id-verify-preview hidden" id="id-upload-preview">
+                                    <img id="id-upload-thumb" alt="Preview of your uploaded ID">
+                                    <div class="id-verify-preview-meta">
+                                        <span id="id-upload-name"></span>
+                                        <button type="button" class="signature-clear-btn" id="id-upload-remove">
+                                            <i class="ti ti-trash" aria-hidden="true"></i> Remove
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <p class="id-verify-status" id="id-verify-status" aria-live="polite"></p>
@@ -839,12 +850,12 @@
     })();
     </script>
 
-    <script type="module" src="/js/footer_content.js?v=71"></script>
+    <script type="module" src="/js/footer_content.js?v=72"></script>
     <script type="module" src="/js/announcement_banner.js"></script>
 
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=71" defer></script>
+  <script src="/js/supabase_health_notice.js?v=72" defer></script>
 </body>
 </html>

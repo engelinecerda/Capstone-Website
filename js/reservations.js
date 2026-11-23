@@ -32,9 +32,11 @@ import { normalizeInclusionOptions, hasRemovableInclusions, optionalCreditTotal,
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
+import { buildBreakdownRows, buildRequestRows, formatBreakdownText, formatRequestsText, BREAKDOWN_HEADING, REQUESTS_HEADING } from '/js/contract_breakdown.js';
 import { computeTransportFee, describeTransportFee, branchesWithCoords } from '/js/transport_fee.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 import { attachPhoneMask } from '/js/phone_format.js';
+import { getIdFileError, resizeIdImage, fetchValidIdStatus, validIdFileExists, saveValidId } from '/js/valid_id.js';
 import { attachNameGuard, attachEmailGuard, attachIntegerGuard, attachPhonePasteNormalizer, validatePersonName, validateEmailAddress, validatePhoneNumber } from '/js/input_validation.js';
 
 const { data: { session } } = await supabase.auth.getSession();
@@ -165,10 +167,10 @@ const GUEST_COUNT_VALIDATION_ENABLED = true;
 // and contracts follow the legacy scan / manual review).
 // A typed signature can't be compared with handwriting, so while this is on
 // the signature must be drawn.
+// The ID itself lives on the customer's My Profile (js/valid_id.js): with one
+// on file this form doesn't ask for it (the server reads the saved one);
+// without one the customer uploads it here and it is saved to My Profile.
 const ID_VERIFICATION_ENABLED = true;
-const ID_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;   // raw file the customer picks
-const ID_UPLOAD_MAX_EDGE_PX = 1600;             // resized before it is sent
-const ID_UPLOAD_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // ── Event types cache (populated by loadEventTypes) ────────────────────
 let eventTypesCache = [];
@@ -649,6 +651,8 @@ const signatureTypePreview    = document.getElementById('signature-type-preview'
 const sigModeDrawBtn          = document.getElementById('sig-mode-draw');
 const sigModeTypeBtn          = document.getElementById('sig-mode-type');
 const idVerifyBlock           = document.getElementById('id-verify-block');
+const idVerifySaved           = document.getElementById('id-verify-saved');
+const idUploadArea            = document.getElementById('id-upload-area');
 const idUploadInput           = document.getElementById('id-upload-input');
 const idUploadTrigger         = document.getElementById('id-upload-trigger');
 const idUploadPreview         = document.getElementById('id-upload-preview');
@@ -1439,8 +1443,30 @@ async function getSignatureDataUrl() {
 const idState = {
     file: null,         // File the customer picked
     dataUrl: null,      // resized JPEG actually sent (built on first check)
-    objectUrl: null     // thumbnail preview URL
+    objectUrl: null,    // thumbnail preview URL
+    savedOnFile: false, // the customer already has an ID on My Profile -> no upload here
+    savedToProfile: false // this form's upload has already been saved to My Profile
 };
+
+// With an ID on the profile the upload controls give way to an "ID on file"
+// note; without one the customer uploads here.
+function showIdSavedMode(isSaved) {
+    idState.savedOnFile = isSaved;
+    idVerifySaved?.classList.toggle('hidden', !isSaved);
+    idUploadArea?.classList.toggle('hidden', isSaved);
+    if (isSaved) setIdVerifyStatus('');
+}
+
+async function loadSavedIdState() {
+    if (!ID_VERIFICATION_ENABLED || !isLoggedIn) return;
+    try {
+        const status = await fetchValidIdStatus(supabase, session.user.id);
+        showIdSavedMode(status.hasId);
+    } catch (error) {
+        // Can't tell -> fall back to asking for the upload here.
+        console.warn('[reservations] could not check for a saved ID:', error);
+    }
+}
 
 function setIdVerifyStatus(msg, kind = '') {
     if (!idVerifyStatus) return;
@@ -1449,18 +1475,12 @@ function setIdVerifyStatus(msg, kind = '') {
     idVerifyStatus.classList.toggle('is-success', kind === 'success');
 }
 
-function getIdFileError(file) {
-    if (!ID_UPLOAD_ALLOWED_TYPES.includes(file.type)) return 'Please upload your ID as a JPG, PNG or WEBP photo.';
-    if (!file.size) return 'That file is empty. Please choose another photo.';
-    if (file.size > ID_UPLOAD_MAX_BYTES) return 'That photo is too large. Please upload one under 10 MB.';
-    return null;
-}
-
 function clearIdFile() {
     if (idState.objectUrl) URL.revokeObjectURL(idState.objectUrl);
     idState.file = null;
     idState.dataUrl = null;
     idState.objectUrl = null;
+    idState.savedToProfile = false;
     if (idUploadInput) idUploadInput.value = '';
     if (idUploadThumb) idUploadThumb.removeAttribute('src');
     idUploadPreview?.classList.add('hidden');
@@ -1482,30 +1502,6 @@ function setIdFile(file) {
     if (idUploadName) idUploadName.textContent = file.name;
     idUploadPreview?.classList.remove('hidden');
     idUploadTrigger?.classList.add('hidden');
-}
-
-// Phone photos are several MB; the comparison doesn't need that. Scales the
-// long edge down to ID_UPLOAD_MAX_EDGE_PX and re-encodes as JPEG (also what
-// strips a PNG/WEBP down to a predictable type for the Edge Function).
-function resizeIdImage(file) {
-    return new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = () => {
-            URL.revokeObjectURL(url);
-            const scale = Math.min(1, ID_UPLOAD_MAX_EDGE_PX / Math.max(img.naturalWidth, img.naturalHeight));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-            canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
-        img.src = url;
-    });
 }
 
 function scrollIdVerifyIntoView() {
@@ -1531,11 +1527,24 @@ const ID_CHECK_REASONS = {
     unclear_signature: 'Your drawn signature is too small or unclear to compare.'
 };
 
-// The resized ID photo that goes to the server with the signature (null when
-// the check is switched off). Nothing is checked here — the comparison runs
-// server-side after the reservation is saved.
-async function getIdImageForSubmit() {
-    if (!ID_VERIFICATION_ENABLED) return null;
+// What goes to the server with the signature: either the resized photo the
+// customer just picked (which is also saved to their My Profile so they never
+// upload it again) or, when an ID is already on file, a flag telling the server
+// to use that one. Nothing is checked here — the comparison runs server-side
+// after the reservation is saved.
+async function getIdForSubmit(userId) {
+    if (!ID_VERIFICATION_ENABLED) return { dataUrl: null, useSaved: false, newlySaved: false };
+
+    if (idState.savedOnFile) {
+        // The profile flag could be stale; catch that BEFORE the reservation is
+        // saved, not after. If the lookup itself fails, let the server decide.
+        let exists = true;
+        try { exists = await validIdFileExists(supabase, userId); } catch { /* server decides */ }
+        if (exists) return { dataUrl: null, useSaved: true, newlySaved: false };
+        showIdSavedMode(false);
+        throw failIdCheck('We couldn\u2019t find the ID saved on your profile. Please upload it again.');
+    }
+
     if (!idState.file) throw failIdCheck('Please upload a photo of your valid ID before submitting.');
 
     if (!idState.dataUrl) {
@@ -1545,7 +1554,20 @@ async function getIdImageForSubmit() {
             throw failIdCheck('We couldn\u2019t read that photo. Please upload your ID again.');
         }
     }
-    return idState.dataUrl;
+
+    // Keep it on My Profile for next time. Best effort: a storage hiccup must
+    // not block the booking, the photo still goes with this submission.
+    let newlySaved = idState.savedToProfile;
+    if (!idState.savedToProfile) {
+        try {
+            await saveValidId(supabase, userId, idState.dataUrl);
+            idState.savedToProfile = true;
+            newlySaved = true;
+        } catch (error) {
+            console.warn('[reservations] could not save the ID to the profile:', error);
+        }
+    }
+    return { dataUrl: idState.dataUrl, useSaved: false, newlySaved };
 }
 
 // The note under "Reservation Submitted!" about how the signature check went.
@@ -1739,6 +1761,41 @@ function renderContractBody(templateBody, contractData = {}) {
     const { introText, legacyClausesText } = splitTemplateIntroAndLegacyClauses(templateBody);
     const summaryText = buildSummaryLinesText(fields, data);
 
+    // Price Breakdown + Additional Requests (js/contract_breakdown.js): spell
+    // out how the Total Amount above was reached and list what the customer
+    // asked for beyond the package, so the signed contract carries the
+    // computation itself. Same figures as the Review step's Total card and
+    // the signed PDF; the package line is whatever remains of the subtotal
+    // after the itemised lines, so every row always adds up to the total.
+    const breakdownSubtotal = computeContractPreviewBase();
+    const breakdownAddOn = (S.locationType === 'onsite' && !isMenuPricedPackage(getActivePackage()) && S.snackAddon) ? S.snackAddon : null;
+    const breakdownAddOnAmount = breakdownAddOn ? Number(breakdownAddOn.price || 0) : 0;
+    const breakdownAdditionalHeadPkg = getSelectedPackageForAdditionalHead();
+    const breakdownRows = breakdownSubtotal > 0 ? buildBreakdownRows({
+        packageName: getSelectedContractPackageLabel() || 'Selected Package',
+        packageAmount: breakdownSubtotal + discount.discountAmount + previewInclusionCredit - previewAdditionalHeadCharge - breakdownAddOnAmount,
+        addOnName: breakdownAddOn?.label || '',
+        addOnAmount: breakdownAddOnAmount,
+        additionalHeads: previewAdditionalHeadCharge > 0 ? S.additionalHeads : 0,
+        additionalHeadPrice: Number(breakdownAdditionalHeadPkg?.pricePerAdditionalHead || 0),
+        additionalHeadCharge: previewAdditionalHeadCharge,
+        removedInclusions: previewRemovedInclusions.map(o => ({ name: o.name, credit: o.credit })),
+        discountLabel: discount.active ? (discount.label || '') : '',
+        discountPercent: discount.active ? discount.percentOff : 0,
+        discountAmount: discount.active ? discount.discountAmount : 0,
+        subtotal: breakdownSubtotal,
+        servicePercent: charge.pct,
+        serviceAmount: charge.amount,
+        transportFee: previewTransport.applies ? previewTransport.fee : 0,
+        transportKm: previewTransport.applies ? previewTransport.distanceKm : 0,
+        total: charge.total + previewTransport.fee
+    }, fmtPeso) : [];
+    const breakdownText = formatBreakdownText(breakdownRows);
+    const requestsText = formatRequestsText(buildRequestRows({
+        notes: S.requests,
+        customRequests: (S.customRequests || []).map(r => r.title)
+    }));
+
     // Layer 3 (Electronic Signature / acknowledgement) is only appended
     // when real admin-saved clauses (Layer 2) are in use. The legacy
     // template_body fallback below is old, self-contained plain text — it
@@ -1764,6 +1821,8 @@ function renderContractBody(templateBody, contractData = {}) {
     const sections = [
         mergeTemplateTokens(introText, data),
         summaryText,
+        breakdownText,
+        requestsText,
         clausesText,
         esText,
         ackText
@@ -1967,7 +2026,7 @@ function parseAgreementSections(text) {
     const lines = String(text || '').split('\n').map(l => l.trim());
     const blocks = [];
     let sawTitle = false;
-    const detailLinePattern = /^([A-Za-z][A-Za-z\s]{1,40}):\s*(.+)$/;
+    const detailLinePattern = /^([A-Za-z][A-Za-z\s-]{1,40}):\s*(.+)$/;
     let i = 0;
 
     while (i < lines.length) {
@@ -1977,6 +2036,13 @@ function parseAgreementSections(text) {
         if (!sawTitle) {
             sawTitle = true;
             blocks.push({ tag: 'h2', text: line });
+            i++;
+            continue;
+        }
+
+        // Un-numbered contract sections added by the system (js/contract_breakdown.js).
+        if (line === BREAKDOWN_HEADING || line === REQUESTS_HEADING) {
+            blocks.push({ tag: 'h3', text: line === BREAKDOWN_HEADING ? 'Price Breakdown' : 'Additional Requests' });
             i++;
             continue;
         }
@@ -4819,7 +4885,7 @@ function validate(n) {
             setSignatureStatus(signatureState.mode === 'draw' ? 'Please sign to continue.' : 'Please type your name to continue.', true);
             return false;
         }
-        if (ID_VERIFICATION_ENABLED && !idState.file) {
+        if (ID_VERIFICATION_ENABLED && !idState.savedOnFile && !idState.file) {
             setIdVerifyStatus('Please upload a photo of your valid ID to continue.', 'error');
             scrollIdVerifyIntoView();
             return false;
@@ -5122,6 +5188,7 @@ idUploadInput?.addEventListener('change', () => {
     if (file) setIdFile(file);
 });
 idUploadRemove?.addEventListener('click', clearIdFile);
+loadSavedIdState();   // not awaited: don't hold up the rest of the page
 policyButtons.forEach(btn => btn.addEventListener('click', () => openPolicyModal(btn.dataset.policy)));
 policyModalClose?.addEventListener('click', closePolicyModal);
 policyModalDismiss?.addEventListener('click', closePolicyModal);
@@ -5191,7 +5258,7 @@ async function submitDone() {
         // with the signature after the reservation is saved; the comparison
         // happens server-side and never blocks the booking — a mismatch keeps
         // the contract pending and prompts a re-upload / re-sign afterwards.
-        const idImageDataUrl = await getIdImageForSubmit();
+        const idForSubmit = await getIdForSubmit(userId);
 
         let packageId  = null;
         let addOnId    = null;
@@ -5354,11 +5421,17 @@ async function submitDone() {
                 signature_data_url: signatureDataUrl,
                 // Compared with the signature on the ID right after the
                 // contract is created (null when the check is switched off).
-                id_image_data_url: idImageDataUrl,
+                id_image_data_url: idForSubmit.dataUrl,
+                // An ID already saved on My Profile is read by the server.
+                use_saved_id: idForSubmit.useSaved,
                 signer_name: signerName,
                 signature_type: signatureType,
                 agreement_view_method: signatureState.agreementViewMethod,
                 agreement_viewed_at: signatureState.agreementViewedAt,
+                // Custom requests are only saved after the contract is made
+                // (sendCustomRequests below), so their titles travel with this
+                // call to be listed under Additional Requests on the contract.
+                custom_requests: (S.customRequests || []).map(r => r.title),
                 // So the contract's signed date/time is in the customer's own
                 // time zone instead of the server's (UTC).
                 time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
@@ -5402,6 +5475,7 @@ async function submitDone() {
             'Your reservation is <strong style="color:#6B3A1F;">under review</strong>.<br>' +
             'We\'ll contact you at <strong>' + S.email + '</strong> to confirm.</p>' +
             buildIdCheckNoteHtml(contractResult.id_check, reservation.reservation_id) +
+            (idForSubmit.newlySaved ? '<p style="margin:12px auto 0;max-width:460px;font-size:13px;line-height:1.6;color:#756559;text-align:left;"><i class="ti ti-lock" aria-hidden="true" style="margin-right:6px;"></i>Your valid ID was saved to <a href="/account" style="color:#6B3A1F;font-weight:600;">My Profile</a>. You can replace or remove it there anytime.</p>' : '') +
             customRequestNote +
             '<p style="margin:16px auto 0;max-width:460px;padding:12px 14px;background:#FFF6E5;border:1px solid #F0D9A8;border-radius:10px;color:#6B3A1F;font-size:13.5px;line-height:1.6;text-align:left;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:6px;"></i><strong>Please note:</strong> your reservation must be approved before you can request to reschedule or cancel it.</p>' +
             '<p style="margin-top:14px;"><a href="' + contractResult.contract_url + '" target="_blank" rel="noopener noreferrer" class="dl-btn" style="text-decoration:none;">Download your signed contract</a></p>' +

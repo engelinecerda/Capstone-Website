@@ -3,6 +3,7 @@ import {
   applyIdCheckResult,
   compareIdAndSignature,
   fetchStoredSignature,
+  loadSavedIdForUser,
   MAX_ID_BYTES,
   MAX_ID_CHECK_ATTEMPTS,
   parseDataUrl,
@@ -20,11 +21,14 @@ import {
 //                       contract is re-read server-side and compared with the
 //                       new ID photo. Match -> contract verified.
 //   2. Re-sign       -> `generate-signed-contract` with `resign: true`, which
-//                       needs the ID photo again (it is never stored).
+//                       compares the new signature with the customer's ID.
 //
-// Privacy: the ID image arrives in the request body, goes to Gemini once and is
-// dropped when the request ends — no Cloudinary/Storage upload, no table write,
-// nothing image-related is logged. Only the verdict is recorded.
+// Which ID is used: either a photo sent in the request body (the customer just
+// chose a new one — the browser has already saved it to their profile), or,
+// with `use_saved_id: true`, the ID saved on their profile (private
+// `customer-ids` bucket, read here with the service role from the verified
+// caller id). It goes to Gemini once; nothing image-related is logged or copied
+// anywhere else. Only the verdict is recorded on the contract.
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -73,8 +77,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const reservationId = typeof body.reservation_id === 'string' ? body.reservation_id : '';
-  const id = parseDataUrl(body.id_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES);
-  if (!reservationId || !id) {
+  const useSavedId = body.use_saved_id === true;
+  let id = useSavedId
+    ? null
+    : parseDataUrl(body.id_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES);
+  if (!reservationId || (!useSavedId && !id)) {
     return jsonResponse(
       { success: false, error: 'A reservation and a valid ID image are required.' },
       400,
@@ -82,6 +89,20 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    if (useSavedId) {
+      id = await loadSavedIdForUser(supabase, userId);
+      if (!id) {
+        return jsonResponse(
+          {
+            success: false,
+            code: 'no_saved_id',
+            error: 'We couldn\u2019t find a valid ID saved on your profile. Please choose a photo of your ID.',
+          },
+          409,
+        );
+      }
+    }
+
     const { data: reservation } = await supabase
       .from('reservations')
       .select('reservation_id, reservation_number, user_id')
@@ -138,7 +159,7 @@ Deno.serve(async (req: Request) => {
 
     console.log('verify-id-signature started', { user_id: userId, reservation_id: reservationId });
 
-    const verdict = await compareIdAndSignature(id, sig);
+    const verdict = await compareIdAndSignature(id!, sig);
     const result = await applyIdCheckResult(supabase, {
       reservationId,
       reservationNumber: reservation.reservation_number,

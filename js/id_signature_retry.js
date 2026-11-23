@@ -4,12 +4,17 @@
 // compared with the e-signature they drew. If they don't match, the contract
 // stays pending and the customer comes here to try again, two ways:
 //
-//   reupload  Upload a different photo of the ID. The signature already saved
-//             on the contract is compared with it (Edge Function
+//   reupload  Re-check the ID saved on the customer's profile, or choose a
+//             different photo (which replaces the saved one). The signature
+//             already saved on the contract is compared with it (Edge Function
 //             `verify-id-signature`).
-//   resign    Draw the signature again. The ID photo is needed again too — it
-//             is never stored — and a new signature that matches replaces the
-//             old one on the contract (`generate-signed-contract`, resign: true).
+//   resign    Draw the signature again. It is compared with the ID saved on the
+//             profile (or a photo chosen here, when none is saved yet) and a new
+//             signature that matches replaces the old one on the contract
+//             (`generate-signed-contract`, resign: true).
+//
+// The ID lives on My Profile (js/valid_id.js); a photo chosen in this modal is
+// saved there, replacing any previous one.
 //
 // A match approves the contract. Anything else leaves it pending, with the
 // reason shown here. The server caps the number of automatic checks
@@ -20,10 +25,7 @@
 // re-rendered page container, so auto-refresh never wipes a half-filled form).
 
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
-
-const ID_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;   // raw file the customer picks
-const ID_UPLOAD_MAX_EDGE_PX = 1600;             // resized before it is sent
-const ID_UPLOAD_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+import { getIdFileError, resizeIdImage, fetchValidIdStatus, saveValidId } from './valid_id.js';
 
 // Contract states the customer can act on. 'error' = the automatic check itself
 // failed at submission, so they may simply try it again. Keep in sync with
@@ -78,27 +80,6 @@ async function readFunctionError(error, fallback) {
     return { message: fallback, attemptsLeft: undefined };
 }
 
-function resizeIdImage(file) {
-    return new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = () => {
-            URL.revokeObjectURL(url);
-            const scale = Math.min(1, ID_UPLOAD_MAX_EDGE_PX / Math.max(img.naturalWidth, img.naturalHeight));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-            canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
-        img.src = url;
-    });
-}
-
 // The live canvas is transparent so the CSS baseline shows through while
 // drawing; the contract's signature image must be opaque. Same export the
 // booking form uses.
@@ -146,8 +127,10 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         file: null,
         objectUrl: null,
         pad: null,
-        busy: false
+        busy: false,
+        hasSavedId: false   // an ID is already saved on the customer's profile
     };
+    const filePickerField = fileInput.closest('.idretry-field');
 
     function setMessage(text = '', kind = '') {
         messageEl.textContent = text;
@@ -165,10 +148,7 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
     }
 
     function setFile(file) {
-        let problem = '';
-        if (!ID_UPLOAD_ALLOWED_TYPES.includes(file.type)) problem = 'Please upload your ID as a JPG, PNG or WEBP photo.';
-        else if (!file.size) problem = 'That file is empty. Please choose another photo.';
-        else if (file.size > ID_UPLOAD_MAX_BYTES) problem = 'That photo is too large. Please upload one under 10 MB.';
+        const problem = getIdFileError(file) || '';
         clearFile();
         if (problem) {
             setMessage(problem, 'error');
@@ -228,19 +208,36 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         unlockBodyScroll();
     }
 
-    function open(mode) {
+    async function open(mode) {
         const pageData = getPageData();
         const check = getIdCheckState(pageData?.contract);
         if (!pageData?.reservation || !check?.canRetry) return;
 
+        // Is there already an ID on the customer's profile? Decides whether a
+        // photo is needed here. If the lookup fails, ask for a photo.
+        state.hasSavedId = false;
+        try {
+            const status = await fetchValidIdStatus(supabase, pageData.reservation.user_id);
+            state.hasSavedId = status.hasId;
+        } catch { /* ask for a photo */ }
+
         state.mode = mode === 'resign' ? 'resign' : 'reupload';
         const resign = state.mode === 'resign';
+        const saved = state.hasSavedId;
 
-        titleEl.textContent = resign ? 'Sign Again' : 'Re-upload Your ID';
-        copyEl.textContent = resign
-            ? 'Draw your signature again, the way it appears on your ID, and upload your ID photo. We can\u2019t keep your ID, so we need to see it again to compare. If they match, your contract is approved.'
-            : 'Upload a clear, well-lit photo of a government-issued ID that shows your signature. We\u2019ll compare it with the signature on your contract. Your ID photo is only used for this check and is not stored.';
+        titleEl.textContent = resign ? 'Sign Again' : (saved ? 'Check Your ID Again' : 'Upload Your ID');
+        if (resign) {
+            copyEl.textContent = saved
+                ? 'Draw your signature again, the way it appears on your ID. We\u2019ll compare it with the valid ID saved on your My Profile. If they match, your contract is approved.'
+                : 'Draw your signature again, the way it appears on your ID, and upload a photo of your ID. It will be saved to your My Profile. If the signatures match, your contract is approved.';
+        } else {
+            copyEl.textContent = saved
+                ? 'We\u2019ll compare the signature on your contract with the valid ID saved on your My Profile. If that photo was unclear, choose a clearer one below: it replaces the saved ID. You can also replace or remove it anytime in My Profile.'
+                : 'Upload a clear, well-lit photo of a government-issued ID that shows your signature. We\u2019ll compare it with the signature on your contract. It will be saved to your My Profile, where you can replace or remove it anytime.';
+        }
         confirmBtn.textContent = resign ? 'Check & Replace Signature' : 'Check My ID';
+        // With an ID on file, signing again needs no photo; re-checking makes it optional.
+        filePickerField?.classList.toggle('hidden', resign && saved);
         signBlock.classList.toggle('hidden', !resign);
         clearFile();
         if (agreeBox) agreeBox.checked = false;
@@ -270,7 +267,8 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         if (!reservation) return;
         const resign = state.mode === 'resign';
 
-        if (!state.file) {
+        // A photo is only required when there is no ID on the profile to use.
+        if (!state.file && !state.hasSavedId) {
             setMessage('Please choose a photo of your ID first.', 'error');
             return;
         }
@@ -289,13 +287,25 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         setMessage('Checking your signature against your ID\u2026');
 
         try {
-            let idDataUrl;
-            try {
-                idDataUrl = await resizeIdImage(state.file);
-            } catch {
-                setMessage('We couldn\u2019t read that photo. Please choose another one.', 'error');
-                return;
+            // A photo chosen here is saved to the profile (replacing the old
+            // one) and sent along; otherwise the server uses the saved ID.
+            let idDataUrl = null;
+            if (state.file) {
+                try {
+                    idDataUrl = await resizeIdImage(state.file);
+                } catch {
+                    setMessage('We couldn\u2019t read that photo. Please choose another one.', 'error');
+                    return;
+                }
+                try {
+                    await saveValidId(supabase, reservation.user_id, idDataUrl);
+                    state.hasSavedId = true;
+                } catch (saveError) {
+                    // Not fatal: the photo still goes with this check.
+                    console.warn('[id_signature_retry] could not save the ID to the profile:', saveError);
+                }
             }
+            const idBody = idDataUrl ? { id_image_data_url: idDataUrl } : { use_saved_id: true };
 
             let invoked;
             if (resign) {
@@ -309,7 +319,7 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
                     body: {
                         reservation_id: reservation.reservation_id,
                         resign: true,
-                        id_image_data_url: idDataUrl,
+                        ...idBody,
                         signature_data_url: signatureDataUrl,
                         signature_type: 'drawn',
                         // The server keeps the original printed name and the
@@ -322,7 +332,7 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
                 invoked = await supabase.functions.invoke('verify-id-signature', {
                     body: {
                         reservation_id: reservation.reservation_id,
-                        id_image_data_url: idDataUrl
+                        ...idBody
                     }
                 });
             }

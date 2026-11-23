@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'https://esm.sh/pdf-lib
 import {
   applyIdCheckResult,
   compareIdAndSignature,
+  loadSavedIdForUser,
   MAX_ID_BYTES,
   MAX_ID_CHECK_ATTEMPTS,
   MAX_SIGNATURE_BYTES,
@@ -514,6 +515,140 @@ function drawReservationSummary(ctx: Ctx, rows: [string, string][]) {
   moveDown(ctx, 8);
 }
 
+// ── Price Breakdown / Additional Requests ──────────────────────────────────
+// Mirrors js/contract_breakdown.js (the customer's preview and the admin's
+// preview) — keep the rows and wording in sync with it. The Reservation
+// Summary only carries the Total Amount; these two sections show how it was
+// reached and list what the customer asked for beyond the package.
+//
+// Order of operations (same as the booking form): package (+ add-on) +
+// additional guests − removed inclusions − discount = Subtotal; + service
+// charge (on the subtotal); + offsite transport fee (never discounted, no
+// service charge) = Total.
+interface BreakdownRow {
+  label: string;
+  detail: string;
+  amount: string;
+  strong?: boolean;
+}
+
+interface BreakdownInput {
+  packageName: string;
+  packageAmount: number;
+  addOnName: string;
+  addOnAmount: number;
+  additionalHeads: number;
+  additionalHeadPrice: number;
+  additionalHeadCharge: number;
+  removedInclusions: { name: string; credit: number }[];
+  discountLabel: string;
+  discountPercent: number;
+  discountAmount: number;
+  subtotal: number;
+  servicePercent: number;
+  serviceAmount: number;
+  transportFee: number;
+  transportKm: number;
+  total: number;
+}
+
+const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+
+function buildBreakdownRows(v: BreakdownInput): BreakdownRow[] {
+  const money = (n: number) => formatCurrency(round2(n));
+  const minus = (n: number) => '-' + formatCurrency(round2(n));
+  const rows: BreakdownRow[] = [];
+
+  rows.push({ label: 'Package', detail: v.packageName, amount: money(v.packageAmount) });
+  if (round2(v.addOnAmount) > 0) rows.push({ label: 'Add-on', detail: v.addOnName, amount: money(v.addOnAmount) });
+  if (v.additionalHeads > 0) {
+    rows.push({
+      label: 'Additional Guests',
+      detail: `${v.additionalHeads} x ${money(v.additionalHeadPrice)}`,
+      amount: money(v.additionalHeadCharge),
+    });
+  }
+  for (const inc of v.removedInclusions) {
+    rows.push({ label: 'Removed Inclusion', detail: inc.name, amount: round2(inc.credit) > 0 ? minus(inc.credit) : money(0) });
+  }
+  if (round2(v.discountAmount) > 0) {
+    const pct = v.discountPercent > 0 ? `${v.discountPercent}% off` : '';
+    const detail = v.discountLabel ? (pct ? `${v.discountLabel} (${pct})` : v.discountLabel) : pct;
+    rows.push({ label: 'Discount', detail, amount: minus(v.discountAmount) });
+  }
+
+  const hasServiceCharge = round2(v.serviceAmount) > 0;
+  const hasTransport = round2(v.transportFee) > 0;
+  if (hasServiceCharge || hasTransport) rows.push({ label: 'Subtotal', detail: '', amount: money(v.subtotal), strong: true });
+  if (hasServiceCharge) rows.push({ label: 'Service Charge', detail: `${v.servicePercent}%`, amount: money(v.serviceAmount) });
+  if (hasTransport) {
+    rows.push({ label: 'Transport Fee', detail: v.transportKm > 0 ? `${v.transportKm} km` : '', amount: money(v.transportFee) });
+  }
+  rows.push({ label: 'Total Amount', detail: '', amount: money(v.total), strong: true });
+  return rows;
+}
+
+// Custom requests are not priced when the contract is signed — the café
+// quotes them afterwards and they are charged only if the customer accepts —
+// so the contract lists them and says they sit outside the Total Amount.
+function buildRequestRows(notes: string, customRequests: string[]): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+  const cleanNotes = String(notes || '').replace(/\s+/g, ' ').trim();
+  if (cleanNotes) rows.push({ label: 'Special Requests', value: cleanNotes });
+  if (customRequests.length) {
+    rows.push({ label: 'Custom Requests', value: customRequests.join('; ') });
+    rows.push({
+      label: 'Custom Request Pricing',
+      value: 'Quoted separately by the café and charged only if the Client accepts the quote. Not included in the Total Amount above.',
+    });
+  }
+  return rows;
+}
+
+const BREAKDOWN_AMOUNT_WIDTH = 105;
+
+function drawPriceBreakdown(ctx: Ctx, rows: BreakdownRow[]) {
+  if (!rows.length) return;
+  drawSectionHeading(ctx, 'Price Breakdown');
+  const detailX = MARGIN_LEFT + LABEL_COLUMN_WIDTH;
+  const detailWidth = CONTENT_WIDTH - LABEL_COLUMN_WIDTH - BREAKDOWN_AMOUNT_WIDTH;
+  const rightEdge = MARGIN_LEFT + CONTENT_WIDTH;
+
+  for (const row of rows) {
+    // A rule above the Total, so the closing figure reads as the sum.
+    if (row.label === 'Total Amount') {
+      ensureSpace(ctx, LINE_HEIGHT_LABEL + 14);
+      moveDown(ctx, 2);
+      drawDivider(ctx);
+    }
+    const valueFont = row.strong ? ctx.boldFont : ctx.font;
+    const detailLines = wrapText(sanitizeForPdf(row.detail || ''), valueFont, FONT_SIZE_LABEL, detailWidth);
+    ensureSpace(ctx, LINE_HEIGHT_LABEL * detailLines.length);
+
+    ctx.page.drawText(sanitizeForPdf(row.label), {
+      x: MARGIN_LEFT, y: ctx.y, size: FONT_SIZE_LABEL, font: ctx.boldFont, color: row.strong ? COLOR_TEXT : COLOR_MUTED,
+    });
+    const safeAmount = sanitizeForPdf(row.amount);
+    ctx.page.drawText(safeAmount, {
+      x: rightEdge - valueFont.widthOfTextAtSize(safeAmount, FONT_SIZE_LABEL),
+      y: ctx.y, size: FONT_SIZE_LABEL, font: valueFont, color: COLOR_TEXT,
+    });
+    detailLines.forEach((line, i) => {
+      if (i > 0) ensureSpace(ctx, LINE_HEIGHT_LABEL);
+      ctx.page.drawText(line, { x: detailX, y: ctx.y, size: FONT_SIZE_LABEL, font: valueFont, color: COLOR_TEXT });
+      moveDown(ctx, LINE_HEIGHT_LABEL);
+    });
+  }
+  moveDown(ctx, 8);
+}
+
+function drawAdditionalRequests(ctx: Ctx, rows: { label: string; value: string }[]) {
+  if (!rows.length) return;
+  drawSectionHeading(ctx, 'Additional Requests');
+  for (const row of rows) drawLabelValueRow(ctx, row.label, row.value);
+  moveDown(ctx, 8);
+}
+
 function drawSelectedPackage(ctx: Ctx, entries: { label: string; items: string[] }[]) {
   if (!entries.length) return;
   drawSectionHeading(ctx, 'Selected Package');
@@ -648,6 +783,8 @@ async function buildContractPdf(
   signatureBytes: Uint8Array,
   signerName: string,
   timeZone: string,
+  breakdownRows: BreakdownRow[],
+  requestRows: { label: string; value: string }[],
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -681,6 +818,11 @@ async function buildContractPdf(
     .filter((f) => f.is_visible !== false)
     .map((f) => [f.label, summaryValues[f.token] ?? '']);
   drawReservationSummary(ctx, summaryRows);
+
+  // Price Breakdown + Additional Requests — system sections, not template
+  // text, so every contract shows its computation whatever the template says.
+  drawPriceBreakdown(ctx, breakdownRows);
+  drawAdditionalRequests(ctx, requestRows);
 
   const packageSections = sections.filter((s) => classifySection(s.heading) === 'package' && sectionMatchesPackage(s.heading, data.packageName));
   const packageEntries = packageSections.flatMap((s) =>
@@ -744,12 +886,21 @@ Deno.serve(async (req: Request) => {
   let agreement_viewed_at: string | undefined;
   let time_zone = DEFAULT_TIME_ZONE;
   let id_image_data_url: unknown;
+  let use_saved_id = false;
   let resign = false;
+  let clientCustomRequests: string[] = [];
 
   try {
     const body = await req.json();
     id_image_data_url = body.id_image_data_url;
+    use_saved_id = body.use_saved_id === true;
     resign = body.resign === true;
+    // Titles of the custom requests the customer typed on the form. They are
+    // only saved after the contract is made, so they arrive with this call;
+    // text only, trimmed and capped. Used when the database has none yet.
+    clientCustomRequests = Array.isArray(body.custom_requests)
+      ? body.custom_requests.map((t: unknown) => String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)).filter(Boolean).slice(0, 10)
+      : [];
     reservation_id = body.reservation_id;
     signature_data_url = body.signature_data_url;
     signer_name = String(body.signer_name || '').trim();
@@ -796,25 +947,36 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // ID-vs-signature check (see supabase/functions/_shared/id_signature_check.ts).
-  // When the browser sends the customer's ID photo, the signature on it is
-  // compared with the e-signature right after the contract is created:
+  // The customer's ID comes from one of two places:
+  //   * id_image_data_url — a photo the browser just sent (their first ID, or a
+  //                         replacement); the browser also saves it to their
+  //                         profile
+  //   * use_saved_id      — the ID already saved on their profile (private
+  //                         `customer-ids` bucket), read here with the service
+  //                         role using the verified caller id
+  // The signature on it is compared with the e-signature right after the
+  // contract is created:
   //   match    -> contract verified
   //   no match -> contract stays pending, the customer is notified and can
-  //               re-upload their ID or re-sign (resign: true, below)
-  // With no ID photo the contract is created exactly as before (the legacy
+  //               replace their ID or re-sign (resign: true, below)
+  // With neither, the contract is created exactly as before (the legacy
   // verify-contract scan / manual review applies).
-  const wantsIdCheck = id_image_data_url !== undefined && id_image_data_url !== null;
-  const idImage = wantsIdCheck
+  const sentIdImage = id_image_data_url !== undefined && id_image_data_url !== null;
+  const wantsIdCheck = sentIdImage || use_saved_id;
+  let idImage = sentIdImage
     ? parseDataUrl(id_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES)
     : null;
   const sigImage = wantsIdCheck
     ? parseDataUrl(signature_data_url, ['image/png'], MAX_SIGNATURE_BYTES)
     : null;
-  if (wantsIdCheck && (!idImage || !sigImage)) {
-    return jsonResponse({ success: false, error: 'A valid ID image and signature image are required.' }, 400);
+  if (wantsIdCheck && !sigImage) {
+    return jsonResponse({ success: false, error: 'A valid signature image is required.' }, 400);
+  }
+  if (sentIdImage && !idImage) {
+    return jsonResponse({ success: false, error: 'A valid ID image is required.' }, 400);
   }
   if (resign && !wantsIdCheck) {
-    return jsonResponse({ success: false, error: 'Re-signing requires a photo of your ID.' }, 400);
+    return jsonResponse({ success: false, error: 'Re-signing requires your ID.' }, 400);
   }
 
   // The ID check spends vision quota and re-signing replaces a contract, so
@@ -830,6 +992,25 @@ Deno.serve(async (req: Request) => {
     callerId = userData.user.id;
   }
 
+  // No photo in the request -> use the ID saved on the caller's profile.
+  if (use_saved_id && !idImage) {
+    try {
+      idImage = await loadSavedIdForUser(supabase, callerId!);
+    } catch (loadError) {
+      console.error('saved id load failed', { error: String((loadError as Error).message) });
+    }
+    if (!idImage) {
+      return jsonResponse(
+        {
+          success: false,
+          code: 'no_saved_id',
+          error: 'We couldn\u2019t find a valid ID saved on your profile. Please upload it on My Profile and try again.',
+        },
+        409,
+      );
+    }
+  }
+
   try {
     const { data: reservation, error: reservationError } = await supabase
       .from('reservations')
@@ -841,7 +1022,9 @@ Deno.serve(async (req: Request) => {
         additional_heads, additional_head_price, additional_head_charge,
         inclusion_adjustment, inclusion_snapshot,
         transport_fee, transport_distance_km,
-        package_id, package:package_id ( package_name )
+        special_requests,
+        package_id, package:package_id ( package_name ),
+        add_on:add_on_id ( package_name, price )
       `)
       .eq('reservation_id', reservation_id)
       .maybeSingle();
@@ -1067,6 +1250,72 @@ Deno.serve(async (req: Request) => {
       }
     });
 
+    // Price Breakdown. Everything comes from what was frozen on the
+    // reservation at booking, so a later price change never alters it. The
+    // package line is what remains of the subtotal after the itemised lines
+    // (add-on, additional guests, removed inclusions, discount), so the rows
+    // always add up to the Total Amount even for menu-priced packages.
+    const totalAmount = Number(reservation.total_price || 0);
+    const transportFeeAmount = (reservation.transport_distance_km != null || Number(reservation.transport_fee) > 0)
+      ? Number(reservation.transport_fee || 0) : 0;
+    const serviceChargeAmount = Number(reservation.service_charge_amount || 0);
+    const subtotalAmount = round2(totalAmount - transportFeeAmount - serviceChargeAmount);
+    const discountAmountValue = reservation.discount_amount != null ? Number(reservation.discount_amount) : 0;
+    const inclusionCreditValue = Number(reservation.inclusion_adjustment) > 0 ? Number(reservation.inclusion_adjustment) : 0;
+    const additionalHeadsValue = Number(reservation.additional_heads) > 0 ? Number(reservation.additional_heads) : 0;
+    const additionalHeadChargeValue = additionalHeadsValue > 0 ? Number(reservation.additional_head_charge || 0) : 0;
+    const packagePlusAddOn = round2(subtotalAmount + discountAmountValue + inclusionCreditValue - additionalHeadChargeValue);
+    const addOnPrice = Number(reservation.add_on?.price || 0);
+    const addOnAmountValue = reservation.add_on && addOnPrice > 0 && addOnPrice < packagePlusAddOn ? addOnPrice : 0;
+    const removedInclusionRows = Array.isArray(reservation.inclusion_snapshot)
+      ? reservation.inclusion_snapshot
+          .filter((i: { removed?: boolean }) => i?.removed)
+          .map((i: { name?: string; credit?: number }) => ({ name: String(i.name || ''), credit: Number(i.credit || 0) }))
+      : [];
+
+    const breakdownRows: BreakdownRow[] = subtotalAmount > 0
+      ? buildBreakdownRows({
+          packageName,
+          packageAmount: packagePlusAddOn - addOnAmountValue,
+          addOnName: reservation.add_on?.package_name || '',
+          addOnAmount: addOnAmountValue,
+          additionalHeads: additionalHeadsValue,
+          additionalHeadPrice: Number(reservation.additional_head_price || 0),
+          additionalHeadCharge: additionalHeadChargeValue,
+          removedInclusions: removedInclusionRows,
+          discountLabel: reservation.discount_label || '',
+          discountPercent: reservation.discount_percent != null ? Number(reservation.discount_percent) : 0,
+          discountAmount: discountAmountValue,
+          subtotal: subtotalAmount,
+          servicePercent: Number(reservation.service_charge_percent || 0),
+          serviceAmount: serviceChargeAmount,
+          transportFee: transportFeeAmount,
+          transportKm: reservation.transport_distance_km != null ? Number(reservation.transport_distance_km) : 0,
+          total: totalAmount,
+        })
+      : [];
+
+    // Additional Requests: the customer's notes plus any custom requests.
+    // Custom requests are read from the database when it has them (a re-sign
+    // happens after they were saved); on a first signing they are not saved
+    // yet, so the titles sent with the request are used. Best-effort — a
+    // failure here must never block the contract.
+    let customRequestTitles: string[] = clientCustomRequests;
+    try {
+      const { data: customRequestRows } = await supabase
+        .from('reservation_custom_requests')
+        .select('title')
+        .eq('reservation_id', reservation.reservation_id)
+        .neq('status', 'declined')
+        .order('created_at', { ascending: true });
+      if (customRequestRows?.length) {
+        customRequestTitles = customRequestRows.map((r: { title: string }) => String(r.title || '').trim()).filter(Boolean);
+      }
+    } catch (customRequestError) {
+      console.error('custom request lookup failed', { error: String((customRequestError as Error).message) });
+    }
+    const requestRows = buildRequestRows(reservation.special_requests || '', customRequestTitles);
+
     const signatureBytes = base64ToBytes(signature_data_url);
 
     const { url: signatureUrl } = await uploadToCloudinary(signatureBytes, {
@@ -1095,6 +1344,8 @@ Deno.serve(async (req: Request) => {
       signatureBytes,
       sanitizeForPdf(signer_name),
       time_zone,
+      breakdownRows,
+      requestRows,
     );
 
     // resourceType 'image' (not 'raw') — required so Cloudinary's pg_N page

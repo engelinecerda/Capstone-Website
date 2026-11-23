@@ -1713,6 +1713,11 @@
         .id-verify-preview-meta { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; font-size: 12.5px; color: #6B5A47; }
         .id-verify-preview-meta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .id-verify-preview-meta .signature-clear-btn { margin-top: 6px; }
+        .id-verify-saved { margin: 0 0 4px; }
+        .id-verify-saved.hidden, #id-upload-area.hidden { display: none; }
+        .id-verify-saved .id-verify-help { margin: 0; padding: 10px 12px; border: 1px solid #CFE5D3; border-radius: 8px; background: #F1F8F2; color: #2E7D4F; }
+        .id-verify-saved .id-verify-help a { color: #2E7D4F; font-weight: 600; }
+        .id-verify-save-note i { margin-right: 4px; }
         .id-verify-status { min-height: 18px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: #756559; }
         .id-verify-status.error { color: #b42318; }
         .id-verify-status.is-success { color: #2E7D4F; }

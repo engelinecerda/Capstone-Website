@@ -25,6 +25,7 @@
 import { portalSupabase as supabase } from './supabase.js';
 import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
+import { buildBreakdownRows, buildRequestRows } from './contract_breakdown.js';
 import { fetchContractTemplateData } from './contract_render.js';
 import { lockBodyScroll } from './modal_scroll_lock.js';
 
@@ -516,6 +517,35 @@ function openContractPreview() {
     .map((f) => `<p><strong>${escHtml(f.label)}:</strong> ${escHtml(values[f.token] ?? '')}</p>`)
     .join('');
 
+  // Price Breakdown + Additional Requests — added to every contract by the
+  // system (not template text), shown here with the sample booking's figures
+  // so admins see the section customers will sign. The amounts here are
+  // illustrative and add up on their own (28,000 + 1,000 − 500 − 5,500 =
+  // 23,000, + 10% service charge + 450 transport = 25,750).
+  const sampleBreakdown = buildBreakdownRows({
+    packageName: values.package_name,
+    packageAmount: 28000,
+    additionalHeads: 5,
+    additionalHeadPrice: 200,
+    additionalHeadCharge: 1000,
+    removedInclusions: [{ name: values.removed_inclusions, credit: 500 }],
+    discountLabel: values.discount_label,
+    discountPercent: 20,
+    discountAmount: 5500,
+    subtotal: 23000,
+    servicePercent: 10,
+    serviceAmount: 2300,
+    transportFee: 450,
+    transportKm: 25,
+    total: 25750,
+  }, (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const renderRows = (rows) => rows
+    .map((r) => `<p><strong>${escHtml(r.label)}:</strong> ${escHtml(r.detail && r.amount ? `${r.detail} — ${r.amount}` : (r.detail || r.amount))}</p>`)
+    .join('');
+  const breakdownHtml = `<h4>Price Breakdown</h4>${renderRows(sampleBreakdown)}`;
+  const sampleRequests = buildRequestRows({ notes: 'Please set up a cake table.', customRequests: ['Balloon arch'] });
+  const requestsHtml = sampleRequests.length ? `<h4>Additional Requests</h4>${renderRows(sampleRequests)}` : '';
+
   const clauseNumberStart = 1;
   const clausesHtml = templateClauses.map((c, i) => `
     <h4>${clauseNumberStart + i}. ${escHtml(mergeTokens(c.heading, values))}</h4>
@@ -539,6 +569,8 @@ function openContractPreview() {
     ${introHtml}
     <h4>Reservation Summary</h4>
     ${fieldsHtml || '<p><em>No visible fields.</em></p>'}
+    ${breakdownHtml}
+    ${requestsHtml}
     ${clausesHtml}
     ${esHtml}
     ${ackHtml}

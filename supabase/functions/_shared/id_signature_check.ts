@@ -9,9 +9,11 @@
 //   * anything else -> contract stays `pending_review`, the customer is told
 //                      what to fix and can re-upload their ID or re-sign
 //
-// Privacy: nothing about the ID is stored. Images are sent to Gemini once and
-// dropped when the request ends. The database only gets the verdict, an attempt
-// count and a timestamp.
+// Privacy: the customer's ID photo is kept only in the private `customer-ids`
+// storage bucket (one object per customer, managed on their profile — see
+// supabase/migrations/20261128_profile_valid_id.sql). It is sent to Gemini and
+// never logged or copied anywhere else. The contract row only gets the verdict,
+// an attempt count and a timestamp.
 //
 // Signature comparison by a vision model is a screening check, not forensic
 // handwriting analysis; a person can always verify a pending contract by hand.
@@ -429,4 +431,30 @@ export async function fetchStoredSignature(
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return { mimeType: 'image/png', data: btoa(binary) };
+}
+
+// The ID the customer saved on their profile (private bucket, fixed path
+// <user_id>/valid-id.jpg). The path is built from the VERIFIED caller id —
+// never from anything the browser sends — so a customer can only ever use
+// their own ID. Returns null when none is saved (or it is unreadable).
+export const VALID_ID_BUCKET = 'customer-ids';
+
+export async function loadSavedIdForUser(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ mimeType: string; data: string } | null> {
+  const { data: blob, error } = await supabase.storage
+    .from(VALID_ID_BUCKET)
+    .download(`${userId}/valid-id.jpg`);
+  if (error || !blob) return null;
+
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  if (!bytes.length || bytes.length > MAX_ID_BYTES) return null;
+
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return { mimeType: 'image/jpeg', data: btoa(binary) };
 }
