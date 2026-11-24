@@ -68,6 +68,7 @@ const locationTagInput     = document.getElementById('locationTagInput');
 const locationNameInput    = document.getElementById('locationNameInput');
 const locationAddressInput = document.getElementById('locationAddressInput');
 const locationLatInput     = document.getElementById('locationLatInput');
+const locationTransportOrigin = document.getElementById('locationTransportOrigin');
 const locationLngInput     = document.getElementById('locationLngInput');
 const locationFindOnMapBtn = document.getElementById('locationFindOnMapBtn');
 const locationFindHint     = document.getElementById('locationFindHint');
@@ -159,7 +160,8 @@ function renderLocations() {
         <div class="location-admin-name">${escapeHtml(loc.name)}</div>
         <div class="location-admin-address">${escapeHtml(loc.address)}</div>
         ${loc.hours_label ? `<div class="location-admin-hours">${escapeHtml(loc.hours_label)}</div>` : ''}
-        <div class="location-admin-hours">${hasCoords(loc) ? `Map location set (${Number(loc.latitude).toFixed(4)}, ${Number(loc.longitude).toFixed(4)})` : 'No map location yet &mdash; needed for the transport fee'}</div>
+        <div class="location-admin-hours">${hasCoords(loc) ? `Map location set (${Number(loc.latitude).toFixed(4)}, ${Number(loc.longitude).toFixed(4)})` : 'No map location yet'}</div>
+        <div class="location-admin-transport ${loc.transport_origin ? 'is-origin' : ''}">${loc.transport_origin ? 'Transport fee starting point' : 'Not a transport fee starting point'}</div>
       </div>
       <div class="location-admin-actions">
         <button type="button" class="btn-icon-xs" data-toggle-location="${loc.id}" aria-label="${loc.is_active ? 'Deactivate' : 'Activate'} ${escapeHtml(loc.name)}">${loc.is_active ? '●' : '○'}</button>
@@ -226,6 +228,7 @@ function openLocationModal(id) {
   locationAddressInput.value = loc?.address || '';
   locationFindHint.textContent = LOCATION_FIND_HINT_DEFAULT;
   fillHoursFields(loc?.hours_label);
+  locationTransportOrigin.checked = !!loc?.transport_origin;
   setModalMsg(locationModalMessage, '');
   openModal(locationModal);
   initLocationPin(hasCoords(loc) ? { lat: Number(loc.latitude), lng: Number(loc.longitude) } : null);
@@ -385,6 +388,13 @@ locationModalSave.addEventListener('click', async () => {
     return;
   }
 
+  const transportOrigin = locationTransportOrigin.checked;
+  if (transportOrigin && latitude === null) {
+    setModalMsg(locationModalMessage, 'Place a pin on the map (or enter coordinates) before using this branch as a transport fee starting point.');
+    return;
+  }
+
+  const hadOriginBefore = hasActiveTransportOrigin();
   locationModalSave.disabled = true;
   try {
     const payload = {
@@ -394,14 +404,17 @@ locationModalSave.addEventListener('click', async () => {
       hours_label: hoursLabel || null,
       latitude: latitude === null ? null : Math.round(latitude * 1e6) / 1e6,
       longitude: longitude === null ? null : Math.round(longitude * 1e6) / 1e6,
+      transport_origin: transportOrigin,
       updated_at: new Date().toISOString()
     };
 
     if (editingLocationId) {
       const { error } = await supabase.from('business_location').update(payload).eq('id', editingLocationId);
       if (error) throw error;
-      Object.assign(locations.find(l => l.id === editingLocationId), payload);
-      await logAudit({ action: 'Updated Location', category: 'business_profile', details: `Updated: ${name}`, entityId: editingLocationId });
+      const existing = locations.find(l => l.id === editingLocationId);
+      const originChanged = !!existing.transport_origin !== transportOrigin;
+      Object.assign(existing, payload);
+      await logAudit({ action: 'Updated Location', category: 'business_profile', details: `Updated: ${name}${originChanged ? ` (transport fee starting point: ${transportOrigin ? 'on' : 'off'})` : ''}`, entityId: editingLocationId });
     } else {
       const nextSort = locations.length ? Math.max(...locations.map(l => l.sort_order)) + 1 : 0;
       const { data, error } = await supabase.from('business_location').insert({ ...payload, sort_order: nextSort }).select().single();
@@ -412,6 +425,7 @@ locationModalSave.addEventListener('click', async () => {
     renderLocations();
     closeModal(locationModal);
     showToast(editingLocationId ? 'Location updated.' : 'Location added.', 'success');
+    warnIfTransportOriginLost(hadOriginBefore);
   } catch (err) {
     setModalMsg(locationModalMessage, `Failed to save: ${err.message}`);
   } finally {
@@ -423,14 +437,29 @@ document.getElementById('locationModalClose').addEventListener('click', () => cl
 document.getElementById('locationModalCancel').addEventListener('click', () => closeModal(locationModal));
 locationModal.addEventListener('click', e => { if (e.target === locationModal) closeModal(locationModal); });
 
+// Transport fees are measured from active branches flagged as a starting
+// point. If the last one is hidden, unflagged or removed, offsite bookings
+// would silently stop being charged, so tell the admin right away.
+function hasActiveTransportOrigin() {
+  return locations.some(l => l.is_active && l.transport_origin && hasCoords(l));
+}
+
+function warnIfTransportOriginLost(hadOriginBefore) {
+  if (hadOriginBefore && !hasActiveTransportOrigin()) {
+    setMsg(locationMsg, 'No active branch is a transport fee starting point now, so transport fees cannot be charged until you set one.', 'error');
+  }
+}
+
 async function toggleLocationActive(id) {
   const loc = locations.find(l => l.id === id);
   if (!loc) return;
   const nextActive = !loc.is_active;
   const { error } = await supabase.from('business_location').update({ is_active: nextActive }).eq('id', id);
   if (error) { setMsg(locationMsg, `Failed: ${error.message}`, 'error'); return; }
+  const hadOriginBefore = hasActiveTransportOrigin();
   loc.is_active = nextActive;
   renderLocations();
+  warnIfTransportOriginLost(hadOriginBefore);
 }
 
 async function moveLocation(id, direction) {
@@ -477,9 +506,11 @@ confirmOk.addEventListener('click', async () => {
       const loc = locations.find(l => l.id === pendingConfirmAction.id);
       const { error } = await supabase.from('business_location').delete().eq('id', pendingConfirmAction.id);
       if (error) throw error;
+      const hadOriginBefore = hasActiveTransportOrigin();
       locations = locations.filter(l => l.id !== pendingConfirmAction.id);
       await logAudit({ action: 'Removed Location', category: 'business_profile', details: `Removed: ${loc?.name}`, entityId: pendingConfirmAction.id });
       renderLocations();
+      warnIfTransportOriginLost(hadOriginBefore);
       toastMsg = 'Location removed.';
     } else if (pendingConfirmAction.type === 'remove-social-link') {
       const link = socialLinks.find(l => l.id === pendingConfirmAction.id);

@@ -213,7 +213,14 @@
           <span class="modal-hint">Type the days, then pick the opening and closing time. Shown to customers as, e.g., “Daily · 1:00 PM – 10:00 PM”. Leave the times empty to save the text as typed.</span>
         </div>
         <div class="modal-field">
-          <label class="modal-label" for="locationFindOnMapBtn">Pin on map <small>(used to measure the offsite transport fee)</small></label>
+          <label class="plain-checkbox-row" for="locationTransportOrigin">
+            <input type="checkbox" id="locationTransportOrigin">
+            <span>Use as a transport fee starting point</span>
+          </label>
+          <span class="modal-hint">Customers' transport fees are measured from branches with this ticked. Leave it off for branches that don't serve offsite events. Requires a map pin below.</span>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="locationFindOnMapBtn">Pin on map <small>(needed for a transport fee starting point)</small></label>
           <div class="hours-input-row">
             <button type="button" class="btn-outline-sm" id="locationFindOnMapBtn">Find address on map</button>
             <button type="button" class="btn-outline-sm" id="locationClearPinBtn">Remove pin</button>

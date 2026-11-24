@@ -1,6 +1,6 @@
 // admin_payment_options.js
 import './money_inputs.js';
-import { readTransportRules, computeTransportFee, describeTransportFee, branchesWithCoords, TRANSPORT_DEFAULTS } from './transport_fee.js';
+import { readTransportRules, computeTransportFee, describeTransportFee, transportOrigins, TRANSPORT_DEFAULTS } from './transport_fee.js';
 import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
@@ -927,8 +927,9 @@ async function saveOffsiteToggle() {
 
 // ── Transport fee (offsite) ──────────────────────────────────────────────────
 // Same system_settings.payment_rules blob as everything above; this card
-// owns the five transport_* keys. Branch coordinates (the measuring points)
-// are set per branch in Business profile.
+// owns the five transport_* keys. The starting point(s) the distance is
+// measured from are chosen per branch in Business profile (the "Transport fee
+// starting point" checkbox + the branch's map pin).
 let transportBranches = [];
 
 function setTfMsg(msg, isError = false) {
@@ -968,11 +969,11 @@ function updateTransportExample() {
   // allowance, so the example always shows a real charge.
   const targetRoadKm = rules.freeKm + 15;
   const straightKm = Math.round((targetRoadKm / rules.roadFactor) * 10) / 10;
-  const origin = branchesWithCoords(transportBranches)[0];
+  const origin = transportOrigins(transportBranches)[0];
   // Fake pin due north of the first branch by `straightKm` (1 degree latitude ~ 111.19 km).
   const baseLat = origin ? Number(origin.latitude) : 14.4647;
   const baseLng = origin ? Number(origin.longitude) : 121.1925;
-  const sampleBranches = [{ name: origin?.name || 'the nearest branch', latitude: baseLat, longitude: baseLng }];
+  const sampleBranches = [{ name: origin?.name || 'the nearest branch', latitude: baseLat, longitude: baseLng, transport_origin: true }];
   const result = computeTransportFee({ ...v, transport_fee_enabled: true }, { lat: baseLat + straightKm / 111.19, lng: baseLng }, sampleBranches);
   const where = `A venue about ${straightKm} km away in a straight line is about ${result.distanceKm} km by road from ${result.originName}`;
   const maths = result.billableKm > 0
@@ -998,17 +999,19 @@ async function loadTransportFeeSection() {
   setVal('tf-road-factor', rules.roadFactor.toFixed(2));
 
   const { data: branches } = await supabase
-    .from('business_location').select('name, branch_tag, latitude, longitude, is_active').eq('is_active', true).order('sort_order', { ascending: true });
+    .from('business_location').select('name, branch_tag, latitude, longitude, transport_origin, is_active').eq('is_active', true).order('sort_order', { ascending: true });
   transportBranches = branches || [];
-  const usable = branchesWithCoords(transportBranches);
+  const usable = transportOrigins(transportBranches);
   const note = document.getElementById('tf-origin-note');
   if (note) {
     if (usable.length) {
-      note.textContent = 'Distance is measured from the nearest of: ' + usable.map((b) => b.name).join(', ') + '.'
-        + (usable.length < transportBranches.length ? ' Branches without a map location are ignored — set one in Business profile → Edit branch.' : '');
+      note.textContent = (usable.length === 1
+        ? 'Distance is measured from: ' + usable[0].name + '.'
+        : 'Distance is measured from the nearest of: ' + usable.map((b) => b.name).join(', ') + '.')
+        + ' To change this, edit a branch in Business profile and update its “Use as a transport fee starting point” setting.';
       note.style.color = '';
     } else {
-      note.textContent = 'No active branch has a map location yet, so no transport fee can be charged. Open Business profile, edit a branch and set its map location.';
+      note.textContent = 'No active branch is a transport fee starting point, so no transport fee can be charged. Open Business profile, edit a branch, place its map pin and tick “Use as a transport fee starting point”.';
       note.style.color = '#b3261e';
     }
   }
@@ -1019,6 +1022,12 @@ async function saveTransportFee() {
   const values = readTransportFields();
   const problem = validateTransportFields(values);
   if (problem) { setTfMsg(problem, true); return; }
+  // Switching the fee on with no starting point would silently charge ₱0 to
+  // every offsite booking, so stop it here instead.
+  if (values.transport_fee_enabled && !transportOrigins(transportBranches).length) {
+    setTfMsg('Set a transport fee starting point first: in Business profile, edit a branch, place its map pin and tick “Use as a transport fee starting point”.', true);
+    return;
+  }
 
   const { data: current } = await supabase
     .from('system_settings').select('setting_value').eq('setting_key', 'payment_rules').maybeSingle();

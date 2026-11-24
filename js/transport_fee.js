@@ -8,7 +8,9 @@
 // maths below is the fallback used when that function can't be reached, and
 // powers the Payment Settings example; the fee rule itself is the same in both.
 //
-// Rule (per-km): the distance from the NEAREST branch to the venue pin is
+// Rule (per-km): the distance from the NEAREST transport fee starting point
+// (a branch flagged business_location.transport_origin that has a map pin) to
+// the venue pin is
 // measured in a straight line, multiplied by a road factor (roads are longer
 // than the crow flies), and rounded to 0.1 km. The first `freeKm` are free;
 // every km after that costs `ratePerKm`, optionally capped at `maxFee`.
@@ -67,8 +69,16 @@ export function branchesWithCoords(branches) {
   });
 }
 
+// Only branches an admin has marked as a "transport fee starting point" (and
+// that have a map pin) are used to measure the fee. An active, pinned branch
+// that is not flagged — e.g. a branch that doesn't serve offsite events — is
+// ignored, so pinning it never changes a price.
+export function transportOrigins(branches) {
+  return branchesWithCoords(branches).filter((b) => b?.transport_origin === true);
+}
+
 export function findNearestBranch(pin, branches) {
-  const usable = branchesWithCoords(branches);
+  const usable = transportOrigins(branches);
   if (!pin || !usable.length) return null;
   let best = null;
   for (const b of usable) {
@@ -81,7 +91,7 @@ export function findNearestBranch(pin, branches) {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 // Prices a single pin. `applies` is false when the fee is switched off, there
-// is no pin yet, or no branch has coordinates — callers then charge nothing.
+// is no pin yet, or no branch is a transport fee starting point with a pin — callers then charge nothing.
 export function computeTransportFee(rawRules, pin, branches) {
   const rules = readTransportRules(rawRules);
   const none = { applies: false, fee: 0, distanceKm: null, billableKm: 0, originName: '', capped: false, rules };

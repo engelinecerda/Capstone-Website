@@ -196,3 +196,9 @@
 .location-pin-status { font-size: 12px; color: var(--muted); }
 .location-coords-manual { margin-top: 8px; }
 .location-coords-manual summary { font-size: 12px; color: var(--muted); cursor: pointer; margin-bottom: 8px; }
+
+/* Transport fee starting point checkbox (branch modal) + status line (branch list) */
+.plain-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; }
+.plain-checkbox-row input { width: 16px; height: 16px; accent-color: var(--btn-primary-bg, #6B3A1F); }
+.location-admin-transport { font-size: 12px; color: var(--muted); }
+.location-admin-transport.is-origin { color: var(--text); font-weight: 600; }

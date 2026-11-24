@@ -6,8 +6,10 @@
 //
 // How it works
 //   1. Reads the transport_* settings from system_settings.payment_rules and
-//      the active branches that have map coordinates.
-//   2. Takes the two branches nearest to the pin (straight line) and asks
+//      the active branches that are marked as a transport fee starting point
+//      (business_location.transport_origin) and have map coordinates. A
+//      branch that is not flagged is never used, even if it has a pin.
+//   2. Takes the two starting points nearest to the pin (straight line) and asks
 //      OpenRouteService for the real driving distance from each. The shorter
 //      one wins.
 //   3. If OpenRouteService can't be reached (no key, quota used up, pin not
@@ -56,6 +58,7 @@ interface Branch {
   branch_tag: string | null;
   latitude: number | string | null;
   longitude: number | string | null;
+  transport_origin: boolean | null;
 }
 
 const num = (v: unknown, fallback: number | null): number | null => {
@@ -164,12 +167,13 @@ Deno.serve(async (req: Request) => {
 
     const { data: branchRows, error: branchErr } = await supabase
       .from('business_location')
-      .select('name, branch_tag, latitude, longitude')
-      .eq('is_active', true);
+      .select('name, branch_tag, latitude, longitude, transport_origin')
+      .eq('is_active', true)
+      .eq('transport_origin', true);
     if (branchErr) throw branchErr;
 
     const withCoords = ((branchRows ?? []) as Branch[])
-      .filter((b) => b.latitude !== null && b.longitude !== null &&
+      .filter((b) => b.transport_origin === true && b.latitude !== null && b.longitude !== null &&
         Number.isFinite(Number(b.latitude)) && Number.isFinite(Number(b.longitude)))
       .map((b) => ({
         name: b.name || b.branch_tag || 'our branch',

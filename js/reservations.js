@@ -33,7 +33,7 @@ import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
 import { buildBreakdownRows, buildRequestRows, formatBreakdownText, formatRequestsText, BREAKDOWN_HEADING, REQUESTS_HEADING } from '/js/contract_breakdown.js';
-import { computeTransportFee, describeTransportFee, branchesWithCoords } from '/js/transport_fee.js';
+import { computeTransportFee, describeTransportFee, transportOrigins } from '/js/transport_fee.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 import { attachPhoneMask } from '/js/phone_format.js';
 import { getIdFileError, resizeIdImage, fetchValidIdStatus, validIdFileExists, saveValidId } from '/js/valid_id.js';
@@ -213,12 +213,13 @@ function resolveServiceCharge(basePrice, locationType, categoryId) {
 }
 
 // ── Transport fee (offsite) ────────────────────────────────────────────
-// Per-km fee from the nearest branch to the venue pin (see js/transport_fee.js).
-// Settings come from payment_rules; the branches are the active
-// business_location rows that have map coordinates. Added to the total AFTER
+// Per-km fee from the nearest transport fee starting point to the venue pin
+// (see js/transport_fee.js). Settings come from payment_rules; the starting
+// points are the active business_location rows flagged transport_origin that
+// have map coordinates. Added to the total AFTER
 // the discount and the service charge, so neither applies to it. Onsite
-// bookings, a switched-off fee, a missing pin or branches without
-// coordinates all resolve to a 0.00 fee.
+// bookings, a switched-off fee, a missing pin or no starting point
+// all resolve to a 0.00 fee.
 let TRANSPORT_RULES = {};
 let TRANSPORT_BRANCHES = [];
 
@@ -241,14 +242,14 @@ function resolveTransport() {
 }
 
 function isTransportFeeActive() {
-    return TRANSPORT_RULES.transport_fee_enabled === true && branchesWithCoords(TRANSPORT_BRANCHES).length > 0;
+    return TRANSPORT_RULES.transport_fee_enabled === true && transportOrigins(TRANSPORT_BRANCHES).length > 0;
 }
 
 async function loadTransportFeeSettings() {
     try {
         const { data } = await supabase
             .from('business_location')
-            .select('name, branch_tag, latitude, longitude')
+            .select('name, branch_tag, latitude, longitude, transport_origin')
             .eq('is_active', true);
         TRANSPORT_BRANCHES = data || [];
     } catch { TRANSPORT_BRANCHES = []; }
@@ -261,7 +262,9 @@ function refreshVenueTransportHint() {
     if (S.locationType !== 'offsite' || !isTransportFeeActive()) { el.classList.add('hidden'); return; }
     const pin = window.getVenuePin ? window.getVenuePin() : null;
     if (!pin) {
-        el.textContent = 'A transport fee applies to offsite venues, based on the distance from our Binangonan branch. Drop a pin on the map to see yours.';
+        const origins = transportOrigins(TRANSPORT_BRANCHES);
+        const from = origins.length === 1 ? (origins[0].name || 'our branch') : 'our nearest branch';
+        el.textContent = 'A transport fee applies to offsite venues, based on the distance from ' + from + '. Drop a pin on the map to see yours.';
         el.classList.remove('hidden');
         return;
     }
