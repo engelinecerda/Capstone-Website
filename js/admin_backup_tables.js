@@ -110,6 +110,7 @@ export const NOT_BACKED_UP = {
   login_ip_failure_tracking:   'live lockout state — restoring it could lock people out',
   vision_api_usage:            'monthly API quota counter — restoring would misstate usage',
   reservation_number_counters: 'locked down by RLS (no client access); rebuilt from reservations by backup_resync_sequences()',
+  receipt_checks:              'short-lived pre-submission receipt check records (service-role only); the verdict that matters is kept on payment.receipt_check_status',
 };
 
 export const BACKUP_TABLES = BACKUP_TABLE_CONFIG.map(t => t.name);
