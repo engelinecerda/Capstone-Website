@@ -25,6 +25,7 @@ import {
     loadPaymentTypes,
     loadReservationRules,
     PAYMENT_DATE_MAX_AGE_DAYS,
+    ReceiptCheckError,
     submitCustomerPayment,
     validateProofFile,
     validateReferenceNumber
@@ -98,6 +99,12 @@ const state = {
     // alone made every visit look like progress.
     selectionTouchedByUser: false,
     isSubmitting: false,
+    // 'uploading' | 'checking' | 'saving' while a submit is in flight
+    submitStage: '',
+    // Result of a receipt check that blocked the last submit (per-field
+    // checklist from validate-receipt). Cleared when the receipt is replaced
+    // or the customer submits again. The form fields are never cleared by it.
+    receiptCheck: null,
     flashMessage: '',
     flashType: '',
     // Set true only when a saved draft is resumed (the receipt file itself
@@ -820,6 +827,70 @@ function renderInstructionCard(reservation) {
     `;
 }
 
+// ── Receipt check checklist ──────────────────────────────────────────────
+// Labels for the per-field results returned by validate-receipt. The messages
+// themselves come from the server (already sanitized) and are always rendered
+// through escapeHtml, since part of them is text read off the customer's image.
+const RECEIPT_CHECK_FIELDS = [
+    { key: 'receiver', label: 'Receiver' },
+    { key: 'amount', label: 'Amount' },
+    { key: 'reference', label: 'Reference number' },
+    { key: 'duplicate', label: 'Reference already used' },
+    { key: 'date', label: 'Payment date' },
+    { key: 'method', label: 'Payment method' },
+    { key: 'transaction', label: 'Transaction' },
+    { key: 'receipt', label: 'Receipt' }
+];
+
+const RECEIPT_CHECK_ICONS = {
+    match: 'ti-circle-check',
+    mismatch: 'ti-circle-x',
+    unclear: 'ti-alert-circle'
+};
+
+function getSubmitButtonLabel() {
+    if (!state.isSubmitting) return 'Submit Payment';
+    if (state.submitStage === 'uploading') return 'Uploading receipt...';
+    if (state.submitStage === 'checking') return 'Checking your receipt...';
+    return 'Submitting Payment...';
+}
+
+function renderReceiptCheckPanel() {
+    const check = state.receiptCheck;
+    if (!check || !check.fields) return '';
+
+    const rows = RECEIPT_CHECK_FIELDS
+        .filter(({ key }) => check.fields[key] && check.fields[key].status !== 'skipped')
+        .map(({ key, label }) => {
+            const field = check.fields[key];
+            const status = RECEIPT_CHECK_ICONS[field.status] ? field.status : 'unclear';
+            return `
+                <li class="payment-receipt-check-row ${status}">
+                    <i class="ti ${RECEIPT_CHECK_ICONS[status]}" aria-hidden="true"></i>
+                    <div>
+                        <div class="payment-receipt-check-label">${escapeHtml(label)}</div>
+                        <div class="payment-receipt-check-message">${escapeHtml(field.message || '')}</div>
+                    </div>
+                </li>
+            `;
+        })
+        .join('');
+
+    return `
+        <div class="payment-receipt-check" role="alert">
+            <div class="payment-receipt-check-head">
+                <i class="ti ti-circle-x" aria-hidden="true"></i>
+                <div>
+                    <div class="payment-receipt-check-title">We couldn't accept this receipt</div>
+                    <div class="payment-receipt-check-sub">Your details are still here. Correct anything marked below, or replace the receipt, then submit again.</div>
+                </div>
+            </div>
+            <ul class="payment-receipt-check-list">${rows}</ul>
+            <button type="button" class="payment-proof-action-btn" data-action="replace-receipt">Replace receipt</button>
+        </div>
+    `;
+}
+
 function renderFormSection(reservation) {
     const selectedOption = getSelectedOption(reservation);
     const selectedMethodObj = getSelectedMethodObject();
@@ -879,7 +950,9 @@ function renderFormSection(reservation) {
                                         : `<i class="ti ti-photo" aria-hidden="true"></i>`}
                                 </div>
                                 <div class="payment-proof-uploaded-info">
-                                    <div class="payment-proof-uploaded-status"><i class="ti ti-circle-check" aria-hidden="true"></i> Uploaded successfully</div>
+                                    ${state.receiptCheck
+                                        ? `<div class="payment-proof-uploaded-status failed"><i class="ti ti-circle-x" aria-hidden="true"></i> Receipt not accepted</div>`
+                                        : `<div class="payment-proof-uploaded-status"><i class="ti ti-circle-check" aria-hidden="true"></i> Uploaded successfully</div>`}
                                     <div class="payment-proof-uploaded-name">${escapeHtml(state.form.proofFile.name)}</div>
                                     <div class="payment-proof-uploaded-size">${escapeHtml(formatFileSize(state.form.proofFile.size))}</div>
                                 </div>
@@ -897,6 +970,7 @@ function renderFormSection(reservation) {
                                 <div class="payment-proof-name">PNG, JPG or WEBP up to 10MB</div>
                             </label>
                         `}
+                        ${renderReceiptCheckPanel()}
                     </div>
                 ` : `
                     <div class="payment-form-row">
@@ -920,7 +994,8 @@ function renderFormSection(reservation) {
                     <span class="payment-submit-preview-label">You are about to submit</span>
                     <span class="payment-submit-preview-value">${escapeHtml(`${selectedMethodObj?.shortLabel || selectedMethodObj?.label || 'Payment method'} · ${selectedOption.displayLabel} · ${formatCurrency(displayAmount)}`)}</span>
                 </div>
-                <button type="button" class="res-primary-btn" data-action="submit-payment" ${state.isSubmitting ? 'disabled' : ''}>${state.isSubmitting ? 'Submitting Payment...' : 'Submit Payment'}</button>
+                <button type="button" class="res-primary-btn" data-action="submit-payment" ${state.isSubmitting ? 'disabled' : ''}>${escapeHtml(getSubmitButtonLabel())}</button>
+                ${state.isSubmitting && state.submitStage === 'checking' ? `<p class="payment-inline-message" role="status">Reading your receipt. This usually takes a few seconds.</p>` : ''}
                 <p class="payment-inline-message ${escapeHtml(state.flashType)}">${escapeHtml(state.flashMessage)}</p>
             </div>
         </section>
@@ -1510,6 +1585,8 @@ async function handleSubmitPayment() {
     }
 
     state.isSubmitting = true;
+    state.submitStage = 'uploading';
+    state.receiptCheck = null;
     state.flashMessage = '';
     state.flashType = '';
     renderReservationPaymentPage();
@@ -1538,7 +1615,12 @@ async function handleSubmitPayment() {
             formatDate,
             reservationRules: state.reservationRules,
             paymentTypes: state.paymentTypes,
-            paymentRules: state.paymentRules
+            paymentRules: state.paymentRules,
+            onStage: (stage) => {
+                if (state.submitStage === stage) return;
+                state.submitStage = stage;
+                renderReservationPaymentPage();
+            }
         });
 
         state.form = {
@@ -1563,6 +1645,21 @@ async function handleSubmitPayment() {
         clearPaymentDraft();
         await loadPaymentPage();
     } catch (error) {
+        if (error instanceof ReceiptCheckError) {
+            // Blocked by the receipt check. Nothing was saved, and the form
+            // (reference, date, notes, attached receipt) stays exactly as it
+            // was so the customer can fix one thing and resubmit.
+            state.receiptCheck = error.check;
+            state.flashMessage = "Your receipt doesn't match this payment. See what to fix below.";
+            state.flashType = 'error';
+            state.isSubmitting = false;
+            state.submitStage = '';
+            renderReservationPaymentPage();
+            requestAnimationFrame(() => {
+                document.querySelector('.payment-receipt-check')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            });
+            return;
+        }
         const rawMessage = error?.message || 'Failed to submit payment.';
         const isStaleFeeMismatch = /must equal the (cancellation|reschedule|extension|additional guests) fee of/i.test(rawMessage);
         state.flashMessage = isStaleFeeMismatch
@@ -1605,6 +1702,7 @@ async function handleSubmitPayment() {
         }
     } finally {
         state.isSubmitting = false;
+        state.submitStage = '';
         renderReservationPaymentPage();
     }
 }
@@ -1678,7 +1776,16 @@ paymentApp?.addEventListener('click', async (event) => {
     if (removeProofButton) {
         state.form.proofFile = null;
         state.form.proofPreviewDataUrl = null;
+        state.receiptCheck = null;
         renderReservationPaymentPage();
+        return;
+    }
+
+    const replaceReceiptButton = event.target.closest('[data-action="replace-receipt"]');
+    if (replaceReceiptButton) {
+        // The old result stays visible until a new file is actually chosen,
+        // so cancelling the picker doesn't lose what the customer needs to fix.
+        document.getElementById('payment-proof-file')?.click();
         return;
     }
 
@@ -1743,6 +1850,7 @@ paymentApp?.addEventListener('change', (event) => {
             return;
         }
         state.flashMessage = '';
+        state.receiptCheck = null;
         state.form.proofFile = file;
         state.form.proofPreviewDataUrl = null;
         if (file) state.draftResumedMissingFile = false;

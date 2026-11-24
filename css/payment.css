@@ -718,6 +718,87 @@ body {
     font-weight: 600;
 }
 
+.payment-proof-uploaded-status.failed {
+    color: var(--pay-red-text);
+}
+
+/* ── Receipt check result (validate-receipt) ─────────────────────────────── */
+.payment-receipt-check {
+    margin-top: 12px;
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--pay-red-text);
+    border-radius: 10px;
+    background: var(--pay-red-bg);
+}
+
+.payment-receipt-check-head {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    color: var(--pay-red-text);
+    font-size: 18px;
+}
+
+.payment-receipt-check-title {
+    color: var(--pay-red-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.payment-receipt-check-sub {
+    margin-top: 2px;
+    color: var(--pay-text);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.payment-receipt-check-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.payment-receipt-check-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid var(--pay-border);
+    font-size: 16px;
+}
+
+.payment-receipt-check-row.match { color: var(--pay-green-text); }
+.payment-receipt-check-row.mismatch { color: var(--pay-red-text); border-color: var(--pay-red-text); }
+.payment-receipt-check-row.unclear { color: var(--pay-amber-text); }
+
+.payment-receipt-check-label {
+    color: var(--pay-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.payment-receipt-check-message {
+    margin-top: 1px;
+    color: var(--pay-muted);
+    font-size: 12.5px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.payment-receipt-check-row.mismatch .payment-receipt-check-message {
+    color: var(--pay-text);
+}
+
+.payment-receipt-check > .payment-proof-action-btn {
+    justify-self: start;
+}
+
 .payment-proof-uploaded-name {
     margin-top: 3px;
     color: var(--pay-text);

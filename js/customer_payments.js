@@ -1296,6 +1296,57 @@ export async function loadCustomerPaymentBundle(supabase, userId, options = {}) 
     };
 }
 
+// ── Receipt check (validate-receipt edge function) ───────────────────────────
+// Thrown by submitCustomerPayment() when the server says a receipt must not be
+// submitted (enforce mode + a confident mismatch). `check` carries the per-field
+// results so the payment page can show a checklist; the form data is untouched.
+export class ReceiptCheckError extends Error {
+    constructor(check) {
+        super(check?.reasons?.[0] || 'This receipt does not match the payment details.');
+        this.name = 'ReceiptCheckError';
+        this.check = check;
+    }
+}
+
+// Pulls a readable message out of a failed functions.invoke() call (the edge
+// function answers non-2xx with { error } JSON; supabase-js hides it in
+// error.context).
+async function readInvokeError(error) {
+    try {
+        const body = await error?.context?.json?.();
+        if (body?.error) return String(body.error);
+    } catch (_) { /* fall through */ }
+    return '';
+}
+
+// Asks validate-receipt to read the uploaded proof and compare it with what the
+// customer typed. NEVER throws: a failed call means "no check", and the database
+// trigger decides what that means (warn mode lets the payment through tagged
+// 'missing'; enforce mode refuses it). The page therefore fails open on outages
+// while the server stays the real gate.
+async function runReceiptCheck(supabase, { imageUrl, methodId, amount, referenceNumber, paymentDate }) {
+    try {
+        const { data, error } = await supabase.functions.invoke('validate-receipt', {
+            body: {
+                image_url: imageUrl,
+                payment_method_id: methodId,
+                amount,
+                reference_number: referenceNumber,
+                payment_date: paymentDate
+            }
+        });
+        if (error) {
+            return { check: null, failureMessage: await readInvokeError(error) };
+        }
+        if (!data?.success) {
+            return { check: null, failureMessage: data?.error ? String(data.error) : '' };
+        }
+        return { check: data, failureMessage: '' };
+    } catch (_) {
+        return { check: null, failureMessage: '' };
+    }
+}
+
 export async function submitCustomerPayment({
     supabase,
     reservations,
@@ -1319,7 +1370,8 @@ export async function submitCustomerPayment({
     formatDate,
     reservationRules = null,
     paymentTypes = null,
-    paymentRules = null
+    paymentRules = null,
+    onStage = null
 }) {
     const reservation = (reservations || []).find((entry) => String(entry.reservation_id) === String(reservationId));
     if (!reservation) {
@@ -1412,7 +1464,29 @@ export async function submitCustomerPayment({
         }
     }
 
+    const reportStage = (stage) => { try { onStage?.(stage); } catch (_) { /* UI hook only */ } };
+
+    reportStage('uploading');
     const proofUrl = isOnsite ? '' : await uploadPaymentProof(proofFile);
+
+    // Read the receipt before anything is saved. A blocking verdict stops here
+    // and the payment row is never inserted; everything else carries on.
+    let receiptCheckFailure = '';
+    if (proofUrl) {
+        reportStage('checking');
+        const { check, failureMessage } = await runReceiptCheck(supabase, {
+            imageUrl: proofUrl,
+            methodId: selectedMethod.id,
+            amount,
+            referenceNumber,
+            paymentDate
+        });
+        receiptCheckFailure = failureMessage;
+        if (check && check.can_submit === false) {
+            throw new ReceiptCheckError(check);
+        }
+    }
+    reportStage('saving');
     const payload = {
         reservation_id: reservation.reservation_id,
         reschedule_request_id: selectedOption.rescheduleRequestId || null,
@@ -1438,7 +1512,15 @@ export async function submitCustomerPayment({
         .select('payment_id')
         .limit(1);
 
-    if (error) throw error;
+    if (error) {
+        // enforce mode refuses a payment with no stored check. If the check
+        // could not run (rate limit, outage), say that instead of the generic
+        // database wording.
+        if (receiptCheckFailure && /receipt needs to be checked/i.test(error.message || '')) {
+            throw new Error(receiptCheckFailure);
+        }
+        throw error;
+    }
 
     const newPaymentId = insertedRows?.[0]?.payment_id;
     let successMessage = isOnsite
