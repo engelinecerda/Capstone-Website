@@ -165,6 +165,7 @@ let extensionRequestMap = {};
 let additionalHeadRequestMap = {};
 let paymentSummaryMap = {};
 let paymentMethodMap = {};
+let receiptCheckMap = {};         // payment_id -> { status, check } from validate-receipt
 let recordPaymentTargetPayment = null;
 let recordPaymentMethods = [];
 let recordPaymentFile = null;
@@ -558,6 +559,7 @@ function renderTable(list) {
         <td data-label="Status">
           <div class="payment-status-stack">
             <span class="status-pill ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
+            ${renderReceiptCheckPill(payment.payment_id)}
           </div>
         </td>
         <td class="actions actions-single" data-label="Action">
@@ -750,6 +752,130 @@ async function fetchPaymentById(paymentId) {
 
   if (error) throw error;
   return data || null;
+}
+
+// ── Receipt check (validate-receipt) ───────────────────────────────────────
+// The check is stored in receipt_checks and linked from payment.receipt_check_id
+// (set by the database trigger, never by the browser). Both reads are
+// best-effort: if they fail (older database, staff role without access) the
+// page simply shows no receipt-check information instead of breaking.
+const RECEIPT_STATUS_META = {
+  passed: { label: 'Receipt checked', className: 'passed' },
+  needs_review: { label: 'Check receipt manually', className: 'needs-review' },
+  mismatch: { label: 'Receipt mismatch', className: 'mismatch' },
+  missing: { label: 'Not auto-checked', className: 'missing' }
+};
+
+const RECEIPT_FIELD_LABELS = [
+  ['receiver', 'Receiver'],
+  ['amount', 'Amount'],
+  ['reference', 'Reference number'],
+  ['duplicate', 'Reference already used'],
+  ['date', 'Payment date'],
+  ['method', 'Payment method'],
+  ['transaction', 'Transaction'],
+  ['receipt', 'Receipt']
+];
+
+async function fetchReceiptChecks(paymentIds) {
+  if (!paymentIds.length) return {};
+  try {
+    const { data: payments, error } = await supabase
+      .from('payment')
+      .select('payment_id, receipt_check_id, receipt_check_status')
+      .in('payment_id', paymentIds);
+    if (error) throw error;
+
+    const checkIds = Array.from(new Set((payments || []).map((p) => p.receipt_check_id).filter(Boolean)));
+    const checksById = {};
+    if (checkIds.length) {
+      const { data: checks, error: checksError } = await supabase
+        .from('receipt_checks')
+        .select('check_id, verdict, reasons, fields, extracted, mode, created_at')
+        .in('check_id', checkIds);
+      if (checksError) throw checksError;
+      (checks || []).forEach((check) => { checksById[check.check_id] = check; });
+    }
+
+    return (payments || []).reduce((map, payment) => {
+      if (!payment.receipt_check_status) return map;
+      map[payment.payment_id] = {
+        status: payment.receipt_check_status,
+        check: payment.receipt_check_id ? (checksById[payment.receipt_check_id] || null) : null
+      };
+      return map;
+    }, {});
+  } catch (error) {
+    console.warn('[admin_payments] receipt checks unavailable:', error?.message || error);
+    return {};
+  }
+}
+
+function renderReceiptCheckPill(paymentId) {
+  const entry = receiptCheckMap[paymentId];
+  const meta = entry && RECEIPT_STATUS_META[entry.status];
+  if (!meta) return '';
+  return `<span class="receipt-check-pill ${meta.className}">${escapeHtml(meta.label)}</span>`;
+}
+
+// Everything printed here partly originates from the customer's receipt
+// image, so it is escaped like any other untrusted text.
+function buildReceiptCheckPanel(payment) {
+  const entry = receiptCheckMap[payment.payment_id];
+  const meta = entry && RECEIPT_STATUS_META[entry.status];
+  if (!meta) return '';
+
+  const head = `
+    <div class="receipt-check-head">
+      <span class="receipt-check-title">Receipt check</span>
+      <span class="receipt-check-pill ${meta.className}">${escapeHtml(meta.label)}</span>
+    </div>`;
+
+  if (entry.status === 'missing') {
+    return `<div class="receipt-check-panel">${head}
+      <p class="receipt-check-note">No receipt check was found for this submission, so nothing was compared automatically. Check the receipt image yourself.</p>
+    </div>`;
+  }
+
+  const check = entry.check;
+  if (!check) {
+    return `<div class="receipt-check-panel">${head}
+      <p class="receipt-check-note">The detailed result is not available to your account.</p>
+    </div>`;
+  }
+
+  const fields = check.fields || {};
+  const rows = RECEIPT_FIELD_LABELS
+    .filter(([key]) => fields[key] && fields[key].status !== 'skipped')
+    .map(([key, label]) => {
+      const field = fields[key];
+      const status = ['match', 'mismatch', 'unclear'].includes(field.status) ? field.status : 'unclear';
+      const glyph = status === 'match' ? '✓' : (status === 'mismatch' ? '✕' : '!');
+      return `
+        <li class="receipt-check-row ${status}">
+          <span class="receipt-check-glyph" aria-hidden="true">${glyph}</span>
+          <div>
+            <div class="receipt-check-label">${escapeHtml(label)}</div>
+            <div class="receipt-check-message">${escapeHtml(field.message || '')}</div>
+          </div>
+        </li>`;
+    })
+    .join('');
+
+  const extracted = check.extracted || {};
+  const readName = extracted.receiverName ? `Receiver read from the receipt: <strong>${escapeHtml(extracted.receiverName)}</strong>` : '';
+  const modeNote = check.mode === 'warn' && check.verdict === 'mismatch'
+    ? 'This was checked in Warn mode, so the customer was not blocked from submitting. Confirm against the image before approving.'
+    : (check.verdict === 'needs_review'
+      ? 'The receipt could not be read clearly enough to decide automatically.'
+      : '');
+
+  return `<div class="receipt-check-panel">${head}
+    ${modeNote ? `<p class="receipt-check-note">${escapeHtml(modeNote)}</p>` : ''}
+    <ul class="receipt-check-list">${rows}</ul>
+    ${readName ? `<p class="receipt-check-note">${readName}</p>` : ''}
+    <p class="receipt-check-foot">Checked ${escapeHtml(formatDateTime(check.created_at))}. Automatic reading is a guide only; always confirm against the receipt image.</p>
+  </div>`;
 }
 
 async function fetchPaymentMethodsById(ids) {
@@ -1200,6 +1326,10 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   ` : '';
 
   // Render the demoted OCR hint panel below the proof image
+  const receiptCheckPanelEl = document.getElementById('paymentReceiptCheckPanel');
+  if (receiptCheckPanelEl) {
+    receiptCheckPanelEl.innerHTML = buildReceiptCheckPanel(payment);
+  }
   const ocrPanelEl = document.getElementById('paymentOcrPanel');
   if (ocrPanelEl) {
     ocrPanelEl.innerHTML = buildOcrPanel(payment);
@@ -1558,6 +1688,7 @@ async function loadData({ silent = false, withStats = true } = {}) {
     const nextAdditionalHeadRequestMap = await fetchAdditionalHeadRequests(idsOf('additional_head_request_id'));
     const nextPaymentSummaryMap = await fetchPaymentSummaries(idsOf('reservation_id'));
     const nextPaymentMethodMap = await fetchPaymentMethodsById(idsOf('payment_method_id'));
+    const nextReceiptCheckMap = await fetchReceiptChecks(idsOf('payment_id'));
 
     if (requestId !== latestRequestId) return;
 
@@ -1572,6 +1703,7 @@ async function loadData({ silent = false, withStats = true } = {}) {
     additionalHeadRequestMap = nextAdditionalHeadRequestMap;
     paymentSummaryMap = nextPaymentSummaryMap;
     paymentMethodMap = nextPaymentMethodMap;
+    receiptCheckMap = nextReceiptCheckMap;
 
     if (counts) {
       renderStats(counts);

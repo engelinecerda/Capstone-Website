@@ -1029,3 +1029,108 @@
   border-color: var(--active-bg);
   color: #fff;
 }
+
+
+/* ── Receipt check (validate-receipt) ───────────────────────────────────── */
+.receipt-check-pill {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.receipt-check-pill.passed { background: #E1F0E3; color: #276B3D; }
+.receipt-check-pill.needs-review { background: #FBEFD3; color: #8A5A00; }
+.receipt-check-pill.mismatch { background: #FBE3DD; color: #A3401F; }
+.receipt-check-pill.missing { background: #EFEAE2; color: #6E5F52; }
+
+.receipt-check-panel {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: #FBF8F3;
+  border: 1px solid #F2EADD;
+  border-radius: 14px;
+}
+
+.receipt-check-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.receipt-check-head .receipt-check-pill { margin-top: 0; }
+
+.receipt-check-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3E2418;
+}
+
+.receipt-check-note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #3E2418;
+}
+
+.receipt-check-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.receipt-check-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #E5DBCC;
+  border-radius: 10px;
+}
+
+.receipt-check-row.mismatch { border-color: #A3401F; }
+
+.receipt-check-glyph {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.receipt-check-row.match .receipt-check-glyph { background: #276B3D; }
+.receipt-check-row.mismatch .receipt-check-glyph { background: #A3401F; }
+.receipt-check-row.unclear .receipt-check-glyph { background: #8A5A00; }
+
+.receipt-check-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #3E2418;
+}
+
+.receipt-check-message {
+  margin-top: 1px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6E5F52;
+  overflow-wrap: anywhere;
+}
+
+.receipt-check-foot {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: #8A7965;
+}

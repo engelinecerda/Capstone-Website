@@ -171,6 +171,7 @@ function pm2ResetModal() {
   document.getElementById('pm2Type').value = 'bank';
   document.getElementById('pm2Label').value = '';
   document.getElementById('pm2AccountName').value = '';
+  document.getElementById('pm2Aliases').value = '';
   document.getElementById('pm2AccountNumber').value = '';
   document.getElementById('pm2PhoneNumber').value = '';
   document.getElementById('pm2Instructions').value = '';
@@ -209,6 +210,7 @@ function openEditMethodModal(id) {
   document.getElementById('pm2Type').value = method.type;
   document.getElementById('pm2Label').value = method.label || '';
   document.getElementById('pm2AccountName').value = method.account_name || '';
+  document.getElementById('pm2Aliases').value = Array.isArray(method.receipt_name_aliases) ? method.receipt_name_aliases.join(', ') : '';
   document.getElementById('pm2AccountNumber').value = method.account_number || '';
   document.getElementById('pm2PhoneNumber').value = method.phone_number || '';
   document.getElementById('pm2Instructions').value = method.instructions || '';
@@ -224,6 +226,22 @@ function openEditMethodModal(id) {
   pm2SetTypeFields(method.type);
   pm2UpdatePreview();
   pm2OpenModal();
+}
+
+// "Engeline Santos, E. Santos" -> ['Engeline Santos', 'E. Santos']. Trimmed,
+// de-duplicated (case-insensitive), at most 10 names of 150 characters.
+function parseReceiptAliases(raw) {
+  const seen = new Set();
+  const names = [];
+  for (const part of String(raw || '').split(/[,\n;]/)) {
+    const name = part.replace(/\s+/g, ' ').trim().slice(0, 150);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+    if (names.length >= 10) break;
+  }
+  return names;
 }
 
 function pm2ValidateFields(type, fields) {
@@ -280,6 +298,10 @@ async function pm2SaveMethod() {
   const fields = {
     label: document.getElementById('pm2Label').value.trim(),
     account_name: document.getElementById('pm2AccountName').value.trim() || null,
+    // Only bank / e-wallet receipts name a receiver; other types keep it empty.
+    receipt_name_aliases: (type === 'bank' || type === 'ewallet')
+      ? parseReceiptAliases(document.getElementById('pm2Aliases').value)
+      : [],
     account_number: document.getElementById('pm2AccountNumber').value.trim() || null,
     phone_number: document.getElementById('pm2PhoneNumber').value.trim() || null,
     instructions: document.getElementById('pm2Instructions').value.trim() || null,
@@ -1112,6 +1134,80 @@ function wireNumericInputClamps() {
   clampNumberInput(document.getElementById('pm2CashWindowDays'), { min: 0, max: 365, decimals: 0 });
 }
 
+// ── Receipt validation mode ──────────────────────────────────────────────────
+// system_settings.receipt_validation_mode holds a plain 'off' | 'warn' |
+// 'enforce' string. Read by the validate-receipt function and by the
+// trg_zz_payment_receipt_check trigger on every customer payment.
+const RV_MODES = {
+  off: { label: 'Off', desc: 'Receipts are not read or compared. Payments go straight to manual review, as before.' },
+  warn: { label: 'Warn', desc: 'Receipts are checked and the result is shown to managers, but customers are never blocked. Use this to watch how accurate the checks are.' },
+  enforce: { label: 'Enforce', desc: 'A receipt that clearly does not match is blocked, and the customer sees what to fix. Unreadable receipts still go to manual review.' }
+};
+let rvSavedMode = 'warn';
+
+function setRvMsg(msg, isError = false) {
+  const el = document.getElementById('rv-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+function normalizeRvMode(value) {
+  const mode = String(value ?? '').replace(/"/g, '').trim().toLowerCase();
+  return RV_MODES[mode] ? mode : 'warn';
+}
+
+function updateRvDescription() {
+  const select = document.getElementById('rv-mode');
+  const desc = document.getElementById('rv-mode-desc');
+  if (select && desc) desc.textContent = RV_MODES[normalizeRvMode(select.value)].desc;
+}
+
+async function loadReceiptValidationSection() {
+  const select = document.getElementById('rv-mode');
+  if (!select) return;
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'receipt_validation_mode')
+    .maybeSingle();
+  rvSavedMode = normalizeRvMode(data?.setting_value);
+  select.value = rvSavedMode;
+  updateRvDescription();
+}
+
+async function saveReceiptValidation() {
+  const select = document.getElementById('rv-mode');
+  if (!select) return;
+  const next = normalizeRvMode(select.value);
+  if (next === rvSavedMode) { setRvMsg('No changes to save.'); return; }
+
+  showSettingsConfirm(
+    'Change Receipt Validation',
+    RV_MODES[rvSavedMode].label,
+    next === 'enforce'
+      ? `${RV_MODES[next].label} (customers with a mismatched receipt will be blocked)`
+      : RV_MODES[next].label,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'receipt_validation_mode', setting_value: next, updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+      if (error) { setRvMsg('Failed to save: ' + error.message, true); return; }
+      await logAudit({
+        action: 'Updated Receipt Validation',
+        category: 'payment_config',
+        details: `Receipt validation mode changed from ${RV_MODES[rvSavedMode].label} to ${RV_MODES[next].label}`
+      });
+      rvSavedMode = next;
+      setRvMsg('Receipt validation mode saved.');
+    }
+  );
+}
+
 async function init() {
   const result = await validateAdminSession({ fallbackLabel: 'Admin' });
   if (!result) return;
@@ -1141,6 +1237,7 @@ async function init() {
   await loadPaymentRules();
   await loadServiceChargeSection();
   await loadTransportFeeSection();
+  await loadReceiptValidationSection();
 
   document.querySelectorAll('.pt-save-btn').forEach((btn) => {
     btn.addEventListener('click', () => ptSaveType(btn.dataset.code));
@@ -1174,6 +1271,8 @@ async function init() {
   document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());
   document.getElementById('sc-save-offsite-btn')?.addEventListener('click', saveOffsiteToggle);
   document.getElementById('tf-save-btn')?.addEventListener('click', saveTransportFee);
+  document.getElementById('rv-save-btn')?.addEventListener('click', saveReceiptValidation);
+  document.getElementById('rv-mode')?.addEventListener('change', updateRvDescription);
   ['tf-free-km', 'tf-rate', 'tf-max-fee', 'tf-road-factor'].forEach((id) => document.getElementById(id)?.addEventListener('input', updateTransportExample));
   document.getElementById('tf-enabled')?.addEventListener('change', updateTransportExample);
   // Live-preview the effect immediately on toggle, before the admin saves —

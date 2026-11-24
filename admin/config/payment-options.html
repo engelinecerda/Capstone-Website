@@ -386,6 +386,31 @@
         </div>
       </div>
 
+      <!-- Receipt Validation -->
+      <div class="card" id="receipt-validation">
+        <p class="card-title">Receipt Validation</p>
+        <p class="card-sub">When a customer uploads a receipt, the system reads it and compares the receiver, amount, reference number, date, payment method and transaction status with what they entered. Unreadable receipts are never blocked; they are flagged for a manual check instead.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Mode</p>
+            <p class="pr-row-desc" id="rv-mode-desc"></p>
+          </div>
+          <div class="pr-row-control">
+            <select class="field-input" id="rv-mode" style="min-width:150px;">
+              <option value="off">Off</option>
+              <option value="warn">Warn</option>
+              <option value="enforce">Enforce</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="rv-save-btn">Save Receipt Validation</button>
+        </div>
+        <p class="form-message" id="rv-msg" style="min-height:0; margin:8px 0 0;"></p>
+      </div>
+
     </section>
   </main>
 
@@ -440,6 +465,13 @@
         <div class="field pm2-fields-bank pm2-fields-ewallet">
           <label class="field-label" for="pm2AccountName">Account name</label>
           <input type="text" class="field-input" id="pm2AccountName" name="account_name" placeholder="e.g. ELI Coffee Events" maxlength="150" autocomplete="organization">
+        </div>
+
+        <!-- Bank + E-wallet: other names a receipt may show -->
+        <div class="field pm2-fields-bank pm2-fields-ewallet">
+          <label class="field-label" for="pm2Aliases">Other names on receipts (optional)</label>
+          <input type="text" class="field-input" id="pm2Aliases" placeholder="e.g. Engeline Santos, E. Santos" maxlength="400" autocomplete="off">
+          <span class="field-note">Receipts can show a different name than the account name above, such as the owner's personal name for a business wallet. Separate names with commas. Customers' receipts are accepted when the receiver matches any of these names.</span>
         </div>
 
         <!-- Bank only -->
