@@ -1079,7 +1079,7 @@ function describeTransportRangesForAudit(v) {
     from = r.to_km;
     return text;
   });
-  const beyond = v.transport_beyond === 'last' ? `beyond ${from} km the last range's fee applies` : `beyond ${from} km the customer must contact us`;
+  const beyond = v.transport_beyond === 'last' ? `beyond ${from} km the last range's fee applies` : `beyond ${from} km the venue can't be booked online`;
   return `free up to ${v.transport_free_km} km; ranges: ${parts.join(', ')}; ${beyond}`;
 }
 
@@ -1105,7 +1105,7 @@ function updateTransportExample() {
     case 'beyond_charged':
       text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeTo)}), so the last range's fee applies: transport fee ${formatMoney(priced.fee)}.`; break;
     default:
-      text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeFrom)}): customers must contact us, so no fee is calculated and they can't continue booking online.`;
+      text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeFrom)}): venues this far can't be booked online, so no fee is calculated and customers are asked to choose a closer venue.`;
   }
   exampleEl.textContent = text + (v.transport_fee_enabled ? '' : ' The fee is currently switched off, so customers are not charged.');
 }

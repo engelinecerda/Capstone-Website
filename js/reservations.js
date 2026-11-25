@@ -258,7 +258,7 @@ async function loadTransportFeeSettings() {
 
 // Draws (or clears) the bookable-area circles on the venue map and shows the
 // "approximate" note. The area exists only while the fee is on and the admin
-// chose "customer must contact us" past the last range; pins outside it are
+// chose "not bookable online" past the last range; pins outside it are
 // refused by the map itself (see the map script in reservations.html).
 function refreshVenueCoverage() {
     if (!window.setVenueMapCoverage) return;
@@ -293,7 +293,7 @@ function refreshVenueTransportHint() {
     window.setVenuePinState?.('ok');
     if (S.locationType !== 'offsite' || !isTransportFeeActive()) { el.classList.add('hidden'); return; }
     if (pinRefusal) {
-        el.textContent = 'That\u2019s beyond our ' + (pinRefusal.maxKm ?? '') + ' km range. Please contact us for a quote.';
+        el.textContent = 'That\u2019s beyond our ' + (pinRefusal.maxKm ?? '') + ' km range. Please choose a venue within it.';
         el.classList.add('venue-transport-hint--over');
         el.classList.remove('hidden');
         return;
@@ -313,10 +313,10 @@ function refreshVenueTransportHint() {
         return;
     }
     if (result.outOfRange) {
-        // Past the last distance range and the admin chose "customer must
-        // contact us": nothing is priced automatically.
+        // Past the last distance range and the admin chose "not bookable
+        // online": nothing is priced and the customer picks a closer venue.
         el.textContent = (result.method === 'estimate' ? 'This venue is about ' : 'This venue is ') + result.distanceKm +
-            ' km by road, beyond our ' + result.rangeFrom + ' km range. Please contact us for a quote, or move the pin.' +
+            ' km by road, beyond our ' + result.rangeFrom + ' km range. Please move the pin to a closer spot.' +
             (result.method === 'estimate' ? ' (Distance is approximate.)' : '');
         el.classList.add('venue-transport-hint--over');
         el.classList.remove('hidden');
@@ -4874,7 +4874,7 @@ function validate(n) {
                 scrollToSection('sub-addon-venue'); return false;
             }
             if (isTransportFeeActive() && getTransportQuoteFor(S.venuePin)?.outOfRange) {
-                showWarningModal('Your venue is farther than the distance we can price online. Please contact us for a transport quote, or choose a venue closer to our branch.');
+                showWarningModal('Your venue is beyond our transport range. Please choose a venue closer to our branch.');
                 scrollToSection('sub-addon-venue'); return false;
             }
         } else {
@@ -5381,8 +5381,8 @@ async function submitDone() {
         // reservation with the pin and distance it was priced from.
         const transport = resolveTransport();
         // A venue past the last distance range can't be priced online (the
-        // admin chose "customer must contact us"); never submit it as free.
-        if (transport.outOfRange) throw new Error('Your venue is farther than the distance we can price online. Please contact us for a transport quote.');
+        // admin chose "not bookable online"); never submit it as free.
+        if (transport.outOfRange) throw new Error('Your venue is beyond our transport range. Please choose a venue closer to our branch.');
         totalPrice = Math.round((totalPrice + transport.fee) * 100) / 100;
 
         const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;

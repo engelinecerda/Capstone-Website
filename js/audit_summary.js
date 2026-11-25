@@ -179,7 +179,7 @@ function paymentRules(details) {
                 from = Number(r.to_km);
                 return text;
             });
-            const beyond = c.transport_beyond === 'last' ? "last range's fee applies beyond it" : 'customer must contact us beyond it';
+            const beyond = c.transport_beyond === 'last' ? "last range's fee applies beyond it" : 'not bookable online beyond it';
             parts.push(`transport fee on (free up to ${c.transport_free_km ?? 0} km${bands.length ? `, ${bands.join(', ')}` : ''}; ${beyond})`);
         } else {
             parts.push(`transport fee on (first ${c.transport_free_km ?? 0} km free, then ${peso(c.transport_rate_per_km ?? 0)} per km${isBlank(c.transport_max_fee) ? '' : `, max ${peso(c.transport_max_fee)}`})`);
