@@ -134,6 +134,35 @@ const submissionFeedbackEyebrow = document.getElementById('submission-feedback-e
 const submissionFeedbackTitle = document.getElementById('submission-feedback-title');
 const submissionFeedbackCopy = document.getElementById('submission-feedback-copy');
 
+// Remembers which reservations tab (Active/Past) and page the customer was
+// on, for this browser tab only. The tab lives in memory (state below), so
+// opening a reservation or the payment page and pressing "Back to My
+// Reservations" reloaded account.html and dropped it back to Active. The back
+// links are plain /account?section=reservations URLs from several pages, so
+// restoring here fixes all of them without touching each link. Storage is
+// optional: if it is blocked or empty, the list simply starts on Active.
+const RESERVATION_LIST_POSITION_KEY = 'eli-account-reservation-list';
+
+function loadReservationListPosition() {
+    try {
+        const saved = JSON.parse(window.sessionStorage.getItem(RESERVATION_LIST_POSITION_KEY) || 'null');
+        return {
+            view: saved?.view === 'past' ? 'past' : 'active',
+            page: Math.max(1, Math.floor(Number(saved?.page)) || 1)
+        };
+    } catch {
+        return { view: 'active', page: 1 };
+    }
+}
+
+function saveReservationListPosition(view, page) {
+    try {
+        window.sessionStorage.setItem(RESERVATION_LIST_POSITION_KEY, JSON.stringify({ view, page }));
+    } catch { /* storage unavailable - not worth failing the page over */ }
+}
+
+const savedReservationListPosition = loadReservationListPosition();
+
 const state = {
     reservations: [],
     paymentRules: null,
@@ -148,8 +177,8 @@ const state = {
     reviewsByReservationId: {},
     profile: null,
     emailSecurityReady: true,
-    reservationView: 'active',
-    reservationPage: 1,
+    reservationView: savedReservationListPosition.view,
+    reservationPage: savedReservationListPosition.page,
     receiptModalPaymentId: null,
     cancelModal: {
         reservationId: null
@@ -1472,6 +1501,7 @@ function renderReservations() {
 
     const totalPages = Math.max(1, Math.ceil(currentReservations.length / RESERVATIONS_PAGE_SIZE));
     state.reservationPage = Math.min(Math.max(1, state.reservationPage), totalPages);
+    saveReservationListPosition(currentView, state.reservationPage);
     const pageStart = (state.reservationPage - 1) * RESERVATIONS_PAGE_SIZE;
     const pagedReservations = currentReservations.slice(pageStart, pageStart + RESERVATIONS_PAGE_SIZE);
     const rangeStart = pagedReservations.length ? pageStart + 1 : 0;
