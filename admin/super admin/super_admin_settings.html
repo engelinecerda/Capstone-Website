@@ -214,6 +214,29 @@
         </div>
       </div>
 
+      <!-- ── LATE PAYMENT GRACE PERIOD ── -->
+      <div class="card" id="late-payment-grace">
+        <p class="card-title">Late Payment Grace Period</p>
+        <p class="card-sub">How long an approved reservation can stay unpaid after its payment due date before it is cancelled automatically. A reservation with no payment at all is cancelled without a cancellation fee; one that was partly paid is cancelled and charged the cancellation fee set in <a href="/admin/config/payment-options" style="color:var(--active-bg);font-weight:600;">Payment Settings</a>.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Grace period after the due date</p>
+            <p class="pr-row-desc">Extra days customers get after the payment due date. Set to 0 to cancel as soon as the due date passes. Reservations with a payment waiting for review are never cancelled while it is pending.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-auto-cancel-days" min="0" max="60" step="1">
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <p class="form-message" id="late-payment-grace-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveLatePaymentGraceBtn">Save Grace Period</button>
+        </div>
+      </div>
+
       <!-- ── RESCHEDULE POLICY ── -->
       <div class="card" id="reschedule-policy">
         <p class="card-title">Reschedule Policy</p>

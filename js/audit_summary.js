@@ -230,6 +230,13 @@ function cancellationRules(details) {
         + `overdue balance grace period: ${days(p.grace_period, 'none')}.`;
 }
 
+function latePaymentGrace(details) {
+    const p = pairs(details);
+    if (isBlank(p.auto_cancel_days)) return null;
+    if (Number(p.auto_cancel_days) === 0) return 'Unpaid reservations are cancelled automatically as soon as the payment due date passes.';
+    return `Unpaid reservations are cancelled automatically ${days(p.auto_cancel_days, 'no days')} after the payment due date.`;
+}
+
 function reschedulePolicy(details) {
     const p = pairs(details);
     if (!('hold' in p) && !('min_notice' in p) && !('max_count' in p)) return null;
@@ -304,6 +311,7 @@ const BY_ACTION = {
     'Updated Payment Type': paymentType,
     'Updated Booking Notice Window': bookingNotice,
     'Updated Cancellation Notice Rules': cancellationRules,
+    'Updated Late Payment Grace Period': latePaymentGrace,
     'Updated Reschedule Policy': reschedulePolicy,
     'Updated Extension Rules': extensionRules,
     'Updated Buffer & Capacity': bufferCapacity,
