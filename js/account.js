@@ -1872,6 +1872,7 @@ async function loadReservations({ silent = false } = {}) {
             total_price,
             special_requests,
             status,
+            cancellation_reason,
             created_at,
             package:package_id ( package_name, package_type, duration_hours ),
             add_on:add_on_id ( package_name, package_type )

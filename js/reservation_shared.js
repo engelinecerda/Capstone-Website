@@ -247,6 +247,17 @@ export function getCancellationFeePayment(payments) {
     return (payments || []).find((payment) => payment.payment_type === 'cancellation_fee') || null;
 }
 
+// An unpaid reservation that the overdue job cancelled normally (20261201):
+// nothing had been paid, so the job created no cancellation_fee row. Without
+// this, "cancelled and no fee row" would read as "fee owed" on every customer
+// screen. It only holds while NO fee row exists — if a fee was created (the
+// customer had paid something, or staff added one) it is handled as usual.
+export function isCancellationFeeWaived(reservation, payments) {
+    return String(reservation?.status || '').toLowerCase() === 'cancelled'
+        && reservation?.cancellation_reason === 'auto_cancelled_overdue'
+        && !getCancellationFeePayment(payments);
+}
+
 // True while the reservation has a cancellation fee outstanding and
 // needs the customer to act — either it's holding its date awaiting the
 // fee (cancellation_requested, payment-first model), or it's already
@@ -259,6 +270,7 @@ export function getCancellationFeePayment(payments) {
 // before this cycle's rewrites.
 export function isCancellationFeeOwed(reservation, payments) {
     if (!['cancellation_requested', 'cancellation_approved', 'cancelled'].includes(String(reservation?.status || '').toLowerCase())) return false;
+    if (isCancellationFeeWaived(reservation, payments)) return false;
     const feePayment = getCancellationFeePayment(payments);
     const feeStatus = String(feePayment?.payment_status || '').toLowerCase();
     return !feePayment || feeStatus === 'rejected';

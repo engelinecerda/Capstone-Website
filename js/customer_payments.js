@@ -255,6 +255,7 @@ const BASE_CUSTOMER_RESERVATION_SELECT = `
     transport_distance_km,
     special_requests,
     status,
+    cancellation_reason,
     created_at,
     package:package_id ( package_name, package_type ),
     add_on:add_on_id ( package_name, package_type )

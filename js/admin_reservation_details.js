@@ -8,7 +8,7 @@ import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { getPortalInitials } from './admin_auth.js';
 import { getBookingScope as getSharedBookingScope } from './reservation_availability.js';
-import { getPaymentStatusPillMeta, getCancellationFee } from './reservation_shared.js';
+import { getPaymentStatusPillMeta, getCancellationFee, isCancellationFeeWaived } from './reservation_shared.js';
 import { isReservationEventPast } from './reservation_status.js';
 import { recordInCafePayment, uploadPaymentReceipt, fetchCafeIssuedPaymentMethods } from './admin_record_payment.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
@@ -801,6 +801,8 @@ function renderHeaderActions() {
       buttons.push(`<span class="header-action-note">Cancellation fee is pending review${escapeHtml(holdNote)}</span>`);
     } else if (feePayment) {
       buttons.push(`<span class="header-action-note">Cancellation fee was rejected — awaiting resubmission${escapeHtml(holdNote)}</span>`);
+    } else if (isCancellationFeeWaived(reservation, getReservationPayments(reservation))) {
+      buttons.push(`<span class="header-action-note">Cancelled automatically. Nothing was paid, so no cancellation fee applies</span>`);
     } else {
       buttons.push(`<span class="header-action-note">Waiting for the customer to pay the cancellation fee${escapeHtml(holdNote)}</span>`);
     }

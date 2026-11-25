@@ -155,6 +155,10 @@ A customer can tick "Review anonymously" when submitting a review, and can flip 
 
 Schema changes go in `supabase/migrations/` as dated SQL files. They are applied manually in the Supabase SQL Editor (not via CLI) since the project targets the hosted Supabase instance directly.
 
+## Overdue auto-cancel and the cancellation fee
+
+`auto_cancel_overdue_reservations()` (hourly pg_cron; latest definition `20261201_no_cancellation_fee_when_nothing_paid.sql`) cancels approved reservations past their payment due date + grace period. If the reservation has **no approved payment of any type** it is cancelled normally with **no `cancellation_fee` row**; if anything was paid, the fee row is created as before. Because the customer pages treat "cancelled with no fee row" as "fee owed", `isCancellationFeeWaived()` in `js/reservation_shared.js` recognises the fee-free case (`cancellation_reason = 'auto_cancelled_overdue'` and no fee row) and `isCancellationFeeOwed()` returns false for it. Any new screen that reads a reservation must select `cancellation_reason` for that to work.
+
 ## Profiles Table — Required Column
 
 The login flow reads `is_locked` from `profiles`. If this column is missing, ALL portal logins fail with "Unable to verify account status." The column is added in `20260624_rename_roles_admin_to_manager.sql`:

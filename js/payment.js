@@ -552,8 +552,9 @@ function renderOverdueStrip(reservation) {
             <i class="ti ti-alert-triangle" aria-hidden="true"></i>
             <p>
                 Payment was due ${escapeHtml(balance.dueDateLabel)}. Unpaid reservations are automatically
-                cancelled after ${escapeHtml(balance.graceDeadlineLabel || 'the grace period')}, and the
-                cancellation fee applies per the service agreement.
+                cancelled after ${escapeHtml(balance.graceDeadlineLabel || 'the grace period')}. If nothing has
+                been paid by then, it is cancelled without a cancellation fee; otherwise the cancellation fee
+                applies per the service agreement.
             </p>
         </div>
     `;
