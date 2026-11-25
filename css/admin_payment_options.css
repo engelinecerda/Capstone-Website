@@ -424,3 +424,69 @@ select.field-input {
   .pt-label-input { flex: 1 1 100%; width: 100%; }
   .pr-row-control > .action-btn { margin-left: auto; }
 }
+
+/* ── Transport fee: distance ranges editor ────────────────────────────────── */
+.tf-ranges-block {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tf-ranges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.tf-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tf-range-from {
+  min-width: 96px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.tf-range-word,
+.tf-range-peso { font-size: 12.5px; color: var(--muted); }
+.tf-range-peso { margin-left: 10px; }
+.tf-range .pr-input-inline { width: 96px; }
+.tf-range-remove {
+  margin-left: auto;
+  min-width: 36px;
+  padding: 6px 10px;
+}
+.tf-legacy-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #FBF8F3;
+  border: 1px solid var(--border);
+}
+.tf-beyond-control {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tf-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.tf-try {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+@media (max-width: 720px) {
+  .tf-range { row-gap: 6px; }
+  .tf-range-from { flex: 1 0 100%; }
+  .tf-range-peso { margin-left: 0; }
+  .tf-beyond-control { width: 100%; }
+}

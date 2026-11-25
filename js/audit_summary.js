@@ -169,9 +169,21 @@ function paymentRules(details) {
         parts.push(`service charge ${c.service_charge_percent}%${c.service_charge_applies_offsite ? ' (also applied offsite)' : ' (onsite only)'}`);
     }
     if (typeof c.transport_fee_enabled === 'boolean') {
-        parts.push(c.transport_fee_enabled
-            ? `transport fee on (first ${c.transport_free_km ?? 0} km free, then ${peso(c.transport_rate_per_km ?? 0)} per km${isBlank(c.transport_max_fee) ? '' : `, max ${peso(c.transport_max_fee)}`})`
-            : 'transport fee off');
+        if (!c.transport_fee_enabled) {
+            parts.push('transport fee off');
+        } else if (Array.isArray(c.transport_ranges)) {
+            // Distance ranges: "free up to 5 km, 5 to 10 km ₱1,000.00, ..."
+            let from = Number(c.transport_free_km ?? 0);
+            const bands = c.transport_ranges.map((r) => {
+                const text = `${from} to ${Number(r.to_km)} km ${peso(r.fee ?? 0)}`;
+                from = Number(r.to_km);
+                return text;
+            });
+            const beyond = c.transport_beyond === 'last' ? "last range's fee applies beyond it" : 'customer must contact us beyond it';
+            parts.push(`transport fee on (free up to ${c.transport_free_km ?? 0} km${bands.length ? `, ${bands.join(', ')}` : ''}; ${beyond})`);
+        } else {
+            parts.push(`transport fee on (first ${c.transport_free_km ?? 0} km free, then ${peso(c.transport_rate_per_km ?? 0)} per km${isBlank(c.transport_max_fee) ? '' : `, max ${peso(c.transport_max_fee)}`})`);
+        }
     }
     return parts.length ? `${parts.join('; ').replace(/^./, (c) => c.toUpperCase())}.` : null;
 }
@@ -232,9 +244,15 @@ function cancellationRules(details) {
 
 function latePaymentGrace(details) {
     const p = pairs(details);
-    if (isBlank(p.auto_cancel_days)) return null;
-    if (Number(p.auto_cancel_days) === 0) return 'Unpaid reservations are cancelled automatically as soon as the payment due date passes.';
-    return `Unpaid reservations are cancelled automatically ${days(p.auto_cancel_days, 'no days')} after the payment due date.`;
+    if (isBlank(p.auto_cancel_days) && isBlank(p.full_payment_days)) return null;
+    const parts = [];
+    if (!isBlank(p.full_payment_days)) parts.push(`Full payment is due ${days(p.full_payment_days, '')} before the event.`);
+    if (!isBlank(p.auto_cancel_days)) {
+        parts.push(Number(p.auto_cancel_days) === 0
+            ? 'Unpaid reservations are cancelled automatically as soon as the payment due date passes.'
+            : `Unpaid reservations are cancelled automatically ${days(p.auto_cancel_days, '')} after the payment due date.`);
+    }
+    return parts.join(' ');
 }
 
 function reschedulePolicy(details) {

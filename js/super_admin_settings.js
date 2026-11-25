@@ -35,7 +35,6 @@ function wireNumericInputClamps() {
   clampNumberInput(document.getElementById('pr-cancellation-min-notice-days'), { min: 0, max: 365, decimals: 0 });
   clampNumberInput(document.getElementById('pr-cancellation-request-window-days'), { min: 1, max: 365, decimals: 0 });
   clampNumberInput(document.getElementById('pr-cancellation-balance-grace-days'), { min: 1, max: 365, decimals: 0 });
-  clampNumberInput(document.getElementById('pr-auto-cancel-days'), { min: 0, max: 60, decimals: 0 });
   clampNumberInput(document.getElementById('pr-reschedule-hold-hours'), { min: 1, max: 720, decimals: 0 });
   clampNumberInput(document.getElementById('pr-reschedule-min-notice-days'), { min: 0, max: 365, decimals: 0 });
   clampNumberInput(document.getElementById('pr-max-reschedule-count'), { min: 1, max: 20, decimals: 0 });
@@ -373,73 +372,6 @@ async function saveCancellationNoticeRules() {
       if (error) { setCancellationNoticeMsg('Failed to save: ' + error.message, true); return; }
       await logAudit({ action: 'Updated Cancellation Notice Rules', category: 'scheduling_config', details: `min_notice=${minNoticeDays}, request_window=${requestWindowDays}, grace_period=${graceDays}` });
       setCancellationNoticeMsg('Cancellation notice rules saved successfully.');
-    }
-  );
-}
-
-// ── Late Payment Grace Period ───────────────────────────────────────────────
-// system_settings.reservation_rules.auto_cancel_days — read by the hourly
-// auto_cancel_overdue_reservations() job (and by the customer payment page's
-// grace deadline). Defaults to 5 when unset, matching both of those readers.
-// Read-merge-write like saveMinAdvanceDays(): the same JSON blob holds
-// min/max advance days, full_payment_days, deposit_pct, min_pax, etc.
-const DEFAULT_AUTO_CANCEL_DAYS = 5;
-
-function setLatePaymentGraceMsg(msg, isError = false) {
-  const el = document.getElementById('late-payment-grace-msg');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.color = isError ? '#c0392b' : '#27ae60';
-}
-
-async function loadLatePaymentGrace() {
-  const input = document.getElementById('pr-auto-cancel-days');
-  if (!input) return;
-  const { data } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'reservation_rules')
-    .maybeSingle();
-  const parsed = data ? JSON.parse(data.setting_value) : {};
-  const stored = Number(parsed.auto_cancel_days);
-  input.value = Number.isInteger(stored) && stored >= 0 ? stored : DEFAULT_AUTO_CANCEL_DAYS;
-}
-
-async function saveLatePaymentGrace() {
-  // An empty box must not read as 0 (Number('') is 0 — that would silently
-  // set "cancel the moment the due date passes").
-  const rawDays = String(document.getElementById('pr-auto-cancel-days')?.value ?? '').trim();
-  const days = rawDays === '' ? NaN : Number(rawDays);
-  if (!Number.isInteger(days) || days < 0 || days > 60) {
-    setLatePaymentGraceMsg('Grace period must be a whole number from 0 to 60 days.', true); return;
-  }
-
-  const { data: current } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'reservation_rules')
-    .maybeSingle();
-  const existing = current ? JSON.parse(current.setting_value) : {};
-  const previous = Number.isInteger(Number(existing.auto_cancel_days)) ? Number(existing.auto_cancel_days) : DEFAULT_AUTO_CANCEL_DAYS;
-  if (previous === days && Number(existing.auto_cancel_days) === days) { setLatePaymentGraceMsg('No changes to save.'); return; }
-  const merged = { ...existing, auto_cancel_days: days };
-
-  showSettingsConfirm(
-    'Change Late Payment Grace Period',
-    `${previous} day${previous === 1 ? '' : 's'}`,
-    `${days} day${days === 1 ? '' : 's'}`,
-    async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from('system_settings')
-        .upsert(
-          { setting_key: 'reservation_rules', setting_value: JSON.stringify(merged), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-          { onConflict: 'setting_key' }
-        );
-
-      if (error) { setLatePaymentGraceMsg('Failed to save: ' + error.message, true); return; }
-      await logAudit({ action: 'Updated Late Payment Grace Period', category: 'scheduling_config', details: `auto_cancel_days=${days}` });
-      setLatePaymentGraceMsg('Grace period saved. It applies the next time overdue reservations are checked.');
     }
   );
 }
@@ -930,7 +862,6 @@ async function init() {
   await loadMinAdvanceDays();
   await loadEventTypeAdvanceOverrides();
   await loadCancellationNoticeRules();
-  await loadLatePaymentGrace();
   await loadReschedulePolicy();
   await loadExtensionRules();
   await loadSchedulingSettings();
@@ -942,7 +873,6 @@ async function init() {
   document.getElementById('saveMinAdvanceBtn')?.addEventListener('click', saveMinAdvanceDays);
   document.getElementById('saveEventTypeAdvanceBtn')?.addEventListener('click', saveEventTypeAdvanceOverrides);
   document.getElementById('saveCancellationNoticeBtn')?.addEventListener('click', saveCancellationNoticeRules);
-  document.getElementById('saveLatePaymentGraceBtn')?.addEventListener('click', saveLatePaymentGrace);
   document.getElementById('pr-cancellation-min-notice-enabled')?.addEventListener('change', (e) => {
     const input = document.getElementById('pr-cancellation-min-notice-days');
     if (input) input.disabled = !e.target.checked;

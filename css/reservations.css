@@ -122,6 +122,24 @@
 
 .venue-transport-hint.hidden { display: none; }
 
+/* Over the transport range: the hint turns red and the pin turns red. */
+.venue-transport-hint.venue-transport-hint--over {
+    background: #fdecea;
+    border-color: #f0b8b2;
+    color: #8c1d18;
+}
+.leaflet-marker-icon.venue-pin-over {
+    filter: hue-rotate(150deg) saturate(1.8);
+}
+
+.venue-coverage-note {
+    margin: 8px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #7a6652;
+}
+.venue-coverage-note.hidden { display: none; }
+
 .venue-search-row {
     display: flex;
     gap: 8px;

@@ -312,6 +312,7 @@
                                 <label for="venue-address-details" class="venue-details-label">Additional address details <small>(house/unit no., lot/block no., building name, landmark &mdash; optional but recommended)</small></label>
                                 <input type="text" id="venue-address-details" class="res-input" placeholder="e.g., Unit 4B, Lot 7 Blk 2, near the yellow gate" maxlength="300">
                             </div>
+                            <p class="venue-coverage-note hidden" id="venue-coverage-note"></p>
                             <p class="venue-transport-hint hidden" id="venue-transport-hint" role="status"></p>
                             <input type="hidden" id="venue-location" value="">
                         </div>
@@ -682,6 +683,52 @@
         var marker         = null;
         var mapInitialized = false;
 
+        // Bookable area (offsite transport fee): reservations.js hands over
+        // circles plus an "is this point allowed" test. Pins outside are
+        // refused; the circles are drawn as a shaded guide. null = no limit.
+        var coverage      = null;
+        var coverageAllows = null;
+        var coverageLayer = null;
+        var coverageDrawnKey = '';
+        var lastPinPos    = null;
+        var pinState      = 'ok';
+
+        function drawCoverage() {
+            if (!map) return;
+            if (coverageLayer) { map.removeLayer(coverageLayer); coverageLayer = null; }
+            coverageDrawnKey = coverage ? JSON.stringify(coverage) : '';
+            if (!coverage) return;
+            coverageLayer = L.layerGroup();
+            coverage.circles.forEach(function (c) {
+                L.circle([c.lat, c.lng], {
+                    radius: coverage.radiusKm * 1000, color: '#8b4a2b', weight: 2, dashArray: '6 6',
+                    fillColor: '#c47a4a', fillOpacity: 0.08, interactive: false
+                }).addTo(coverageLayer);
+            });
+            coverageLayer.addTo(map);
+        }
+
+        window.setVenueMapCoverage = function (cov, allows) {
+            coverage = cov || null;
+            coverageAllows = allows || null;
+            var key = coverage ? JSON.stringify(coverage) : '';
+            if (map && key === coverageDrawnKey) return;   // nothing changed
+            drawCoverage();
+        };
+
+        function pinAllowed(lat, lng) {
+            return !coverage || !coverageAllows || coverageAllows(lat, lng);
+        }
+        function announceRefused(lat, lng) {
+            document.dispatchEvent(new CustomEvent('venuepinrefused', { detail: { lat: lat, lng: lng, maxKm: coverage ? coverage.radiusKm : null } }));
+        }
+
+        // 'over' turns the pin red (the road distance is beyond the limit).
+        function applyPinState() {
+            if (marker && marker._icon) marker._icon.classList.toggle('venue-pin-over', pinState === 'over');
+        }
+        window.setVenuePinState = function (state) { pinState = state; applyPinState(); };
+
         function initVenueMap() {
             if (mapInitialized) return;
             mapInitialized = true;
@@ -698,25 +745,39 @@
             }).addTo(map);
 
             map.on('click', function (e) { placeMarker(e.latlng.lat, e.latlng.lng, true); });
+            drawCoverage();
         }
 
         // Expose globally so buildAddonOrVenueStep() can call it
         window.initVenueMap = initVenueMap;
 
+        // Returns false when the spot is outside the bookable area (nothing is
+        // placed or moved; reservations.js shows the message).
         function placeMarker(lat, lng, doReverseGeocode) {
-            if (!map) return;
+            if (!map) return false;
+            if (!pinAllowed(lat, lng)) { announceRefused(lat, lng); return false; }
             if (marker) marker.setLatLng([lat, lng]);
             else {
                 marker = L.marker([lat, lng], { draggable: true }).addTo(map);
                 marker.on('dragend', function () {
                     var pos = marker.getLatLng();
+                    if (!pinAllowed(pos.lat, pos.lng)) {
+                        // Dropped outside the area: snap back to the last good spot.
+                        if (lastPinPos) marker.setLatLng(lastPinPos);
+                        announceRefused(pos.lat, pos.lng);
+                        return;
+                    }
+                    lastPinPos = [pos.lat, pos.lng];
                     reverseGeocode(pos.lat, pos.lng);
                     announceVenuePin();
                 });
             }
+            lastPinPos = [lat, lng];
+            applyPinState();
             map.panTo([lat, lng]);
             if (doReverseGeocode) reverseGeocode(lat, lng);
             announceVenuePin();
+            return true;
         }
 
         // The pinned position, for reservations.js (the offsite transport fee
@@ -798,13 +859,16 @@
 
         function searchAddress(query) {
             if (!query.trim()) return;
+            var labelEl = document.getElementById('venue-pinned-label');
+            var previousAddress = labelEl ? labelEl.value : '';
             setVenueAddress('Searching…');
             var cfg = getMapConfig();
             var fullQuery = query + ', Rizal, Philippines';
             var viewbox = cfg.sw_lng+','+cfg.sw_lat+','+cfg.ne_lng+','+cfg.ne_lat;
 
             function show(lat, lng, name) {
-                placeMarker(lat, lng, false);
+                // Outside the bookable area: keep the current pin and address.
+                if (!placeMarker(lat, lng, false)) { setVenueAddress(previousAddress); return; }
                 setVenueAddress(name);
             }
             function viaBrowser() {

@@ -1,8 +1,8 @@
 // calculate-transport-fee — prices the offsite transport fee on the server.
 //
 // Input : POST { lat, lng }  (the venue pin the customer dropped)
-// Output: { success: true, result: { applies, fee, distanceKm, billableKm,
-//           originName, capped, method, rules } }
+// Output: { success: true, result: { applies, fee, distanceKm, status,
+//           rangeFrom, rangeTo, outOfRange, originName, method, rules } }
 //
 // How it works
 //   1. Reads the transport_* settings from system_settings.payment_rules and
@@ -15,15 +15,21 @@
 //   3. If OpenRouteService can't be reached (no key, quota used up, pin not
 //      near a road, timeout), falls back to straight-line distance x the
 //      road distance factor, and says so with method = 'estimate'.
-//   4. fee = min( max(0, roadKm - freeKm) * ratePerKm , maxFee )
+//   4. The distance is looked up in the admin's distance ranges (free up to
+//      freeKm, then one flat fee per range; see _shared/transport_pricing.ts).
+//      Past the last range the venue is `outOfRange` (customer must contact
+//      us) or charged the last range's fee, per the admin's setting.
 //
-// The maths mirrors js/transport_fee.js (kept in sync by hand, because an
-// edge function can't import from the website's /js folder).
+// The rule lives in _shared/transport_pricing.ts, which mirrors
+// js/transport_fee.js; _shared/transport_pricing_test.ts checks the two agree.
+// Because it imports _shared/, deploy with the CLI:
+//   npx supabase functions deploy calculate-transport-fee
 //
 // Secret required: ORS_API_KEY (supabase secrets set ORS_API_KEY=...).
 // JWT verification stays on, so only signed-in customers can call it.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { priceTransportDistance, readTransportRules } from '../_shared/transport_pricing.ts';
 
 const ORS_API_KEY = Deno.env.get('ORS_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -45,37 +51,12 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-interface TransportRules {
-  enabled: boolean;
-  freeKm: number;
-  ratePerKm: number;
-  maxFee: number | null;
-  roadFactor: number;
-}
-
 interface Branch {
   name: string | null;
   branch_tag: string | null;
   latitude: number | string | null;
   longitude: number | string | null;
   transport_origin: boolean | null;
-}
-
-const num = (v: unknown, fallback: number | null): number | null => {
-  if (v === null || v === undefined || v === '') return fallback;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-};
-
-function readRules(raw: Record<string, unknown>): TransportRules {
-  const maxFee = num(raw.transport_max_fee, null);
-  return {
-    enabled: raw.transport_fee_enabled === true,
-    freeKm: Math.max(0, num(raw.transport_free_km, 10) as number),
-    ratePerKm: Math.max(0, num(raw.transport_rate_per_km, 30) as number),
-    maxFee: maxFee === null ? null : Math.max(0, maxFee),
-    roadFactor: Math.max(1, num(raw.transport_road_factor, 1.3) as number),
-  };
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -86,8 +67,6 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // Driving distance in km from a branch to the pin, or null if ORS can't give one.
 async function orsRoadKm(
@@ -157,10 +136,11 @@ Deno.serve(async (req: Request) => {
     } else if (sv && typeof sv === 'object') {
       rawRules = sv as Record<string, unknown>;
     }
-    const rules = readRules(rawRules);
+    const rules = readTransportRules(rawRules);
 
     const none = {
-      applies: false, fee: 0, distanceKm: null, billableKm: 0,
+      applies: false, fee: 0, distanceKm: null, status: 'none',
+      rangeFrom: null, rangeTo: null, billableKm: 0, outOfRange: false,
       originName: '', capped: false, method: 'none', rules,
     };
     if (!rules.enabled) return jsonResponse({ success: true, result: none });
@@ -208,17 +188,19 @@ Deno.serve(async (req: Request) => {
     }
 
     const distanceKm = Math.round(rawKm * 10) / 10;
-    const billableKm = Math.max(0, round2(distanceKm - rules.freeKm));
-    let fee = round2(billableKm * rules.ratePerKm);
-    let capped = false;
-    if (rules.maxFee !== null && fee > rules.maxFee) {
-      fee = round2(rules.maxFee);
-      capped = true;
-    }
+    const priced = priceTransportDistance(rules, distanceKm);
 
     return jsonResponse({
       success: true,
-      result: { applies: true, fee, distanceKm, billableKm, originName, capped, method, rules },
+      result: {
+        applies: true,
+        ...priced,
+        outOfRange: priced.status === 'out_of_range',
+        distanceKm,
+        originName,
+        method,
+        rules,
+      },
     });
   } catch (err) {
     console.error('calculate-transport-fee failed', err);

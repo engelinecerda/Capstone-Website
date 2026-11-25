@@ -256,6 +256,40 @@
         </div>
       </div>
 
+      <!-- Payment deadline and grace period -->
+      <div class="card" id="late-payment-grace">
+        <p class="card-title">Payment Deadline and Grace Period</p>
+        <p class="card-sub">When an approved reservation's payment is due, and how long it can stay unpaid after that before it is cancelled automatically. A reservation with no payment at all is cancelled without a cancellation fee; one that was partly paid is cancelled and charged the cancellation fee set in <a href="#payment-rules" style="color:var(--active-bg);font-weight:600;">Payment Rules</a> above.</p>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Payment due date</p>
+            <p class="pr-row-desc">The full balance is due this many days before the event. This applies to every unpaid reservation, including existing ones, so raising it can make some of them overdue right away. Keep it shorter than your minimum booking notice, otherwise new bookings would already be late.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-full-payment-days" min="1" max="60" step="1">
+            <span class="field-note" style="margin:0;">days before the event</span>
+          </div>
+        </div>
+
+        <div class="pr-row">
+          <div class="pr-row-copy">
+            <p class="pr-row-label">Grace period after the due date</p>
+            <p class="pr-row-desc">Extra days customers get after the payment due date. Set to 0 to cancel as soon as the due date passes. Reservations with a payment waiting for review are never cancelled while it is pending.</p>
+          </div>
+          <div class="pr-row-control">
+            <input type="number" class="pr-input-inline" id="pr-auto-cancel-days" min="0" max="60" step="1">
+            <span class="field-note" style="margin:0;">days</span>
+          </div>
+        </div>
+
+        <p class="form-message" id="late-payment-grace-msg"></p>
+
+        <div class="action-bar">
+          <button type="button" class="btn-primary" id="saveLatePaymentGraceBtn">Save Payment Deadline Settings</button>
+        </div>
+      </div>
+
       <!-- Service Charge -->
       <div class="card" id="service-charge">
         <p class="card-title">Service Charge</p>
@@ -314,7 +348,7 @@
       <!-- Transport Fee -->
       <div class="card" id="transport-fee">
         <p class="card-title">Transport Fee (offsite)</p>
-        <p class="card-sub">A per-kilometre fee added to offsite bookings, based on the distance from the nearest branch to the venue pin the customer drops on the booking map. Shown to customers as its own line. It is added after the discount and the service charge, so neither applies to it. Onsite bookings are never charged.</p>
+        <p class="card-sub">A fee added to offsite bookings, based on how far the venue pin the customer drops on the booking map is from the nearest branch. Each distance range has one flat fee. Shown to customers as its own line. It is added after the discount and the service charge, so neither applies to it. Onsite bookings are never charged.</p>
 
         <div class="pr-row">
           <div class="pr-row-copy">
@@ -332,34 +366,31 @@
         <div class="pr-row">
           <div class="pr-row-copy">
             <p class="pr-row-label">Free distance</p>
-            <p class="pr-row-desc">No fee for venues within this many kilometres of the nearest branch.</p>
+            <p class="pr-row-desc">No fee for venues up to this many kilometres from the nearest branch. The first range below starts right after it.</p>
           </div>
           <div class="pr-row-control">
-            <input type="number" class="pr-input-inline" id="tf-free-km" min="0" max="500" step="0.5" value="10">
+            <span class="field-note" style="margin:0;">up to</span>
+            <input type="number" class="pr-input-inline" id="tf-free-km" min="0" max="500" step="0.5" value="5">
             <span class="field-note" style="margin:0;">km</span>
           </div>
         </div>
 
-        <div class="pr-row">
-          <div class="pr-row-copy">
-            <p class="pr-row-label">Rate per kilometre</p>
-            <p class="pr-row-desc">Charged for every kilometre beyond the free distance.</p>
-          </div>
-          <div class="pr-row-control">
-            <span class="field-note" style="margin:0;">&#8369;</span>
-            <input type="number" class="pr-input-inline" id="tf-rate" data-money min="0" max="100000" step="0.01" value="30.00">
-            <span class="field-note" style="margin:0;">per km</span>
-          </div>
+        <div class="tf-ranges-block">
+          <p class="pr-row-label">Distance ranges</p>
+          <p class="pr-row-desc tf-legacy-note hidden" id="tf-legacy-note">These are suggested starting ranges. Customers are still charged the old per-kilometre fee until you click Save Transport Fee.</p>
+          <p class="pr-row-desc">One flat fee per range, not multiplied by kilometres. A range includes its end point, so with a 10 km end point a venue exactly 10 km away pays that range&rsquo;s fee. Each range starts where the one above it ends.</p>
+          <div class="tf-ranges" id="tf-ranges" role="list"></div>
+          <button type="button" class="action-btn" id="tf-add-range">+ Add distance range</button>
         </div>
 
         <div class="pr-row">
           <div class="pr-row-copy">
-            <p class="pr-row-label">Maximum transport fee</p>
-            <p class="pr-row-desc">Optional ceiling for very far venues. Leave empty for no limit.</p>
+            <p class="pr-row-label">Venues beyond the last range</p>
+            <p class="pr-row-desc" id="tf-beyond-desc">What happens when a venue is farther than the last range.</p>
           </div>
-          <div class="pr-row-control">
-            <span class="field-note" style="margin:0;">&#8369;</span>
-            <input type="number" class="pr-input-inline" id="tf-max-fee" data-money min="0" max="1000000" step="0.01" placeholder="No limit">
+          <div class="pr-row-control tf-beyond-control">
+            <label class="tf-radio"><input type="radio" name="tf-beyond" id="tf-beyond-contact" value="contact"> <span>Customer must contact us</span></label>
+            <label class="tf-radio"><input type="radio" name="tf-beyond" id="tf-beyond-last" value="last"> <span>Charge the last range&rsquo;s fee</span></label>
           </div>
         </div>
 
@@ -381,7 +412,11 @@
         <p class="pr-row-desc" id="tf-origin-note" style="margin-top:10px;"></p>
 
         <div class="sc-example-box">
-          <p class="sc-example-title">Worked example</p>
+          <p class="sc-example-title">Try a distance</p>
+          <div class="tf-try">
+            <input type="number" class="pr-input-inline" id="tf-try-km" min="0" max="500" step="0.1" value="12" aria-label="Distance to try, in kilometres">
+            <span class="field-note" style="margin:0;">km by road</span>
+          </div>
           <p class="sc-example-text" id="tf-example-text"></p>
         </div>
       </div>

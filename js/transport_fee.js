@@ -1,32 +1,51 @@
 // transport_fee.js — pure helpers (no DOM, no network) for the offsite
 // transport fee. Used by the booking form (reservations.js) to price a venue
-// pin and by Payment Settings (admin_payment_options.js) for the live example,
-// so both always do the same maths.
+// pin and by Payment Settings (admin_payment_options.js) for the live "try a
+// distance" box, so both always do the same maths.
 //
 // NOTE: the booking form gets the real road distance from the
 // calculate-transport-fee edge function (OpenRouteService). The distance
 // maths below is the fallback used when that function can't be reached, and
-// powers the Payment Settings example; the fee rule itself is the same in both.
+// powers the Payment Settings test box. The fee rule itself is the same in
+// both: it is mirrored in supabase/functions/_shared/transport_pricing.ts, and
+// _shared/transport_pricing_test.ts fails if the two ever price differently.
 //
-// Rule (per-km): the distance from the NEAREST transport fee starting point
-// (a branch flagged business_location.transport_origin that has a map pin) to
-// the venue pin is
-// measured in a straight line, multiplied by a road factor (roads are longer
-// than the crow flies), and rounded to 0.1 km. The first `freeKm` are free;
-// every km after that costs `ratePerKm`, optionally capped at `maxFee`.
+// Rule (distance ranges): the distance from the NEAREST transport fee starting
+// point (a branch flagged business_location.transport_origin that has a map
+// pin) to the venue pin is measured in a straight line, multiplied by a road
+// factor (roads are longer than the crow flies), and rounded to 0.1 km. That
+// distance is then looked up in the admin's list of ranges. Each range means
+// "over the previous end, up to and INCLUDING its own end" and has one flat fee:
 //
-//   fee = min( max(0, roadKm - freeKm) * ratePerKm , maxFee )
+//   up to freeKm              -> free
+//   over freeKm, up to 10 km  -> ranges[0].fee
+//   over 10, up to 15 km      -> ranges[1].fee   ... and so on
+//   over the last end         -> `beyond`: 'contact' (customer must contact us,
+//                                nothing is charged automatically) or 'last'
+//                                (the last range's fee is charged)
 //
 // The settings live in system_settings.payment_rules (same JSON blob as the
-// other fees) under the transport_* keys below.
+// other fees) under the transport_* keys. Until `transport_ranges` has been
+// saved once, the old per-km rule (transport_rate_per_km / transport_max_fee)
+// keeps pricing, so nothing changes for customers until an admin saves.
 
 import { formatMoney } from './money.js';
 
+export const MAX_TRANSPORT_KM = 500;
+
+// Suggested starting ranges (the cafe's rate card). Used to pre-fill Payment
+// Settings the first time; they only take effect once an admin saves.
+export const TRANSPORT_DEFAULT_RANGES = Object.freeze([
+  Object.freeze({ toKm: 10, fee: 1000 }),
+  Object.freeze({ toKm: 15, fee: 2000 }),
+  Object.freeze({ toKm: 20, fee: 4500 }),
+  Object.freeze({ toKm: 25, fee: 5000 })
+]);
+
 export const TRANSPORT_DEFAULTS = Object.freeze({
   enabled: false,     // safe default: nothing changes until an admin opts in
-  freeKm: 10,
-  ratePerKm: 30,
-  maxFee: null,       // null = no cap
+  freeKm: 5,
+  beyond: 'contact',  // 'contact' | 'last'
   roadFactor: 1.3
 });
 
@@ -36,16 +55,43 @@ const num = (v, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const round1 = (n) => Math.round(n * 10) / 10;
+const round2 = (n) => Math.round(n * 100) / 100;
+
 // Turns the raw payment_rules blob into clean, always-valid settings.
+// `ranges` is null until the ranges have been saved once (old per-km rule).
 export function readTransportRules(rules) {
   const r = rules || {};
   const maxFee = num(r.transport_max_fee, null);
+  const hasRanges = Array.isArray(r.transport_ranges);
+  // Free distance default: 10 for the old per-km rule, 5 for ranges.
+  const freeKm = Math.max(0, num(r.transport_free_km, hasRanges ? TRANSPORT_DEFAULTS.freeKm : 10));
+
+  let ranges = null;
+  if (hasRanges) {
+    ranges = [];
+    let prev = freeKm;
+    const sorted = r.transport_ranges
+      .map((x) => ({ toKm: num(x?.to_km, NaN), fee: num(x?.fee, NaN) }))
+      .filter((x) => Number.isFinite(x.toKm) && Number.isFinite(x.fee))
+      .sort((a, b) => a.toKm - b.toKm);
+    for (const x of sorted) {
+      const toKm = round1(x.toKm);
+      if (toKm <= prev || toKm > MAX_TRANSPORT_KM) continue; // keeps ends strictly increasing
+      ranges.push({ toKm, fee: round2(Math.max(0, x.fee)) });
+      prev = toKm;
+    }
+  }
+
   return {
     enabled: r.transport_fee_enabled === true,
-    freeKm: Math.max(0, num(r.transport_free_km, TRANSPORT_DEFAULTS.freeKm)),
-    ratePerKm: Math.max(0, num(r.transport_rate_per_km, TRANSPORT_DEFAULTS.ratePerKm)),
-    maxFee: maxFee === null ? null : Math.max(0, maxFee),
-    roadFactor: Math.max(1, num(r.transport_road_factor, TRANSPORT_DEFAULTS.roadFactor))
+    freeKm,
+    ranges,
+    beyond: r.transport_beyond === 'last' ? 'last' : 'contact',
+    roadFactor: Math.max(1, num(r.transport_road_factor, TRANSPORT_DEFAULTS.roadFactor)),
+    // Old per-km rule, only used while `ranges` is null.
+    ratePerKm: Math.max(0, num(r.transport_rate_per_km, 30)),
+    maxFee: maxFee === null ? null : Math.max(0, maxFee)
   };
 }
 
@@ -88,38 +134,104 @@ export function findNearestBranch(pin, branches) {
   return best;
 }
 
-const round2 = (n) => Math.round(n * 100) / 100;
+// Prices one road distance (km, already rounded to 0.1). Mirrors
+// priceTransportDistance() in supabase/functions/_shared/transport_pricing.ts.
+// status: 'free' | 'range' | 'beyond_charged' | 'out_of_range' | 'per_km'.
+export function priceTransportDistance(rules, distanceKm) {
+  const base = { rangeFrom: null, rangeTo: null, billableKm: 0, capped: false };
+
+  // Old per-km rule: fee = min( max(0, km - freeKm) * ratePerKm , maxFee )
+  if (rules.ranges === null) {
+    const billableKm = Math.max(0, round2(distanceKm - rules.freeKm));
+    let fee = round2(billableKm * rules.ratePerKm);
+    let capped = false;
+    if (rules.maxFee !== null && fee > rules.maxFee) { fee = round2(rules.maxFee); capped = true; }
+    return { ...base, fee, status: 'per_km', billableKm, capped };
+  }
+
+  if (distanceKm <= rules.freeKm) return { ...base, fee: 0, status: 'free' };
+
+  let from = rules.freeKm;
+  for (const range of rules.ranges) {
+    if (distanceKm <= range.toKm) {
+      return { ...base, fee: range.fee, status: 'range', rangeFrom: from, rangeTo: range.toKm };
+    }
+    from = range.toKm;
+  }
+
+  // Past the last range (or no ranges at all).
+  const last = rules.ranges[rules.ranges.length - 1];
+  if (rules.beyond === 'last' && last) {
+    const prevEnd = rules.ranges.length > 1 ? rules.ranges[rules.ranges.length - 2].toKm : rules.freeKm;
+    return { ...base, fee: last.fee, status: 'beyond_charged', rangeFrom: prevEnd, rangeTo: last.toKm };
+  }
+  return { ...base, fee: 0, status: 'out_of_range', rangeFrom: last ? last.toKm : rules.freeKm, rangeTo: null };
+}
 
 // Prices a single pin. `applies` is false when the fee is switched off, there
-// is no pin yet, or no branch is a transport fee starting point with a pin — callers then charge nothing.
+// is no pin yet, or no branch is a transport fee starting point with a pin —
+// callers then charge nothing. `outOfRange` is true when the venue is past the
+// last range and the admin chose "customer must contact us": the fee is 0 but
+// the booking form must not let the customer continue.
 export function computeTransportFee(rawRules, pin, branches) {
   const rules = readTransportRules(rawRules);
-  const none = { applies: false, fee: 0, distanceKm: null, billableKm: 0, originName: '', capped: false, rules };
+  const none = { applies: false, fee: 0, distanceKm: null, status: 'none', rangeFrom: null, rangeTo: null, billableKm: 0, outOfRange: false, originName: '', capped: false, rules };
   if (!rules.enabled) return none;
   const nearest = findNearestBranch(pin, branches);
   if (!nearest) return none;
 
-  const distanceKm = Math.round(nearest.straightKm * rules.roadFactor * 10) / 10;
-  const billableKm = Math.max(0, round2(distanceKm - rules.freeKm));
-  let fee = round2(billableKm * rules.ratePerKm);
-  let capped = false;
-  if (rules.maxFee !== null && fee > rules.maxFee) { fee = round2(rules.maxFee); capped = true; }
+  const distanceKm = round1(nearest.straightKm * rules.roadFactor);
+  const priced = priceTransportDistance(rules, distanceKm);
   return {
     applies: true,
-    fee,
+    ...priced,
+    outOfRange: priced.status === 'out_of_range',
     distanceKm,
-    billableKm,
     originName: nearest.branch.name || nearest.branch.branch_tag || 'our branch',
-    capped,
     rules
   };
 }
 
+// The area customers can book online. Only exists when the fee is on, ranges
+// have been saved, the admin chose "customer must contact us" past the last
+// range, and at least one starting point has a pin: one circle per starting
+// point, as wide as the last range's end. It is a straight-line circle and a
+// road is never shorter than a straight line, so a pin OUTSIDE it is always
+// too far; a pin inside can still be too far by road (the exact road check
+// stays the final decision). Returns null when there is no limit to show.
+export function transportCoverage(rawRules, branches) {
+  const rules = readTransportRules(rawRules);
+  if (!rules.enabled || rules.ranges === null || rules.beyond !== 'contact' || !rules.ranges.length) return null;
+  const origins = transportOrigins(branches);
+  if (!origins.length) return null;
+  return {
+    radiusKm: rules.ranges[rules.ranges.length - 1].toKm,
+    circles: origins.map((b) => ({ lat: Number(b.latitude), lng: Number(b.longitude), name: b.name || b.branch_tag || 'our branch' }))
+  };
+}
+
+// True when the pin is inside the combined circles (or there is no limit).
+export function pinInCoverage(pin, coverage) {
+  if (!coverage) return true;
+  if (!pin) return false;
+  return coverage.circles.some((c) => haversineKm(Number(pin.lat), Number(pin.lng), c.lat, c.lng) <= coverage.radiusKm);
+}
+
+const kmText = (n) => `${Number(n)} km`;
+
 // One-line plain-English breakdown, e.g.
-// "12.4 km from ELI Coffee Antipolo (first 10 km free): 2.4 km × ₱30.00"
+// "12.4 km from ELI Coffee Binangonan: 10 to 15 km range"
 export function describeTransportFee(result) {
   if (!result?.applies) return '';
-  const { distanceKm, billableKm, originName, rules, capped } = result;
-  if (billableKm <= 0) return `${distanceKm} km from ${originName} (within the ${rules.freeKm} km free distance)`;
-  return `${distanceKm} km from ${originName} (first ${rules.freeKm} km free): ${billableKm} km × ${formatMoney(rules.ratePerKm)}${capped ? ', capped' : ''}`;
+  const { distanceKm, originName, rules, status, rangeFrom, rangeTo, billableKm, capped } = result;
+  const lead = `${distanceKm} km from ${originName}`;
+  switch (status) {
+    case 'free': return `${lead} (within the ${kmText(rules.freeKm)} free distance)`;
+    case 'range': return `${lead}: ${rangeFrom} to ${kmText(rangeTo)} range`;
+    case 'beyond_charged': return `${lead}: beyond ${kmText(rangeTo)}, charged at the last range's fee`;
+    case 'out_of_range': return `${lead}: beyond our ${kmText(rangeFrom)} transport range`;
+    default: // 'per_km' — the old rule, until the ranges are saved
+      if (billableKm <= 0) return `${lead} (within the ${kmText(rules.freeKm)} free distance)`;
+      return `${lead} (first ${kmText(rules.freeKm)} free): ${billableKm} km × ${formatMoney(rules.ratePerKm)}${capped ? ', capped' : ''}`;
+  }
 }

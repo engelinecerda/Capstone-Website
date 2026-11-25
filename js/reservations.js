@@ -33,7 +33,7 @@ import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
 import { buildBreakdownRows, buildRequestRows, formatBreakdownText, formatRequestsText, BREAKDOWN_HEADING, REQUESTS_HEADING } from '/js/contract_breakdown.js';
-import { computeTransportFee, describeTransportFee, transportOrigins } from '/js/transport_fee.js';
+import { computeTransportFee, describeTransportFee, transportOrigins, transportCoverage, pinInCoverage } from '/js/transport_fee.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 import { attachPhoneMask } from '/js/phone_format.js';
 import { getIdFileError, resizeIdImage, fetchValidIdStatus, validIdFileExists, saveValidId } from '/js/valid_id.js';
@@ -213,7 +213,8 @@ function resolveServiceCharge(basePrice, locationType, categoryId) {
 }
 
 // ── Transport fee (offsite) ────────────────────────────────────────────
-// Per-km fee from the nearest transport fee starting point to the venue pin
+// Flat fee for the distance range (free, 5-10 km, 10-15 km, ...) that the
+// venue pin falls in, measured from the nearest transport fee starting point
 // (see js/transport_fee.js). Settings come from payment_rules; the starting
 // points are the active business_location rows flagged transport_origin that
 // have map coordinates. Added to the total AFTER
@@ -255,11 +256,48 @@ async function loadTransportFeeSettings() {
     } catch { TRANSPORT_BRANCHES = []; }
 }
 
-// Live "estimated transport fee" line under the venue map.
+// Draws (or clears) the bookable-area circles on the venue map and shows the
+// "approximate" note. The area exists only while the fee is on and the admin
+// chose "customer must contact us" past the last range; pins outside it are
+// refused by the map itself (see the map script in reservations.html).
+function refreshVenueCoverage() {
+    if (!window.setVenueMapCoverage) return;
+    const cov = (S.locationType === 'offsite' && isTransportFeeActive())
+        ? transportCoverage(TRANSPORT_RULES, TRANSPORT_BRANCHES) : null;
+    window.setVenueMapCoverage(cov, cov ? (lat, lng) => pinInCoverage({ lat, lng }, cov) : null);
+    const note = document.getElementById('venue-coverage-note');
+    if (note) {
+        note.classList.toggle('hidden', !cov);
+        if (cov) note.textContent = 'Approximate area (up to ' + cov.radiusKm + ' km). The exact distance is checked by road when you drop a pin.';
+    }
+}
+
+// A pin dropped outside the bookable area is refused; the message stays for a
+// few seconds, or until the customer places a valid pin.
+let pinRefusal = null;
+let pinRefusalTimer = null;
+document.addEventListener('venuepinrefused', (e) => {
+    pinRefusal = { maxKm: e.detail?.maxKm };
+    clearTimeout(pinRefusalTimer);
+    pinRefusalTimer = setTimeout(() => { pinRefusal = null; refreshVenueTransportHint(); }, 7000);
+    refreshVenueTransportHint();
+});
+
+// Live "estimated transport fee" line under the venue map. Also keeps the
+// bookable-area circle and the pin colour (red when over the range) in step.
 function refreshVenueTransportHint() {
     const el = document.getElementById('venue-transport-hint');
+    refreshVenueCoverage();
     if (!el) return;
+    el.classList.remove('venue-transport-hint--over');
+    window.setVenuePinState?.('ok');
     if (S.locationType !== 'offsite' || !isTransportFeeActive()) { el.classList.add('hidden'); return; }
+    if (pinRefusal) {
+        el.textContent = 'That\u2019s beyond our ' + (pinRefusal.maxKm ?? '') + ' km range. Please contact us for a quote.';
+        el.classList.add('venue-transport-hint--over');
+        el.classList.remove('hidden');
+        return;
+    }
     const pin = window.getVenuePin ? window.getVenuePin() : null;
     if (!pin) {
         const origins = transportOrigins(TRANSPORT_BRANCHES);
@@ -274,6 +312,17 @@ function refreshVenueTransportHint() {
         el.classList.remove('hidden');
         return;
     }
+    if (result.outOfRange) {
+        // Past the last distance range and the admin chose "customer must
+        // contact us": nothing is priced automatically.
+        el.textContent = (result.method === 'estimate' ? 'This venue is about ' : 'This venue is ') + result.distanceKm +
+            ' km by road, beyond our ' + result.rangeFrom + ' km range. Please contact us for a quote, or move the pin.' +
+            (result.method === 'estimate' ? ' (Distance is approximate.)' : '');
+        el.classList.add('venue-transport-hint--over');
+        el.classList.remove('hidden');
+        window.setVenuePinState?.('over');
+        return;
+    }
     el.textContent = 'Estimated transport fee: ' + fmtPeso(result.fee) + ' \u2014 ' + describeTransportFee(result) +
         (result.method === 'estimate' ? ' (approximate)' : '') + '.';
     el.classList.remove('hidden');
@@ -285,6 +334,7 @@ let transportQuoteTimer = null;
 let transportQuoteSeq = 0;
 function scheduleTransportQuote() {
     clearTimeout(transportQuoteTimer);
+    pinRefusal = null;
     const pin = window.getVenuePin ? window.getVenuePin() : null;
     if (S.locationType !== 'offsite' || !isTransportFeeActive() || !pin) {
         transportQuoteSeq++;
@@ -4823,6 +4873,10 @@ function validate(n) {
                 showWarningModal('We are still calculating your transport fee. Please wait a moment and click Next again.');
                 scrollToSection('sub-addon-venue'); return false;
             }
+            if (isTransportFeeActive() && getTransportQuoteFor(S.venuePin)?.outOfRange) {
+                showWarningModal('Your venue is farther than the distance we can price online. Please contact us for a transport quote, or choose a venue closer to our branch.');
+                scrollToSection('sub-addon-venue'); return false;
+            }
         } else {
             S.venuePin = null;
         }
@@ -5322,10 +5376,13 @@ async function submitDone() {
         const serviceCharge = resolveServiceCharge(totalPrice, S.locationType, S.categoryId);
         totalPrice = serviceCharge.total;
 
-        // Offsite transport fee (per km from the nearest branch to the pin):
+        // Offsite transport fee (flat fee for the distance range the venue pin falls in):
         // added AFTER the discount and service charge, frozen on the
         // reservation with the pin and distance it was priced from.
         const transport = resolveTransport();
+        // A venue past the last distance range can't be priced online (the
+        // admin chose "customer must contact us"); never submit it as free.
+        if (transport.outOfRange) throw new Error('Your venue is farther than the distance we can price online. Please contact us for a transport quote.');
         totalPrice = Math.round((totalPrice + transport.fee) * 100) / 100;
 
         const displayEventType = S.eventType === 'Other' ? (S.eventTypeOther || 'Other') : S.eventType;

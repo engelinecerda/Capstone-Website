@@ -1,6 +1,6 @@
 // admin_payment_options.js
 import './money_inputs.js';
-import { readTransportRules, computeTransportFee, describeTransportFee, transportOrigins, TRANSPORT_DEFAULTS } from './transport_fee.js';
+import { readTransportRules, priceTransportDistance, transportOrigins, TRANSPORT_DEFAULTS, TRANSPORT_DEFAULT_RANGES, MAX_TRANSPORT_KM } from './transport_fee.js';
 import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
@@ -14,7 +14,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { attachPhoneMask } from './phone_format.js';
-import { clampNumberInput } from './numeric_input.js';
+import { clampNumberInput, clampNumberValue } from './numeric_input.js';
 
 attachPhoneMask(document.getElementById('pm2PhoneNumber'));
 
@@ -591,10 +591,11 @@ async function ptSaveType(code) {
 
 // ── Payment rules ────────────────────────────────────────────────────────────
 // deposit_pct is set on this page under Payment Types > Custom Amount
-// (percent_of_total), not duplicated here. full_payment_days still lives in
-// system_settings.reservation_rules, but that settings tab was removed
-// (see super_admin_settings.html) — it's DB-only until a UI need for it
-// comes back.
+// (percent_of_total), not duplicated here. full_payment_days and
+// auto_cancel_days live in system_settings.reservation_rules and are edited
+// in the "Payment Deadline and Grace Period" card below (see
+// loadLatePaymentGrace / saveLatePaymentGrace). The rest of that blob
+// (min_pax, etc.) has no admin UI and is DB-only.
 //
 // cancellation_min_notice_days / cancellation_request_window_days moved to
 // the "Cancellation Notice Rules" card on Availability and Scheduling
@@ -603,7 +604,7 @@ async function ptSaveType(code) {
 // currentPaymentRulesConfig caches whatever was last loaded from the DB so
 // savePaymentRules() below can pass those two fields straight through
 // unchanged instead of wiping them out on every save from this page.
-const TRANSPORT_RULE_KEYS = ['transport_fee_enabled', 'transport_free_km', 'transport_rate_per_km', 'transport_max_fee', 'transport_road_factor'];
+const TRANSPORT_RULE_KEYS = ['transport_fee_enabled', 'transport_free_km', 'transport_ranges', 'transport_beyond', 'transport_rate_per_km', 'transport_max_fee', 'transport_road_factor'];
 const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,
@@ -619,10 +620,10 @@ const DEFAULT_PAYMENT_RULES = {
   service_charge_applies_offsite: false,
   // Transport fee (offsite) — owned by the Transport Fee card further down;
   // savePaymentRules() passes these straight through (see TRANSPORT_RULE_KEYS).
+  // transport_free_km / transport_ranges / transport_beyond are deliberately
+  // not defaulted here: until the Transport Fee card saves them, the helper
+  // falls back to the old per-km rule so no live price changes.
   transport_fee_enabled: false,
-  transport_free_km: TRANSPORT_DEFAULTS.freeKm,
-  transport_rate_per_km: TRANSPORT_DEFAULTS.ratePerKm,
-  transport_max_fee: null,
   transport_road_factor: TRANSPORT_DEFAULTS.roadFactor,
   cancellation_min_notice_days: null,
   cancellation_request_window_days: null
@@ -949,9 +950,17 @@ async function saveOffsiteToggle() {
 
 // ── Transport fee (offsite) ──────────────────────────────────────────────────
 // Same system_settings.payment_rules blob as everything above; this card
-// owns the five transport_* keys. The starting point(s) the distance is
+// owns the transport_* keys: transport_fee_enabled, transport_free_km,
+// transport_ranges ([{ to_km, fee }, ...]), transport_beyond ('contact' |
+// 'last') and transport_road_factor. The starting point(s) the distance is
 // measured from are chosen per branch in Business profile (the "Transport fee
 // starting point" checkbox + the branch's map pin).
+//
+// Ranges are chained: a range's start is always the end of the row above it
+// (the first starts at the free distance), so the admin only types an end
+// point and a fee, and gaps or overlaps cannot exist. A range includes its end
+// point. The old transport_rate_per_km / transport_max_fee values are left in
+// the blob untouched but are ignored once transport_ranges has been saved.
 let transportBranches = [];
 
 function setTfMsg(msg, isError = false) {
@@ -962,47 +971,143 @@ function setTfMsg(msg, isError = false) {
   el.classList.toggle('success', !isError && !!msg);
 }
 
+const tfRound1 = (n) => Math.round(n * 10) / 10;
+const tfNumOrNaN = (raw) => (raw === '' || raw === null || raw === undefined ? NaN : Number(raw));
+const tfKm = (n) => `${Number(n)} km`;
+
+function tfRangeRowHtml(toKm, fee) {
+  const toVal = Number.isFinite(toKm) ? toKm : '';
+  const feeVal = Number.isFinite(fee) ? Number(fee).toFixed(2) : '';
+  return `
+    <div class="tf-range" role="listitem">
+      <span class="tf-range-from"></span>
+      <span class="tf-range-word">up to</span>
+      <input type="number" class="pr-input-inline tf-range-to" min="0" max="${MAX_TRANSPORT_KM}" step="0.5" value="${toVal}" aria-label="Range ends at (km)">
+      <span class="tf-range-word">km</span>
+      <span class="tf-range-peso">&#8369;</span>
+      <input type="number" class="pr-input-inline tf-range-fee" data-money min="0" max="10000000" step="0.01" value="${feeVal}" placeholder="0.00" aria-label="Flat fee for this range (pesos)">
+      <button type="button" class="action-btn tf-range-remove" aria-label="Remove this distance range" title="Remove this range">&#10005;</button>
+    </div>`;
+}
+
+function renderTransportRanges(rows) {
+  const host = document.getElementById('tf-ranges');
+  if (!host) return;
+  host.innerHTML = rows.map((r) => tfRangeRowHtml(r.toKm, r.fee)).join('');
+  syncTransportRangeLabels();
+}
+
+// Fills each row's "Over X km" from the row above (or the free distance).
+function syncTransportRangeLabels() {
+  const free = tfNumOrNaN(document.getElementById('tf-free-km')?.value);
+  let prev = free;
+  document.querySelectorAll('#tf-ranges .tf-range').forEach((row) => {
+    const label = row.querySelector('.tf-range-from');
+    if (label) label.textContent = Number.isFinite(prev) ? `Over ${tfKm(prev)},` : 'Over …,';
+    prev = tfNumOrNaN(row.querySelector('.tf-range-to')?.value);
+  });
+}
+
+function readTransportRangeRows() {
+  return Array.from(document.querySelectorAll('#tf-ranges .tf-range')).map((row) => ({
+    toKm: tfNumOrNaN(row.querySelector('.tf-range-to')?.value),
+    fee: tfNumOrNaN(row.querySelector('.tf-range-fee')?.value)
+  }));
+}
+
+function addTransportRange() {
+  const rows = readTransportRangeRows();
+  const free = tfNumOrNaN(document.getElementById('tf-free-km')?.value);
+  const lastTo = rows.length ? rows[rows.length - 1].toKm : free;
+  // Suggest an end point 5 km past the last one; the fee is left for the admin.
+  rows.push({ toKm: Number.isFinite(lastTo) ? tfRound1(lastTo + 5) : NaN, fee: NaN });
+  renderTransportRanges(rows);
+  const inputs = document.querySelectorAll('#tf-ranges .tf-range-fee');
+  inputs[inputs.length - 1]?.focus();
+  updateTransportExample();
+}
+
+function removeTransportRange(button) {
+  const row = button.closest('.tf-range');
+  if (!row) return;
+  const index = Array.from(document.querySelectorAll('#tf-ranges .tf-range')).indexOf(row);
+  const rows = readTransportRangeRows();
+  rows.splice(index, 1);
+  renderTransportRanges(rows);
+  updateTransportExample();
+}
+
 function readTransportFields() {
-  const maxRaw = document.getElementById('tf-max-fee')?.value ?? '';
   return {
     transport_fee_enabled: !!document.getElementById('tf-enabled')?.checked,
-    transport_free_km: Number(document.getElementById('tf-free-km')?.value),
-    transport_rate_per_km: Number(document.getElementById('tf-rate')?.value),
-    transport_max_fee: maxRaw === '' ? null : Number(maxRaw),
+    transport_free_km: tfNumOrNaN(document.getElementById('tf-free-km')?.value),
+    transport_ranges: readTransportRangeRows().map((r) => ({ to_km: r.toKm, fee: r.fee })),
+    transport_beyond: document.getElementById('tf-beyond-last')?.checked ? 'last' : 'contact',
     transport_road_factor: Number(document.getElementById('tf-road-factor')?.value)
   };
 }
 
 function validateTransportFields(v) {
-  if (!Number.isFinite(v.transport_free_km) || v.transport_free_km < 0 || v.transport_free_km > 500) return 'Free distance must be between 0 and 500 km.';
-  if (!Number.isFinite(v.transport_rate_per_km) || v.transport_rate_per_km < 0 || v.transport_rate_per_km > 100000) return 'Rate per kilometre must be a valid amount (0.00 or more).';
-  if (v.transport_max_fee !== null && (!Number.isFinite(v.transport_max_fee) || v.transport_max_fee < 0)) return 'Maximum transport fee must be 0.00 or more, or left empty for no limit.';
+  if (!Number.isFinite(v.transport_free_km) || v.transport_free_km < 0 || v.transport_free_km > MAX_TRANSPORT_KM) return `Free distance must be between 0 and ${MAX_TRANSPORT_KM} km.`;
+  if (!v.transport_ranges.length) return 'Add at least one distance range.';
+  let prev = v.transport_free_km;
+  for (let i = 0; i < v.transport_ranges.length; i++) {
+    const r = v.transport_ranges[i];
+    const n = i + 1;
+    if (!Number.isFinite(r.to_km)) return `Range ${n}: enter the distance where it ends.`;
+    if (r.to_km <= prev) return `Range ${n}: the end point must be more than ${tfKm(prev)}, the end of the range above it.`;
+    if (r.to_km > MAX_TRANSPORT_KM) return `Range ${n}: the end point can't be more than ${MAX_TRANSPORT_KM} km.`;
+    if (!Number.isFinite(r.fee) || r.fee < 0 || r.fee > 10000000) return `Range ${n}: enter a fee (0.00 or more).`;
+    prev = r.to_km;
+  }
   if (!Number.isFinite(v.transport_road_factor) || v.transport_road_factor < 1 || v.transport_road_factor > 3) return 'Road distance factor must be between 1 and 3.';
   return '';
 }
 
+// The values exactly as they are saved: end points rounded to 0.1 km, fees to centavos.
+function cleanTransportFields(v) {
+  return {
+    ...v,
+    transport_ranges: v.transport_ranges.map((r) => ({ to_km: tfRound1(r.to_km), fee: Math.round(r.fee * 100) / 100 }))
+  };
+}
+
+function describeTransportRangesForAudit(v) {
+  let from = v.transport_free_km;
+  const parts = v.transport_ranges.map((r) => {
+    const text = `${from} to ${r.to_km} km ${formatMoney(r.fee)}`;
+    from = r.to_km;
+    return text;
+  });
+  const beyond = v.transport_beyond === 'last' ? `beyond ${from} km the last range's fee applies` : `beyond ${from} km the customer must contact us`;
+  return `free up to ${v.transport_free_km} km; ranges: ${parts.join(', ')}; ${beyond}`;
+}
+
+// "Try a distance" box: prices any road distance with the ranges as they are
+// typed (before saving), using the same helper the booking form uses.
 function updateTransportExample() {
+  syncTransportRangeLabels();
   const exampleEl = document.getElementById('tf-example-text');
   if (!exampleEl) return;
   const v = readTransportFields();
-  if (validateTransportFields(v)) { exampleEl.textContent = ''; return; }
-  const rules = readTransportRules(v);
-  // Straight-line distance that lands the road distance 15 km past the free
-  // allowance, so the example always shows a real charge.
-  const targetRoadKm = rules.freeKm + 15;
-  const straightKm = Math.round((targetRoadKm / rules.roadFactor) * 10) / 10;
-  const origin = transportOrigins(transportBranches)[0];
-  // Fake pin due north of the first branch by `straightKm` (1 degree latitude ~ 111.19 km).
-  const baseLat = origin ? Number(origin.latitude) : 14.4647;
-  const baseLng = origin ? Number(origin.longitude) : 121.1925;
-  const sampleBranches = [{ name: origin?.name || 'the nearest branch', latitude: baseLat, longitude: baseLng, transport_origin: true }];
-  const result = computeTransportFee({ ...v, transport_fee_enabled: true }, { lat: baseLat + straightKm / 111.19, lng: baseLng }, sampleBranches);
-  const where = `A venue about ${straightKm} km away in a straight line is about ${result.distanceKm} km by road from ${result.originName}`;
-  const maths = result.billableKm > 0
-    ? `${rules.freeKm} km free, then ${result.billableKm} km × ${formatMoney(rules.ratePerKm)}`
-    : `within the ${rules.freeKm} km free distance`;
-  exampleEl.textContent = `${where}: ${maths} = transport fee ${formatMoney(result.fee)}${result.capped ? ' (capped at the maximum)' : ''}.`
-    + (v.transport_fee_enabled ? '' : ' The fee is currently switched off, so customers are not charged.');
+  if (validateTransportFields(v)) { exampleEl.textContent = 'Fill in every range above to test a distance.'; return; }
+  const km = tfRound1(tfNumOrNaN(document.getElementById('tf-try-km')?.value));
+  if (!Number.isFinite(km) || km < 0) { exampleEl.textContent = 'Enter a distance to test.'; return; }
+
+  const rules = readTransportRules(cleanTransportFields({ ...v, transport_fee_enabled: true }));
+  const priced = priceTransportDistance(rules, km);
+  let text;
+  switch (priced.status) {
+    case 'free':
+      text = `${tfKm(km)} is within the ${tfKm(rules.freeKm)} free distance: transport fee ${formatMoney(0)}.`; break;
+    case 'range':
+      text = `${tfKm(km)} falls in the ${priced.rangeFrom} to ${tfKm(priced.rangeTo)} range: transport fee ${formatMoney(priced.fee)}.`; break;
+    case 'beyond_charged':
+      text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeTo)}), so the last range's fee applies: transport fee ${formatMoney(priced.fee)}.`; break;
+    default:
+      text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeFrom)}): customers must contact us, so no fee is calculated and they can't continue booking online.`;
+  }
+  exampleEl.textContent = text + (v.transport_fee_enabled ? '' : ' The fee is currently switched off, so customers are not charged.');
 }
 
 async function loadTransportFeeSection() {
@@ -1012,13 +1117,26 @@ async function loadTransportFeeSection() {
   if (setting?.setting_value) { try { parsed = JSON.parse(setting.setting_value); } catch { /* defaults */ } }
   const rules = readTransportRules(parsed);
 
-  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   const enabledEl = document.getElementById('tf-enabled');
   if (enabledEl) enabledEl.checked = rules.enabled;
-  setVal('tf-free-km', rules.freeKm);
-  setVal('tf-rate', moneyInputValue(rules.ratePerKm));
-  setVal('tf-max-fee', rules.maxFee === null ? '' : moneyInputValue(rules.maxFee));
-  setVal('tf-road-factor', rules.roadFactor.toFixed(2));
+
+  // Ranges never saved yet: pre-fill the suggested rate card. Nothing changes
+  // for customers (the old per-km fee keeps applying) until Save is clicked.
+  const firstTime = rules.ranges === null;
+  const freeKm = firstTime ? TRANSPORT_DEFAULTS.freeKm : rules.freeKm;
+  const rows = firstTime ? TRANSPORT_DEFAULT_RANGES.map((r) => ({ toKm: r.toKm, fee: r.fee })) : rules.ranges.map((r) => ({ toKm: r.toKm, fee: r.fee }));
+  const freeEl = document.getElementById('tf-free-km');
+  if (freeEl) freeEl.value = freeKm;
+  const beyond = firstTime ? TRANSPORT_DEFAULTS.beyond : rules.beyond;
+  const beyondContact = document.getElementById('tf-beyond-contact');
+  const beyondLast = document.getElementById('tf-beyond-last');
+  if (beyondContact) beyondContact.checked = beyond !== 'last';
+  if (beyondLast) beyondLast.checked = beyond === 'last';
+  const legacyNote = document.getElementById('tf-legacy-note');
+  if (legacyNote) legacyNote.classList.toggle('hidden', !firstTime);
+  renderTransportRanges(rows);
+  const roadEl = document.getElementById('tf-road-factor');
+  if (roadEl) roadEl.value = rules.roadFactor.toFixed(2);
 
   const { data: branches } = await supabase
     .from('business_location').select('name, branch_tag, latitude, longitude, transport_origin, is_active').eq('is_active', true).order('sort_order', { ascending: true });
@@ -1041,9 +1159,10 @@ async function loadTransportFeeSection() {
 }
 
 async function saveTransportFee() {
-  const values = readTransportFields();
-  const problem = validateTransportFields(values);
+  const raw = readTransportFields();
+  const problem = validateTransportFields(raw);
   if (problem) { setTfMsg(problem, true); return; }
+  const values = cleanTransportFields(raw);
   // Switching the fee on with no starting point would silently charge ₱0 to
   // every offsite booking, so stop it here instead.
   if (values.transport_fee_enabled && !transportOrigins(transportBranches).length) {
@@ -1072,9 +1191,11 @@ async function saveTransportFee() {
     action: 'Updated Transport Fee',
     category: 'payment_config',
     details: values.transport_fee_enabled
-      ? `Transport fee on: first ${values.transport_free_km} km free, ${formatMoney(values.transport_rate_per_km)} per km after that, ${values.transport_max_fee === null ? 'no maximum' : 'maximum ' + formatMoney(values.transport_max_fee)}, road factor ${values.transport_road_factor}`
+      ? `Transport fee on: ${describeTransportRangesForAudit(values)}; road factor ${values.transport_road_factor}`
       : 'Transport fee turned off'
   });
+  const legacyNote = document.getElementById('tf-legacy-note');
+  if (legacyNote) legacyNote.classList.add('hidden');
   setTfMsg('Saved.');
   updateTransportExample();
 }
@@ -1128,10 +1249,126 @@ function wireNumericInputClamps() {
   clampNumberInput(document.getElementById('pr-reschedule-fee'), { min: 0, max: 1000000, decimals: 2 });
   clampNumberInput(document.getElementById('sc-global-percent'), { min: 0, max: 100, decimals: 1 });
   clampNumberInput(document.getElementById('tf-free-km'), { min: 0, max: 500, decimals: 1 });
-  clampNumberInput(document.getElementById('tf-rate'), { min: 0, max: 100000, decimals: 2 });
-  clampNumberInput(document.getElementById('tf-max-fee'), { min: 0, max: 1000000, decimals: 2 });
+  // Distance range rows are added and removed at runtime, so their inputs are
+  // clamped by one delegated handler (blur does not bubble; focusout does).
+  document.getElementById('tf-ranges')?.addEventListener('focusout', (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.value === '') return;
+    const isFee = el.classList.contains('tf-range-fee');
+    const isEnd = el.classList.contains('tf-range-to');
+    if (!isFee && !isEnd) return;
+    const clamped = clampNumberValue(el.value, isFee ? { min: 0, max: 10000000, decimals: 2 } : { min: 0, max: MAX_TRANSPORT_KM, decimals: 1 });
+    el.value = clamped === null ? '' : (isFee ? clamped.toFixed(2) : String(clamped));
+    updateTransportExample();
+  });
   clampNumberInput(document.getElementById('tf-road-factor'), { min: 1, max: 3, decimals: 2 });
   clampNumberInput(document.getElementById('pm2CashWindowDays'), { min: 0, max: 365, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-full-payment-days'), { min: 1, max: 60, decimals: 0 });
+  clampNumberInput(document.getElementById('pr-auto-cancel-days'), { min: 0, max: 60, decimals: 0 });
+}
+
+// ── Payment Deadline and Grace Period ───────────────────────────────────────
+// system_settings.reservation_rules.full_payment_days (balance due this many
+// days before the event) and .auto_cancel_days (grace after that due date).
+// Both are read by the hourly auto_cancel_overdue_reservations() job (via
+// get_full_payment_days()), by the reminder notifications, and by the
+// customer pages. Defaults match every one of those readers: 7 and 5.
+// Read-merge-write: the same JSON blob holds min/max advance days (edited on
+// Availability and Scheduling), deposit_pct, min_pax, etc., so a save here
+// only touches these two fields.
+const DEFAULT_FULL_PAYMENT_DAYS = 7;
+const DEFAULT_AUTO_CANCEL_DAYS = 5;
+const DEFAULT_MIN_ADVANCE_FOR_DUE_CHECK = 14;
+
+function setLatePaymentGraceMsg(msg, isError = false) {
+  const el = document.getElementById('late-payment-grace-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? '#c0392b' : '#27ae60';
+}
+
+// An empty box must not read as 0 (Number('') is 0).
+function readWholeNumberField(id) {
+  const raw = String(document.getElementById(id)?.value ?? '').trim();
+  return raw === '' ? NaN : Number(raw);
+}
+
+function storedWholeNumber(value, fallback) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+}
+
+function dayLabel(n) {
+  return `${n} day${n === 1 ? '' : 's'}`;
+}
+
+async function loadLatePaymentGrace() {
+  const dueInput = document.getElementById('pr-full-payment-days');
+  const graceInput = document.getElementById('pr-auto-cancel-days');
+  if (!dueInput && !graceInput) return;
+  const { data } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'reservation_rules')
+    .maybeSingle();
+  const parsed = data ? JSON.parse(data.setting_value) : {};
+  const due = storedWholeNumber(parsed.full_payment_days, DEFAULT_FULL_PAYMENT_DAYS);
+  if (dueInput) dueInput.value = due >= 1 ? due : DEFAULT_FULL_PAYMENT_DAYS;
+  if (graceInput) graceInput.value = storedWholeNumber(parsed.auto_cancel_days, DEFAULT_AUTO_CANCEL_DAYS);
+}
+
+async function saveLatePaymentGrace() {
+  const dueDays = readWholeNumberField('pr-full-payment-days');
+  const graceDays = readWholeNumberField('pr-auto-cancel-days');
+
+  if (!Number.isInteger(dueDays) || dueDays < 1 || dueDays > 60) {
+    setLatePaymentGraceMsg('Payment due date must be a whole number from 1 to 60 days before the event.', true); return;
+  }
+  if (!Number.isInteger(graceDays) || graceDays < 0 || graceDays > 60) {
+    setLatePaymentGraceMsg('Grace period must be a whole number from 0 to 60 days.', true); return;
+  }
+
+  const { data: current } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'reservation_rules')
+    .maybeSingle();
+  const existing = current ? JSON.parse(current.setting_value) : {};
+
+  // A due date further out than the shortest allowed booking notice would make
+  // every new booking late the moment it is made.
+  const minAdvance = storedWholeNumber(existing.min_advance_days, DEFAULT_MIN_ADVANCE_FOR_DUE_CHECK);
+  if (dueDays >= minAdvance) {
+    setLatePaymentGraceMsg(`Payment due date must be shorter than the site-wide minimum booking notice (${dayLabel(minAdvance)}), otherwise new bookings would already be late.`, true); return;
+  }
+
+  const previousDue = storedWholeNumber(existing.full_payment_days, DEFAULT_FULL_PAYMENT_DAYS);
+  const previousGrace = storedWholeNumber(existing.auto_cancel_days, DEFAULT_AUTO_CANCEL_DAYS);
+  if (previousDue === dueDays && previousGrace === graceDays
+      && Number(existing.full_payment_days) === dueDays && Number(existing.auto_cancel_days) === graceDays) {
+    setLatePaymentGraceMsg('No changes to save.'); return;
+  }
+  const merged = { ...existing, full_payment_days: dueDays, auto_cancel_days: graceDays };
+
+  const raisedDue = dueDays > previousDue;
+  showSettingsConfirm(
+    'Change Payment Deadline Settings',
+    `due ${dayLabel(previousDue)} before the event, ${dayLabel(previousGrace)} grace`,
+    `due ${dayLabel(dueDays)} before the event, ${dayLabel(graceDays)} grace${raisedDue ? ' (existing unpaid reservations move to the earlier due date and some may become overdue right away)' : ''}`,
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          { setting_key: 'reservation_rules', setting_value: JSON.stringify(merged), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: 'setting_key' }
+        );
+
+      if (error) { setLatePaymentGraceMsg('Failed to save: ' + error.message, true); return; }
+      await logAudit({ action: 'Updated Late Payment Grace Period', category: 'payment_config', details: `full_payment_days=${dueDays}, auto_cancel_days=${graceDays}` });
+      setLatePaymentGraceMsg('Saved. It applies the next time overdue reservations are checked.');
+    }
+  );
 }
 
 // ── Receipt validation mode ──────────────────────────────────────────────────
@@ -1237,6 +1474,7 @@ async function init() {
   await loadPaymentRules();
   await loadServiceChargeSection();
   await loadTransportFeeSection();
+  await loadLatePaymentGrace();
   await loadReceiptValidationSection();
 
   document.querySelectorAll('.pt-save-btn').forEach((btn) => {
@@ -1271,9 +1509,17 @@ async function init() {
   document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());
   document.getElementById('sc-save-offsite-btn')?.addEventListener('click', saveOffsiteToggle);
   document.getElementById('tf-save-btn')?.addEventListener('click', saveTransportFee);
+  document.getElementById('saveLatePaymentGraceBtn')?.addEventListener('click', saveLatePaymentGrace);
   document.getElementById('rv-save-btn')?.addEventListener('click', saveReceiptValidation);
   document.getElementById('rv-mode')?.addEventListener('change', updateRvDescription);
-  ['tf-free-km', 'tf-rate', 'tf-max-fee', 'tf-road-factor'].forEach((id) => document.getElementById(id)?.addEventListener('input', updateTransportExample));
+  ['tf-free-km', 'tf-try-km', 'tf-road-factor'].forEach((id) => document.getElementById(id)?.addEventListener('input', updateTransportExample));
+  document.getElementById('tf-ranges')?.addEventListener('input', updateTransportExample);
+  document.getElementById('tf-ranges')?.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('.tf-range-remove');
+    if (btn) removeTransportRange(btn);
+  });
+  document.getElementById('tf-add-range')?.addEventListener('click', addTransportRange);
+  ['tf-beyond-contact', 'tf-beyond-last'].forEach((id) => document.getElementById(id)?.addEventListener('change', updateTransportExample));
   document.getElementById('tf-enabled')?.addEventListener('change', updateTransportExample);
   // Live-preview the effect immediately on toggle, before the admin saves —
   // same "see it before committing" behaviour the global-percent input
