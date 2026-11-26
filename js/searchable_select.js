@@ -8,7 +8,10 @@
 //
 // Usage: makeSelectSearchable(document.getElementById('cateringPackageSelect'));
 
-export function makeSelectSearchable(select, { placeholder = 'Search…', noResults = 'No matches' } = {}) {
+// sortAlphabetically: list the options A-Z (case-insensitive) instead of in the
+// <select>'s own order. An option with value="" is the blank/"nothing chosen"
+// state: it is never listed, and the box is simply empty when it is selected.
+export function makeSelectSearchable(select, { placeholder = 'Search…', noResults = 'No matches', sortAlphabetically = false } = {}) {
   if (!select || select.dataset.searchable === '1') return null;
   select.dataset.searchable = '1';
 
@@ -40,13 +43,14 @@ export function makeSelectSearchable(select, { placeholder = 'Search…', noResu
   let shown = [];
 
   const options = () => Array.from(select.options).filter((o) => o.value !== '');
-  const selectedLabel = () => select.selectedOptions[0]?.textContent.trim() || '';
+  const selectedLabel = () => (select.value === '' ? '' : (select.selectedOptions[0]?.textContent.trim() || ''));
 
   function syncInput() { input.value = selectedLabel(); }
 
   function render(query = '') {
     const q = query.trim().toLowerCase();
     shown = options().filter((o) => !q || o.textContent.toLowerCase().includes(q));
+    if (sortAlphabetically) shown.sort((a, b) => a.textContent.trim().localeCompare(b.textContent.trim(), undefined, { sensitivity: 'base', numeric: true }));
     list.innerHTML = '';
     if (!shown.length) {
       const li = document.createElement('li');

@@ -342,7 +342,7 @@ const addCateringCategoryBtn              = document.getElementById('addCatering
 const cateringPageMessage                 = document.getElementById('cateringPageMessage');
 const cateringPackagePickerCard           = document.getElementById('cateringPackagePickerCard');
 const cateringPackageSelect               = document.getElementById('cateringPackageSelect');
-makeSelectSearchable(cateringPackageSelect, { placeholder: 'Search packages\u2026', noResults: 'No packages match' });
+makeSelectSearchable(cateringPackageSelect, { placeholder: 'Search or choose a package\u2026', noResults: 'No packages match', sortAlphabetically: true });
 const cateringRestrictionsSection         = document.getElementById('cateringRestrictionsSection');
 const cateringRestrictionsBody            = document.getElementById('cateringRestrictionsBody');
 const activeCateringSection               = document.getElementById('activeCateringSection');
@@ -4262,19 +4262,20 @@ async function loadCateringMenuPackages() {
       return;
     }
 
-    addCateringCategoryBtn.disabled = false;
     cateringPackagePickerCard.style.display = '';
-    cateringRestrictionsSection.style.display = '';
-    activeCateringSection.style.display = '';
 
-    // Keep the previous selection if it's still a valid catering package, else default to the first.
+    // Nothing is chosen on a fresh visit: the admin picks a package first. A
+    // package chosen earlier stays chosen across reloads of this list.
     if (!cateringMenuActivePackageId || !cateringMenuPackages.some(p => p.package_id === cateringMenuActivePackageId)) {
-      cateringMenuActivePackageId = cateringMenuPackages[0].package_id;
+      cateringMenuActivePackageId = null;
     }
 
-    cateringPackageSelect.innerHTML = cateringMenuPackages
-      .map(p => `<option value="${p.package_id}" ${p.package_id === cateringMenuActivePackageId ? 'selected' : ''}>${escapeHtml(p.package_name)}${p.is_active ? '' : ' (Archived package)'}</option>`)
-      .join('');
+    // The leading blank option is the "nothing chosen" state; the searchable
+    // box lists the real packages A-Z.
+    cateringPackageSelect.innerHTML = '<option value=""' + (cateringMenuActivePackageId ? '' : ' selected') + '></option>'
+      + cateringMenuPackages
+        .map(p => `<option value="${p.package_id}" ${p.package_id === cateringMenuActivePackageId ? 'selected' : ''}>${escapeHtml(p.package_name)}${p.is_active ? '' : ' (Archived package)'}</option>`)
+        .join('');
 
     setMessage(cateringPageMessage, '');
     await loadCateringMenu();
@@ -4289,8 +4290,23 @@ cateringPackageSelect.addEventListener('change', async () => {
   await loadCateringMenu();
 });
 
+// Nothing below the picker applies until a package is chosen.
+function applyCateringSelectionVisibility() {
+  const chosen = Boolean(cateringMenuActivePackageId);
+  addCateringCategoryBtn.disabled = !chosen;
+  cateringRestrictionsSection.style.display = chosen ? '' : 'none';
+  activeCateringSection.style.display = chosen ? '' : 'none';
+  if (!chosen) archivedCateringSection.style.display = 'none';
+}
+
 async function loadCateringMenu() {
-  if (!cateringMenuActivePackageId) { allCateringCategories = []; allCateringDishes = []; allCateringSectionRules = []; renderCateringTables(); renderCateringRestrictions(); return; }
+  if (!cateringMenuActivePackageId) {
+    allCateringCategories = []; allCateringDishes = []; allCateringSectionRules = [];
+    renderCateringTables(); renderCateringRestrictions();
+    applyCateringSelectionVisibility();
+    setMessage(cateringPageMessage, 'Choose a package above to manage its catering menu.');
+    return;
+  }
   setMessage(cateringPageMessage, 'Loading catering menu…');
   try {
     const [{ data: cats, error: catErr }, { data: dishes, error: dishErr }, { data: rules, error: ruleErr }] = await Promise.all([
@@ -4306,6 +4322,7 @@ async function loadCateringMenu() {
     allCateringSectionRules = rules || [];
     renderCateringTables();
     renderCateringRestrictions();
+    applyCateringSelectionVisibility();
     setMessage(cateringPageMessage, '');
   } catch (err) {
     setMessage(cateringPageMessage, `Failed to load catering menu: ${err.message}`, 'error');
