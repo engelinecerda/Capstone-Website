@@ -327,6 +327,36 @@ function splitDetailLine(line: string): { label: string; items: string[] } {
   return { label, items: items.length ? items : [rest] };
 }
 
+// Older templates have the package price and extension rate typed into the
+// text (e.g. "VIP Lite (PHP 2,999)", "Extension Hour: PHP 800 per hour"), which
+// goes stale the moment a price is edited. For those lines the PDF swaps in the
+// booked package price and the package's real extension rate. Lines that use
+// {{package_price}} / {{extension_price}} are already correct and pass through
+// unchanged (the replacement writes the same value).
+const PESO_AMOUNT = String.raw`(?:₱|PHP\s?)\s?\d[\d,]*(?:\.\d+)?`;
+
+function applyLivePackagePricing(
+  entries: { label: string; items: string[] }[],
+  packagePrice: number,
+  extensionPrice: number,
+): { label: string; items: string[] }[] {
+  const priceInParens = new RegExp(String.raw`\(\s*${PESO_AMOUNT}\s*\)`);
+  const extensionLine = /^extension\s+hour\b/i;
+  return entries.map((entry) => {
+    const label = packagePrice > 0
+      ? entry.label.replace(priceInParens, `(${formatCurrency(packagePrice)})`)
+      : entry.label;
+    const items = entry.items.flatMap((item) => {
+      if (!extensionLine.test(item)) return [item];
+      // No extension rate on the package: drop the line rather than print a
+      // price the café no longer charges.
+      if (!(extensionPrice > 0)) return [];
+      return [`Extension Hour: ${formatCurrency(extensionPrice)} per hour`];
+    });
+    return { label, items };
+  }).filter((entry) => entry.label || entry.items.length);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PDF layout constants + drawing context
 // ─────────────────────────────────────────────────────────────────────────────
@@ -754,6 +784,8 @@ interface ContractData {
   guestCount: string;
   packageName: string;
   totalPrice: string;
+  packagePrice: number;
+  extensionPrice: number;
   fallbackVenueLabel: string;
 }
 
@@ -825,8 +857,12 @@ async function buildContractPdf(
   drawAdditionalRequests(ctx, requestRows);
 
   const packageSections = sections.filter((s) => classifySection(s.heading) === 'package' && sectionMatchesPackage(s.heading, data.packageName));
-  const packageEntries = packageSections.flatMap((s) =>
-    filterLinesForPackage(s.bodyLines, data.packageName).map((line) => splitDetailLine(line)),
+  const packageEntries = applyLivePackagePricing(
+    packageSections.flatMap((s) =>
+      filterLinesForPackage(s.bodyLines, data.packageName).map((line) => splitDetailLine(line)),
+    ),
+    data.packagePrice,
+    data.extensionPrice,
   );
   drawSelectedPackage(ctx, packageEntries);
 
@@ -1023,7 +1059,7 @@ Deno.serve(async (req: Request) => {
         inclusion_adjustment, inclusion_snapshot,
         transport_fee, transport_distance_km,
         special_requests,
-        package_id, package:package_id ( package_name ),
+        package_id, package:package_id ( package_name, extension_price ),
         add_on:add_on_id ( package_name, price )
       `)
       .eq('reservation_id', reservation_id)
@@ -1194,6 +1230,36 @@ Deno.serve(async (req: Request) => {
     let privacyBody = '';
     try { privacyBody = privacyRow?.setting_value ? (JSON.parse(privacyRow.setting_value).body || '') : ''; } catch { /* leave blank */ }
 
+    // Price Breakdown. Everything comes from what was frozen on the
+    // reservation at booking, so a later price change never alters it. The
+    // package line is what remains of the subtotal after the itemised lines
+    // (add-on, additional guests, removed inclusions, discount), so the rows
+    // always add up to the Total Amount even for menu-priced packages.
+    const totalAmount = Number(reservation.total_price || 0);
+    const transportFeeAmount = (reservation.transport_distance_km != null || Number(reservation.transport_fee) > 0)
+      ? Number(reservation.transport_fee || 0) : 0;
+    const serviceChargeAmount = Number(reservation.service_charge_amount || 0);
+    const subtotalAmount = round2(totalAmount - transportFeeAmount - serviceChargeAmount);
+    const discountAmountValue = reservation.discount_amount != null ? Number(reservation.discount_amount) : 0;
+    const inclusionCreditValue = Number(reservation.inclusion_adjustment) > 0 ? Number(reservation.inclusion_adjustment) : 0;
+    const additionalHeadsValue = Number(reservation.additional_heads) > 0 ? Number(reservation.additional_heads) : 0;
+    const additionalHeadChargeValue = additionalHeadsValue > 0 ? Number(reservation.additional_head_charge || 0) : 0;
+    const packagePlusAddOn = round2(subtotalAmount + discountAmountValue + inclusionCreditValue - additionalHeadChargeValue);
+    const addOnPrice = Number(reservation.add_on?.price || 0);
+    const addOnAmountValue = reservation.add_on && addOnPrice > 0 && addOnPrice < packagePlusAddOn ? addOnPrice : 0;
+    const removedInclusionRows = Array.isArray(reservation.inclusion_snapshot)
+      ? reservation.inclusion_snapshot
+          .filter((i: { removed?: boolean }) => i?.removed)
+          .map((i: { name?: string; credit?: number }) => ({ name: String(i.name || ''), credit: Number(i.credit || 0) }))
+      : [];
+
+    // The package's own price as frozen on this booking (what remains of the
+    // subtotal after add-on, guests, removed inclusions and discount) and its
+    // per-hour extension rate. The Selected Package lines read these, so a
+    // price edited on the Packages page shows up without retyping the template.
+    const packageBasePrice = round2(packagePlusAddOn - addOnAmountValue);
+    const extensionRate = Number(reservation.package?.extension_price || 0);
+
     const mergeData: Record<string, string> = {
       customer_name: reservation.contact_name || '',
       package_name: packageName,
@@ -1203,6 +1269,8 @@ Deno.serve(async (req: Request) => {
       venue: venueLabel,
       reservation_number: reservationNumber,
       total_price: formatCurrency(reservation.total_price),
+      package_price: packageBasePrice > 0 ? formatCurrency(packageBasePrice) : '',
+      extension_price: extensionRate > 0 ? formatCurrency(extensionRate) : '',
       // Snapshotted on the reservation at booking time (unlike deposit_percent/
       // cancellation_fee below, which read live config) — the applied rate
       // must freeze at the moment of booking, not reflect today's settings.
@@ -1249,29 +1317,6 @@ Deno.serve(async (req: Request) => {
         lockedClauses[c.key as 'acknowledgement' | 'electronic_signature'] = { heading: c.heading, body: c.body };
       }
     });
-
-    // Price Breakdown. Everything comes from what was frozen on the
-    // reservation at booking, so a later price change never alters it. The
-    // package line is what remains of the subtotal after the itemised lines
-    // (add-on, additional guests, removed inclusions, discount), so the rows
-    // always add up to the Total Amount even for menu-priced packages.
-    const totalAmount = Number(reservation.total_price || 0);
-    const transportFeeAmount = (reservation.transport_distance_km != null || Number(reservation.transport_fee) > 0)
-      ? Number(reservation.transport_fee || 0) : 0;
-    const serviceChargeAmount = Number(reservation.service_charge_amount || 0);
-    const subtotalAmount = round2(totalAmount - transportFeeAmount - serviceChargeAmount);
-    const discountAmountValue = reservation.discount_amount != null ? Number(reservation.discount_amount) : 0;
-    const inclusionCreditValue = Number(reservation.inclusion_adjustment) > 0 ? Number(reservation.inclusion_adjustment) : 0;
-    const additionalHeadsValue = Number(reservation.additional_heads) > 0 ? Number(reservation.additional_heads) : 0;
-    const additionalHeadChargeValue = additionalHeadsValue > 0 ? Number(reservation.additional_head_charge || 0) : 0;
-    const packagePlusAddOn = round2(subtotalAmount + discountAmountValue + inclusionCreditValue - additionalHeadChargeValue);
-    const addOnPrice = Number(reservation.add_on?.price || 0);
-    const addOnAmountValue = reservation.add_on && addOnPrice > 0 && addOnPrice < packagePlusAddOn ? addOnPrice : 0;
-    const removedInclusionRows = Array.isArray(reservation.inclusion_snapshot)
-      ? reservation.inclusion_snapshot
-          .filter((i: { removed?: boolean }) => i?.removed)
-          .map((i: { name?: string; credit?: number }) => ({ name: String(i.name || ''), credit: Number(i.credit || 0) }))
-      : [];
 
     const breakdownRows: BreakdownRow[] = subtotalAmount > 0
       ? buildBreakdownRows({
@@ -1335,6 +1380,8 @@ Deno.serve(async (req: Request) => {
         guestCount: mergeData.guest_count,
         packageName,
         totalPrice: mergeData.total_price,
+        packagePrice: packageBasePrice,
+        extensionPrice: extensionRate,
         fallbackVenueLabel: venueLabel,
       },
       mergeData,

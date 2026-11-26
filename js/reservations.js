@@ -1775,6 +1775,11 @@ function renderContractBody(templateBody, contractData = {}) {
         ? removedOptions(getInclusionOptions(previewInclusionPkg), getRemovedInclusionIds(previewInclusionPkg)) : [];
     const isOffsite = S.locationType === 'offsite';
     const previewTransport = resolveTransport();
+    // Package's own price for the {{package_price}} token — the subtotal with
+    // discount, removed-inclusion credit, additional guests and any snack
+    // add-on taken back out (same rule as the Price Breakdown further down).
+    const pkgPriceAddOn = (S.locationType === 'onsite' && !isMenuPricedPackage(getActivePackage()) && S.snackAddon) ? Number(S.snackAddon.price || 0) : 0;
+    const breakdownPackageAmount = computeContractPreviewBase() + discount.discountAmount + previewInclusionCredit - previewAdditionalHeadCharge - pkgPriceAddOn;
     const data = {
         customer_name: S.name || 'Customer',
         package_name: getSelectedContractPackageLabel() || 'Selected Package',
@@ -1784,6 +1789,11 @@ function renderContractBody(templateBody, contractData = {}) {
         venue: S.locationType === 'offsite' ? (S.venueLocation || 'Customer-provided venue') : 'ELI Coffee Events Cafe Binangonan (Onsite)',
         reservation_number: 'Assigned upon submission',
         total_price: fmtPeso(charge.total + previewTransport.fee),
+        // Same two values the signed PDF prints in Selected Package: the
+        // package's own price (what is left of the subtotal after the
+        // itemised lines) and its per-hour extension rate. Blank when unset.
+        package_price: (breakdownPackageAmount > 0) ? fmtPeso(breakdownPackageAmount) : '',
+        extension_price: Number(getActivePackage()?.extensionPrice) > 0 ? fmtPeso(getActivePackage().extensionPrice) : '',
         service_charge_percent: String(charge.pct),
         service_charge_amount: fmtPeso(charge.amount),
         discount_percent: discount.active ? String(discount.percentOff) : '',
@@ -2652,7 +2662,7 @@ async function loadPackages() {
     packagesLoadState = 'loading';
     const { data: pkgs, error } = await supabase
         .from('package')
-        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, inclusion_options, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, allow_additional_head, price_per_additional_head, max_additional_heads, package_category(category_name, is_active, sort_order, service_charge_percent)')
+        .select('package_id, package_name, description, package_type, price, guest_capacity, min_guests, max_guests, location_type, duration_hours, booking_scope, sort_order, inclusions, inclusion_options, package_image, package_category_id, catering_main_dish_max, uses_catering_menu, allow_additional_head, price_per_additional_head, max_additional_heads, extension_price, package_category(category_name, is_active, sort_order, service_charge_percent)')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -2771,6 +2781,7 @@ async function loadPackages() {
             guestCapacity: p.guest_capacity ?? null,
             allowAdditionalHead: !!p.allow_additional_head,
             pricePerAdditionalHead: p.price_per_additional_head ?? null,
+            extensionPrice: p.extension_price ?? null,
             maxAdditionalHeads: p.max_additional_heads ?? null,
             categoryId,
             categoryName,
