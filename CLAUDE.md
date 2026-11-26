@@ -165,6 +165,10 @@ A catering package (`package.uses_catering_menu`) already has its pax count and 
 
 Payment management lists the newest submitted payment first for every status chip (`get_admin_payments_page()` falls back to `submitted_at desc` when no column is sorted; `20261208_payments_default_newest_first.sql`; the page sends no sort until a header is clicked). The Inventory > Inclusions list is searchable, has a "Not used in any package" filter, and shows 10 rows per page (`renderInclusionTables()` in `js/super_admin_packages.js`); drag-to-reorder is only available while no search/filter is active, and drag positions are offset by the current page.
 
+## Extra payment returned: email too
+
+`mark_excess_returned()` now sends the customer an in-app notice AND an email through `dispatch_notification()` with the `payment_excess_returned` trigger/template (editable under Notifications; not disableable; token `{{amount_returned}}` plus the usual reservation tokens) — `20261209_excess_returned_email.sql`. The email is sent by `send-notification-email`, which maps the trigger to its button label; redeploy it with the migration. The notice shown when an excess is first recorded (manager alert) is unchanged.
+
 ## Admin reservations "Upcoming" chip
 
 "Upcoming" lists only `approved` and `rescheduled` reservations whose event date has not passed (pending ones await a manager decision and live under the Pending chip / All). The rule is in two places that must match: `get_admin_reservations_page()` and `get_admin_reservation_counts()` (`20261207_upcoming_excludes_pending.sql`).
