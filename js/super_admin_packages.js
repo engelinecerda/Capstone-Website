@@ -358,10 +358,6 @@ const cateringCatName        = document.getElementById('cateringCatName');
 const cateringCatIcon        = document.getElementById('cateringCatIcon');
 const cateringCatTag         = document.getElementById('cateringCatTag');
 const cateringCatRequired    = document.getElementById('cateringCatRequired');
-const cateringPrice20        = document.getElementById('cateringPrice20');
-const cateringPrice30        = document.getElementById('cateringPrice30');
-const cateringPrice40        = document.getElementById('cateringPrice40');
-const cateringPrice50        = document.getElementById('cateringPrice50');
 
 const cateringDishDrawer      = document.getElementById('cateringDishDrawer');
 const cateringDishDrawerTitle = document.getElementById('cateringDishDrawerTitle');
@@ -387,10 +383,6 @@ clampNumberInput(pkgMaxAdditionalHeads, { min: 0, max: 9999, decimals: 0 });
 clampNumberInput(pkgExtensionPrice, { min: 0, max: 100000, decimals: 2 });
 clampNumberInput(discPercentOffInput, { min: 0.01, max: 100, decimals: 2 });
 clampNumberInput(venueCapacity, { min: 1, max: 9999, decimals: 0 });
-clampNumberInput(cateringPrice20, { min: 0, max: 1000000, decimals: 2 });
-clampNumberInput(cateringPrice30, { min: 0, max: 1000000, decimals: 2 });
-clampNumberInput(cateringPrice40, { min: 0, max: 1000000, decimals: 2 });
-clampNumberInput(cateringPrice50, { min: 0, max: 1000000, decimals: 2 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
@@ -2852,8 +2844,7 @@ confirmOk.addEventListener('click', async () => {
       for (const c of sourceCats) {
         const { data, error } = await supabase.from(CATERING_CATEGORY_TABLE).insert({
           package_id: id, name: c.name, icon: c.icon, tag: c.tag, sort_order: c.sort_order,
-          is_required: c.is_required, price_20: c.price_20, price_30: c.price_30,
-          price_40: c.price_40, price_50: c.price_50, is_active: true
+          is_required: c.is_required, is_active: true
         }).select().single();
         if (error) throw error;
         idMap.set(c.category_id, data.category_id);
@@ -4272,10 +4263,6 @@ function dishesForCategory(categoryId) {
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
-function cateringPriceSummary(cat) {
-  return `${formatCurrency(cat.price_20)} / ${formatCurrency(cat.price_30)} / ${formatCurrency(cat.price_40)} / ${formatCurrency(cat.price_50)}`;
-}
-
 function buildCateringCategoryRow(cat) {
   const isArchived = !cat.is_active;
   const dishes = dishesForCategory(cat.category_id);
@@ -4298,7 +4285,6 @@ function buildCateringCategoryRow(cat) {
     <td>${cat.icon ? cat.icon + ' ' : ''}${escapeHtml(cat.name)} <span class="category-pill">${CATERING_TAG_LABELS[cat.tag] || cat.tag}</span></td>
     <td>${cat.is_required ? 'Required' : 'Optional'}</td>
     <td><span class="count-pill">${activeDishCount} dish${activeDishCount === 1 ? '' : 'es'}</span></td>
-    <td>${cateringPriceSummary(cat)}</td>
     <td><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>
     <td>${actions}</td>
   </tr>`;
@@ -4310,7 +4296,7 @@ function renderCateringTables() {
 
   activeCateringBody.innerHTML = active.length
     ? active.map(buildCateringCategoryRow).join('')
-    : '<tr class="empty-row"><td colspan="7">No categories yet. Add one so customers have something to pick from.</td></tr>';
+    : '<tr class="empty-row"><td colspan="6">No categories yet. Add one so customers have something to pick from.</td></tr>';
 
   archivedCateringSection.style.display = archived.length ? '' : 'none';
   archivedCateringBody.innerHTML = archived.length ? archived.map(buildCateringCategoryRow).join('') : '';
@@ -4665,10 +4651,6 @@ function openAddCateringCategoryModal() {
   cateringCatIcon.value = '';
   cateringCatTag.value = 'main';
   cateringCatRequired.checked = true;
-  cateringPrice20.value = '';
-  cateringPrice30.value = '';
-  cateringPrice40.value = '';
-  cateringPrice50.value = '';
   setModalMsg(cateringCategoryModalMessage, '');
   openModal(cateringCategoryModal);
 }
@@ -4685,10 +4667,6 @@ function openEditCateringCategoryModal(categoryId) {
   cateringCatIcon.value = cat.icon || '';
   cateringCatTag.value = cat.tag || 'main';
   cateringCatRequired.checked = !!cat.is_required;
-  cateringPrice20.value = moneyInputValue(cat.price_20 ?? 0);
-  cateringPrice30.value = moneyInputValue(cat.price_30 ?? 0);
-  cateringPrice40.value = moneyInputValue(cat.price_40 ?? 0);
-  cateringPrice50.value = moneyInputValue(cat.price_50 ?? 0);
   setModalMsg(cateringCategoryModalMessage, '');
   openModal(cateringCategoryModal);
 }
@@ -4696,12 +4674,6 @@ function openEditCateringCategoryModal(categoryId) {
 cateringCategoryModalSave.addEventListener('click', async () => {
   const name = cateringCatName.value.trim();
   if (!name) { setModalMsg(cateringCategoryModalMessage, 'Category name is required.'); return; }
-
-  const prices = [cateringPrice20, cateringPrice30, cateringPrice40, cateringPrice50].map(el => Number(el.value));
-  if (prices.some(p => Number.isNaN(p) || p < 0)) {
-    setModalMsg(cateringCategoryModalMessage, 'All four pax-bracket prices are required and must be 0 or more.');
-    return;
-  }
 
   cateringCategoryModalSave.disabled = true;
   cateringCategoryModalSaveLabel.textContent = 'Saving…';
@@ -4713,7 +4685,6 @@ cateringCategoryModalSave.addEventListener('click', async () => {
       icon: cateringCatIcon.value.trim() || null,
       tag: cateringCatTag.value,
       is_required: cateringCatRequired.checked,
-      price_20: prices[0], price_30: prices[1], price_40: prices[2], price_50: prices[3],
     };
 
     if (editingCateringCategoryId) {

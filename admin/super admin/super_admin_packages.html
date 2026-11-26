@@ -384,7 +384,7 @@
         <div class="page-header">
           <div>
             <h1 class="page-title">Catering Menu</h1>
-            <p class="page-sub">Food & drink categories the customer picks from when building a catering tray, plus pricing per pax bracket.</p>
+            <p class="page-sub">Food & drink categories the customer picks from when building a catering tray. The pax count and price come from the package itself, so dishes carry no price.</p>
           </div>
           <button type="button" class="btn-primary" id="addCateringCategoryBtn">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -438,13 +438,12 @@
                   <th>Category</th>
                   <th>Required</th>
                   <th>Dishes</th>
-                  <th>Price (20 / 30 / 40 / 50 pax)</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="activeCateringBody">
-                <tr class="empty-row"><td colspan="7">Loading catering menu...</td></tr>
+                <tr class="empty-row"><td colspan="6">Loading catering menu...</td></tr>
               </tbody>
             </table>
           </div>
@@ -464,7 +463,6 @@
                   <th>Category</th>
                   <th>Required</th>
                   <th>Dishes</th>
-                  <th>Price (20 / 30 / 40 / 50 pax)</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -1027,15 +1025,6 @@
             <input type="checkbox" id="cateringCatRequired" checked>
             <span>Required — customer must pick a dish from this category before checkout</span>
           </label>
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Price per pax bracket *</label>
-          <div class="modal-row modal-row-four">
-            <input type="number" id="cateringPrice20" class="modal-input" data-money placeholder="20 pax" min="0" max="1000000" step="0.01">
-            <input type="number" id="cateringPrice30" class="modal-input" data-money placeholder="30 pax" min="0" max="1000000" step="0.01">
-            <input type="number" id="cateringPrice40" class="modal-input" data-money placeholder="40 pax" min="0" max="1000000" step="0.01">
-            <input type="number" id="cateringPrice50" class="modal-input" data-money placeholder="50 pax" min="0" max="1000000" step="0.01">
-          </div>
         </div>
       </div>
       <div class="modal-footer modal-footer-stacked">

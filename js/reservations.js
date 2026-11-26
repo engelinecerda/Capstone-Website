@@ -129,8 +129,6 @@ const S = {
     cateringCart: [],
     cateringActiveMain: null,
     cateringOpenSection: null,
-    cateringGlobalPax: null,
-    cateringPaxCustomizeOpen: {},
     guestCount: '',
     eventType: '',
     eventTypeOther: '',
@@ -458,7 +456,10 @@ function isCateringPackage(pkg) {
 // replace it, or the total falls below package.price and the server rejects
 // the booking ("Total price cannot be less than the selected package price").
 function isMenuPricedPackage(pkg) {
-    return isCateringPackage(pkg) && S.locationType === 'offsite' && /catering/i.test(pkg?.label || '');
+    // Catering packages are priced by the package itself (its pax count is
+    // part of the package, e.g. "Buffet Service (50) pax"). Dishes carry no
+    // price any more, so nothing is ever priced from the menu cart.
+    return false;
 }
 
 // For a flagged package that is NOT menu-priced: is the chosen menu already
@@ -983,17 +984,6 @@ const FALLBACK_DISHES = [
     { cat:'Rice',       icon:'&#127834;', tag:'rice',      required:false, items:['Steamed Rice'] }
 ];
 
-const FALLBACK_PRICES = {
-    Chicken:    {20:2700, 30:3800, 40:4800, 50:5900},
-    Pork:       {20:2700, 30:3800, 40:4800, 50:5900},
-    Beef:       {20:2700, 30:3800, 40:4800, 50:5900},
-    Fish:       {20:2400, 30:3400, 40:4500, 50:5600},
-    Vegetables: {20:2400, 30:3400, 40:4500, 50:5600},
-    Pasta:      {20:2000, 30:2900, 40:3800, 50:4600},
-    Dessert:    {20:1400, 30:2900, 40:2600, 50:3200},
-    Rice:       {20:600,  30:900,  40:1200, 50:1500}
-};
-
 // Fallback cap on how many main-dish (protein) selections the buffet
 // builder allows, used only when the package's own catering_main_dish_max
 // hasn't loaded (e.g. DB fetch failed). The live value comes from the
@@ -1001,7 +991,6 @@ const FALLBACK_PRICES = {
 const FALLBACK_MAIN_DISH_MAX = 3;
 
 let DISHES = FALLBACK_DISHES;
-let PRICES = FALLBACK_PRICES;
 
 // Explicit per-section (tag) restrictions from public.catering_section_rule
 // for the currently loaded package — { [tag]: { min, max } }. A tag with no
@@ -1050,7 +1039,6 @@ async function loadCateringMenu(packageId) {
             // switching into an unconfigured package never keeps showing
             // the old package's dishes and prices.
             DISHES = [];
-            PRICES = {};
             cateringMenuUnavailable = true;
             return;
         }
@@ -1070,9 +1058,6 @@ async function loadCateringMenu(packageId) {
                 items: dishesByCategory[c.category_id],
             }));
 
-        PRICES = {};
-        cats.forEach(c => { PRICES[c.name] = { 20: Number(c.price_20), 30: Number(c.price_30), 40: Number(c.price_40), 50: Number(c.price_50) }; });
-
         // Categories exist but every one of them filtered out above for
         // having zero active dishes — functionally the same "nothing to
         // show" case as no categories at all.
@@ -1083,7 +1068,6 @@ async function loadCateringMenu(packageId) {
         // transient error doesn't strand every catering customer.
         console.warn('Failed to load catering menu from database, using fallback menu:', err);
         DISHES = FALLBACK_DISHES;
-        PRICES = FALLBACK_PRICES;
         CATERING_SECTION_RULES = {};
     }
 }
@@ -2983,8 +2967,6 @@ async function selectCategory(cat) {
         S.cateringCart   = [];
         S.cateringActiveMain = null;
         S.cateringOpenSection = null;
-        S.cateringGlobalPax = null;
-        S.cateringPaxCustomizeOpen = {};
         S.time           = '';
         syncSelectedDate('');
     }
@@ -3159,8 +3141,6 @@ function buildMiniGrid() {
                 S.cateringCart = [];
                 S.cateringActiveMain = null;
                 S.cateringOpenSection = null;
-                S.cateringGlobalPax = null;
-                S.cateringPaxCustomizeOpen = {};
                 await ensureCateringMenuLoaded(p);
             }
             activate(g, c);
@@ -3229,8 +3209,6 @@ function buildOffsiteSub(categoryId) {
                 S.cateringCart = [];
                 S.cateringActiveMain = null;
                 S.cateringOpenSection = null;
-                S.cateringGlobalPax = null;
-                S.cateringPaxCustomizeOpen = {};
                 await ensureCateringMenuLoaded(p);
             }
             activate(g, c);
@@ -3701,9 +3679,6 @@ const CATERING_TAG_ORDER = ['main', 'vegetable', 'pasta', 'dessert', 'rice', 'dr
 // customers pick a global serving size before any dish category unlocks
 // (see the `locked` handling in buildCateringDishBuilder()).
 function getCateringSections() {
-    const paxMeta = CATERING_SECTION_META.pax;
-    const paxSection = { tag: 'pax', label: paxMeta.label, optional: false, hint: paxMeta.hint() };
-
     const dishSections = CATERING_TAG_ORDER
         .filter(tag => DISHES.some(g => g.tag === tag))
         .map(tag => {
@@ -3714,7 +3689,7 @@ function getCateringSections() {
             return { tag, label: meta.label, optional: !required, hint: meta.hint(required, max ?? min) };
         });
 
-    return [paxSection, ...dishSections];
+    return dishSections;
 }
 
 // The package's configured cap on main-dish (protein) selections —
@@ -3777,7 +3752,6 @@ function isCateringSelectionValid() {
 // section with no minimum is always optional. Pax Count is required but
 // isn't tag-driven at all, since it has no DISHES group of its own.
 function isCateringSectionValid(section) {
-    if (section.tag === 'pax') return !!S.cateringGlobalPax;
     const min = getCateringSectionMin(section.tag);
     return min <= 0 || getCateringSectionSelectedCount(section.tag) >= min;
 }
@@ -3853,9 +3827,6 @@ function scrollToCateringMenu() {
 }
 
 function scrollToCateringSection(tag) {
-    // Every dish section is locked until a global pax is chosen — redirect
-    // there instead of opening a section the customer can't use yet.
-    if (tag !== 'pax' && !S.cateringGlobalPax) { openCateringSection('pax'); return; }
     openCateringSection(tag);
 }
 
@@ -3870,51 +3841,23 @@ function getCateringCartCount()  { return S.cateringCart.filter(i => i && i.pax)
 function getCateringSelection(cat) { return S.cateringCart.filter(i => i.cat === cat); }
 function isDishSelected(cat, dish) { return S.cateringCart.some(i => i.cat === cat && i.dish === dish); }
 
-// `customPax`, when provided, overrides this dish's tray size independent
-// of the global serving size chosen in the Pax Count step. Omitting it
-// (null/undefined) falls back to that global pax, and keeps following it
-// automatically if the customer changes the global pax later (see
-// updateGlobalCateringPax) — that's what distinguishes a "default" pick
-// from a "customized" one (the `customized` flag).
+// A dish pick is complete the moment it is clicked: the pax count belongs to
+// the package itself and dishes carry no price. `pax: true` is only the
+// "complete" marker the cart / section checks look for (same marker Drinks
+// always used), never a headcount.
 //
 // Only replaces the cart entry for this exact cat+dish pair (not every
 // entry under `cat`) — that's what lets a second, third, etc. dish be
 // added under the same category instead of bumping the previous pick.
-function setCateringSelection(cat, dish, customPax) {
+function setCateringSelection(cat, dish) {
     S.cateringCart = S.cateringCart.filter(i => !(i.cat === cat && i.dish === dish));
-    if (!dish) return;
-    const effectivePax = customPax || S.cateringGlobalPax || null;
-    if (effectivePax && PRICES[cat] && PRICES[cat][effectivePax]) {
-        S.cateringCart.push({ cat, dish, pax: effectivePax, price: PRICES[cat][effectivePax], customized: !!customPax });
-    } else {
-        S.cateringCart.push({ cat, dish, pax: null, price: 0, customized: false });
-    }
-}
-
-// Reverts a dish that was customized away from the global pax back to
-// following it. Needs `dish` now that a category can hold several picks.
-function resetCateringPaxToDefault(cat, dish) {
-    const selected = S.cateringCart.find(i => i.cat === cat && i.dish === dish);
-    if (!selected) return;
-    setCateringSelection(cat, dish, null);
-    rebuildCateringUI();
-}
-
-// Drinks aren't priced per pax bracket — one price per package regardless
-// of headcount — so picking a drink finalizes it immediately instead of
-// going through the "choose your pax" step every other category needs.
-// pax:true (not a number) marks it complete for the truthy checks
-// elsewhere (cart count, hasCateringTag, etc.) without implying a bracket.
-function setCateringFlatSelection(cat, dish) {
-    S.cateringCart = S.cateringCart.filter(i => !(i.cat === cat && i.dish === dish));
-    if (dish) S.cateringCart.push({ cat, dish, pax: true, price: Number(PRICES[cat]?.[20]) || 0 });
+    if (dish) S.cateringCart.push({ cat, dish, pax: true, price: 0 });
 }
 
 // `dish` removes just that one pick; omitting it clears every dish under
 // `cat` (used by "Clear all" style flows elsewhere).
 function clearCateringSelection(cat, dish) {
     S.cateringCart = S.cateringCart.filter(i => !(i.cat === cat && (dish === undefined || i.dish === dish)));
-    if (dish !== undefined) delete S.cateringPaxCustomizeOpen[cat + '|' + dish];
 }
 
 async function clearAllCateringSelections() {
@@ -3930,50 +3873,20 @@ async function clearAllCateringSelections() {
 
     S.cateringCart = [];
     S.cateringActiveMain = null;
-    S.cateringPaxCustomizeOpen = {};
-    // Global pax (serving size) isn't a "dish", so it's left as-is — only
-    // the dish picks are cleared. Reopen whichever section is now first
-    // incomplete (Main Dish, unless pax itself was somehow never set).
+    // Reopen whichever section is now first incomplete (normally Main Dish).
     S.cateringOpenSection = getFirstIncompleteCateringSection()?.tag || null;
     buildCateringDishBuilder();
 }
 
-// Fires only when a pax count is chosen (the point at which a dish becomes
-// a *complete* pick) — mirrors the "build your bowl" pattern of Chipotle/
-// Cava/Sweetgreen-style ordering flows: finishing the section you're
-// currently working in collapses it into a compact confirmed summary and
-// auto-advances to the next thing still needed, instead of requiring an
-// explicit "Next" click. Only triggers when the section that was just
-// completed is the one currently open, so switching between protein tabs
-// inside an already-satisfied Main Dish section never yanks focus away.
-function handleCateringPaxSelected(cat, dish, pax) {
-    setCateringSelection(cat, dish, pax);
+// Finishing the section you're currently working in collapses it into a
+// compact confirmed summary and auto-advances to the next thing still needed,
+// instead of requiring an explicit "Next" click (the "build your bowl"
+// pattern). Only triggers when the section that was just completed is the one
+// currently open, so switching between protein tabs inside an
+// already-satisfied Main Dish section never yanks focus away.
+function handleCateringSelected(cat, dish) {
+    setCateringSelection(cat, dish);
     advanceCateringSectionIfDoneForTag(DISHES.find(g => g.cat === cat)?.tag);
-}
-
-// Same auto-advance behavior as handleCateringPaxSelected, for categories
-// (currently just Drinks) that skip the pax step entirely.
-function handleCateringFlatSelected(cat, dish) {
-    setCateringFlatSelection(cat, dish);
-    advanceCateringSectionIfDoneForTag(DISHES.find(g => g.cat === cat)?.tag);
-}
-
-// Sets the order-wide serving size and re-prices every dish that's still
-// following it (not individually customized), then advances out of the
-// Pax Count step the same way finishing any other section does.
-function handleGlobalPaxSelected(pax) {
-    updateGlobalCateringPax(pax);
-    advanceCateringSectionIfDoneForTag('pax');
-}
-
-function updateGlobalCateringPax(pax) {
-    S.cateringGlobalPax = pax;
-    S.cateringCart.forEach(item => {
-        if (item && !item.customized && typeof item.pax === 'number' && PRICES[item.cat] && PRICES[item.cat][pax]) {
-            item.pax = pax;
-            item.price = PRICES[item.cat][pax];
-        }
-    });
 }
 
 function advanceCateringSectionIfDoneForTag(tag) {
@@ -4006,12 +3919,11 @@ function renderCateringProgress() {
     // of where the break falls, so there's no wrap point to get wrong.
     sections.forEach((section, idx) => {
         const done = isCateringSectionValid(section);
-        const locked = section.tag !== 'pax' && !S.cateringGlobalPax;
 
         const item = document.createElement('div');
-        item.className = 'pt-item' + (done ? ' done' : ' pending') + (S.cateringOpenSection === section.tag ? ' active' : '') + (locked ? ' locked' : '');
+        item.className = 'pt-item' + (done ? ' done' : ' pending') + (S.cateringOpenSection === section.tag ? ' active' : '');
         item.innerHTML =
-            '<div class="pt-dot">' + (done ? '&#10003;' : (locked ? '<i class="ti ti-lock" aria-hidden="true"></i>' : idx + 1)) + '</div>' +
+            '<div class="pt-dot">' + (done ? '&#10003;' : idx + 1) + '</div>' +
             '<span>' + section.label + (section.optional ? ' <em style="font-weight:400;font-style:normal;opacity:0.6">(optional)</em>' : '') + '</span>';
         item.onclick = () => scrollToCateringSection(section.tag);
         tracker.appendChild(item);
@@ -4040,12 +3952,11 @@ function buildCateringDishBuilder() {
     }
     if (cartSection) cartSection.style.display = '';
 
-    // First-ever render with nothing picked at all (no cart, no pax yet):
-    // default to the first section open. Once anything is picked —
-    // including just the global pax — an explicit collapse (auto-advance
-    // or manual) is a deliberate state and is never overridden.
+    // First-ever render with nothing picked at all: default to the first
+    // section open. Once anything is picked, an explicit collapse
+    // (auto-advance or manual) is a deliberate state and is never overridden.
     const sections = getCateringSections();
-    if (S.cateringOpenSection === null && S.cateringCart.length === 0 && !S.cateringGlobalPax) {
+    if (S.cateringOpenSection === null && S.cateringCart.length === 0) {
         S.cateringOpenSection = sections[0]?.tag || null;
     }
 
@@ -4057,19 +3968,15 @@ function buildCateringDishBuilder() {
     if (hintEl) hintEl.textContent = 'Tap a section to choose its dish \u2014 it\u2019ll confirm and move you to what\u2019s next automatically.';
 
     sections.forEach((section) => {
-        const isPaxSection = section.tag === 'pax';
-        const groups = isPaxSection ? [] : DISHES.filter(g => g.tag === section.tag);
-        if (!isPaxSection && !groups.length) return;
+        const groups = DISHES.filter(g => g.tag === section.tag);
+        if (!groups.length) return;
 
-        // Every dish section stays locked until a global pax is chosen —
-        // that's the "pax before dishes" ordering the builder enforces.
-        const locked = !isPaxSection && !S.cateringGlobalPax;
         const valid  = isCateringSectionValid(section);
-        const isOpen = !locked && S.cateringOpenSection === section.tag;
-        const titleIcon = (!isPaxSection && groups.length === 1) ? groups[0].icon + ' ' : '';
+        const isOpen = S.cateringOpenSection === section.tag;
+        const titleIcon = groups.length === 1 ? groups[0].icon + ' ' : '';
 
         const sectionEl = document.createElement('div');
-        sectionEl.className = 'catering-accordion-item' + (isOpen ? ' open' : '') + (valid ? ' done' : '') + (locked ? ' locked' : '');
+        sectionEl.className = 'catering-accordion-item' + (isOpen ? ' open' : '') + (valid ? ' done' : '');
         sectionEl.id = 'catering-section-' + section.tag;
 
         const header = document.createElement('button');
@@ -4077,12 +3984,11 @@ function buildCateringDishBuilder() {
         header.className = 'catering-accordion-header';
         header.innerHTML =
             '<span class="accordion-status-dot' + (valid ? ' visible' : '') + '">' +
-                (valid ? '&#10003;' : (locked ? '<i class="ti ti-lock" aria-hidden="true"></i>' : '')) +
+                (valid ? '&#10003;' : '') +
             '</span>' +
             '<span class="catering-accordion-title">' + titleIcon + escHtml(section.label) + (section.optional ? ' <span class="cat-tag">(optional)</span>' : '') + '</span>' +
             '<i class="ti ti-chevron-down accordion-chevron" aria-hidden="true"></i>';
         header.onclick = () => {
-            if (locked) { openCateringSection('pax'); return; }
             S.cateringOpenSection = isOpen ? null : section.tag; buildCateringDishBuilder();
         };
         sectionEl.appendChild(header);
@@ -4093,9 +3999,7 @@ function buildCateringDishBuilder() {
             hint.textContent = section.hint;
             body.appendChild(hint);
 
-            if (isPaxSection) {
-                body.appendChild(buildGlobalPaxPicker());
-            } else if (groups.length > 1) {
+            if (groups.length > 1) {
                 // Main Dish: several protein categories share this one
                 // section. Rather than stacking every category's full dish
                 // grid at once (the original clutter), show a tab per
@@ -4128,7 +4032,7 @@ function buildCateringDishBuilder() {
 
             sectionEl.appendChild(body);
         } else if (valid) {
-            sectionEl.appendChild(isPaxSection ? buildGlobalPaxRecap() : buildCateringSectionRecap(groups));
+            sectionEl.appendChild(buildCateringSectionRecap(groups));
         }
 
         builder.appendChild(sectionEl);
@@ -4136,41 +4040,6 @@ function buildCateringDishBuilder() {
 
     renderCateringCart();
     renderCateringProgress();
-}
-
-// The Pax Count step's body: a single global 20/30/40/50 picker that sets
-// every dish's default tray size at once. Mirrors the per-dish pax-buttons
-// styling so it reads as the same kind of choice, just made once up front.
-function buildGlobalPaxPicker() {
-    const wrap = document.createElement('div');
-    const btns = document.createElement('div'); btns.className = 'pax-buttons';
-    [20, 30, 40, 50].forEach(n => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'pax-btn' + (S.cateringGlobalPax === n ? ' selected' : '');
-        btn.textContent = n + ' pax';
-        btn.onclick = () => handleGlobalPaxSelected(n);
-        btns.appendChild(btn);
-    });
-    wrap.appendChild(btns);
-
-    if (!S.cateringGlobalPax) {
-        const hint = document.createElement('p'); hint.className = 'pax-hint';
-        hint.textContent = 'This sets the default tray size for every dish \u2014 pick a different pax for any individual dish later if you need to.';
-        wrap.appendChild(hint);
-    }
-    return wrap;
-}
-
-// Compact recap for the collapsed, completed Pax Count step.
-function buildGlobalPaxRecap() {
-    const recap = document.createElement('div'); recap.className = 'catering-accordion-recap';
-    const row = document.createElement('div'); row.className = 'catering-recap-row';
-    row.innerHTML =
-        '<span class="catering-recap-dish">Serving size</span>' +
-        '<span class="catering-recap-meta">' + S.cateringGlobalPax + ' pax</span>';
-    recap.appendChild(row);
-    return recap;
 }
 
 // Compact "confirmed" recap shown for a collapsed, completed section — one
@@ -4184,8 +4053,7 @@ function buildCateringSectionRecap(groups) {
         selections.forEach(selected => {
             const row = document.createElement('div'); row.className = 'catering-recap-row';
             row.innerHTML =
-                '<span class="catering-recap-dish">' + group.icon + ' ' + escHtml(selected.dish) + '</span>' +
-                '<span class="catering-recap-meta">' + (selected.pax === true ? '' : selected.pax + ' pax &middot; ') + escHtml(fmtPeso(selected.price)) + '</span>';
+                '<span class="catering-recap-dish">' + group.icon + ' ' + escHtml(selected.dish) + '</span>';
             recap.appendChild(row);
         });
     });
@@ -4232,86 +4100,13 @@ function buildCateringCategoryBlock(group) {
             '<div class="dish-status remove">&#10005; Click to remove</div>';
         if (disableAdd) {
             dc.onclick = null;
-        } else if (group.tag === 'drinks') {
-            // No pax bracket for drinks — picking the card finalizes it
-            // immediately instead of opening the pax-wrapper below.
-            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat, item); else handleCateringFlatSelected(group.cat, item); rebuildCateringUI(); };
         } else {
-            dc.onclick = () => { if (isSelected) clearCateringSelection(group.cat, item); else setCateringSelection(group.cat, item, null); rebuildCateringUI(); };
+            // Picking a card finalizes it at once (no pax or price step).
+            dc.onclick = () => { if (isSelected) { clearCateringSelection(group.cat, item); rebuildCateringUI(); } else handleCateringSelected(group.cat, item); };
         }
         grid.appendChild(dc);
     });
     wrap.appendChild(grid);
-
-    // A picked dish is already complete the moment it's clicked — it
-    // inherits the global pax from the Pax Count step. "Customize pax"
-    // only needs to appear (per-dish, optional) for the customer to
-    // override that default; Drinks never gets it since drinks are always
-    // flat-priced regardless of headcount. One summary row (with its own
-    // optional pax picker) is rendered per selected dish, since each pick
-    // under this category can be customized independently.
-    if (selections.length && group.tag !== 'drinks') {
-        selections.forEach(selected => {
-            const dishKey = group.cat + '|' + selected.dish;
-            const isCustomizing = !!S.cateringPaxCustomizeOpen[dishKey];
-
-            const summary = document.createElement('div'); summary.className = 'pax-summary-row';
-            summary.innerHTML =
-                (selections.length > 1 ? '<span class="pax-summary-dish">' + escHtml(selected.dish) + '</span>' : '') +
-                '<span class="pax-summary-text">' + (selected.pax === true ? '' : selected.pax + ' pax per tray \u00b7 ') +
-                '<b>' + escHtml(fmtPeso(selected.price)) + '</b>' +
-                (selected.customized ? ' <span class="pax-custom-badge">Customized</span>' : '') + '</span>';
-
-            if (!isCustomizing) {
-                const actions = document.createElement('div'); actions.className = 'pax-summary-actions';
-                const custBtn = document.createElement('button');
-                custBtn.type = 'button'; custBtn.className = 'pax-link-btn';
-                custBtn.textContent = 'Customize pax';
-                custBtn.onclick = () => { S.cateringPaxCustomizeOpen[dishKey] = true; rebuildCateringUI(); };
-                actions.appendChild(custBtn);
-
-                if (selected.customized) {
-                    const resetBtn = document.createElement('button');
-                    resetBtn.type = 'button'; resetBtn.className = 'pax-link-btn';
-                    resetBtn.textContent = 'Reset to default';
-                    resetBtn.onclick = () => resetCateringPaxToDefault(group.cat, selected.dish);
-                    actions.appendChild(resetBtn);
-                }
-                summary.appendChild(actions);
-            }
-            wrap.appendChild(summary);
-
-            // The pax-per-tray picker only shows up while actively
-            // customizing this particular dish — not on every dish, all
-            // the time.
-            if (isCustomizing) {
-                const paxWrap = document.createElement('div'); paxWrap.className = 'pax-wrapper visible';
-                const paxTop  = document.createElement('div'); paxTop.className = 'pax-top';
-                paxTop.innerHTML = '<span class="pax-top-label">Pax per tray' + (selections.length > 1 ? ' \u2014 ' + escHtml(selected.dish) : '') + '</span>';
-                const cancelBtn = document.createElement('button');
-                cancelBtn.type = 'button'; cancelBtn.className = 'pax-link-btn';
-                cancelBtn.textContent = 'Cancel';
-                cancelBtn.onclick = () => { S.cateringPaxCustomizeOpen[dishKey] = false; rebuildCateringUI(); };
-                paxTop.appendChild(cancelBtn);
-                paxWrap.appendChild(paxTop);
-
-                const paxBtns = document.createElement('div'); paxBtns.className = 'pax-buttons';
-                [20, 30, 40, 50].forEach(n => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'pax-btn' + (selected.pax === n ? ' selected' : '');
-                    btn.textContent = n + ' pax';
-                    btn.onclick = () => {
-                        S.cateringPaxCustomizeOpen[dishKey] = false;
-                        handleCateringPaxSelected(group.cat, selected.dish, n);
-                    };
-                    paxBtns.appendChild(btn);
-                });
-                paxWrap.appendChild(paxBtns);
-                wrap.appendChild(paxWrap);
-            }
-        });
-    }
 
     return wrap;
 }
@@ -4350,8 +4145,8 @@ function renderCateringCart() {
                 '<div class="ci-indicator"></div>' +
                 '<div><div class="ci-cat">' + item.cat + '</div>' +
                 '<div class="ci-dish">' + item.dish + '</div>' +
-                (item.pax === true ? '' : '<div class="ci-pax">' + item.pax + ' pax</div>') + '</div>' +
-                '<div class="ci-right"><span class="ci-price">' + fmtPeso(item.price) + '</span>' +
+                '</div>' +
+                '<div class="ci-right">' +
                 '<button type="button" class="ci-remove-btn" data-cat="' + escHtml(item.cat) + '" data-dish="' + escHtml(item.dish) + '">Remove</button></div>';
             rows.appendChild(row);
         });
@@ -4375,7 +4170,6 @@ function renderCateringCart() {
                 const missing = getCateringSections()
                     .filter(section => !isCateringSectionValid(section))
                     .map(section => {
-                        if (section.tag === 'pax') return 'your pax count';
                         const min = getCateringSectionMin(section.tag);
                         if (min > 1) {
                             const remaining = min - getCateringSectionSelectedCount(section.tag);
@@ -4648,11 +4442,7 @@ function buildSummary() {
         S.cateringCart.filter(i => i && i.pax).forEach(i => {
             const billedSeparately = menuPriced || !MENU_INCLUDED_IN_PACKAGE_PRICE;
             if (billedSeparately) total += i.price;
-            // Flat-priced categories (Drinks) are stored with pax:true as a
-            // completion marker, not a headcount — label them with the
-            // chosen Pax Count instead, like every other dish.
-            const paxLabel = i.pax === true ? S.cateringGlobalPax : i.pax;
-            pkgRows += sr(paxLabel ? i.cat + ' (' + paxLabel + ' pax)' : i.cat, billedSeparately ? (i.dish + ' &mdash; ' + fmtPeso(i.price)) : (i.dish + ' &mdash; included'), 'users');
+            pkgRows += sr(i.cat, billedSeparately ? (i.dish + ' &mdash; ' + fmtPeso(i.price)) : (i.dish + ' &mdash; included'), 'users');
         });
         if (!menuPriced && S.locationType === 'onsite' && S.snackAddon) {
             total += S.snackAddon.price;
@@ -5234,8 +5024,6 @@ document.querySelectorAll('.location-card').forEach(c => {
             S.cateringCart    = [];
             S.cateringActiveMain = null;
             S.cateringOpenSection = null;
-            S.cateringGlobalPax = null;
-            S.cateringPaxCustomizeOpen = {};
             S.time            = '';
             syncSelectedDate('');
         }
@@ -5489,13 +5277,12 @@ async function submitDone() {
         // Persist the dish builder's picks so the customer's and admin's
         // reservation-details pages can show what was ordered. Only for a
         // catering-flagged package (same condition the summary uses to list
-        // the cart); pax:true is the flat-priced (Drinks) completion marker,
-        // so it is resolved to the chosen Pax Count like the summary does.
+        // the cart). No pax or price is stored: the pax count is part of the
+        // package itself.
         const menuSelections = isCateringPackage(getActivePackage())
             ? S.cateringCart.filter(i => i && i.pax).map(i => ({
                 category: i.cat,
-                dish: i.dish,
-                pax: i.pax === true ? (S.cateringGlobalPax || null) : i.pax
+                dish: i.dish
             }))
             : [];
 

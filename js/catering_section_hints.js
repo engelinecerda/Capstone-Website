@@ -12,7 +12,6 @@
 // rule. Any wording change here changes both places at once.
 
 export const CATERING_SECTION_META = {
-    pax:       { label: 'Pax Count', hint: () => 'Choose how many guests this catering order serves \u2014 this sets the default tray size for every dish. You can customize any individual dish\u2019s pax afterward.' },
     main:      { label: 'Main Dish', hint: (required, max) => `Choose ${max} dish${max === 1 ? '' : 'es'} below for your main course \u2014 mix and match dishes until you reach ${max}.` },
     vegetable: { label: 'Vegetable', hint: (required) => required ? 'Choose 1 vegetable dish for your event.' : 'Optional add-on \u2014 include a vegetable dish, or skip it.' },
     pasta:     { label: 'Pasta',     hint: (required) => required ? 'Choose 1 pasta dish for your event.' : 'Optional add-on \u2014 include a pasta dish, or skip it.' },

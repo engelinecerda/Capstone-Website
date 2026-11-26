@@ -155,6 +155,10 @@ A customer can tick "Review anonymously" when submitting a review, and can flip 
 
 Schema changes go in `supabase/migrations/` as dated SQL files. They are applied manually in the Supabase SQL Editor (not via CLI) since the project targets the hosted Supabase instance directly.
 
+## Catering menu: dishes only, no pax or per-dish price
+
+A catering package (`package.uses_catering_menu`) already has its pax count and price built in (e.g. "Buffet Service (50) pax"), so the reservation form's dish builder (`js/reservations.js`) only asks which dishes to include: there is no Pax Count step, no per-dish "Customize pax", and no dish prices. A pick is complete when clicked (`setCateringSelection` stores `{cat, dish, pax: true, price: 0}`; `pax: true` is only the "complete" marker the section checks look for). `isMenuPricedPackage()` always returns false, so the booking total is always the package price. `reservations.menu_selections` stores `{category, dish}` (older rows may still carry a `pax`, which the details pages still display when present). In Inventory > Catering Menu the category editor and table no longer show the 20/30/40/50 prices; the `catering_dish_category.price_20..price_50` columns are left in the database but unused (default 0).
+
 ## Admin reservations "Upcoming" chip
 
 "Upcoming" lists only `approved` and `rescheduled` reservations whose event date has not passed (pending ones await a manager decision and live under the Pending chip / All). The rule is in two places that must match: `get_admin_reservations_page()` and `get_admin_reservation_counts()` (`20261207_upcoming_excludes_pending.sql`).
