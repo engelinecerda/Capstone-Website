@@ -3401,6 +3401,8 @@ function scrollToInclusionBlock() {
 const INCLUDED_CARD_COLLAPSED_COUNT = 5;   // shown before "Show all" ...
 const INCLUDED_CARD_COLLAPSE_ABOVE  = 6;   // ... when the list is longer than this
 let includedCardExpandedFor = null;        // package id whose full list is open
+const CUSTOMIZE_COLLAPSE_ABOVE = 6;        // customize list: show this many, rest behind "Show more"
+let customizeExpandedFor = null;           // package id whose full customize list is open
 
 function getPackageInclusionNames(pkg) {
     const options = getInclusionOptions(pkg);
@@ -3472,7 +3474,16 @@ function buildInclusionBlock() {
 
     const removed = new Set(getRemovedInclusionIds(pkg));
     const credit = getInclusionCredit(pkg);
-    const rows = options.map(o => {
+    // Long lists collapse to the first few rows. Anything the customer already
+    // removed stays visible so a change is never hidden behind the button.
+    const pkgKey = pkg.id ?? pkg.label;
+    const collapsible = options.length > CUSTOMIZE_COLLAPSE_ABOVE;
+    const expanded = !collapsible || customizeExpandedFor === pkgKey;
+    const visibleOptions = expanded
+        ? options
+        : options.filter((o, i) => i < CUSTOMIZE_COLLAPSE_ABOVE || (!o.required && removed.has(o.id)));
+    const hiddenCount = options.length - visibleOptions.length;
+    const rows = visibleOptions.map(o => {
         const isRemoved = !o.required && removed.has(o.id);
         let chip;
         if (o.required) chip = '<span class="inclusion-chip inclusion-chip--required"><i class="ti ti-lock" aria-hidden="true"></i> Required</span>';
@@ -3499,12 +3510,24 @@ function buildInclusionBlock() {
     block.innerHTML =
         '<h3 class="inclusion-title">Customize your <em>inclusions</em></h3>' +
         '<div class="inclusion-list">' + rows + '</div>' +
+        (collapsible
+            ? '<button type="button" class="included-toggle" data-customize-toggle aria-expanded="' + expanded + '">' +
+                  (expanded ? 'Show less' : 'Show ' + hiddenCount + ' more') + '</button>'
+            : '') +
         savings +
         '<p class="inclusion-summary">' + summary + '</p>';
     block.classList.remove('hidden');
 }
 
 document.getElementById('inclusion-customize-block')?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-customize-toggle]')) {
+        const pkg = getCustomizablePackage();
+        if (!pkg) return;
+        const key = pkg.id ?? pkg.label;
+        customizeExpandedFor = customizeExpandedFor === key ? null : key;
+        buildInclusionBlock();
+        return;
+    }
     if (!e.target.closest('[data-inclusion-reset]')) return;
     S.removedInclusions = [];
     buildInclusionBlock();
