@@ -1789,12 +1789,25 @@ async function respondToCustomRequest(button, action) {
     const requestId = button.dataset.requestId;
     if (!requestId || button.disabled) return;
     const request = (pageData?.customRequests || []).find(r => r.request_id === requestId);
-    const question = action === 'accept'
-        ? `Accept “${request?.title || 'this request'}” for ${formatCurrency(request?.quoted_price)}? It will be added to your balance.`
-        : (request?.status === 'quoted'
-            ? 'Decline this quote? You can send a new request any time.'
-            : 'Withdraw this request?');
-    if (!window.confirm(question)) return;
+    const title = request?.title || 'this request';
+    const confirmed = action === 'accept'
+        ? await showConfirmModal({
+            type: 'info',
+            title: 'Accept this quote?',
+            message: `“${title}” will be added to your reservation balance for ${formatCurrency(request?.quoted_price)}. You can pay it together with the rest of your reservation.`,
+            confirmText: `Accept ${formatCurrency(request?.quoted_price)}`,
+            cancelText: 'Not yet'
+        })
+        : await showConfirmModal({
+            title: request?.status === 'quoted' ? 'Decline this quote?' : 'Withdraw this request?',
+            message: request?.status === 'quoted'
+                ? 'You can send a new request any time.'
+                : 'This request will be closed. You can send a new one any time.',
+            confirmText: request?.status === 'quoted' ? 'Decline quote' : 'Withdraw request',
+            cancelText: 'Keep it',
+            destructive: true
+        });
+    if (!confirmed) return;
 
     button.disabled = true;
     try {
@@ -1813,7 +1826,11 @@ async function respondToCustomRequest(button, action) {
         }
     } catch (error) {
         button.disabled = false;
-        window.alert(error.message || 'Something went wrong. Please try again.');
+        showFeedbackModal({
+            type: 'error',
+            title: 'Something went wrong',
+            message: error.message || 'Please try again.'
+        });
     }
 }
 

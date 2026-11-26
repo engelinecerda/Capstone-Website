@@ -12,6 +12,7 @@ import {
 import { getPaymentStatusPillMeta, fetchUnseenReservationChanges, markReservationChangesSeen } from './reservation_shared.js';
 import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
+import { hasUnseenPending } from './pending_seen.js';
 import { mountRefreshStatus } from './refresh_status.js';
 import { initTableSort, rpcWithSort } from './table_sort.js';
 
@@ -858,6 +859,31 @@ validateAdminSession({
       }
     }
 
+    // Opens on "Upcoming", except when a new reservation is waiting for a
+    // decision (pending and not yet opened by this manager): then it opens on
+    // "Pending". Only the first load of a visit decides this; the 2-minute
+    // refresh never switches chips under the manager's hands.
+    await openOnPendingWhenNew();
+
     await loadData();
   }
 });
+
+async function openOnPendingWhenNew() {
+  const params = new URLSearchParams(window.location.search);
+  // An explicit ?status= or the "recently changed" review already chose a chip.
+  if (params.get('status') || reviewFilterIds.size) return;
+  try {
+    const { data, error } = await supabase
+      .from('reservations')
+      .select('reservation_id, created_at')
+      .eq('status', 'pending')
+      .limit(500);
+    if (error) throw error;
+    if (!hasUnseenPending(adminSession?.user?.id, data || [])) return;
+    chipsRow?.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+    chipsRow?.querySelector('[data-status="pending"]')?.classList.add('active');
+  } catch (error) {
+    // Non-fatal: stay on the default "Upcoming" chip.
+  }
+}

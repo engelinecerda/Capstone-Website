@@ -1,6 +1,7 @@
 import './money_inputs.js';
 import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
+import { markPendingSeen } from './pending_seen.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
@@ -2543,6 +2544,9 @@ async function init() {
   try {
     currentPaymentRules = await loadPaymentRules(supabase).catch(() => null);
     const reservation = await fetchReservationDetail(idParam);
+    // Opening a reservation counts as viewing it: the Reservations page stops
+    // opening on "Pending" because of it (see pending_seen.js).
+    markPendingSeen(adminSession?.user?.id, reservation?.reservation_id);
     if (!reservation) {
       showError('This reservation could not be found.');
       return;

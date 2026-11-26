@@ -155,6 +155,12 @@ A customer can tick "Review anonymously" when submitting a review, and can flip 
 
 Schema changes go in `supabase/migrations/` as dated SQL files. They are applied manually in the Supabase SQL Editor (not via CLI) since the project targets the hosted Supabase instance directly.
 
+## Admin reservations "Upcoming" chip
+
+"Upcoming" lists only `approved` and `rescheduled` reservations whose event date has not passed (pending ones await a manager decision and live under the Pending chip / All). The rule is in two places that must match: `get_admin_reservations_page()` and `get_admin_reservation_counts()` (`20261207_upcoming_excludes_pending.sql`).
+
+The page opens on "Upcoming" unless a pending reservation submitted since this browser first ran the check (the old backlog never counts) has not been opened yet by this manager, in which case it opens on "Pending" (first load of a visit only; auto-refresh never switches chips; an explicit `?status=` or the Review filter wins). "Opened" is remembered per user in localStorage by `js/pending_seen.js` and set when the reservation details page loads, so it is per browser, not per account.
+
 ## Notice-based cancellation and reschedule fees (contract section 6)
 
 All payments are non-refundable. **Cancelling** a reservation less than `cancellation_fee_notice_days` (default 2) before the event costs `cancellation_fee_percent` (default 30) % of `reservations.total_price` — the full amount on top of what was already paid, nothing is refunded. Earlier cancellations, and cancellations where nothing has been paid, cost nothing. **Rescheduling** less than `reschedule_fee_notice_days` (default 30) before the ORIGINAL event date costs `reschedule_fee_percent` (default 10) %; with more notice it is free. Exactly 2 / exactly 30 days is free. Days are whole calendar days in Asia/Manila. The four keys live in `system_settings.payment_rules` (Payment Settings → Cancellation / Reschedule fee rows). The old flat `cancellation_fee_onsite/offsite` now apply only to the overdue auto-cancel; the flat `reschedule_fee` is only a fallback for requests created before the migration.
