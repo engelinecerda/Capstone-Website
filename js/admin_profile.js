@@ -11,6 +11,7 @@ import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { initAdminNav } from './admin_nav.js';
 import { attachPhoneMask } from './phone_format.js';
+import { bindSaving } from './button_saving.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -293,8 +294,8 @@ async function handlePasswordSubmit(event) {
 }
 
 function bindEvents() {
-  profileForm?.addEventListener('submit', handleProfileSubmit);
-  passwordForm?.addEventListener('submit', handlePasswordSubmit);
+  bindSaving(profileForm, handleProfileSubmit, { submit: true });
+  bindSaving(passwordForm, handlePasswordSubmit, { submit: true });
 }
 
 // ── MFA ──────────────────────────────────────────────────────────
@@ -524,7 +525,7 @@ function cancelDisable() {
   if (mfaStatusRow) mfaStatusRow.style.display = '';
 }
 
-mfaConfirmDisableBtn?.addEventListener('click', handleConfirmDisable);
+bindSaving(mfaConfirmDisableBtn, handleConfirmDisable, { label: 'Working…' });
 mfaCancelDisableBtn?.addEventListener('click', cancelDisable);
 
 async function cancelEnroll() {
@@ -537,7 +538,7 @@ async function cancelEnroll() {
   await loadMfaStatus();
 }
 
-mfaVerifyBtn?.addEventListener('click', handleVerifyEnroll);
+bindSaving(mfaVerifyBtn, handleVerifyEnroll, { label: 'Verifying…' });
 mfaCancelEnrollBtn?.addEventListener('click', cancelEnroll);
 
 // ── BOOT ─────────────────────────────────────────────────────────

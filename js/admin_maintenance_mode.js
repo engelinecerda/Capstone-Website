@@ -9,6 +9,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { buildMaintenancePageHtml } from './maintenance_template.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { bindSaving } from './button_saving.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let mode = null;
@@ -139,7 +140,7 @@ titleInput.addEventListener('input', updatePreview);
 messageInput.addEventListener('input', updatePreview);
 
 // ── SAVE MESSAGE ─────────────────────────────────────────────────
-saveContentBtn.addEventListener('click', async () => {
+bindSaving(saveContentBtn, async () => {
   setFormMsg('');
   const title = titleInput.value.trim();
   const message = messageInput.value.trim();
@@ -185,7 +186,7 @@ confirmCancel.addEventListener('click', () => closeModal(confirmModal));
 confirmClose.addEventListener('click', () => closeModal(confirmModal));
 confirmModal.addEventListener('click', e => { if (e.target === confirmModal) closeModal(confirmModal); });
 
-confirmOk.addEventListener('click', async () => {
+bindSaving(confirmOk, async () => {
   confirmOk.disabled = true;
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -212,7 +213,7 @@ confirmOk.addEventListener('click', async () => {
 // passes scheduled_start/scheduled_end, then clears whichever field it
 // acted on so it's a one-shot schedule, not a recurring one, and can't
 // fight a later manual toggle.
-saveScheduleBtn.addEventListener('click', async () => {
+bindSaving(saveScheduleBtn, async () => {
   setScheduleMsg('');
   const scheduledStart = fromDatetimeLocalValue(scheduledStartInput.value);
   const scheduledEnd = fromDatetimeLocalValue(scheduledEndInput.value);
@@ -241,7 +242,7 @@ saveScheduleBtn.addEventListener('click', async () => {
   }
 });
 
-clearScheduleBtn.addEventListener('click', async () => {
+bindSaving(clearScheduleBtn, async () => {
   setScheduleMsg('');
   clearScheduleBtn.disabled = true;
   try {

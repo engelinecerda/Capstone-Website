@@ -14,6 +14,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { bindSaving } from './button_saving.js';
 
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarRoleBottom = document.getElementById('sidebarRoleBottom');
@@ -395,7 +396,7 @@ function wireRosterTable() {
 function wireRosterModal() {
   rosterAddBtn?.addEventListener('click', openAddEmployeeModal);
   rosterModalCancel?.addEventListener('click', closeRosterModal);
-  rosterModalSave?.addEventListener('click', saveRosterEmployee);
+  bindSaving(rosterModalSave, saveRosterEmployee);
   rosterModal?.addEventListener('click', (event) => {
     if (event.target === rosterModal) closeRosterModal();
   });
@@ -403,7 +404,7 @@ function wireRosterModal() {
 
 function wireRosterConfirmModal() {
   rosterConfirmCancel?.addEventListener('click', closeRosterConfirmModal);
-  rosterConfirmOk?.addEventListener('click', confirmRosterAction);
+  bindSaving(rosterConfirmOk, confirmRosterAction, { label: 'Working…' });
   rosterConfirmModal?.addEventListener('click', (event) => {
     if (event.target === rosterConfirmModal) closeRosterConfirmModal();
   });

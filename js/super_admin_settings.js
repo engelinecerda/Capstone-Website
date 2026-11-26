@@ -20,6 +20,7 @@ import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { withSaving, triggerButton, bindSaving } from './button_saving.js';
 import { clampNumberInput, clampNumberValue } from './numeric_input.js';
 
 // Native min/max/step never stop someone from typing/pasting an out-of-
@@ -44,9 +45,12 @@ function wireNumericInputClamps() {
 }
 
 // ── Confirm modal (Operating Hours) ───────────────────────────────────────
-function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
+// The Save button that opened the dialog shows the saving state while the
+// confirmed change is written (see button_saving.js).
+function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm, button = null) {
   const modal = document.getElementById('settingsConfirmModal');
   if (!modal) { onConfirm(); return; }
+  const trigger = button || triggerButton();
 
   document.getElementById('settingsConfirmTitle').textContent = title;
   document.getElementById('settingsConfirmCopy').textContent = `${oldValueLabel} → ${newValueLabel}`;
@@ -54,7 +58,7 @@ function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
   document.getElementById('settingsConfirmOk').onclick = () => {
     modal.classList.add('hidden');
     unlockBodyScroll();
-    onConfirm();
+    if (trigger) withSaving(trigger, onConfirm); else onConfirm();
   };
   document.getElementById('settingsConfirmCancel').onclick = () => {
     modal.classList.add('hidden');
@@ -870,8 +874,8 @@ async function init() {
 
   document.getElementById('saveHoursBtn')?.addEventListener('click', saveOperatingHours);
   document.getElementById('applyDefaultHoursBtn')?.addEventListener('click', applyDefaultHours);
-  document.getElementById('saveMinAdvanceBtn')?.addEventListener('click', saveMinAdvanceDays);
-  document.getElementById('saveEventTypeAdvanceBtn')?.addEventListener('click', saveEventTypeAdvanceOverrides);
+  bindSaving(document.getElementById('saveMinAdvanceBtn'), saveMinAdvanceDays);
+  bindSaving(document.getElementById('saveEventTypeAdvanceBtn'), saveEventTypeAdvanceOverrides);
   document.getElementById('saveCancellationNoticeBtn')?.addEventListener('click', saveCancellationNoticeRules);
   document.getElementById('pr-cancellation-min-notice-enabled')?.addEventListener('change', (e) => {
     const input = document.getElementById('pr-cancellation-min-notice-days');
@@ -887,9 +891,9 @@ async function init() {
     const input = document.getElementById('pr-reschedule-min-notice-days');
     if (input) input.disabled = !e.target.checked;
   });
-  document.getElementById('saveCapacityBtn')?.addEventListener('click', saveSchedulingSettings);
-  document.getElementById('saveScopeCapacityBtn')?.addEventListener('click', saveScopeCapacity);
-  document.getElementById('saveVenueCapacityBtn')?.addEventListener('click', saveVenueCapacity);
+  bindSaving(document.getElementById('saveCapacityBtn'), saveSchedulingSettings);
+  bindSaving(document.getElementById('saveScopeCapacityBtn'), saveScopeCapacity);
+  bindSaving(document.getElementById('saveVenueCapacityBtn'), saveVenueCapacity);
 }
 
 init();

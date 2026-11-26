@@ -9,6 +9,7 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { logAudit } from './audit_logger.js';
 import { computeAnnouncementStatus, renderAnnouncementBannerHtml, KIND_LABELS } from './announcement_helpers.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { bindSaving } from './button_saving.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let announcements = [];
@@ -237,7 +238,7 @@ document.getElementById('announcementModalCancel').addEventListener('click', clo
 modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(); });
 
-saveBtn.addEventListener('click', async () => {
+bindSaving(saveBtn, async () => {
   linkError.textContent = '';
   setModalMsg('');
 

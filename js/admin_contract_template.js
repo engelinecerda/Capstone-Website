@@ -29,6 +29,7 @@ import { buildBreakdownRows, buildRequestRows } from './contract_breakdown.js';
 import { fetchContractTemplateData } from './contract_render.js';
 import { getFeeTokenValues } from './reservation_shared.js';
 import { lockBodyScroll } from './modal_scroll_lock.js';
+import { bindSaving, withSaving } from './button_saving.js';
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -403,7 +404,7 @@ document.addEventListener('click', async (e) => {
 
   const saveLockedBtn = e.target.closest('[data-save-locked]');
   if (saveLockedBtn) {
-    await saveLockedClause(saveLockedBtn.dataset.saveLocked);
+    await withSaving(saveLockedBtn, () => saveLockedClause(saveLockedBtn.dataset.saveLocked));
     return;
   }
 });
@@ -605,8 +606,8 @@ export async function initContractTemplateTab() {
     await refreshForSelectedPackage();
   });
 
-  document.getElementById('ct-intro-save')?.addEventListener('click', saveTitleIntro);
-  document.getElementById('ct-fields-save')?.addEventListener('click', saveFields);
-  document.getElementById('ct-clauses-save')?.addEventListener('click', saveClauses);
+  bindSaving(document.getElementById('ct-intro-save'), saveTitleIntro);
+  bindSaving(document.getElementById('ct-fields-save'), saveFields);
+  bindSaving(document.getElementById('ct-clauses-save'), saveClauses);
   document.getElementById('ct-preview-btn')?.addEventListener('click', openContractPreview);
 }

@@ -16,6 +16,7 @@ import { logAudit } from './audit_logger.js';
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 import { showToast } from './admin_toast.js';
+import { bindSaving, setButtonSaving } from './button_saving.js';
 
 const PAGE_LABELS = { home: 'Home', packages: 'Packages', about: 'About', faqs: 'FAQs', menu: 'Menu', reviews: 'Reviews' };
 
@@ -317,7 +318,7 @@ async function handleHeaderFile(file) {
 
 [headerHeadingInput, headerSubInput].forEach(el => el.addEventListener('input', updateHeroPreview));
 
-headerModalSave.addEventListener('click', async () => {
+bindSaving(headerModalSave, async () => {
   const altText = headerAltInput.value.trim();
   if ((headerPendingFile || pageHeaders.find(h => h.page_key === editingHeaderKey)?.image_url) && !altText) {
     setModalMsg(headerModalMessage, 'Alt text is required for the hero image.');
@@ -455,7 +456,7 @@ function openGalleryEditModal(id) {
   openModal(galleryEditModal);
 }
 
-document.getElementById('galleryEditSave').addEventListener('click', async () => {
+bindSaving(document.getElementById('galleryEditSave'), async () => {
   const altText = galleryAltInput.value.trim();
   if (!altText) { setModalMsg(galleryEditMessage, 'Alt text is required.'); return; }
 
@@ -592,6 +593,7 @@ aboutSectionsEl.addEventListener('click', async e => {
     }
 
     saveBtn.disabled = true;
+    setButtonSaving(saveBtn, true);
     setMsg(aboutMsg, 'Saving…');
     try {
       const payload = {
@@ -630,6 +632,7 @@ aboutSectionsEl.addEventListener('click', async e => {
     } catch (err) {
       setMsg(aboutMsg, `Failed to save: ${err.message}`, 'error');
     } finally {
+      setButtonSaving(saveBtn, false);
       saveBtn.disabled = false;
     }
     return;
@@ -750,7 +753,7 @@ function openFaqModal(id) {
   openModal(faqModal);
 }
 
-faqModalSave.addEventListener('click', async () => {
+bindSaving(faqModalSave, async () => {
   const question = faqQuestionInput.value.trim();
   const answer = faqAnswerInput.value.trim();
   if (!question || !answer) { setModalMsg(faqModalMessage, 'Question and answer are both required.'); return; }
@@ -927,7 +930,7 @@ async function handleServiceFile(file) {
   reader.readAsDataURL(resized);
 }
 
-serviceModalSave.addEventListener('click', async () => {
+bindSaving(serviceModalSave, async () => {
   const title = serviceTitleInput.value.trim();
   if (!title) { setModalMsg(serviceModalMessage, 'Title is required.'); return; }
 
@@ -1112,7 +1115,7 @@ async function handleMenuSectionFile(file) {
   reader.readAsDataURL(resized);
 }
 
-menuSectionModalSave.addEventListener('click', async () => {
+bindSaving(menuSectionModalSave, async () => {
   const heading = menuSectionHeadingInput.value.trim();
   const altText = menuSectionAltInput.value.trim();
   const section = editingMenuSectionId ? menuSections.find(m => m.id === editingMenuSectionId) : null;
@@ -1254,7 +1257,7 @@ async function handleMenuBannerFile(file) {
   reader.readAsDataURL(resized);
 }
 
-saveMenuBannerBtn.addEventListener('click', async () => {
+bindSaving(saveMenuBannerBtn, async () => {
   const label = menuBannerLabelInput.value.trim();
   const heading = menuBannerHeadingInput.value.trim();
   const description = menuBannerDescInput.value.trim();
@@ -1378,7 +1381,7 @@ function openValueModal(id) {
   openModal(valueModal);
 }
 
-valueModalSave.addEventListener('click', async () => {
+bindSaving(valueModalSave, async () => {
   const label = valueLabelInput.value.trim();
   const description = valueDescInput.value.trim();
   if (!label) { setModalMsg(valueModalMessage, 'Label is required.'); return; }

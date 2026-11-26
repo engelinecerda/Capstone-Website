@@ -26,6 +26,7 @@ import { cateringSectionHint } from './catering_section_hints.js';
 import { clampNumberInput } from './numeric_input.js';
 import { enableDragReorder } from './drag_reorder.js';
 import { renderPagination, getTotalPages } from './pagination.js';
+import { bindSaving } from './button_saving.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -1284,7 +1285,7 @@ function attemptCloseCategoryModal() {
 }
 
 // Category save
-catModalSave.addEventListener('click', async () => {
+bindSaving(catModalSave, async () => {
   const name = catNameInput.value.trim();
   const description = catDescriptionInput.value.trim();
   const inclusions  = catInclusionsInput.value.trim();
@@ -2277,7 +2278,7 @@ function validatePackageForm() {
 }
 
 // Package save
-pkgModalSave.addEventListener('click', async () => {
+bindSaving(pkgModalSave, async () => {
   const err = validatePackageForm();
   if (err) { setModalMsg(pkgModalMessage, err); return; }
 
@@ -2483,7 +2484,7 @@ async function openConfirmDeletePackage(packageId) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHARED DELETE MODAL HANDLER (category / package / venue)
 // ═══════════════════════════════════════════════════════════════════════════════
-deleteModalOk.addEventListener('click', async () => {
+bindSaving(deleteModalOk, async () => {
   if (!pendingDeleteAction) return;
   const { scope, id, mode } = pendingDeleteAction;
 
@@ -2619,7 +2620,7 @@ deleteModal.addEventListener('click', e => { if (e.target === deleteModal) close
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIRM MODAL: Shared handler (archive/restore for category, package, venue)
 // ═══════════════════════════════════════════════════════════════════════════════
-confirmOk.addEventListener('click', async () => {
+bindSaving(confirmOk, async () => {
   if (!pendingAction) return;
   const { scope, type, id, payload } = pendingAction;
   confirmOk.disabled = true;
@@ -3271,8 +3272,8 @@ async function endDiscount() {
 
 discountModalClose.addEventListener('click', () => closeModal(discountModal));
 discountModal.addEventListener('click', e => { if (e.target === discountModal) closeModal(discountModal); });
-discountSaveBtn.addEventListener('click', saveDiscount);
-discountEndBtn.addEventListener('click', endDiscount);
+bindSaving(discountSaveBtn, saveDiscount);
+bindSaving(discountEndBtn, endDiscount);
 discountNewBtn.addEventListener('click', () => {
   setModalMsg(discountModalMessage, 'End the current discount before starting a new one.');
 });
@@ -3568,7 +3569,7 @@ async function openEditVenueModal(venueId) {
   }
 }
 
-venueModalSave.addEventListener('click', async () => {
+bindSaving(venueModalSave, async () => {
   const name = venueName.value.trim();
   const capacity = parseInt(venueCapacity.value, 10);
   if (!name) { setModalMsg(venueModalMessage, 'Venue name is required.'); return; }
@@ -3836,7 +3837,7 @@ function openEditBadgeTypeModal(badgeId) {
   openModal(badgeTypeModal);
 }
 
-badgeTypeModalSave.addEventListener('click', async () => {
+bindSaving(badgeTypeModalSave, async () => {
   const label = badgeTypeLabelInput.value.trim();
   if (!label) { setModalMsg(badgeTypeModalMessage, 'A label is required.'); return; }
 
@@ -4129,7 +4130,7 @@ function openEditInclusionModal(inclusionId) {
   openModal(inclusionModal);
 }
 
-inclusionModalSave.addEventListener('click', async () => {
+bindSaving(inclusionModalSave, async () => {
   const name = inclusionNameInput.value.trim();
   const price = Number(inclusionPriceInput.value);
   if (!name) { setModalMsg(inclusionModalMessage, 'A name is required.'); return; }
@@ -4629,7 +4630,7 @@ function updateCopyRestrictionsBtnState() {
 
 copyRestrictionsSelect?.addEventListener('change', updateCopyRestrictionsBtnState);
 
-copyRestrictionsBtn?.addEventListener('click', async () => {
+bindSaving(copyRestrictionsBtn, async () => {
   const sourceId = copyRestrictionsSelect?.value;
   const source = cateringMenuPackages.find(p => p.package_id === sourceId);
   if (!source || !cateringMenuActivePackageId) return;
@@ -4676,7 +4677,7 @@ function updateCopyCategoriesBtnState() {
 
 copyCategoriesSelect?.addEventListener('change', updateCopyCategoriesBtnState);
 
-copyCategoriesBtn?.addEventListener('click', async () => {
+bindSaving(copyCategoriesBtn, async () => {
   const sourceId = copyCategoriesSelect?.value;
   const source = cateringMenuPackages.find(p => p.package_id === sourceId);
   if (!source || !cateringMenuActivePackageId) return;
@@ -4753,7 +4754,7 @@ function openEditCateringCategoryModal(categoryId) {
   openModal(cateringCategoryModal);
 }
 
-cateringCategoryModalSave.addEventListener('click', async () => {
+bindSaving(cateringCategoryModalSave, async () => {
   const name = cateringCatName.value.trim();
   if (!name) { setModalMsg(cateringCategoryModalMessage, 'Category name is required.'); return; }
 
@@ -4995,7 +4996,7 @@ async function addCateringDish() {
   }
 }
 
-cateringAddDishBtn.addEventListener('click', addCateringDish);
+bindSaving(cateringAddDishBtn, addCateringDish);
 cateringNewDishInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCateringDish(); } });
 
 // ═══════════════════════════════════════════════════════════════════════════════

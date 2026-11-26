@@ -14,6 +14,7 @@ clearFooterCacheWhenLeaving(); // the public footer is cached for 5 min; refresh
 import { uploadToCloudinary, destroyCloudinaryImage, validateImageFile, resizeImageFile } from './image_upload.js';
 import { showToast } from './admin_toast.js';
 import { attachPhoneMask } from './phone_format.js';
+import { bindSaving } from './button_saving.js';
 
 // ── STATE ────────────────────────────────────────────────────────
 let locations = [];
@@ -358,7 +359,7 @@ locationFindOnMapBtn.addEventListener('click', async () => {
   }
 });
 
-locationModalSave.addEventListener('click', async () => {
+bindSaving(locationModalSave, async () => {
   const name = locationNameInput.value.trim();
   const address = locationAddressInput.value.trim();
   if (!name || !address) { setModalMsg(locationModalMessage, 'Name and address are both required.'); return; }
@@ -587,7 +588,7 @@ function openSocialLinkModal(id) {
   openModal(socialLinkModal);
 }
 
-socialLinkModalSave.addEventListener('click', async () => {
+bindSaving(socialLinkModalSave, async () => {
   const label = socialLinkLabelInput.value.trim();
   const url = socialLinkUrlInput.value.trim();
   if (!label || !url) { setModalMsg(socialLinkModalMessage, 'Label and URL are both required.'); return; }
@@ -750,7 +751,7 @@ resetMapScopeBtn.addEventListener('click', () => {
   setMsg(mapScopeMsg, 'Reset to Rizal province defaults — click Save Map Scope to apply.');
 });
 
-saveMapScopeBtn.addEventListener('click', async () => {
+bindSaving(saveMapScopeBtn, async () => {
   const b = boundsFromCorners();
   if ((b.ne_lat - b.sw_lat) < MIN_MAP_SPAN_DEG || (b.ne_lng - b.sw_lng) < MIN_MAP_SPAN_DEG) {
     setMsg(mapScopeMsg, 'That area is too small — drag the pins further apart (at least ~2km across).', 'error');
@@ -809,7 +810,7 @@ async function handleLogoFile(file) {
   reader.readAsDataURL(resized);
 }
 
-saveBrandBtn.addEventListener('click', async () => {
+bindSaving(saveBrandBtn, async () => {
   const brandName = fieldBrandName.value.trim();
   if (!brandName) { setMsg(brandMsg, 'Brand Name is required.', 'error'); return; }
 
@@ -853,7 +854,7 @@ saveBrandBtn.addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // CONTACT & SOCIAL
 // ═══════════════════════════════════════════════════════════════════════════
-document.getElementById('saveContactBtn').addEventListener('click', async () => {
+bindSaving(document.getElementById('saveContactBtn'), async () => {
   setMsg(contactMsg, 'Saving…');
   try {
     const { data: { user } } = await supabase.auth.getUser();

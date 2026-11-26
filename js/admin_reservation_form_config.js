@@ -9,6 +9,7 @@ import { portalSupabase as supabase } from './supabase.js';
 import { logAudit } from './audit_logger.js';
 import { parsePolicyBody, renderPolicyBlocks } from './policy_text.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { bindSaving } from './button_saving.js';
 
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -289,11 +290,11 @@ export function initReservationFormConfig() {
   Object.values(LEGAL_TAB_CONFIG).forEach(({ settingKey, textareaId }) => loadLegalBody(settingKey, textareaId));
   loadEventTypes();
 
-  document.getElementById('rf-fields-save')?.addEventListener('click', saveRequiredFields);
+  bindSaving(document.getElementById('rf-fields-save'), saveRequiredFields);
 
-  document.getElementById('rf-legal-save')?.addEventListener('click', () => {
+  bindSaving(document.getElementById('rf-legal-save'), () => {
     const { settingKey, textareaId } = LEGAL_TAB_CONFIG[activeLegalTabKey()];
-    saveLegalBody(settingKey, textareaId);
+    return saveLegalBody(settingKey, textareaId);
   });
   document.getElementById('rf-legal-preview')?.addEventListener('click', openPreview);
   document.getElementById('rf-preview-close')?.addEventListener('click', () => {
@@ -309,7 +310,7 @@ export function initReservationFormConfig() {
 
   document.getElementById('et-add-btn')?.addEventListener('click', () => openEventTypeModal(null));
   document.getElementById('et-modal-cancel')?.addEventListener('click', closeEventTypeModal);
-  document.getElementById('et-modal-save')?.addEventListener('click', saveEventType);
+  bindSaving(document.getElementById('et-modal-save'), saveEventType);
   document.getElementById('et-modal-backdrop')?.addEventListener('click', (e) => {
     if (e.target.id === 'et-modal-backdrop') closeEventTypeModal();
   });

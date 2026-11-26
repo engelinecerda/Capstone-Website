@@ -15,45 +15,19 @@ import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { showConfirmModal } from './feedback_modal.js';
+import { setButtonSaving, isButtonSaving, withSaving, triggerButton } from './button_saving.js';
 import { attachPhoneMask } from './phone_format.js';
 import { clampNumberInput, clampNumberValue } from './numeric_input.js';
 
 attachPhoneMask(document.getElementById('pm2PhoneNumber'));
 
 // ── Confirm modal (Payment Rules) ────────────────────────────────────────────
-// Save buttons show a spinner and 'Saving…' while their write is running, then
-// go back to their own label. The button is not `disabled` (that would dim it
-// like an unavailable action); clicks are ignored while it is busy instead.
-function setButtonSaving(btn, saving, label = 'Saving…') {
-  if (!btn) return;
-  if (saving) {
-    if (btn.classList.contains('is-saving')) return;
-    btn.dataset.idleLabel = btn.textContent;
-    btn.style.minWidth = btn.offsetWidth + 'px';   // keep the width so the row doesn't jump
-    btn.textContent = label;
-    btn.classList.add('is-saving');
-    btn.setAttribute('aria-busy', 'true');
-  } else if (btn.classList.contains('is-saving')) {
-    btn.textContent = btn.dataset.idleLabel ?? btn.textContent;
-    btn.style.minWidth = '';
-    btn.classList.remove('is-saving');
-    btn.removeAttribute('aria-busy');
-  }
-}
-
-const isButtonSaving = (btn) => !!btn?.classList.contains('is-saving');
-
-async function withSaving(btn, fn) {
-  if (isButtonSaving(btn)) return undefined;
-  setButtonSaving(btn, true);
-  try { return await fn(); } finally { setButtonSaving(btn, false); }
-}
-
 // `button` (optional) is the Save button that opened the dialog: it shows the
 // saving state while onConfirm runs.
 function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm, button = null) {
   const modal = document.getElementById('settingsConfirmModal');
   if (!modal) { onConfirm(); return; }
+  const trigger = button || triggerButton();
 
   document.getElementById('settingsConfirmTitle').textContent = title;
   document.getElementById('settingsConfirmCopy').textContent = `${oldValueLabel} → ${newValueLabel}`;
@@ -61,7 +35,7 @@ function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm, but
   document.getElementById('settingsConfirmOk').onclick = () => {
     modal.classList.add('hidden');
     unlockBodyScroll();
-    if (button) withSaving(button, onConfirm); else onConfirm();
+    if (trigger) withSaving(trigger, onConfirm); else onConfirm();
   };
   document.getElementById('settingsConfirmCancel').onclick = () => {
     modal.classList.add('hidden');

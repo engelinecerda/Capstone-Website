@@ -11,6 +11,7 @@ import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from '
 import { renderPagination } from './pagination.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { clampNumberInput } from './numeric_input.js';
+import { bindSaving } from './button_saving.js';
 
 // Own page size, not the shared pagination.js default (10) — that constant
 // is also used by other pages' client-side-sliced lists; this log pages at
@@ -222,7 +223,7 @@ function openEditor(triggerCode) {
   openModal(editorModal);
 }
 
-editorModalSave.addEventListener('click', async () => {
+bindSaving(editorModalSave, async () => {
   const body = editorBodyInput.value.trim();
   if (!body) { setModalMsg(editorModalMessage, 'Message body is required.'); return; }
   if (!editorSendInApp.checked && !editorSendEmail.checked) { setModalMsg(editorModalMessage, 'At least one channel must be selected.'); return; }

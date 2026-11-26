@@ -19,6 +19,7 @@ import { logAudit } from './audit_logger.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { clampNumberInput } from './numeric_input.js';
+import { bindSaving, setButtonSaving } from './button_saving.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -1454,7 +1455,7 @@ function wireRecordPaymentModal() {
   recordPaymentBtn?.addEventListener('click', openRecordPaymentModal);
   recordPaymentModalClose?.addEventListener('click', closeRecordPaymentModal);
   recordPaymentCancelBtn?.addEventListener('click', closeRecordPaymentModal);
-  recordPaymentSaveBtn?.addEventListener('click', saveRecordPayment);
+  bindSaving(recordPaymentSaveBtn, saveRecordPayment);
   recordPaymentModal?.addEventListener('click', (event) => {
     if (event.target === recordPaymentModal) closeRecordPaymentModal();
   });
@@ -1564,9 +1565,9 @@ function wireAddChargeModal() {
   addChargeBtn?.addEventListener('click', openAddChargeModal);
   addChargeModalClose?.addEventListener('click', closeAddChargeModal);
   addChargeCancelBtn?.addEventListener('click', closeAddChargeModal);
-  addChargeSaveBtn?.addEventListener('click', saveAddCharge);
+  bindSaving(addChargeSaveBtn, saveAddCharge);
   voidChargeCancelBtn?.addEventListener('click', closeVoidChargeModal);
-  voidChargeConfirmBtn?.addEventListener('click', confirmVoidCharge);
+  bindSaving(voidChargeConfirmBtn, confirmVoidCharge, { label: 'Voiding…' });
   voidChargeConfirmModal?.addEventListener('click', (event) => {
     if (event.target === voidChargeConfirmModal) closeVoidChargeModal();
   });
@@ -1676,6 +1677,7 @@ async function handleManualVerifyContract() {
 
   const button = signatureCheckPanel.querySelector('[data-action="manual-verify-contract"]');
   if (button) button.setAttribute('disabled', 'true');
+  setButtonSaving(button, true, 'Verifying…');
 
   try {
     setFlashMessage('Verifying contract...');
@@ -1703,6 +1705,7 @@ async function handleManualVerifyContract() {
     await reloadAndRender('Contract manually verified. The reservation can now be approved.');
   } catch (error) {
     setFlashMessage(error.message || 'Failed to verify contract.', true);
+    setButtonSaving(button, false);
     if (button) button.removeAttribute('disabled');
   }
 }
@@ -1820,6 +1823,8 @@ async function submitIdReviewDecision(action) {
   })) return;
 
   setIdReviewBusy(true);
+  const decisionBtn = action === 'approve' ? idReviewApproveBtn : idReviewRejectBtn;
+  setButtonSaving(decisionBtn, true, action === 'approve' ? 'Approving…' : 'Rejecting…');
   setIdReviewMessage(action === 'approve' ? 'Approving\u2026' : 'Sending your request\u2026');
   try {
     const { data, error } = await supabase.functions.invoke('review-customer-id', {
@@ -1839,6 +1844,7 @@ async function submitIdReviewDecision(action) {
     });
 
     setIdReviewBusy(false);
+    setButtonSaving(decisionBtn, false);
     closeIdReview();
     await reloadAndRender(action === 'approve'
       ? 'ID approved. The contract is verified and the reservation can now be approved.'
@@ -1846,6 +1852,7 @@ async function submitIdReviewDecision(action) {
   } catch (error) {
     setIdReviewMessage(error.message || 'Something went wrong. Please try again.', true);
     setIdReviewBusy(false);
+    setButtonSaving(decisionBtn, false);
   }
 }
 
@@ -2146,7 +2153,7 @@ function wireCustomRequests() {
   });
   document.getElementById('customRequestModalClose')?.addEventListener('click', closeCustomRequestModal);
   document.getElementById('customRequestCancelBtn')?.addEventListener('click', closeCustomRequestModal);
-  customRequestSaveBtn?.addEventListener('click', saveCustomRequestAction);
+  bindSaving(customRequestSaveBtn, saveCustomRequestAction);
   customRequestModal?.addEventListener('click', (event) => { if (event.target === customRequestModal) closeCustomRequestModal(); });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && customRequestModal && !customRequestModal.classList.contains('hidden')) closeCustomRequestModal();
@@ -2229,6 +2236,7 @@ function wireHeaderActions() {
 
     try {
       button.setAttribute('disabled', 'true');
+      setButtonSaving(button, true, action === 'approve' ? 'Approving…' : 'Declining…');
       setFlashMessage('Updating reservation...');
 
       if (action === 'approve') {
@@ -2245,6 +2253,7 @@ function wireHeaderActions() {
       }
     } catch (error) {
       setFlashMessage(error.message, true);
+      setButtonSaving(button, false);
       button.removeAttribute('disabled');
     }
   });
@@ -2412,7 +2421,7 @@ function wireAssignmentModal() {
   assignStaffBtn?.addEventListener('click', openAssignmentModal);
   assignmentCancelBtn?.addEventListener('click', closeAssignmentModal);
   assignmentModalClose?.addEventListener('click', closeAssignmentModal);
-  assignmentSaveBtn?.addEventListener('click', saveAssignmentSelection);
+  bindSaving(assignmentSaveBtn, saveAssignmentSelection);
   assignmentModal?.addEventListener('click', (event) => {
     if (event.target === assignmentModal) closeAssignmentModal();
   });

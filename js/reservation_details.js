@@ -53,6 +53,7 @@ import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { initRescheduleModal } from './reservation_details_reschedule.js';
 import { initIdRetryModal, getIdCheckState } from './id_signature_retry.js';
+import { bindSaving, setButtonSaving } from './button_saving.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 if (!session) {
@@ -1810,6 +1811,7 @@ async function respondToCustomRequest(button, action) {
     if (!confirmed) return;
 
     button.disabled = true;
+    setButtonSaving(button, true, action === 'accept' ? 'Accepting…' : 'Working…');
     try {
         const { error } = action === 'accept'
             ? await supabase.rpc('accept_custom_request', { p_request_id: requestId })
@@ -1825,6 +1827,7 @@ async function respondToCustomRequest(button, action) {
             });
         }
     } catch (error) {
+        setButtonSaving(button, false);
         button.disabled = false;
         showFeedbackModal({
             type: 'error',
@@ -1836,7 +1839,7 @@ async function respondToCustomRequest(button, action) {
 
 customRequestClose?.addEventListener('click', closeCustomRequestModal);
 customRequestDismiss?.addEventListener('click', closeCustomRequestModal);
-customRequestConfirm?.addEventListener('click', submitCustomRequest);
+bindSaving(customRequestConfirm, submitCustomRequest, { label: 'Sending…' });
 customRequestBackdrop?.addEventListener('click', (event) => {
     if (event.target === customRequestBackdrop) closeCustomRequestModal();
 });
@@ -1969,7 +1972,7 @@ pageContainer?.addEventListener('click', async (event) => {
 
 cancelModalClose?.addEventListener('click', closeCancelModal);
 cancelModalDismiss?.addEventListener('click', closeCancelModal);
-cancelModalConfirm?.addEventListener('click', submitCancellationRequest);
+bindSaving(cancelModalConfirm, submitCancellationRequest, { label: 'Sending…' });
 cancelReservationBackdrop?.addEventListener('click', (event) => {
     if (event.target === cancelReservationBackdrop) closeCancelModal();
 });
@@ -1981,14 +1984,14 @@ document.addEventListener('keydown', (event) => {
 
 extensionModalClose?.addEventListener('click', closeExtensionModal);
 extensionModalDismiss?.addEventListener('click', closeExtensionModal);
-extensionModalConfirm?.addEventListener('click', submitExtensionRequest);
+bindSaving(extensionModalConfirm, submitExtensionRequest, { label: 'Sending…' });
 extensionRequestBackdrop?.addEventListener('click', (event) => {
     if (event.target === extensionRequestBackdrop) closeExtensionModal();
 });
 
 additionalHeadModalClose?.addEventListener('click', closeAdditionalHeadModal);
 additionalHeadModalDismiss?.addEventListener('click', closeAdditionalHeadModal);
-additionalHeadModalConfirm?.addEventListener('click', submitAdditionalHeadRequest);
+bindSaving(additionalHeadModalConfirm, submitAdditionalHeadRequest, { label: 'Sending…' });
 additionalHeadRequestBackdrop?.addEventListener('click', (event) => {
     if (event.target === additionalHeadRequestBackdrop) closeAdditionalHeadModal();
 });

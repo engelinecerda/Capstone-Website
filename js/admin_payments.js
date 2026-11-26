@@ -19,6 +19,7 @@ import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { logAudit } from './audit_logger.js';
 import { clampNumberInput } from './numeric_input.js';
 import { initTableSort, rpcWithSort } from './table_sort.js';
+import { bindSaving, setButtonSaving } from './button_saving.js';
 
 const sidebarNameEl = document.getElementById('sidebarName');
 const sidebarEmailEl = document.getElementById('sidebarEmail');
@@ -1804,7 +1805,7 @@ async function saveRecordPayment() {
 function wireRecordPaymentModal() {
   recordPaymentModalClose?.addEventListener('click', closeRecordPaymentModal);
   recordPaymentCancelBtn?.addEventListener('click', closeRecordPaymentModal);
-  recordPaymentSaveBtn?.addEventListener('click', saveRecordPayment);
+  bindSaving(recordPaymentSaveBtn, saveRecordPayment);
   recordPaymentModal?.addEventListener('click', (event) => {
     if (event.target === recordPaymentModal) closeRecordPaymentModal();
   });
@@ -2085,6 +2086,7 @@ function wireModals() {
       if (!excessId) return;
       const note = document.getElementById('excessReturnNote')?.value.trim() || '';
       actionTarget.disabled = true;
+      setButtonSaving(actionTarget, true);
       (async () => {
         try {
           if (currentRole === 'admin') throw new Error('This action requires the Manager role.');
@@ -2101,6 +2103,7 @@ function wireModals() {
           paymentReviewFlash = { message: 'Marked as returned. The customer was notified.', isError: false };
           await loadData();
         } catch (error) {
+          setButtonSaving(actionTarget, false);
           actionTarget.disabled = false;
           setPaymentReviewMessage(`Failed to save: ${error.message}`, true);
         }
@@ -2108,6 +2111,7 @@ function wireModals() {
       return;
     }
 
+    setButtonSaving(actionTarget, true, action === 'approve-payment' ? 'Approving…' : 'Rejecting…');
     (async () => {
       try {
         setPaymentReviewMessage('Updating payment status...');
@@ -2119,6 +2123,7 @@ function wireModals() {
         await loadData();
         setMessage(tableMessage, 'Payment updated.');
       } catch (error) {
+        setButtonSaving(actionTarget, false);
         setPaymentReviewMessage(`Failed to update payment: ${error.message}`, true);
         setMessage(tableMessage, `Failed to update payment: ${error.message}`, true);
       }

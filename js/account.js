@@ -66,6 +66,7 @@ import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { attachPhoneMask } from './phone_format.js';
 import { attachEmailGuard, attachPhonePasteNormalizer, validateEmailAddress, validatePhoneNumber } from './input_validation.js';
+import { bindSaving } from './button_saving.js';
 
 attachEmailGuard(document.getElementById('profile-email'));
 attachPhonePasteNormalizer(document.getElementById('profile-phone'));
@@ -2556,7 +2557,7 @@ function wireProfileForm() {
     const profileForm = document.getElementById('profile-form');
     const profileMessage = document.getElementById('profile-msg');
 
-    profileForm?.addEventListener('submit', async (event) => {
+    bindSaving(profileForm, async (event) => {
         event.preventDefault();
 
         const saveBtn = document.getElementById('save-profile-btn');
@@ -2685,14 +2686,14 @@ function wireProfileForm() {
         } finally {
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }
         }
-    });
+    }, { submit: true });
 }
 
 function wirePasswordForm() {
     const passwordForm = document.getElementById('password-form');
     const passwordMessage = document.getElementById('password-msg');
 
-    passwordForm?.addEventListener('submit', async (event) => {
+    bindSaving(passwordForm, async (event) => {
         event.preventDefault();
 
         const updateBtn = document.getElementById('update-password-btn');
@@ -2732,7 +2733,7 @@ function wirePasswordForm() {
         } finally {
             if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = 'Update Password'; }
         }
-    });
+    }, { submit: true });
 }
 
 function wireLogout() {

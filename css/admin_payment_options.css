@@ -552,20 +552,3 @@ select.field-input {
 .sc-dirty-hint--active { color: #8A5A00; font-weight: 600; }
 .sc-dirty-hint--error { color: #b3261e; font-weight: 600; }
 .sc-action-bar .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
-
-/* ── Save buttons while their write is running ─────────────────────────────── */
-@keyframes btn-saving-spin { to { transform: rotate(360deg); } }
-.is-saving { pointer-events: none; cursor: progress; opacity: 0.85; }
-.is-saving::before {
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 8px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  vertical-align: -2px;
-  animation: btn-saving-spin 0.7s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) { .is-saving::before { animation-duration: 2s; } }

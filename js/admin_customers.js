@@ -12,6 +12,7 @@ import { mountRefreshStatus } from './refresh_status.js';
 import { initTableSort, rpcWithSort } from './table_sort.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { logAudit } from './audit_logger.js';
+import { bindSaving } from './button_saving.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -656,8 +657,8 @@ function wireIdReviewModal() {
     const button = event.target.closest('[data-id-review]');
     if (button) openIdReview(button.dataset.idReview);
   });
-  idReviewApproveBtn?.addEventListener('click', () => submitIdReviewDecision('approve'));
-  idReviewRejectBtn?.addEventListener('click', () => submitIdReviewDecision('reject'));
+  bindSaving(idReviewApproveBtn, () => submitIdReviewDecision('approve'), { label: 'Approving…' });
+  bindSaving(idReviewRejectBtn, () => submitIdReviewDecision('reject'), { label: 'Rejecting…' });
   idReviewCancelBtn?.addEventListener('click', closeIdReview);
   idReviewClose?.addEventListener('click', closeIdReview);
   idReviewModal?.addEventListener('click', (event) => {
