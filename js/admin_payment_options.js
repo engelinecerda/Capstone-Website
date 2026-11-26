@@ -14,6 +14,7 @@ import { initAdminNav } from './admin_nav.js';
 import { initManagerNotificationBell } from './manager_notification_bell.js';
 import { paymentMethodIconSvg } from './admin_payment_method_icons.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { showConfirmModal } from './feedback_modal.js';
 import { attachPhoneMask } from './phone_format.js';
 import { clampNumberInput, clampNumberValue } from './numeric_input.js';
 
@@ -800,6 +801,10 @@ async function savePaymentRules() {
 // package + add-on total only; there's no separate travel-fee amount
 // anywhere in this codebase to include or exclude.
 let scCategories = [];
+// What is saved right now (the form is compared against this to find unsaved
+// changes). Category overrides are saved on scCategories[].service_charge_percent.
+let scSaved = { globalPct: DEFAULT_PAYMENT_RULES.service_charge_percent, appliesOffsite: DEFAULT_PAYMENT_RULES.service_charge_applies_offsite };
+const scNum = (v) => (v === null || v === undefined || String(v).trim() === '' ? null : Number(v));
 
 function setScMsg(elId, msg, isError = false) {
   const el = document.getElementById(elId);
@@ -825,6 +830,7 @@ async function loadServiceChargeSection() {
     } catch { /* keep defaults */ }
   }
 
+  scSaved = { globalPct, appliesOffsite };
   const globalInput = document.getElementById('sc-global-percent');
   if (globalInput) globalInput.value = globalPct;
 
@@ -840,37 +846,66 @@ async function loadServiceChargeSection() {
   if (error || !categories) {
     if (body) body.innerHTML = '<tr><td colspan="4">Failed to load categories.</td></tr>';
   } else {
-    scCategories = categories;
-    renderCategoryOverrideTable(globalPct);
+    scCategories = categories.map((c) => ({ ...c, service_charge_percent: scNum(c.service_charge_percent) }));
+    renderCategoryOverrideTable();
   }
 
   updateWorkedExample(globalPct, appliesOffsite);
+  updateServiceChargeDirty();
 }
 
-function renderCategoryOverrideTable(globalPct) {
+function renderCategoryOverrideTable() {
   const body = document.getElementById('sc-category-body');
   if (!body) return;
 
   if (!scCategories.length) {
-    body.innerHTML = '<tr><td colspan="4">No categories yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="3">No categories yet.</td></tr>';
     return;
   }
 
   body.innerHTML = scCategories.map((cat) => {
-    const hasOverride = cat.service_charge_percent !== null && cat.service_charge_percent !== undefined;
-    const effective = hasOverride ? Number(cat.service_charge_percent) : globalPct;
+    const hasOverride = cat.service_charge_percent !== null;
+    const inactive = cat.is_active === false;
     return `
-      <tr data-category-id="${cat.package_category_id}">
-        <td data-label="Category">${escapeHtmlSc(cat.category_name || 'Untitled')}${cat.is_active === false ? ' <span class="field-note" style="margin:0;">(inactive)</span>' : ''}</td>
-        <td data-label="Effective rate">${effective}%</td>
+      <tr data-category-id="${cat.package_category_id}"${inactive ? ' class="sc-inactive-row"' : ''}>
+        <td data-label="Category">${escapeHtmlSc(cat.category_name || 'Untitled')}${inactive ? ' <span class="field-note" style="margin:0;">(inactive)</span>' : ''}</td>
+        <td data-label="Effective rate" class="sc-effective"></td>
         <td data-label="Override">
           <input type="number" class="pr-input-inline sc-override-input" min="0" max="100" step="0.5"
-                 placeholder="Inherits default (${globalPct}%)"
-                 value="${hasOverride ? effective : ''}">
+                 value="${hasOverride ? cat.service_charge_percent : ''}">
         </td>
-        <td><button type="button" class="action-btn view sc-save-category-btn">Save</button></td>
       </tr>`;
   }).join('');
+
+  // Inactive categories are tucked away behind a toggle: they are most of the list.
+  const inactiveCount = scCategories.filter((c) => c.is_active === false).length;
+  const toggle = document.getElementById('sc-inactive-toggle');
+  const table = document.getElementById('sc-category-table');
+  if (table) table.classList.toggle('sc-hide-inactive', inactiveCount > 0 && !scShowInactive);
+  if (toggle) {
+    toggle.classList.toggle('hidden', inactiveCount === 0);
+    toggle.textContent = scShowInactive
+      ? 'Hide inactive categories'
+      : `Show ${inactiveCount} inactive categor${inactiveCount === 1 ? 'y' : 'ies'}`;
+  }
+  refreshCategoryRates();
+}
+
+let scShowInactive = false;
+
+// Effective rate + placeholder follow what is typed (global default and each
+// override), before anything is saved.
+function refreshCategoryRates() {
+  const globalPct = Number(document.getElementById('sc-global-percent')?.value);
+  const shownGlobal = Number.isFinite(globalPct) ? globalPct : scSaved.globalPct;
+  document.querySelectorAll('#sc-category-body tr[data-category-id]').forEach((row) => {
+    const input = row.querySelector('.sc-override-input');
+    const typed = scNum(input?.value);
+    const effective = Number.isFinite(typed) ? typed : shownGlobal;
+    const cell = row.querySelector('.sc-effective');
+    if (cell) cell.textContent = `${effective}%`;
+    if (input) input.placeholder = `Inherits default (${shownGlobal}%)`;
+  });
 }
 
 function escapeHtmlSc(str) {
@@ -913,80 +948,138 @@ function updateWorkedExample(globalPctOverride, appliesOffsiteOverride) {
   }
 }
 
-async function saveGlobalServiceCharge() {
-  const input = document.getElementById('sc-global-percent');
-  const pct = Number(input?.value);
-  if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-    setScMsg('sc-global-msg', 'Service charge must be between 0 and 100.', true);
-    return;
+// Reads the whole Service Charge card and compares it with what is saved.
+// Returns { problem } or { global, offsite, categories: [{ cat, from, to }], count }.
+function readServiceChargeChanges() {
+  const pct = Number(document.getElementById('sc-global-percent')?.value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return { problem: 'The global default must be between 0 and 100.' };
+  const appliesOffsite = !!document.getElementById('sc-offsite-toggle')?.checked;
+
+  const categories = [];
+  for (const row of document.querySelectorAll('#sc-category-body tr[data-category-id]')) {
+    const cat = scCategories.find((c) => c.package_category_id === row.dataset.categoryId);
+    if (!cat) continue;
+    const raw = row.querySelector('.sc-override-input')?.value;
+    const to = scNum(raw);
+    if (to !== null && (!Number.isFinite(to) || to < 0 || to > 100)) {
+      return { problem: `${cat.category_name || 'A category'}: the override must be between 0 and 100, or left blank to inherit the default.` };
+    }
+    if (to !== cat.service_charge_percent) categories.push({ cat, from: cat.service_charge_percent, to });
   }
 
-  const { data: current } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'payment_rules')
-    .maybeSingle();
-
-  let config = { ...DEFAULT_PAYMENT_RULES };
-  if (current?.setting_value) {
-    try { config = { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) }; } catch { /* use default */ }
-  }
-  config.service_charge_percent = pct;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from('system_settings')
-    .upsert(
-      { setting_key: 'payment_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-      { onConflict: 'setting_key' }
-    );
-
-  if (error) { setScMsg('sc-global-msg', 'Failed to save: ' + error.message, true); return; }
-
-  await logAudit({ action: 'Updated Service Charge Default', category: 'payment_config', details: `Global default set to ${pct}%` });
-  setScMsg('sc-global-msg', 'Saved.');
-  renderCategoryOverrideTable(pct);
-  updateWorkedExample(pct);
+  const globalChanged = pct !== scSaved.globalPct;
+  const offsiteChanged = appliesOffsite !== scSaved.appliesOffsite;
+  return {
+    global: globalChanged ? { from: scSaved.globalPct, to: pct } : null,
+    offsite: offsiteChanged ? { from: scSaved.appliesOffsite, to: appliesOffsite } : null,
+    categories,
+    count: (globalChanged ? 1 : 0) + (offsiteChanged ? 1 : 0) + categories.length
+  };
 }
 
-async function saveOffsiteToggle() {
-  const toggle = document.getElementById('sc-offsite-toggle');
-  if (!toggle) return;
-  const appliesOffsite = toggle.checked;
-
-  const { data: current } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'payment_rules')
-    .maybeSingle();
-
-  let config = { ...DEFAULT_PAYMENT_RULES };
-  if (current?.setting_value) {
-    try { config = { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) }; } catch { /* use default */ }
-  }
-  config.service_charge_applies_offsite = appliesOffsite;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from('system_settings')
-    .upsert(
-      { setting_key: 'payment_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-      { onConflict: 'setting_key' }
-    );
-
-  if (error) {
-    setScMsg('sc-offsite-msg', 'Failed to save: ' + error.message, true);
-    toggle.checked = !appliesOffsite; // revert the visible toggle to match what's actually saved
-    return;
-  }
-
-  await logAudit({
-    action: 'Updated Offsite Service Charge Setting',
-    category: 'payment_config',
-    details: `Offsite packages now ${appliesOffsite ? 'DO' : 'do NOT'} receive the service charge`
+// "N unsaved changes" hint, highlighted rows, and the Save button state.
+function updateServiceChargeDirty() {
+  refreshCategoryRates();
+  const changes = readServiceChargeChanges();
+  const changedIds = new Set((changes.categories || []).map((c) => c.cat.package_category_id));
+  document.querySelectorAll('#sc-category-body tr[data-category-id]').forEach((row) => {
+    row.classList.toggle('sc-row-changed', changedIds.has(row.dataset.categoryId));
   });
-  setScMsg('sc-offsite-msg', 'Saved.');
-  updateWorkedExample(Number(document.getElementById('sc-global-percent')?.value), appliesOffsite);
+  const hint = document.getElementById('sc-dirty-hint');
+  const btn = document.getElementById('sc-save-btn');
+  const count = changes.problem ? 0 : changes.count;
+  if (hint) {
+    hint.textContent = changes.problem ? changes.problem : (count ? `${count} unsaved change${count === 1 ? '' : 's'}` : 'No unsaved changes');
+    hint.classList.toggle('sc-dirty-hint--active', !changes.problem && count > 0);
+    hint.classList.toggle('sc-dirty-hint--error', !!changes.problem);
+  }
+  if (btn) btn.disabled = !!changes.problem || count === 0;
+}
+
+const scPct = (n) => (n === null ? 'inherits the default' : `${n}%`);
+
+async function saveServiceCharge() {
+  const changes = readServiceChargeChanges();
+  if (changes.problem) { setScMsg('sc-msg', changes.problem, true); return; }
+  if (!changes.count) { setScMsg('sc-msg', 'No changes to save.'); return; }
+
+  const lines = [];
+  if (changes.global) lines.push(`Global default: ${changes.global.from}% \u2192 ${changes.global.to}%`);
+  if (changes.offsite) lines.push(`Offsite packages: ${changes.offsite.from ? 'charged' : 'not charged'} \u2192 ${changes.offsite.to ? 'charged' : 'not charged'}`);
+  changes.categories.forEach((c) => lines.push(`${c.cat.category_name || 'Category'}: ${scPct(c.from)} \u2192 ${scPct(c.to)}`));
+
+  const ok = await showConfirmModal({
+    title: `Save ${changes.count} change${changes.count === 1 ? '' : 's'}?`,
+    message: lines.join('\n'),
+    confirmText: 'Save changes',
+    cancelText: 'Not yet'
+  });
+  if (!ok) return;
+
+  const btn = document.getElementById('sc-save-btn');
+  if (btn) btn.disabled = true;
+  setScMsg('sc-msg', '');
+  const failures = [];
+
+  // 1. The payment_rules blob (global default + offsite toggle), re-read first
+  //    so nothing else saved in it meanwhile is overwritten.
+  if (changes.global || changes.offsite) {
+    const { data: current } = await supabase
+      .from('system_settings').select('setting_value').eq('setting_key', 'payment_rules').maybeSingle();
+    let config = { ...DEFAULT_PAYMENT_RULES };
+    if (current?.setting_value) {
+      try { config = { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) }; } catch { /* use default */ }
+    }
+    if (changes.global) config.service_charge_percent = changes.global.to;
+    if (changes.offsite) config.service_charge_applies_offsite = changes.offsite.to;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert(
+        { setting_key: 'payment_rules', setting_value: JSON.stringify(config), updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+        { onConflict: 'setting_key' }
+      );
+    if (error) {
+      failures.push('the global default / offsite setting (' + error.message + ')');
+    } else {
+      if (changes.global) {
+        scSaved.globalPct = changes.global.to;
+        await logAudit({ action: 'Updated Service Charge Default', category: 'payment_config', details: `Global default set to ${changes.global.to}%` });
+      }
+      if (changes.offsite) {
+        scSaved.appliesOffsite = changes.offsite.to;
+        await logAudit({
+          action: 'Updated Offsite Service Charge Setting',
+          category: 'payment_config',
+          details: `Offsite packages now ${changes.offsite.to ? 'DO' : 'do NOT'} receive the service charge`
+        });
+      }
+    }
+  }
+
+  // 2. Category overrides, one update each so a failure names its category.
+  for (const { cat, to } of changes.categories) {
+    const { error } = await supabase
+      .from('package_category')
+      .update({ service_charge_percent: to })
+      .eq('package_category_id', cat.package_category_id);
+    if (error) { failures.push(`${cat.category_name || 'a category'} (${error.message})`); continue; }
+    cat.service_charge_percent = to;
+    await logAudit({
+      action: 'Updated Category Service Charge Override',
+      category: 'payment_config',
+      details: `${cat.category_name || cat.package_category_id}: ${to === null ? 'inherit default' : to + '%'}`
+    });
+  }
+
+  updateWorkedExample();
+  updateServiceChargeDirty();
+  if (failures.length) {
+    setScMsg('sc-msg', 'Some changes were not saved: ' + failures.join('; ') + '. They are still marked as unsaved, so you can try again.', true);
+  } else {
+    setScMsg('sc-msg', 'Saved.');
+  }
 }
 
 // ── Transport fee (offsite) ──────────────────────────────────────────────────
@@ -1392,40 +1485,6 @@ async function saveTransportFee() {
   updateTransportExample();
 }
 
-async function saveCategoryOverride(row) {
-  const categoryId = row.dataset.categoryId;
-  const input = row.querySelector('.sc-override-input');
-  const raw = input?.value?.trim();
-  const category = scCategories.find((c) => c.package_category_id === categoryId);
-
-  // Empty input = clear the override (inherit the default again).
-  let value = null;
-  if (raw !== '') {
-    value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || value > 100) {
-      setScMsg('sc-category-msg', 'Category override must be between 0 and 100, or left blank to inherit.', true);
-      return;
-    }
-  }
-
-  const { error } = await supabase
-    .from('package_category')
-    .update({ service_charge_percent: value })
-    .eq('package_category_id', categoryId);
-
-  if (error) { setScMsg('sc-category-msg', 'Failed to save: ' + error.message, true); return; }
-
-  if (category) category.service_charge_percent = value;
-  await logAudit({
-    action: 'Updated Category Service Charge Override',
-    category: 'payment_config',
-    details: `${category?.category_name || categoryId}: ${value === null ? 'inherit default' : value + '%'}`
-  });
-  setScMsg('sc-category-msg', 'Saved.');
-  const globalInput = document.getElementById('sc-global-percent');
-  renderCategoryOverrideTable(Number(globalInput?.value) || DEFAULT_PAYMENT_RULES.service_charge_percent);
-}
-
 // ── Init ────────────────────────────────────────────────────────────────────
 // Native min/max/step never stop someone from typing/pasting an out-of-
 // range or absurdly precise value — see js/numeric_input.js.
@@ -1699,9 +1758,9 @@ async function init() {
 
   document.getElementById('pr-save-btn')?.addEventListener('click', savePaymentRules);
 
-  document.getElementById('sc-save-global-btn')?.addEventListener('click', saveGlobalServiceCharge);
-  document.getElementById('sc-global-percent')?.addEventListener('input', () => updateWorkedExample());
-  document.getElementById('sc-save-offsite-btn')?.addEventListener('click', saveOffsiteToggle);
+  document.getElementById('sc-save-btn')?.addEventListener('click', saveServiceCharge);
+  document.getElementById('sc-global-percent')?.addEventListener('input', () => { updateWorkedExample(); updateServiceChargeDirty(); });
+  document.getElementById('sc-inactive-toggle')?.addEventListener('click', () => { scShowInactive = !scShowInactive; renderCategoryOverrideTable(); updateServiceChargeDirty(); });
   document.getElementById('tf-save-btn')?.addEventListener('click', saveTransportFee);
   document.getElementById('saveLatePaymentGraceBtn')?.addEventListener('click', saveLatePaymentGrace);
   document.getElementById('rv-save-btn')?.addEventListener('click', saveReceiptValidation);
@@ -1740,11 +1799,15 @@ async function init() {
   // Live-preview the effect immediately on toggle, before the admin saves —
   // same "see it before committing" behaviour the global-percent input
   // already has above.
-  document.getElementById('sc-offsite-toggle')?.addEventListener('change', () => updateWorkedExample());
-  document.getElementById('sc-category-body')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('.sc-save-category-btn');
-    if (!btn) return;
-    saveCategoryOverride(btn.closest('tr'));
+  document.getElementById('sc-offsite-toggle')?.addEventListener('change', () => { updateWorkedExample(); updateServiceChargeDirty(); });
+  // Category rows are re-rendered, so their inputs are handled by delegation.
+  document.getElementById('sc-category-body')?.addEventListener('input', updateServiceChargeDirty);
+  document.getElementById('sc-category-body')?.addEventListener('focusout', (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || !el.classList.contains('sc-override-input') || el.value === '') return;
+    const clamped = clampNumberValue(el.value, { min: 0, max: 100, decimals: 1 });
+    el.value = clamped === null ? '' : String(clamped);
+    updateServiceChargeDirty();
   });
 }
 

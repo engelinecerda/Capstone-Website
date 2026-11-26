@@ -67,6 +67,7 @@
 }
 
 .fm-message {
+    white-space: pre-line; /* a message can list one change per line */
     margin: 0;
     font-size: 14.5px;
     line-height: 1.6;

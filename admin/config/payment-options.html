@@ -338,10 +338,8 @@
               <input type="checkbox" id="sc-offsite-toggle">
               <span class="pm2-toggle-track"></span>
             </label>
-            <button type="button" class="action-btn view" id="sc-save-offsite-btn">Save</button>
           </div>
         </div>
-        <p class="form-message" id="sc-offsite-msg"></p>
 
         <div class="pr-row">
           <div class="pr-row-copy">
@@ -351,25 +349,28 @@
           <div class="pr-row-control">
             <input type="number" class="pr-input-inline" id="sc-global-percent" min="0" max="100" step="0.5" value="10">
             <span class="field-note" style="margin:0;">%</span>
-            <button type="button" class="action-btn view" id="sc-save-global-btn">Save</button>
           </div>
         </div>
-
-        <p class="form-message" id="sc-global-msg"></p>
 
         <p class="pr-row-label" style="margin-top:22px;">Per-category overrides</p>
         <p class="pr-row-desc" style="margin-bottom:12px;">Leave a category on "Inherits default" unless it needs a different rate. Setting 0% is allowed and exempts that category — for onsite always, and for offsite too once the toggle above is on.</p>
         <div class="table-wrap">
           <table class="pm2-table" id="sc-category-table">
             <thead>
-              <tr><th>Category</th><th>Effective Rate</th><th>Override</th><th></th></tr>
+              <tr><th>Category</th><th>Effective Rate</th><th>Override</th></tr>
             </thead>
             <tbody id="sc-category-body">
-              <tr><td colspan="4">Loading…</td></tr>
+              <tr><td colspan="3">Loading…</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="form-message" id="sc-category-msg"></p>
+        <button type="button" class="sc-inactive-toggle hidden" id="sc-inactive-toggle"></button>
+
+        <div class="action-bar sc-action-bar">
+          <span class="sc-dirty-hint" id="sc-dirty-hint" aria-live="polite"></span>
+          <button type="button" class="btn-primary" id="sc-save-btn" disabled>Save service charge</button>
+        </div>
+        <p class="form-message" id="sc-msg"></p>
 
         <div class="sc-example-box">
           <p class="sc-example-title">Worked example</p>
