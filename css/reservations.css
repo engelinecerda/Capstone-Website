@@ -1403,6 +1403,16 @@
         .rs-row-label { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 400; color: #3E2418; }
         .rs-row-label i { font-size: 15px; color: #8A5A3B; flex-shrink: 0; }
         .rs-row-value { font-size: 14px; font-weight: 600; color: #2A1208; text-align: right; min-width: 0; word-break: break-word; }
+        .rs-summary-row--stack { flex-direction: column; align-items: flex-start; gap: 6px; }
+        .rs-summary-row--stack .rs-row-value { text-align: left; font-weight: 500; line-height: 1.5; }
+        .rs-row-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 4px; }
+        .rs-row-list li { position: relative; padding-left: 16px; font-size: 13.5px; line-height: 1.5; font-weight: 500; color: #2A1208; overflow-wrap: anywhere; }
+        .rs-row-list li::before { content: ''; position: absolute; left: 3px; top: 0.62em; width: 5px; height: 5px; border-radius: 50%; background: #C9A98E; }
+        .rs-row-list li.rs-more { display: none; }
+        .rs-row-list.is-open li.rs-more { display: block; }
+        .rs-more-toggle { padding: 2px 0; background: none; border: 0; font: inherit; font-size: 13px; font-weight: 600; color: #4A2C17; text-decoration: underline; cursor: pointer; }
+        .rs-more-toggle:hover { color: #A34F2E; }
+        .rs-row-note { font-size: 12.5px; color: #756756; }
 
         /* Total — the receipt-style closing line, given more visual weight
            than every other row so it reads as the number that matters. */

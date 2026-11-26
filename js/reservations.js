@@ -4478,13 +4478,20 @@ function buildSummary() {
         const cateringItems = Array.isArray(cateringPkg?.inclusions) ? cateringPkg.inclusions.filter(i => i && i.trim()) : [];
         const cateringOffer = cateringItems.find(i => /^\s*special offer\s*:/i.test(i));
         const cateringPlainItems = cateringItems.filter(i => i !== cateringOffer);
-        if (cateringPlainItems.length) pkgRows += sr('Inclusions', cateringPlainItems.join(', '), 'list-check');
+        if (cateringPlainItems.length) pkgRows += srList('Inclusions', cateringPlainItems.map(escapeHtml), 'list-check');
         else if (cateringPkg?.desc) pkgRows += sr('Inclusions', cateringPkg.desc, 'list-check');
         if (cateringOffer) pkgRows += sr('Special Offer', cateringOffer.replace(/^\s*special offer\s*:\s*/i, ''), 'gift');
+        // One row per dish category (Main Entrées, Pasta, ...) listing the
+        // chosen dishes, instead of one row per dish.
+        const dishGroups = new Map();
         S.cateringCart.filter(i => i && i.pax).forEach(i => {
             const billedSeparately = menuPriced || !MENU_INCLUDED_IN_PACKAGE_PRICE;
             if (billedSeparately) total += i.price;
-            pkgRows += sr(i.cat, billedSeparately ? (i.dish + ' &mdash; ' + fmtPeso(i.price)) : (i.dish + ' &mdash; included'), 'users');
+            if (!dishGroups.has(i.cat)) dishGroups.set(i.cat, []);
+            dishGroups.get(i.cat).push(billedSeparately ? (escapeHtml(i.dish) + ' &mdash; ' + fmtPeso(i.price)) : escapeHtml(i.dish));
+        });
+        dishGroups.forEach((dishes, cat) => {
+            pkgRows += dishes.length === 1 ? sr(cat, dishes[0], 'users') : srList(cat, dishes, 'users');
         });
         if (!menuPriced && S.locationType === 'onsite' && S.snackAddon) {
             total += S.snackAddon.price;
@@ -4522,7 +4529,7 @@ function buildSummary() {
     const inclusionCredit = getInclusionCredit(inclusionPkg);
     if (removedInclusionList.length) {
         total -= inclusionCredit;
-        pkgRows += sr('Removed inclusions', removedInclusionList.map(o => escapeHtml(o.name)).join(', '), 'list-check');
+        pkgRows += srList('Removed inclusions', removedInclusionList.map(o => escapeHtml(o.name)), 'list-check');
     }
 
     // Discount reduces the base BEFORE the service charge — the critical
@@ -4578,7 +4585,7 @@ function buildSummary() {
         sr('Phone', S.phone, 'phone') +
         (S.requests ? sr('Requests', S.requests, 'message') : '') +
         ((S.customRequests || []).length
-            ? sr('Custom requests', S.customRequests.map(r => escapeHtml(r.title)).join(', ') + ' &middot; we&rsquo;ll send you a price', 'sparkles')
+            ? srList('Custom requests', S.customRequests.map(r => escapeHtml(r.title)), 'sparkles', 5, 'We\u2019ll send you a price for each.')
             : '');
 
     box.innerHTML =
@@ -4598,8 +4605,37 @@ function summaryCard(title, rowsHtml) {
 
 function sr(label, value, icon) {
     const iconHtml = icon ? '<i class="ti ti-' + icon + '" aria-hidden="true"></i>' : '';
-    return '<div class="rs-summary-row"><span class="rs-row-label">' + iconHtml + label + '</span><span class="rs-row-value">' + value + '</span></div>';
+    // Long values (addresses, free-text requests) get their own line under the
+    // label, left-aligned, instead of being squeezed into a right-hand column.
+    const plain = String(value ?? '').replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ');
+    const stack = plain.length > 44;
+    return '<div class="rs-summary-row' + (stack ? ' rs-summary-row--stack' : '') + '"><span class="rs-row-label">' + iconHtml + label + '</span><span class="rs-row-value">' + value + '</span></div>';
 }
+
+// A label with a tidy bulleted list underneath. Lists longer than `limit`
+// show the first few with a "Show N more" toggle (wired below). `items` are
+// already-escaped HTML strings.
+function srList(label, items, icon, limit = 5, note = '') {
+    const iconHtml = icon ? '<i class="ti ti-' + icon + '" aria-hidden="true"></i>' : '';
+    const extra = Math.max(0, items.length - limit);
+    const lis = items.map((it, i) => '<li' + (i >= limit ? ' class="rs-more"' : '') + '>' + it + '</li>').join('');
+    return '<div class="rs-summary-row rs-summary-row--stack">' +
+        '<span class="rs-row-label">' + iconHtml + label + '</span>' +
+        '<ul class="rs-row-list">' + lis + '</ul>' +
+        (extra > 0 ? '<button type="button" class="rs-more-toggle" data-rs-more="' + extra + '" aria-expanded="false">Show ' + extra + ' more</button>' : '') +
+        (note ? '<span class="rs-row-note">' + note + '</span>' : '') +
+    '</div>';
+}
+
+document.getElementById('summary-content')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-rs-more]');
+    if (!btn) return;
+    const list = btn.parentElement?.querySelector('.rs-row-list');
+    if (!list) return;
+    const open = list.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', String(open));
+    btn.textContent = open ? 'Show less' : 'Show ' + btn.dataset.rsMore + ' more';
+});
 
 function totalRow(label, value) {
     return '<div class="rs-summary-total-row"><span class="rs-row-label">' + label + '</span><span class="rs-row-value">' + value + '</span></div>';
