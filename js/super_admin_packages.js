@@ -8,6 +8,7 @@
 
 import './money_inputs.js';
 import { moneyInputValue } from './money.js';
+import { makeSelectSearchable } from './searchable_select.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -336,6 +337,7 @@ const addCateringCategoryBtn              = document.getElementById('addCatering
 const cateringPageMessage                 = document.getElementById('cateringPageMessage');
 const cateringPackagePickerCard           = document.getElementById('cateringPackagePickerCard');
 const cateringPackageSelect               = document.getElementById('cateringPackageSelect');
+makeSelectSearchable(cateringPackageSelect, { placeholder: 'Search packages\u2026', noResults: 'No packages match' });
 const cateringRestrictionsSection         = document.getElementById('cateringRestrictionsSection');
 const cateringRestrictionsBody            = document.getElementById('cateringRestrictionsBody');
 const activeCateringSection               = document.getElementById('activeCateringSection');
