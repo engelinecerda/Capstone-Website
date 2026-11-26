@@ -1,4 +1,5 @@
 import { portalSupabase as supabase } from './supabase.js';
+import { showConfirmModal } from './feedback_modal.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { initAdminSidebarBadges } from './admin_sidebar_counts.js';
@@ -607,10 +608,13 @@ async function submitIdReviewDecision(action) {
     idReviewNote.focus();
     return;
   }
-  if (action === 'approve' && !window.confirm(
-    `Confirm this is a genuine valid ID that belongs to ${idReviewCustomerName}.\n\n` +
-    'The ID is approved even though it has no signature to compare. Any of their contracts waiting on this ID are verified now, and their future bookings skip the signature comparison until they replace their ID.'
-  )) return;
+  if (action === 'approve' && !await showConfirmModal({
+    type: 'warning',
+    title: 'Approve this ID?',
+    message: `Confirm this is a genuine valid ID that belongs to ${idReviewCustomerName}. The ID is approved even though it has no signature to compare. Any of their contracts waiting on this ID are verified now, and their future bookings skip the signature comparison until they replace their ID.`,
+    confirmText: 'Yes, approve ID',
+    cancelText: 'Cancel'
+  })) return;
 
   setIdReviewBusy(true);
   setIdReviewMessage(action === 'approve' ? 'Approving…' : 'Sending your request…');

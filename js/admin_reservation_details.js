@@ -2,6 +2,7 @@ import './money_inputs.js';
 import { formatMoney, moneyInputValue } from './money.js';
 import { portalSupabase as supabase } from './supabase.js';
 import { markPendingSeen } from './pending_seen.js';
+import { showConfirmModal } from './feedback_modal.js';
 import { validateAdminSession, wireLogoutButton, watchAuthState } from './session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
 import { refreshAdminSidebarCounts } from './admin_sidebar_counts.js';
@@ -1661,10 +1662,13 @@ async function handleManualVerifyContract() {
   const reservation = currentReservation;
   if (!reservation) return;
 
-  const confirmed = window.confirm(
-    'Confirm you have opened the contract PDF and visually verified the signature is present and matches the client name.\n\n' +
-    'This will mark the contract as verified, bypassing the automatic scan, and allow the reservation to be approved.'
-  );
+  const confirmed = await showConfirmModal({
+    type: 'warning',
+    title: 'Verify this contract?',
+    message: 'Confirm you have opened the contract PDF and visually verified the signature is present and matches the client name. This will mark the contract as verified, bypassing the automatic scan, and allow the reservation to be approved.',
+    confirmText: 'Yes, mark as verified',
+    cancelText: 'Cancel'
+  });
   if (!confirmed) return;
 
   const button = signatureCheckPanel.querySelector('[data-action="manual-verify-contract"]');
@@ -1804,10 +1808,13 @@ async function submitIdReviewDecision(action) {
     idReviewNote.focus();
     return;
   }
-  if (action === 'approve' && !window.confirm(
-    'Confirm this is a genuine valid ID that belongs to the client.\n\n' +
-    'The ID is approved and this contract is marked verified, even though the ID has no signature to compare. Future bookings by this client skip the signature comparison until they replace their ID.'
-  )) return;
+  if (action === 'approve' && !await showConfirmModal({
+    type: 'warning',
+    title: 'Approve this ID?',
+    message: 'Confirm this is a genuine valid ID that belongs to the client. The ID is approved and this contract is marked verified, even though the ID has no signature to compare. Future bookings by this client skip the signature comparison until they replace their ID.',
+    confirmText: 'Yes, approve ID',
+    cancelText: 'Cancel'
+  })) return;
 
   setIdReviewBusy(true);
   setIdReviewMessage(action === 'approve' ? 'Approving\u2026' : 'Sending your request\u2026');
