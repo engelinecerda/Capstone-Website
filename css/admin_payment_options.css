@@ -484,6 +484,9 @@ select.field-input {
   margin: 4px 0 8px;
 }
 
+.tf-msg { min-height: 0; margin: 10px 0 0; }
+.tf-msg:empty { margin: 0; }
+.tf-origin-note { margin: 20px 0 0; }
 .tf-overrides-block {
   padding: 14px 0;
   border-bottom: 1px solid var(--border);
