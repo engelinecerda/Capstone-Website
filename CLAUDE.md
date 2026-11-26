@@ -125,7 +125,7 @@ The hamburger button and overlay are injected dynamically by `js/admin_sidebar_c
 
 ### CSS cache-busting — bump on every CSS edit
 
-`vercel.json` caches everything under `/css/*` for a full year (`immutable`), which is only safe because every reference to a first-party stylesheet — both `<link href="/css/*.css">` tags across every HTML file and the `@import url('./*.css')` statements between CSS files — carries a `?v=N` query string. **Whenever you edit any file in `css/`, you must bump that version number everywhere** (currently a single shared `?v=73` used site-wide, not per-file), or returning visitors keep getting the old cached copy for up to a year. To bump it: find-and-replace `?v=73` → `?v=74` (next integer) across every `.html` and `.css` file in the repo (mind the space in `admin/super admin/` when scripting it).
+`vercel.json` caches everything under `/css/*` for a full year (`immutable`), which is only safe because every reference to a first-party stylesheet — both `<link href="/css/*.css">` tags across every HTML file and the `@import url('./*.css')` statements between CSS files — carries a `?v=N` query string. **Whenever you edit any file in `css/`, you must bump that version number everywhere** (currently a single shared `?v=74` used site-wide, not per-file), or returning visitors keep getting the old cached copy for up to a year. To bump it: find-and-replace `?v=74` → `?v=74` (next integer) across every `.html` and `.css` file in the repo (mind the space in `admin/super admin/` when scripting it).
 
 This does **not** apply to `/js/*` — JS here is native ES modules with deep transitive `import` chains (most real logic lives in files reached only via `import ... from './x.js'` inside other JS files, never via `<script src>` directly), so versioning only the HTML entry-point `<script>` tags would leave everything they import silently uncached-busted. JS is instead capped at a 1-day cache (`vercel.json`, `/js/(.*)`) as a safer middle ground that needs no manual bumping.
 
@@ -236,3 +236,6 @@ The board stays open all day with the screen kept awake (wake lock), so it never
 
 ## Saving indicator (js/button_saving.js)
 Shared helper for 'Saving…' feedback on buttons: `bindSaving(el, handler, {submit, label})`, `withSaving`, `setButtonSaving`, `triggerButton`. The button is not `disabled`; it keeps its width, shows a spinner and ignores clicks while busy, then restores its label. Confirm-dialog flows (`showSettingsConfirm`) mark the clicked button busy only after the admin confirms. Use it for any new save/submit/approve button.
+
+## Customer 'Remember me' (login.html, js/login.js, js/supabase.js)
+Ticked (or no choice recorded) = session stays in localStorage until sign-out. Unticked = session-only: `setCustomerRememberMe(false)` sets `eli-customer-session-only`; open customer tabs keep a heartbeat, and a page that opens with no tab marker and a stale heartbeat (>30 s) discards the stored session (browser was closed). Admin/board pages are not affected.

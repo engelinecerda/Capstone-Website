@@ -344,6 +344,26 @@
     color: var(--brown-dark, #1E0C03);
 }
 
+/* Remember me — sits between the password field and the Login button */
+.remember-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: -4px 0 20px;
+}
+
+.remember-row input[type="checkbox"] {
+    flex-shrink: 0;
+    accent-color: var(--brown-primary, #3D1A0A);
+    cursor: pointer;
+}
+
+.remember-row label {
+    font-size: 13px;
+    color: var(--text-mid, #5A3420);
+    cursor: pointer;
+}
+
 /* ================================================
    Terms & Conditions Row
 ================================================ */

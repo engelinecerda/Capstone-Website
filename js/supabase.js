@@ -149,6 +149,90 @@ function clearCustomerRecoveryFlag() {
     if (!arrivingViaRecoveryLink) clearCustomerRecoveryFlag()
 })()
 
+// ── Customer 'Remember me' ──────────────────────────────────────────────────
+// Ticked (or no choice recorded — every session that existed before this
+// option, and any session not started from the login form): the session stays
+// in localStorage until the customer signs out, as before.
+// Unticked: the session is session-only. It is still kept in localStorage so
+// every tab shares it, but it ends when the browser is closed. A tab marks
+// itself alive in sessionStorage and the open tabs refresh a heartbeat in
+// localStorage; a page that opens with no marker and no recent heartbeat means
+// the browser was closed and reopened, so the stored session is discarded.
+const CUSTOMER_SESSION_ONLY_FLAG = 'eli-customer-session-only'
+const CUSTOMER_HEARTBEAT_KEY = 'eli-customer-heartbeat'
+const CUSTOMER_TAB_MARKER = 'eli-customer-tab-alive'
+const HEARTBEAT_EVERY_MS = 10000
+const HEARTBEAT_STALE_MS = 30000
+
+function beatCustomerHeartbeat() {
+    try { window.localStorage.setItem(CUSTOMER_HEARTBEAT_KEY, String(Date.now())) } catch (error) { /* storage unavailable */ }
+}
+
+function startCustomerHeartbeat() {
+    try { window.sessionStorage.setItem(CUSTOMER_TAB_MARKER, '1') } catch (error) { /* storage unavailable */ }
+    beatCustomerHeartbeat()
+    if (window.__eliCustomerHeartbeat) return
+    window.__eliCustomerHeartbeat = window.setInterval(beatCustomerHeartbeat, HEARTBEAT_EVERY_MS)
+    window.addEventListener('pagehide', beatCustomerHeartbeat)
+}
+
+// Called by the customer login form right before it signs in.
+export function setCustomerRememberMe(remember) {
+    if (typeof window === 'undefined' || !window.localStorage) return
+    try {
+        if (remember) {
+            window.localStorage.removeItem(CUSTOMER_SESSION_ONLY_FLAG)
+            window.localStorage.removeItem(CUSTOMER_HEARTBEAT_KEY)
+        } else {
+            window.localStorage.setItem(CUSTOMER_SESSION_ONLY_FLAG, '1')
+            startCustomerHeartbeat()
+        }
+    } catch (error) { /* storage unavailable: the session simply stays remembered */ }
+}
+
+;(function expireSessionOnlyCustomerSession() {
+    if (typeof window === 'undefined' || !window.localStorage) return
+
+    const path = window.location.pathname
+    if (path.startsWith('/admin') || path.startsWith('/board')) return
+
+    let sessionOnly = false
+    try { sessionOnly = window.localStorage.getItem(CUSTOMER_SESSION_ONLY_FLAG) === '1' } catch (error) { return }
+    if (!sessionOnly) return
+
+    let tabAlive = false
+    try { tabAlive = window.sessionStorage.getItem(CUSTOMER_TAB_MARKER) === '1' } catch (error) { /* treat as not alive */ }
+
+    if (!tabAlive) {
+        let lastBeat = 0
+        try { lastBeat = Number(window.localStorage.getItem(CUSTOMER_HEARTBEAT_KEY)) || 0 } catch (error) { /* ignore */ }
+
+        if (Date.now() - lastBeat > HEARTBEAT_STALE_MS) {
+            // No tab has been open for a while: the browser was closed. End the session.
+            let accessToken = ''
+            try {
+                const raw = window.localStorage.getItem(CUSTOMER_STORAGE_KEY)
+                accessToken = (raw && JSON.parse(raw)?.access_token) || ''
+            } catch (error) { /* unreadable session: removed below anyway */ }
+            try { window.localStorage.removeItem(CUSTOMER_STORAGE_KEY) } catch (error) { /* storage unavailable */ }
+            try { window.localStorage.removeItem(CUSTOMER_SESSION_ONLY_FLAG) } catch (error) { /* storage unavailable */ }
+            try { window.localStorage.removeItem(CUSTOMER_HEARTBEAT_KEY) } catch (error) { /* storage unavailable */ }
+            if (accessToken && typeof fetch === 'function') {
+                try {
+                    fetch(`${supabaseUrl}/auth/v1/logout?scope=local`, {
+                        method: 'POST',
+                        headers: { apikey: supabaseKey, Authorization: `Bearer ${accessToken}` },
+                        keepalive: true
+                    }).catch(() => {})
+                } catch (error) { /* best effort */ }
+            }
+            return
+        }
+    }
+
+    startCustomerHeartbeat()
+})()
+
 function makeClient(storageKey) {
     if (typeof window === 'undefined' || !window.supabase || typeof window.supabase.createClient !== 'function') {
         throw new Error('Supabase UMD bundle not loaded — add <script src=".../supabase-js@2.../dist/umd/supabase.js" defer> before this page\'s module scripts.')
@@ -168,7 +252,10 @@ function makeClient(storageKey) {
         // arrived. A sign-out ends the recovery state.
         client.auth.onAuthStateChange((event) => {
             if (event === 'PASSWORD_RECOVERY') setCustomerRecoveryFlag()
-            else if (event === 'SIGNED_OUT') clearCustomerRecoveryFlag()
+            else if (event === 'SIGNED_OUT') {
+                clearCustomerRecoveryFlag()
+                try { window.localStorage.removeItem(CUSTOMER_SESSION_ONLY_FLAG) } catch (error) { /* storage unavailable */ }
+            }
         })
     }
 

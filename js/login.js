@@ -1,4 +1,4 @@
-import { customerSupabase as supabase } from './supabase.js';
+import { customerSupabase as supabase, setCustomerRememberMe } from './supabase.js';
 import { initPasswordToggles } from './password_toggle.js';
 import { attachEmailGuard } from './input_validation.js';
 
@@ -9,6 +9,7 @@ const btn        = document.getElementById('login-btn');
 const msg        = document.getElementById('login-message');
 const emailInput = document.getElementById('login-email');
 const pwInput    = document.getElementById('login-password');
+const rememberInput = document.getElementById('login-remember');
 attachEmailGuard(emailInput);
 
 const MAX_ATTEMPTS = 5;
@@ -199,6 +200,9 @@ form.addEventListener('submit', async function (e) {
 
     setMsg('');
     setSubmitting(true);
+
+    // Decide before signing in so the new session is stored the right way.
+    setCustomerRememberMe(!!rememberInput?.checked);
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
