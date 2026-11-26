@@ -136,6 +136,15 @@ const recordPaymentFileName = document.getElementById('recordPaymentFileName');
 const recordPaymentFileRemoveBtn = document.getElementById('recordPaymentFileRemoveBtn');
 const recordPaymentNotesInput = document.getElementById('recordPaymentNotesInput');
 
+const idReviewModal = document.getElementById('idReviewModal');
+const idReviewGrid = document.getElementById('idReviewGrid');
+const idReviewNote = document.getElementById('idReviewNote');
+const idReviewStatus = document.getElementById('idReviewStatus');
+const idReviewMessage = document.getElementById('idReviewMessage');
+const idReviewApproveBtn = document.getElementById('idReviewApproveBtn');
+const idReviewRejectBtn = document.getElementById('idReviewRejectBtn');
+const idReviewCancelBtn = document.getElementById('idReviewCancelBtn');
+const idReviewClose = document.getElementById('idReviewClose');
 const receiptViewerModal = document.getElementById('receiptViewerModal');
 const receiptViewerClose = document.getElementById('receiptViewerClose');
 const receiptViewerBody = document.getElementById('receiptViewerBody');
@@ -498,6 +507,11 @@ async function fetchReservationContracts(reservationIds) {
   if (!reservationIds.length) return [];
   const extendedSelect = 'reservation_id, contract_url, verified_date, template_id, review_status, review_notes, reviewed_at';
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
+  // id_check_status tells the panel WHY a contract is pending (e.g. no signature
+  // on the ID). If that column isn't there yet, fall back to the older select.
+  const withIdCheck = await supabase.from('reservation_contracts').select(`${extendedSelect}, id_check_status`).in('reservation_id', reservationIds);
+  if (!withIdCheck.error) return withIdCheck.data || [];
+
   const { data, error } = await supabase.from('reservation_contracts').select(extendedSelect).in('reservation_id', reservationIds);
   if (!error) return data || [];
 
@@ -1598,6 +1612,21 @@ function renderSignatureCheckPanel(contract) {
     }
   }[state];
 
+  // Why the automatic ID check didn't approve it, when we know. A genuine ID
+  // with no signature can never match, so point the manager at the ID review.
+  const idStatus = String(contract.contract?.id_check_status || '');
+  const idReasons = {
+    no_id_signature: 'No signature was found on the customer\u2019s ID. If the ID is valid, review it and approve it.',
+    awaiting_id_review: 'Flagged: no signature was found on the customer\u2019s ID. Review the ID, then approve or reject it.',
+    mismatch: 'The signature on the ID didn\u2019t match the one drawn. Review the ID to decide.',
+    unclear_id: 'The ID photo was too unclear to compare. Review it, or ask the customer for a new one.',
+    id_rejected: 'You asked the customer for a new ID. Waiting for them to upload it.',
+    manual_approved: 'A manager reviewed the ID and approved this contract.'
+  };
+  if (idReasons[idStatus]) copy.sub = idReasons[idStatus];
+  const showIdReviewBtn = currentRole === 'manager'
+    && String(contract.contract?.review_status || '').toLowerCase() === 'pending_review';
+
   signatureCheckPanel.className = `signature-check-panel state-${state}`;
   // Manual override for whenever the automatic scan can't (or hasn't yet)
   // confirmed a signature — approval is otherwise permanently blocked with
@@ -1610,6 +1639,11 @@ function renderSignatureCheckPanel(contract) {
     <span class="signature-check-copy">
       <span class="signature-check-title">${escapeHtml(copy.title)}</span>
       <span class="signature-check-sub">${escapeHtml(copy.sub)}</span>
+      ${showIdReviewBtn ? `
+        <button type="button" class="signature-manual-verify-btn" data-action="review-customer-id">
+          Review customer&rsquo;s ID
+        </button>
+      ` : ''}
       ${showManualVerifyBtn ? `
         <button type="button" class="signature-manual-verify-btn" data-action="manual-verify-contract">
           I checked the contract — signature confirmed
@@ -1662,10 +1696,165 @@ async function handleManualVerifyContract() {
   }
 }
 
+// ── Manager review of the customer's valid ID ──────────────────────────
+// Photos never come straight from storage (staff have no read policy on the
+// private bucket). review-customer-id checks the caller is a manager, logs the
+// view and returns 2-minute signed links.
+async function readIdReviewError(error, fallback) {
+  try {
+    const body = await error?.context?.json?.();
+    if (body?.error) return String(body.error);
+  } catch { /* fall through */ }
+  return fallback;
+}
+
+function setIdReviewMessage(text = '', isError = false) {
+  if (!idReviewMessage) return;
+  idReviewMessage.textContent = text;
+  idReviewMessage.classList.toggle('error', !!isError);
+}
+
+let idReviewSaving = false;
+function setIdReviewBusy(busy) {
+  idReviewSaving = busy;
+  [idReviewApproveBtn, idReviewRejectBtn, idReviewCancelBtn, idReviewClose].forEach((btn) => {
+    if (btn) btn.disabled = busy;
+  });
+}
+
+function renderIdReviewFigure(label, url) {
+  if (!url) {
+    return `<figure class="id-review-figure"><figcaption>${escapeHtml(label)}</figcaption><div class="id-review-image-wrap"><p class="id-review-missing">Not uploaded.</p></div></figure>`;
+  }
+  return `<figure class="id-review-figure"><figcaption>${escapeHtml(label)}</figcaption><div class="id-review-image-wrap"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}"></div><a class="id-review-open-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open larger</a></figure>`;
+}
+
+function closeIdReview() {
+  if (idReviewSaving) return;   // a decision is being saved
+  idReviewModal?.classList.add('hidden');
+  idReviewModal?.setAttribute('aria-hidden', 'true');
+  // Drop the signed links as soon as the dialog closes.
+  if (idReviewGrid) idReviewGrid.innerHTML = '';
+  if (idReviewNote) idReviewNote.value = '';
+  setIdReviewMessage('');
+  unlockBodyScroll();
+}
+
+async function openIdReview() {
+  const reservation = currentReservation;
+  if (!reservation || currentRole !== 'manager') return;
+
+  idReviewGrid.innerHTML = '<p class="id-review-missing">Loading the ID\u2026</p>';
+  idReviewNote.value = '';
+  idReviewStatus?.classList.add('hidden');
+  setIdReviewMessage('');
+  setIdReviewBusy(true);
+  idReviewModal.classList.remove('hidden');
+  idReviewModal.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
+
+  try {
+    const { data, error } = await supabase.functions.invoke('review-customer-id', {
+      body: { action: 'view', reservation_id: reservation.reservation_id }
+    });
+    if (error || !data?.success) {
+      throw new Error(await readIdReviewError(error, data?.error || 'We couldn\u2019t load the ID right now.'));
+    }
+    idReviewGrid.innerHTML = renderIdReviewFigure('Front of ID', data.front_url) + renderIdReviewFigure('Back of ID', data.back_url);
+
+    // What the automatic signature check found, and any earlier decision.
+    const reviewCopy = {
+      flagged: ['flagged', 'Flagged: no handwritten signature was found on this ID. Decide whether to accept it.'],
+      clear: ['clear', 'The automatic check found a signature on this ID.'],
+      approved: ['approved', 'Already approved by a manager.'],
+      rejected: ['rejected', `Rejected by a manager${data.review?.note ? `: ${data.review.note}` : '.'}`]
+    }[data.review?.status];
+    if (idReviewStatus) {
+      idReviewStatus.classList.toggle('hidden', !reviewCopy);
+      idReviewStatus.className = `id-review-status${reviewCopy ? ` state-${reviewCopy[0]}` : ' hidden'}`;
+      idReviewStatus.textContent = reviewCopy ? reviewCopy[1] : '';
+    }
+    if (!data.front_url && !data.back_url) {
+      setIdReviewMessage('The customer has no ID on file. Ask them for a new one.', true);
+    }
+    // Approving needs something to look at; asking for a new ID never does.
+    idReviewApproveBtn.disabled = !data.front_url && !data.back_url;
+    idReviewRejectBtn.disabled = false;
+    idReviewCancelBtn.disabled = false;
+    idReviewClose.disabled = false;
+  } catch (error) {
+    idReviewGrid.innerHTML = '';
+    setIdReviewMessage(error.message || 'We couldn\u2019t load the ID right now.', true);
+    idReviewCancelBtn.disabled = false;
+    idReviewClose.disabled = false;
+  }
+}
+
+async function submitIdReviewDecision(action) {
+  const reservation = currentReservation;
+  if (!reservation) return;
+  const note = idReviewNote.value.replace(/\s+/g, ' ').trim();
+
+  if (action === 'reject' && !note) {
+    setIdReviewMessage('Please tell the customer what is wrong with the ID.', true);
+    idReviewNote.focus();
+    return;
+  }
+  if (action === 'approve' && !window.confirm(
+    'Confirm this is a genuine valid ID that belongs to the client.\n\n' +
+    'The ID is approved and this contract is marked verified, even though the ID has no signature to compare. Future bookings by this client skip the signature comparison until they replace their ID.'
+  )) return;
+
+  setIdReviewBusy(true);
+  setIdReviewMessage(action === 'approve' ? 'Approving\u2026' : 'Sending your request\u2026');
+  try {
+    const { data, error } = await supabase.functions.invoke('review-customer-id', {
+      body: { action, reservation_id: reservation.reservation_id, note }
+    });
+    if (error || !data?.success) {
+      throw new Error(await readIdReviewError(error, data?.error || 'Something went wrong. Please try again.'));
+    }
+
+    await logAudit({
+      action: action === 'approve' ? 'Approved Customer ID' : 'Rejected Customer ID',
+      category: 'contract',
+      details: action === 'approve'
+        ? `Reviewed the customer's ID and approved it (contract verified).${note ? ` Note: ${note}` : ''}`
+        : `Rejected the customer's ID; they were asked to upload it again. Reason: ${note}`,
+      entityId: reservation.reservation_id
+    });
+
+    setIdReviewBusy(false);
+    closeIdReview();
+    await reloadAndRender(action === 'approve'
+      ? 'ID approved. The contract is verified and the reservation can now be approved.'
+      : 'ID rejected. The customer was asked to upload it again.');
+  } catch (error) {
+    setIdReviewMessage(error.message || 'Something went wrong. Please try again.', true);
+    setIdReviewBusy(false);
+  }
+}
+
+function wireIdReviewModal() {
+  idReviewApproveBtn?.addEventListener('click', () => submitIdReviewDecision('approve'));
+  idReviewRejectBtn?.addEventListener('click', () => submitIdReviewDecision('reject'));
+  idReviewCancelBtn?.addEventListener('click', closeIdReview);
+  idReviewClose?.addEventListener('click', closeIdReview);
+  idReviewModal?.addEventListener('click', (event) => {
+    if (event.target === idReviewModal) closeIdReview();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && idReviewModal && !idReviewModal.classList.contains('hidden')) closeIdReview();
+  });
+}
+
 function wireSignatureCheckPanel() {
   signatureCheckPanel.addEventListener('click', (event) => {
     if (event.target.closest('[data-action="manual-verify-contract"]')) {
       handleManualVerifyContract();
+    }
+    if (event.target.closest('[data-action="review-customer-id"]')) {
+      openIdReview();
     }
   });
 }
@@ -2374,6 +2563,7 @@ wireRecordPaymentModal();
 wireAddChargeModal();
 wireCustomRequests();
 wireSignatureCheckPanel();
+wireIdReviewModal();
 wireStickyHeaderScroll();
 wireBreadcrumb();
 wireLogoutButton();

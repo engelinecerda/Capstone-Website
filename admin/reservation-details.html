@@ -293,6 +293,39 @@
     </div>
   </div>
 
+  <!-- Manager review of the customer's valid ID (front + back). Photos come from the
+       review-customer-id Edge Function as 2-minute signed links; every view is logged. -->
+  <div class="modal-backdrop hidden" id="idReviewModal" aria-hidden="true">
+    <div class="modal-card id-review-card" role="dialog" aria-modal="true" aria-labelledby="idReviewTitle">
+      <div class="assignment-modal-header">
+        <div>
+          <h2 class="assignment-modal-title" id="idReviewTitle">Customer&rsquo;s valid ID</h2>
+          <p class="assignment-modal-subtitle" id="idReviewSubtitle">Check the ID, then approve or reject it.</p>
+        </div>
+        <button type="button" class="assignment-modal-close" id="idReviewClose" aria-label="Close ID review">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="assignment-modal-body">
+        <p class="id-review-status hidden" id="idReviewStatus"></p>
+        <p class="id-review-privacy">This is a personal document. Opening it is recorded. Don&rsquo;t save, copy or share the photos.</p>
+        <div class="id-review-grid" id="idReviewGrid"></div>
+
+        <label class="record-payment-field-label" for="idReviewNote">Note <span class="record-payment-optional">(required to reject &mdash; the customer will see it)</span></label>
+        <textarea id="idReviewNote" class="record-payment-textarea" rows="2" maxlength="500" placeholder="e.g. The back of the ID is cut off. Please upload the full card."></textarea>
+
+        <p class="modal-message" id="idReviewMessage"></p>
+      </div>
+
+      <div class="assignment-modal-footer">
+        <button type="button" class="header-action-btn" id="idReviewCancelBtn">Close</button>
+        <button type="button" class="header-action-btn" id="idReviewRejectBtn">Reject ID</button>
+        <button type="button" class="header-action-btn primary" id="idReviewApproveBtn">Approve ID</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop hidden" id="receiptViewerModal" aria-hidden="true">
     <div class="modal-card receipt-viewer-card" role="dialog" aria-modal="true" aria-labelledby="receiptViewerTitle">
       <div class="assignment-modal-header">

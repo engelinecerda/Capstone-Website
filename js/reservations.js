@@ -36,7 +36,7 @@ import { buildBreakdownRows, buildRequestRows, formatBreakdownText, formatReques
 import { computeTransportFee, describeTransportFee, transportOrigins, transportCoverage, pinInCoverage } from '/js/transport_fee.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
 import { attachPhoneMask } from '/js/phone_format.js';
-import { getIdFileError, resizeIdImage, fetchValidIdStatus, validIdFileExists, saveValidId } from '/js/valid_id.js';
+import { getIdFileError, resizeIdImage, fetchValidIdStatus, validIdFilesExist, saveValidId, checkSavedIdSignature } from '/js/valid_id.js';
 import { attachNameGuard, attachEmailGuard, attachIntegerGuard, attachPhonePasteNormalizer, validatePersonName, validateEmailAddress, validatePhoneNumber } from '/js/input_validation.js';
 
 const { data: { session } } = await supabase.auth.getSession();
@@ -706,12 +706,19 @@ const sigModeTypeBtn          = document.getElementById('sig-mode-type');
 const idVerifyBlock           = document.getElementById('id-verify-block');
 const idVerifySaved           = document.getElementById('id-verify-saved');
 const idUploadArea            = document.getElementById('id-upload-area');
-const idUploadInput           = document.getElementById('id-upload-input');
-const idUploadTrigger         = document.getElementById('id-upload-trigger');
-const idUploadPreview         = document.getElementById('id-upload-preview');
-const idUploadThumb           = document.getElementById('id-upload-thumb');
-const idUploadName            = document.getElementById('id-upload-name');
-const idUploadRemove          = document.getElementById('id-upload-remove');
+// Front and back each have their own slot: { el, input, trigger, preview, thumb, name, remove }.
+const idUploadSlots = {};
+document.querySelectorAll('#id-upload-area .id-verify-slot').forEach((el) => {
+    idUploadSlots[el.dataset.side] = {
+        el,
+        input:   el.querySelector('[data-role="input"]'),
+        trigger: el.querySelector('[data-role="trigger"]'),
+        preview: el.querySelector('[data-role="preview"]'),
+        thumb:   el.querySelector('[data-role="thumb"]'),
+        name:    el.querySelector('[data-role="name"]'),
+        remove:  el.querySelector('[data-role="remove"]')
+    };
+});
 const idVerifyStatus          = document.getElementById('id-verify-status');
 const signatureCapturedBadge  = document.getElementById('signature-captured-badge');
 const signatureGuidePlaceholder = document.getElementById('signature-guide-placeholder');
@@ -1493,28 +1500,48 @@ async function getSignatureDataUrl() {
 // result — a mismatch just leaves the contract pending (see the success
 // screen and js/reservation_details.js). The ID is never stored; only the
 // verdict is.
+const ID_SIDE_NAMES = ['front', 'back'];
 const idState = {
-    file: null,         // File the customer picked
-    dataUrl: null,      // resized JPEG actually sent (built on first check)
-    objectUrl: null,    // thumbnail preview URL
-    savedOnFile: false, // the customer already has an ID on My Profile -> no upload here
-    savedToProfile: false // this form's upload has already been saved to My Profile
+    // Per side: the File picked, the resized JPEG that is sent, the thumbnail
+    // URL, and whether this form already saved it to My Profile.
+    front: { file: null, dataUrl: null, objectUrl: null, savedToProfile: false },
+    back:  { file: null, dataUrl: null, objectUrl: null, savedToProfile: false },
+    // Which sides are already on the customer's My Profile (no upload needed).
+    onFile: { front: false, back: false }
 };
 
-// With an ID on the profile the upload controls give way to an "ID on file"
-// note; without one the customer uploads here.
-function showIdSavedMode(isSaved) {
-    idState.savedOnFile = isSaved;
-    idVerifySaved?.classList.toggle('hidden', !isSaved);
-    idUploadArea?.classList.toggle('hidden', isSaved);
-    if (isSaved) setIdVerifyStatus('');
+function idIsComplete() {
+    return ID_SIDE_NAMES.every((side) => idState.onFile[side] || idState[side].file);
+}
+
+// Sides already on the profile give way to an "ID on file" note; any side still
+// missing keeps its upload slot. With both on file the whole upload area hides.
+function applyIdOnFile(onFile) {
+    idState.onFile = { front: !!onFile.front, back: !!onFile.back };
+    const complete = idState.onFile.front && idState.onFile.back;
+    idVerifySaved?.classList.toggle('hidden', !complete);
+    idUploadArea?.classList.toggle('hidden', complete);
+    ID_SIDE_NAMES.forEach((side) => {
+        idUploadSlots[side]?.el.classList.toggle('hidden', idState.onFile[side]);
+    });
+    if (complete) setIdVerifyStatus('');
+    else if (idState.onFile.front && !idState.onFile.back) {
+        setIdVerifyStatus('Your front is on file. Please add the back of your ID.');
+    }
 }
 
 async function loadSavedIdState() {
     if (!ID_VERIFICATION_ENABLED || !isLoggedIn) return;
     try {
         const status = await fetchValidIdStatus(supabase, session.user.id);
-        showIdSavedMode(status.hasId);
+        // Without the back column (migration pending) a front alone is complete.
+        if (status.rejected) {
+            // Our team rejected the saved ID: new photos are needed, so nothing counts as on file.
+            applyIdOnFile({ front: false, back: false });
+            setIdVerifyStatus('Our team couldn\u2019t accept your saved ID' + (status.reviewNote ? ': ' + status.reviewNote : '.') + ' Please upload new photos of the front and back.', 'error');
+        } else {
+            applyIdOnFile({ front: status.hasFront, back: status.hasBack || (status.backUnavailable && status.hasFront) });
+        }
     } catch (error) {
         // Can't tell -> fall back to asking for the upload here.
         console.warn('[reservations] could not check for a saved ID:', error);
@@ -1528,33 +1555,38 @@ function setIdVerifyStatus(msg, kind = '') {
     idVerifyStatus.classList.toggle('is-success', kind === 'success');
 }
 
-function clearIdFile() {
-    if (idState.objectUrl) URL.revokeObjectURL(idState.objectUrl);
-    idState.file = null;
-    idState.dataUrl = null;
-    idState.objectUrl = null;
-    idState.savedToProfile = false;
-    if (idUploadInput) idUploadInput.value = '';
-    if (idUploadThumb) idUploadThumb.removeAttribute('src');
-    idUploadPreview?.classList.add('hidden');
-    idUploadTrigger?.classList.remove('hidden');
+function clearIdFile(side) {
+    const state = idState[side];
+    const slot = idUploadSlots[side];
+    if (!state || !slot) return;
+    if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+    state.file = null;
+    state.dataUrl = null;
+    state.objectUrl = null;
+    state.savedToProfile = false;
+    if (slot.input) slot.input.value = '';
+    if (slot.thumb) slot.thumb.removeAttribute('src');
+    slot.preview?.classList.add('hidden');
+    slot.trigger?.classList.remove('hidden');
     setIdVerifyStatus('');
 }
 
-function setIdFile(file) {
+function setIdFile(file, side) {
+    const slot = idUploadSlots[side];
+    if (!slot) return;
     const problem = getIdFileError(file);
+    clearIdFile(side);
     if (problem) {
-        clearIdFile();
         setIdVerifyStatus(problem, 'error');
         return;
     }
-    clearIdFile();
-    idState.file = file;
-    idState.objectUrl = URL.createObjectURL(file);
-    if (idUploadThumb) idUploadThumb.src = idState.objectUrl;
-    if (idUploadName) idUploadName.textContent = file.name;
-    idUploadPreview?.classList.remove('hidden');
-    idUploadTrigger?.classList.add('hidden');
+    const state = idState[side];
+    state.file = file;
+    state.objectUrl = URL.createObjectURL(file);
+    if (slot.thumb) slot.thumb.src = state.objectUrl;
+    if (slot.name) slot.name.textContent = file.name;
+    slot.preview?.classList.remove('hidden');
+    slot.trigger?.classList.add('hidden');
 }
 
 function scrollIdVerifyIntoView() {
@@ -1586,47 +1618,89 @@ const ID_CHECK_REASONS = {
 // to use that one. Nothing is checked here — the comparison runs server-side
 // after the reservation is saved.
 async function getIdForSubmit(userId) {
-    if (!ID_VERIFICATION_ENABLED) return { dataUrl: null, useSaved: false, newlySaved: false };
+    const none = { dataUrl: null, backDataUrl: null, useSaved: false, newlySaved: false, flagged: false };
+    if (!ID_VERIFICATION_ENABLED) return none;
 
-    if (idState.savedOnFile) {
-        // The profile flag could be stale; catch that BEFORE the reservation is
-        // saved, not after. If the lookup itself fails, let the server decide.
-        let exists = true;
-        try { exists = await validIdFileExists(supabase, userId); } catch { /* server decides */ }
-        if (exists) return { dataUrl: null, useSaved: true, newlySaved: false };
-        showIdSavedMode(false);
-        throw failIdCheck('We couldn\u2019t find the ID saved on your profile. Please upload it again.');
-    }
-
-    if (!idState.file) throw failIdCheck('Please upload a photo of your valid ID before submitting.');
-
-    if (!idState.dataUrl) {
-        try {
-            idState.dataUrl = await resizeIdImage(idState.file);
-        } catch {
-            throw failIdCheck('We couldn\u2019t read that photo. Please upload your ID again.');
+    // Sides already on the profile: the flag could be stale, so catch that
+    // BEFORE the reservation is saved, not after. If the lookup itself fails,
+    // let the server decide.
+    if (idState.onFile.front || idState.onFile.back) {
+        let exists = { front: true, back: true };
+        try { exists = await validIdFilesExist(supabase, userId); } catch { /* server decides */ }
+        const stale = ID_SIDE_NAMES.filter((side) => idState.onFile[side] && !exists[side]);
+        if (stale.length) {
+            applyIdOnFile({ front: idState.onFile.front && exists.front, back: idState.onFile.back && exists.back });
+            throw failIdCheck('We couldn\u2019t find the ' + stale.join(' and ') + ' of the ID saved on your profile. Please upload it again.');
         }
     }
 
-    // Keep it on My Profile for next time. Best effort: a storage hiccup must
-    // not block the booking, the photo still goes with this submission.
-    let newlySaved = idState.savedToProfile;
-    if (!idState.savedToProfile) {
-        try {
-            await saveValidId(supabase, userId, idState.dataUrl);
-            idState.savedToProfile = true;
-            newlySaved = true;
-        } catch (error) {
-            console.warn('[reservations] could not save the ID to the profile:', error);
+    for (const side of ID_SIDE_NAMES) {
+        if (!idState.onFile[side] && !idState[side].file) {
+            throw failIdCheck('Please upload a photo of the ' + side + ' of your valid ID before submitting.');
         }
     }
-    return { dataUrl: idState.dataUrl, useSaved: false, newlySaved };
+
+    // Resize and keep any newly picked photo on My Profile for next time. Best
+    // effort: a storage hiccup must not block the booking, the photo still goes
+    // with this submission.
+    let newlySaved = false;
+    for (const side of ID_SIDE_NAMES) {
+        const state = idState[side];
+        if (idState.onFile[side]) continue;
+        if (!state.dataUrl) {
+            try {
+                state.dataUrl = await resizeIdImage(state.file);
+            } catch {
+                throw failIdCheck('We couldn\u2019t read that photo of the ' + side + ' of your ID. Please upload it again.');
+            }
+        }
+        if (!state.savedToProfile) {
+            try {
+                await saveValidId(supabase, userId, state.dataUrl, side);
+                state.savedToProfile = true;
+                newlySaved = true;
+            } catch (error) {
+                console.warn('[reservations] could not save the ID to the profile:', error);
+            }
+        }
+    }
+
+    // Look for a signature on the freshly saved ID. An unreadable photo is sent
+    // back for a better one BEFORE the reservation is saved; "no signature" is
+    // fine and just flags the ID for our team (the booking goes ahead).
+    let flagged = false;
+    if (newlySaved) {
+        const result = await checkSavedIdSignature(supabase);
+        if (result.needsBetterPhoto) {
+            ID_SIDE_NAMES.forEach((side) => { if (!idState.onFile[side]) clearIdFile(side); });
+            throw failIdCheck(result.message);
+        }
+        flagged = result.flagged;
+    }
+
+    return {
+        flagged,
+        // A new front goes with the request; otherwise the server reads the saved one.
+        dataUrl: idState.onFile.front ? null : idState.front.dataUrl,
+        // A new back goes with the request; otherwise the server uses the saved back.
+        backDataUrl: idState.onFile.back ? null : idState.back.dataUrl,
+        useSaved: idState.onFile.front,
+        newlySaved
+    };
 }
 
 // The note under "Reservation Submitted!" about how the signature check went.
 function buildIdCheckNoteHtml(idCheck, reservationId) {
     if (!idCheck) return '';
     const box = 'margin:16px auto 0;max-width:460px;padding:12px 14px;border-radius:10px;font-size:13.5px;line-height:1.6;text-align:left;';
+
+    // The ID has no signature: it is waiting for our team, nothing for the customer to fix.
+    if (idCheck.verdict === 'awaiting_id_review') {
+        return '<p style="' + box + 'background:#FFF6E5;border:1px solid #F0D9A8;color:#6B3A1F;"><i class="ti ti-info-circle" aria-hidden="true" style="margin-right:6px;"></i><strong>Your ID is being reviewed.</strong> We couldn\u2019t find a signature on it, so our team will check it and approve your contract. You\u2019ll be notified once it\u2019s done.</p>';
+    }
+    if (idCheck.verdict === 'id_approved') {
+        return '<p style="' + box + 'background:#F1F8F2;border:1px solid #CFE5D3;color:#2E7D4F;"><i class="ti ti-shield-check" aria-hidden="true" style="margin-right:6px;"></i><strong>Contract approved.</strong> Our team already approved your ID, so no signature check was needed.</p>';
+    }
 
     if (idCheck.verified) {
         return '<p style="' + box + 'background:#F1F8F2;border:1px solid #CFE5D3;color:#2E7D4F;"><i class="ti ti-shield-check" aria-hidden="true" style="margin-right:6px;"></i><strong>Signature verified.</strong> It matches the signature on your ID, so your contract has been approved.</p>';
@@ -4953,8 +5027,8 @@ function validate(n) {
             setSignatureStatus(signatureState.mode === 'draw' ? 'Please sign to continue.' : 'Please type your name to continue.', true);
             return false;
         }
-        if (ID_VERIFICATION_ENABLED && !idState.savedOnFile && !idState.file) {
-            setIdVerifyStatus('Please upload a photo of your valid ID to continue.', 'error');
+        if (ID_VERIFICATION_ENABLED && !idIsComplete()) {
+            setIdVerifyStatus('Please upload photos of the front and back of your valid ID to continue.', 'error');
             scrollIdVerifyIntoView();
             return false;
         }
@@ -5250,12 +5324,15 @@ if (ID_VERIFICATION_ENABLED) {
     // way to sign while the check is on.
     sigModeDrawBtn?.parentElement?.classList.add('hidden');
 }
-idUploadTrigger?.addEventListener('click', () => idUploadInput?.click());
-idUploadInput?.addEventListener('change', () => {
-    const file = idUploadInput.files?.[0];
-    if (file) setIdFile(file);
+ID_SIDE_NAMES.forEach((side) => {
+    const slot = idUploadSlots[side];
+    slot?.trigger?.addEventListener('click', () => slot.input?.click());
+    slot?.input?.addEventListener('change', () => {
+        const file = slot.input.files?.[0];
+        if (file) setIdFile(file, side);
+    });
+    slot?.remove?.addEventListener('click', () => clearIdFile(side));
 });
-idUploadRemove?.addEventListener('click', clearIdFile);
 loadSavedIdState();   // not awaited: don't hold up the rest of the page
 policyButtons.forEach(btn => btn.addEventListener('click', () => openPolicyModal(btn.dataset.policy)));
 policyModalClose?.addEventListener('click', closePolicyModal);
@@ -5493,6 +5570,8 @@ async function submitDone() {
                 // Compared with the signature on the ID right after the
                 // contract is created (null when the check is switched off).
                 id_image_data_url: idForSubmit.dataUrl,
+                // Back of the ID (omitted when the saved one should be used).
+                id_back_image_data_url: idForSubmit.backDataUrl,
                 // An ID already saved on My Profile is read by the server.
                 use_saved_id: idForSubmit.useSaved,
                 signer_name: signerName,

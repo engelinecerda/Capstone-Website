@@ -498,21 +498,43 @@
                             </div>
 
                             <div id="id-upload-area">
-                                <p class="id-verify-help">Upload a clear photo of a government-issued ID that shows your signature. When you submit, we compare it with the signature you drew above: if they match, your contract is approved right away; if not, your contract stays pending and we&rsquo;ll ask you to replace your ID or sign again.</p>
+                                <p class="id-verify-help">Upload a clear photo of the <strong>front and back</strong> of your valid ID (your signature may be on either side). When you submit, we compare it with the signature you drew above: if they match, your contract is approved right away; if not, your contract stays pending and we&rsquo;ll ask you to replace your ID or sign again. If your ID has no signature, our team will review it.</p>
                                 <p class="id-verify-help id-verify-save-note"><i class="ti ti-lock" aria-hidden="true"></i> Your ID will be saved privately to your <strong>My Profile</strong>, so you won&rsquo;t need to upload it again. You can also upload it there, and replace or remove it anytime.</p>
-                                <input type="file" id="id-upload-input" class="id-verify-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of your valid ID">
-                                <button type="button" class="id-verify-drop" id="id-upload-trigger">
-                                    <i class="ti ti-id" aria-hidden="true"></i>
-                                    <span id="id-upload-label">Choose a photo of your ID</span>
-                                </button>
-                                <div class="id-verify-preview hidden" id="id-upload-preview">
-                                    <img id="id-upload-thumb" alt="Preview of your uploaded ID">
-                                    <div class="id-verify-preview-meta">
-                                        <span id="id-upload-name"></span>
-                                        <button type="button" class="signature-clear-btn" id="id-upload-remove">
-                                            <i class="ti ti-trash" aria-hidden="true"></i> Remove
-                                        </button>
+                                <div class="id-verify-slots">
+                                <div class="id-verify-slot" data-side="front">
+                                    <span class="id-verify-slot-label">Front of ID</span>
+                                    <input type="file" class="id-verify-input" data-role="input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of the front of your valid ID">
+                                    <button type="button" class="id-verify-drop" data-role="trigger">
+                                        <i class="ti ti-id" aria-hidden="true"></i>
+                                        <span>Choose a photo of the front</span>
+                                    </button>
+                                    <div class="id-verify-preview hidden" data-role="preview">
+                                        <img data-role="thumb" alt="Preview of the front of your ID">
+                                        <div class="id-verify-preview-meta">
+                                            <span data-role="name"></span>
+                                            <button type="button" class="signature-clear-btn" data-role="remove">
+                                                <i class="ti ti-trash" aria-hidden="true"></i> Remove
+                                            </button>
+                                        </div>
                                     </div>
+                                </div>
+                                <div class="id-verify-slot" data-side="back">
+                                    <span class="id-verify-slot-label">Back of ID</span>
+                                    <input type="file" class="id-verify-input" data-role="input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of the back of your valid ID">
+                                    <button type="button" class="id-verify-drop" data-role="trigger">
+                                        <i class="ti ti-id" aria-hidden="true"></i>
+                                        <span>Choose a photo of the back</span>
+                                    </button>
+                                    <div class="id-verify-preview hidden" data-role="preview">
+                                        <img data-role="thumb" alt="Preview of the back of your ID">
+                                        <div class="id-verify-preview-meta">
+                                            <span data-role="name"></span>
+                                            <button type="button" class="signature-clear-btn" data-role="remove">
+                                                <i class="ti ti-trash" aria-hidden="true"></i> Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 </div>
                             </div>
                             <p class="id-verify-status" id="id-verify-status" aria-live="polite"></p>

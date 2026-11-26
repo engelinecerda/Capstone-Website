@@ -1,13 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   applyIdCheckResult,
-  compareIdAndSignature,
+  CUSTOMER_RETRY_STATES,
+  decideIdOutcome,
   fetchStoredSignature,
+  loadSavedIdBackForUser,
   loadSavedIdForUser,
   MAX_ID_BYTES,
   MAX_ID_CHECK_ATTEMPTS,
   parseDataUrl,
-  RETRYABLE_VERDICTS,
 } from '../_shared/id_signature_check.ts';
 
 // "Re-upload my ID" retry for a contract that is still pending because the
@@ -81,6 +82,14 @@ Deno.serve(async (req: Request) => {
   let id = useSavedId
     ? null
     : parseDataUrl(body.id_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES);
+  // Back of the ID: optional; a photo sent here wins over the saved one.
+  const sentBack = body.id_back_image_data_url !== undefined && body.id_back_image_data_url !== null;
+  let idBack = sentBack
+    ? parseDataUrl(body.id_back_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES)
+    : null;
+  if (sentBack && !idBack) {
+    return jsonResponse({ success: false, error: 'A valid image of the back of your ID is required.' }, 400);
+  }
   if (!reservationId || (!useSavedId && !id)) {
     return jsonResponse(
       { success: false, error: 'A reservation and a valid ID image are required.' },
@@ -100,6 +109,14 @@ Deno.serve(async (req: Request) => {
           },
           409,
         );
+      }
+    }
+
+    if (!idBack) {
+      try {
+        idBack = await loadSavedIdBackForUser(supabase, userId);
+      } catch (loadError) {
+        console.error('saved id back load failed', { error: String((loadError as Error).message) });
       }
     }
 
@@ -126,7 +143,7 @@ Deno.serve(async (req: Request) => {
     if (contract.review_status !== 'pending_review') {
       return jsonResponse({ success: false, error: 'This contract has already been reviewed.' }, 409);
     }
-    const retryable = [...RETRYABLE_VERDICTS, 'error'] as string[];
+    const retryable = CUSTOMER_RETRY_STATES;
     if (!contract.id_check_status || !retryable.includes(contract.id_check_status)) {
       return jsonResponse({ success: false, error: 'This contract doesn\u2019t need another ID check.' }, 409);
     }
@@ -159,7 +176,7 @@ Deno.serve(async (req: Request) => {
 
     console.log('verify-id-signature started', { user_id: userId, reservation_id: reservationId });
 
-    const verdict = await compareIdAndSignature(id!, sig);
+    const verdict = await decideIdOutcome(supabase, userId, id!, idBack, sig);
     const result = await applyIdCheckResult(supabase, {
       reservationId,
       reservationNumber: reservation.reservation_number,

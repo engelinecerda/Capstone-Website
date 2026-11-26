@@ -2,15 +2,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PDFDocument, StandardFonts, rgb, degrees } from 'https://esm.sh/pdf-lib@1.17.1';
 import {
   applyIdCheckResult,
-  compareIdAndSignature,
+  CUSTOMER_RETRY_STATES,
+  decideIdOutcome,
+  type IdOutcome,
+  loadSavedIdBackForUser,
   loadSavedIdForUser,
   MAX_ID_BYTES,
   MAX_ID_CHECK_ATTEMPTS,
   MAX_SIGNATURE_BYTES,
   parseDataUrl,
-  RETRYABLE_VERDICTS,
   recordIdCheckError,
-  type Verdict,
 } from '../_shared/id_signature_check.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -922,6 +923,7 @@ Deno.serve(async (req: Request) => {
   let agreement_viewed_at: string | undefined;
   let time_zone = DEFAULT_TIME_ZONE;
   let id_image_data_url: unknown;
+  let id_back_image_data_url: unknown;
   let use_saved_id = false;
   let resign = false;
   let clientCustomRequests: string[] = [];
@@ -929,6 +931,7 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json();
     id_image_data_url = body.id_image_data_url;
+    id_back_image_data_url = body.id_back_image_data_url;
     use_saved_id = body.use_saved_id === true;
     resign = body.resign === true;
     // Titles of the custom requests the customer typed on the form. They are
@@ -1011,6 +1014,15 @@ Deno.serve(async (req: Request) => {
   if (sentIdImage && !idImage) {
     return jsonResponse({ success: false, error: 'A valid ID image is required.' }, 400);
   }
+  // Back of the ID: optional. A photo sent with the request wins; otherwise the
+  // back saved on the profile is picked up below (best effort).
+  const sentIdBack = id_back_image_data_url !== undefined && id_back_image_data_url !== null;
+  let idBackImage = sentIdBack
+    ? parseDataUrl(id_back_image_data_url, ['image/jpeg', 'image/png', 'image/webp'], MAX_ID_BYTES)
+    : null;
+  if (sentIdBack && !idBackImage) {
+    return jsonResponse({ success: false, error: 'A valid image of the back of your ID is required.' }, 400);
+  }
   if (resign && !wantsIdCheck) {
     return jsonResponse({ success: false, error: 'Re-signing requires your ID.' }, 400);
   }
@@ -1044,6 +1056,15 @@ Deno.serve(async (req: Request) => {
         },
         409,
       );
+    }
+  }
+
+  // The back of the saved ID, when the request didn't bring a new one.
+  if (wantsIdCheck && !idBackImage) {
+    try {
+      idBackImage = await loadSavedIdBackForUser(supabase, callerId!);
+    } catch (loadError) {
+      console.error('saved id back load failed', { error: String((loadError as Error).message) });
     }
   }
 
@@ -1088,7 +1109,7 @@ Deno.serve(async (req: Request) => {
       if (pending.review_status !== 'pending_review') {
         return jsonResponse({ success: false, error: 'This contract has already been reviewed.' }, 409);
       }
-      const retryable = [...RETRYABLE_VERDICTS, 'error'] as string[];
+      const retryable = CUSTOMER_RETRY_STATES;
       if (!pending.id_check_status || !retryable.includes(pending.id_check_status)) {
         return jsonResponse({ success: false, error: 'This contract doesn\u2019t need to be signed again.' }, 409);
       }
@@ -1125,9 +1146,9 @@ Deno.serve(async (req: Request) => {
 
       // Compare FIRST. A signature that still doesn't match never replaces
       // anything, so no PDF is built for it.
-      let verdict: Verdict;
+      let verdict: IdOutcome;
       try {
-        verdict = await compareIdAndSignature(idImage!, sigImage!);
+        verdict = await decideIdOutcome(supabase, reservation.user_id, idImage!, idBackImage, sigImage!);
       } catch (checkError) {
         console.error('resign id check failed', { reservation_id, error: String((checkError as Error).message) });
         return jsonResponse(
@@ -1155,9 +1176,9 @@ Deno.serve(async (req: Request) => {
     // First submission: start the comparison now so it runs while the PDF is
     // being built. A service failure is captured (not thrown) and recorded
     // after the contract exists.
-    const initialCheck: Promise<{ verdict?: Verdict; failed?: boolean }> | null =
+    const initialCheck: Promise<{ verdict?: IdOutcome; failed?: boolean }> | null =
       wantsIdCheck && !resign
-        ? compareIdAndSignature(idImage!, sigImage!).then(
+        ? decideIdOutcome(supabase, callerId, idImage!, idBackImage, sigImage!).then(
           (verdict) => ({ verdict }),
           (checkError) => {
             console.error('id check failed', { reservation_id, error: String((checkError as Error).message) });

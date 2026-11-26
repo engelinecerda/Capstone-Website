@@ -9,6 +9,8 @@ import { renderPagination, getTotalPages, getPageRange } from './pagination.js';
 import { initAutoRefresh } from './auto_refresh.js';
 import { mountRefreshStatus } from './refresh_status.js';
 import { initTableSort, rpcWithSort } from './table_sort.js';
+import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
+import { logAudit } from './audit_logger.js';
 
 const sidebarName = document.getElementById('sidebarName');
 const sidebarEmail = document.getElementById('sidebarEmail');
@@ -26,6 +28,20 @@ const statTotalCustomers = document.getElementById('statTotalCustomers');
 const statCustomersWithReservations = document.getElementById('statCustomersWithReservations');
 const statNewThisMonth = document.getElementById('statNewThisMonth');
 const statCustomersWithPhone = document.getElementById('statCustomersWithPhone');
+const idFilterChips = document.getElementById('idFilterChips');
+const chipAllCount = document.getElementById('chipAllCount');
+const chipFlaggedCount = document.getElementById('chipFlaggedCount');
+const idReviewModal = document.getElementById('idReviewModal');
+const idReviewSubtitle = document.getElementById('idReviewSubtitle');
+const idReviewStatus = document.getElementById('idReviewStatus');
+const idReviewGrid = document.getElementById('idReviewGrid');
+const idReviewDecision = document.getElementById('idReviewDecision');
+const idReviewNote = document.getElementById('idReviewNote');
+const idReviewMessage = document.getElementById('idReviewMessage');
+const idReviewApproveBtn = document.getElementById('idReviewApproveBtn');
+const idReviewRejectBtn = document.getElementById('idReviewRejectBtn');
+const idReviewCancelBtn = document.getElementById('idReviewCancelBtn');
+const idReviewClose = document.getElementById('idReviewClose');
 
 // Server-side pagination: the database returns one page of customers at a
 // time (get_admin_customers_page), already filtered by the search term. The
@@ -48,6 +64,10 @@ let totalRegisteredCustomers = 0;  // all customers, ignoring the search
 let activeSearch = '';             // the search term currently applied
 let latestRequestId = 0;           // lets a newer request supersede an older one
 let searchDebounceTimer = null;
+let currentRole = '';               // 'manager' | 'admin', set after the session check
+let activeIdFilter = 'all';         // 'all' | 'flagged' (the chips above the table)
+let customersOnPage = [];           // rows on screen, so the ID modal can name the customer
+let pendingFlash = '';              // shown once by the next render (e.g. after an ID decision)
 
 function redirectToAdminLogin() {
   window.location.replace('/admin');
@@ -140,13 +160,58 @@ function getCurrentMonthRange() {
   };
 }
 
+// ── Valid ID ────────────────────────────────────────────────────────────
+// valid_id_status comes from get_admin_customers_page (valid_id_review, or
+// 'none' when no photo is on file). Before the 20261205 migration is applied
+// the field is missing, and the column just shows a dash.
+const VALID_ID_META = {
+  none: { label: 'No ID', tone: 'soft', sub: 'Not uploaded yet' },
+  unchecked: { label: 'Not checked', tone: 'soft', sub: 'Saved; the automatic check hasn\u2019t confirmed a signature' },
+  clear: { label: 'Clear', tone: 'good', sub: 'Signature found' },
+  flagged: { label: 'Flagged', tone: 'warn', sub: 'No signature found \u2014 needs a manager' },
+  approved: { label: 'Approved', tone: 'good', sub: 'Approved by a manager' },
+  rejected: { label: 'Rejected', tone: 'bad', sub: 'Waiting for a new ID' }
+};
+
+function getValidIdStatus(customer) {
+  if (!Object.prototype.hasOwnProperty.call(customer, 'valid_id_status')) return null;
+  const status = String(customer.valid_id_status || 'none').toLowerCase();
+  return VALID_ID_META[status] ? status : 'unchecked';
+}
+
+function renderValidIdCell(customer) {
+  const status = getValidIdStatus(customer);
+  if (!status) return '<span class="table-sub">\u2014</span>';
+
+  const meta = VALID_ID_META[status];
+  const sub = status === 'rejected' && customer.valid_id_review_note
+    ? `Rejected: ${customer.valid_id_review_note}`
+    : meta.sub;
+  // Managers decide on flagged IDs; anyone else (and any other status) can
+  // only look. Nothing to open when no photo is on file.
+  let button = '';
+  if (status !== 'none') {
+    const decides = status === 'flagged' && currentRole === 'manager';
+    button = `<button type="button" class="id-review-open${decides ? ' primary' : ''}" data-id-review="${escapeHtml(customer.user_id)}">${decides ? 'Review ID' : 'View ID'}</button>`;
+  }
+
+  return `
+    <div class="valid-id-cell">
+      <span class="tag ${meta.tone}">${escapeHtml(meta.label)}</span>
+      <span class="table-sub">${escapeHtml(sub)}</span>
+      ${button}
+    </div>
+  `;
+}
+
 function renderCustomers(customers) {
+  customersOnPage = customers;
   if (!customersBody) return;
 
   if (!customers.length) {
     customersBody.innerHTML = `
       <tr class="empty-row">
-        <td colspan="4">No registered customers matched this search.</td>
+        <td colspan="5">${escapeHtml(activeIdFilter === 'flagged' ? 'No flagged IDs to show.' : 'No registered customers matched this search.')}</td>
       </tr>
     `;
     return;
@@ -165,6 +230,7 @@ function renderCustomers(customers) {
     const lastReservation = customer.lastReservationDate
       ? `Latest booking on ${formatDate(customer.lastReservationDate)}`
       : 'No reservation activity yet';
+    const validIdCell = renderValidIdCell(customer);
 
     return `
       <tr>
@@ -194,6 +260,7 @@ function renderCustomers(customers) {
           </div>
           <span class="table-sub">${escapeHtml(lastReservation)}</span>
         </td>
+        <td data-label="Valid ID">${validIdCell}</td>
       </tr>
     `;
   }).join('');
@@ -207,6 +274,8 @@ function updateStats(stats) {
   if (statCustomersWithReservations) statCustomersWithReservations.textContent = asCount(safe.with_reservations);
   if (statNewThisMonth) statNewThisMonth.textContent = asCount(safe.new_this_month);
   if (statCustomersWithPhone) statCustomersWithPhone.textContent = asCount(safe.with_phone);
+  if (chipAllCount) chipAllCount.textContent = asCount(safe.total);
+  if (chipFlaggedCount) chipFlaggedCount.textContent = asCount(safe.flagged_ids);
 }
 
 function renderCustomersView(customers) {
@@ -221,8 +290,15 @@ function renderCustomersView(customers) {
     }
   });
 
-  if (customersTotal) {
+  if (pendingFlash) {
+    setCustomersMessage(pendingFlash);
+    pendingFlash = '';
+  } else if (customersTotal) {
     setCustomersMessage('');
+  } else if (activeIdFilter === 'flagged') {
+    setCustomersMessage(activeSearch
+      ? `No flagged IDs matched "${activeSearch}".`
+      : 'No flagged IDs. Every ID with no signature has been reviewed.');
   } else if (activeSearch) {
     setCustomersMessage(`No registered customers matched "${activeSearch}".`);
   } else {
@@ -235,11 +311,15 @@ function renderCustomersView(customers) {
 // .range(from, to) would select.
 async function fetchCustomersPage(page, search) {
   const { from } = getPageRange(page, CUSTOMERS_PAGE_SIZE);
-  const { data, error } = await rpcWithSort(supabase, 'get_admin_customers_page', {
+  const params = {
     p_search: search || null,
     p_limit: CUSTOMERS_PAGE_SIZE,
     p_offset: from
-  }, customersSort.getRpcParams());
+  };
+  // Only sent when filtering, so the unfiltered list keeps working even before
+  // the 20261205 migration (which adds p_id_filter) is applied.
+  if (activeIdFilter === 'flagged') params.p_id_filter = 'flagged';
+  const { data, error } = await rpcWithSort(supabase, 'get_admin_customers_page', params, customersSort.getRpcParams());
 
   if (error) {
     throw error;
@@ -313,7 +393,7 @@ async function loadCustomers({ silent = false, withStats = true } = {}) {
     customersCurrentPage = result.page;
     customersTotal = result.total;
 
-    if (!activeSearch) {
+    if (!activeSearch && activeIdFilter === 'all') {
       totalRegisteredCustomers = result.total;
     } else if (stats) {
       totalRegisteredCustomers = Number(stats.total) || 0;
@@ -365,6 +445,218 @@ function handleSearchInput() {
   }, SEARCH_DEBOUNCE_MS);
 }
 
+// ── Valid ID filter chips ──────────────────────────────────────────────
+function setIdFilter(nextFilter) {
+  const filter = nextFilter === 'flagged' ? 'flagged' : 'all';
+  idFilterChips?.querySelectorAll('[data-id-filter]').forEach((chip) => {
+    const active = chip.dataset.idFilter === filter;
+    chip.classList.toggle('active', active);
+    chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  if (filter === activeIdFilter) return;
+  activeIdFilter = filter;
+  customersCurrentPage = 1;
+  loadCustomers({ withStats: false });
+}
+
+function wireIdFilterChips() {
+  idFilterChips?.addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-id-filter]');
+    if (chip) setIdFilter(chip.dataset.idFilter);
+  });
+}
+
+// ── Customer's valid ID (view for staff, approve/reject for managers) ──
+// Photos never come straight from storage (staff have no read policy on the
+// private bucket). review-customer-id checks the caller's role, logs the view
+// and returns 2-minute signed links. Admins can look; only managers decide,
+// and only while the ID is flagged (no signature found).
+let idReviewCustomerId = null;
+let idReviewCustomerName = '';
+let idReviewSaving = false;
+let idReviewOpen = false;
+let idReviewRequest = 0;            // a newer open (or a close) makes older responses stale
+
+async function readIdReviewError(error, fallback) {
+  try {
+    const body = await error?.context?.json?.();
+    if (body?.error) return String(body.error);
+  } catch { /* fall through */ }
+  return fallback;
+}
+
+function setIdReviewMessage(text = '', isError = false) {
+  if (!idReviewMessage) return;
+  idReviewMessage.textContent = text;
+  idReviewMessage.classList.toggle('error', !!isError);
+}
+
+function setIdReviewBusy(busy) {
+  idReviewSaving = busy;
+  [idReviewApproveBtn, idReviewRejectBtn, idReviewCancelBtn, idReviewClose].forEach((btn) => {
+    if (btn) btn.disabled = busy;
+  });
+  if (idReviewNote) idReviewNote.disabled = busy;
+}
+
+function showIdDecision(show) {
+  idReviewDecision?.classList.toggle('hidden', !show);
+  idReviewApproveBtn?.classList.toggle('hidden', !show);
+  idReviewRejectBtn?.classList.toggle('hidden', !show);
+}
+
+function renderIdReviewFigure(label, url) {
+  if (!url) {
+    return `<figure class="id-review-figure"><figcaption>${escapeHtml(label)}</figcaption><div class="id-review-image-wrap"><p class="id-review-missing">Not uploaded.</p></div></figure>`;
+  }
+  return `<figure class="id-review-figure"><figcaption>${escapeHtml(label)}</figcaption><div class="id-review-image-wrap"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}"></div><a class="id-review-open-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open larger</a></figure>`;
+}
+
+function closeIdReview() {
+  if (idReviewSaving || !idReviewOpen) return;   // a decision is being saved
+  idReviewOpen = false;
+  idReviewModal?.classList.add('hidden');
+  idReviewModal?.setAttribute('aria-hidden', 'true');
+  // Drop the signed links so the photos don't linger in the page.
+  if (idReviewGrid) idReviewGrid.innerHTML = '';
+  if (idReviewNote) idReviewNote.value = '';
+  setIdReviewMessage('');
+  idReviewCustomerId = null;
+  idReviewCustomerName = '';
+  idReviewRequest += 1;
+  unlockBodyScroll();
+}
+
+async function openIdReview(customerId) {
+  if (!idReviewModal || !customerId || idReviewOpen) return;
+  const requestId = ++idReviewRequest;
+  const customer = customersOnPage.find((row) => row.user_id === customerId);
+  idReviewCustomerId = customerId;
+  idReviewCustomerName = customer ? getCustomerName(customer) : 'Customer';
+
+  idReviewOpen = true;
+  if (idReviewSubtitle) idReviewSubtitle.textContent = idReviewCustomerName;
+  idReviewGrid.innerHTML = '<p class="id-review-missing">Loading the ID…</p>';
+  idReviewNote.value = '';
+  idReviewStatus?.classList.add('hidden');
+  showIdDecision(false);
+  setIdReviewMessage('');
+  setIdReviewBusy(false);   // Close stays usable while the photos load
+  idReviewModal.classList.remove('hidden');
+  idReviewModal.setAttribute('aria-hidden', 'false');
+  lockBodyScroll();
+
+  try {
+    const { data, error } = await supabase.functions.invoke('review-customer-id', {
+      body: { action: 'view', customer_id: customerId }
+    });
+    if (error || !data?.success) {
+      throw new Error(await readIdReviewError(error, data?.error || 'We couldn’t load the ID right now.'));
+    }
+    if (requestId !== idReviewRequest) return;   // closed (or reopened) meanwhile
+
+    idReviewGrid.innerHTML = renderIdReviewFigure('Front of ID', data.front_url) + renderIdReviewFigure('Back of ID', data.back_url);
+
+    const status = String(data.review?.status || 'unchecked');
+    const reviewCopy = {
+      flagged: ['flagged', 'Flagged: no handwritten signature was found on this ID. Decide whether to accept it.'],
+      clear: ['clear', 'The automatic check found a signature on this ID.'],
+      approved: ['approved', `Approved by a manager${data.review?.note ? `: ${data.review.note}` : '.'}`],
+      rejected: ['rejected', `Rejected by a manager${data.review?.note ? `: ${data.review.note}` : '.'} Waiting for the customer to upload a new ID.`],
+      unchecked: ['unchecked', 'The automatic check hasn’t confirmed a signature on this ID yet.']
+    }[status];
+    if (idReviewStatus && reviewCopy) {
+      idReviewStatus.className = `id-review-status state-${reviewCopy[0]}`;
+      idReviewStatus.textContent = reviewCopy[1];
+    }
+
+    const hasPhoto = !!(data.front_url || data.back_url);
+    const canDecide = currentRole === 'manager' && data.can_decide === true && status === 'flagged';
+    showIdDecision(canDecide);
+    if (!hasPhoto) {
+      setIdReviewMessage('The customer has no ID photo on file.', true);
+    } else if (currentRole !== 'manager' && status === 'flagged') {
+      setIdReviewMessage('Only a manager can approve or reject this ID.');
+    }
+    setIdReviewBusy(false);
+    // Approving needs something to look at; asking for a new ID never does.
+    if (idReviewApproveBtn) idReviewApproveBtn.disabled = !hasPhoto;
+  } catch (err) {
+    if (requestId !== idReviewRequest) return;
+    idReviewGrid.innerHTML = '';
+    setIdReviewBusy(false);
+    showIdDecision(false);
+    setIdReviewMessage(err.message || 'We couldn’t load the ID right now.', true);
+  }
+}
+
+async function submitIdReviewDecision(action) {
+  const customerId = idReviewCustomerId;
+  if (!customerId || currentRole !== 'manager' || idReviewSaving) return;
+  const note = idReviewNote.value.replace(/\s+/g, ' ').trim();
+
+  if (action === 'reject' && !note) {
+    setIdReviewMessage('Please tell the customer what is wrong with the ID.', true);
+    idReviewNote.focus();
+    return;
+  }
+  if (action === 'approve' && !window.confirm(
+    `Confirm this is a genuine valid ID that belongs to ${idReviewCustomerName}.\n\n` +
+    'The ID is approved even though it has no signature to compare. Any of their contracts waiting on this ID are verified now, and their future bookings skip the signature comparison until they replace their ID.'
+  )) return;
+
+  setIdReviewBusy(true);
+  setIdReviewMessage(action === 'approve' ? 'Approving…' : 'Sending your request…');
+  try {
+    const { data, error } = await supabase.functions.invoke('review-customer-id', {
+      body: { action, customer_id: customerId, note }
+    });
+    if (error || !data?.success) {
+      throw new Error(await readIdReviewError(error, data?.error || 'Something went wrong. Please try again.'));
+    }
+
+    const contracts = Number(data.contracts_updated) || 0;
+    await logAudit({
+      action: action === 'approve' ? 'Approved Customer ID' : 'Rejected Customer ID',
+      category: 'contract',
+      details: action === 'approve'
+        ? `Approved the valid ID of ${idReviewCustomerName} from the Customers page (${contracts} waiting contract${contracts === 1 ? '' : 's'} verified).${note ? ` Note: ${note}` : ''}`
+        : `Rejected the valid ID of ${idReviewCustomerName} from the Customers page; they were asked to upload it again. Reason: ${note}`,
+      entityId: customerId
+    });
+
+    setIdReviewBusy(false);
+    closeIdReview();
+    pendingFlash = action === 'approve'
+      ? (contracts
+        ? `ID approved. ${contracts} contract${contracts === 1 ? ' was' : 's were'} waiting on it and ${contracts === 1 ? 'is' : 'are'} now verified.`
+        : 'ID approved. Their future contracts will go through without the signature comparison.')
+      : 'ID rejected. The customer was asked to upload a new one.';
+    // Counts and the row both change; the next render shows pendingFlash.
+    await loadCustomers({ silent: true });
+  } catch (err) {
+    setIdReviewMessage(err.message || 'Something went wrong. Please try again.', true);
+    setIdReviewBusy(false);
+  }
+}
+
+function wireIdReviewModal() {
+  customersBody?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-id-review]');
+    if (button) openIdReview(button.dataset.idReview);
+  });
+  idReviewApproveBtn?.addEventListener('click', () => submitIdReviewDecision('approve'));
+  idReviewRejectBtn?.addEventListener('click', () => submitIdReviewDecision('reject'));
+  idReviewCancelBtn?.addEventListener('click', closeIdReview);
+  idReviewClose?.addEventListener('click', closeIdReview);
+  idReviewModal?.addEventListener('click', (event) => {
+    if (event.target === idReviewModal) closeIdReview();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && idReviewOpen) closeIdReview();
+  });
+}
+
 wireLogoutButton();
 watchAuthState();
 
@@ -380,8 +672,14 @@ validateAdminSession({
     initManagerNotificationBell(supabase, session.user.id);
     initAdminNav({ role: profile.role });
 
+    // Decides which Valid ID actions the page offers (the Edge Function
+    // enforces the same rule server-side).
+    currentRole = String(profile.role || '').toLowerCase();
+
     // Attach UI listeners (IMPORTANT)
     searchInput?.addEventListener('input', handleSearchInput);
+    wireIdFilterChips();
+    wireIdReviewModal();
 
     // Load data
     await loadCustomers();

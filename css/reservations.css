@@ -1736,6 +1736,11 @@
         .id-verify-saved .id-verify-help { margin: 0; padding: 10px 12px; border: 1px solid #CFE5D3; border-radius: 8px; background: #F1F8F2; color: #2E7D4F; }
         .id-verify-saved .id-verify-help a { color: #2E7D4F; font-weight: 600; }
         .id-verify-save-note i { margin-right: 4px; }
+        .id-verify-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .id-verify-slot { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .id-verify-slot.hidden { display: none; }
+        .id-verify-slot-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #756559; }
+        @media (max-width: 600px) { .id-verify-slots { grid-template-columns: 1fr; } }
         .id-verify-status { min-height: 18px; margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: #756559; }
         .id-verify-status.error { color: #b42318; }
         .id-verify-status.is-success { color: #2E7D4F; }

@@ -187,27 +187,56 @@
             </div>
           </div>
           <div class="valid-id-body">
-            <p class="valid-id-help">Upload a clear photo of a government-issued ID that shows your signature. It is saved privately on your account and used when you book, so you won&rsquo;t be asked for it again. You can replace or remove it at any time.</p>
+            <p class="valid-id-help">Upload a clear photo of the <strong>front and back</strong> of a government-issued ID. Your signature may be on either side. It is saved privately on your account and used when you book, so you won&rsquo;t be asked for it again. You can replace or remove it at any time. If your ID has no signature, our team can review it by hand.</p>
             <input type="file" id="valid-id-input" class="valid-id-input" accept="image/jpeg,image/png,image/webp" aria-label="Choose a photo of your valid ID">
 
-            <div class="valid-id-empty" id="valid-id-empty" hidden>
-              <i class="ti ti-id" aria-hidden="true"></i>
-              <span>No valid ID uploaded yet.</span>
-              <button type="button" class="pill-btn" id="valid-id-upload-btn"><i class="ti ti-upload" aria-hidden="true"></i> Upload ID</button>
-            </div>
-
-            <div class="valid-id-saved" id="valid-id-saved" hidden>
-              <div class="valid-id-thumb-wrap">
-                <img id="valid-id-thumb" alt="Your saved valid ID" class="valid-id-thumb">
-              </div>
-              <div class="valid-id-saved-meta">
-                <span class="valid-id-saved-title"><i class="ti ti-circle-check" aria-hidden="true"></i> ID on file</span>
-                <span class="valid-id-saved-date" id="valid-id-date"></span>
-                <div class="valid-id-actions">
-                  <button type="button" class="pill-btn" id="valid-id-replace-btn"><i class="ti ti-refresh" aria-hidden="true"></i> Replace</button>
-                  <button type="button" class="pill-btn danger" id="valid-id-remove-btn"><i class="ti ti-trash" aria-hidden="true"></i> Remove</button>
+            <div class="valid-id-slots">
+              <div class="valid-id-slot" data-side="front">
+                <span class="valid-id-slot-label">Front of ID</span>
+                <div class="valid-id-empty" data-role="empty" hidden>
+                  <i class="ti ti-id" aria-hidden="true"></i>
+                  <span>Not uploaded yet.</span>
+                  <button type="button" class="pill-btn" data-action="pick"><i class="ti ti-upload" aria-hidden="true"></i> Upload</button>
+                </div>
+                <div class="valid-id-saved" data-role="saved" hidden>
+                  <div class="valid-id-thumb-wrap">
+                    <img data-role="thumb" alt="Front of your saved valid ID" class="valid-id-thumb">
+                  </div>
+                  <div class="valid-id-saved-meta">
+                    <span class="valid-id-saved-title"><i class="ti ti-circle-check" aria-hidden="true"></i> On file</span>
+                    <span class="valid-id-saved-date" data-role="date"></span>
+                    <div class="valid-id-actions">
+                      <button type="button" class="pill-btn" data-action="pick"><i class="ti ti-refresh" aria-hidden="true"></i> Replace</button>
+                    </div>
+                  </div>
                 </div>
               </div>
+              <div class="valid-id-slot" data-side="back">
+                <span class="valid-id-slot-label">Back of ID</span>
+                <div class="valid-id-empty" data-role="empty" hidden>
+                  <i class="ti ti-id" aria-hidden="true"></i>
+                  <span>Not uploaded yet.</span>
+                  <button type="button" class="pill-btn" data-action="pick"><i class="ti ti-upload" aria-hidden="true"></i> Upload</button>
+                </div>
+                <div class="valid-id-saved" data-role="saved" hidden>
+                  <div class="valid-id-thumb-wrap">
+                    <img data-role="thumb" alt="Back of your saved valid ID" class="valid-id-thumb">
+                  </div>
+                  <div class="valid-id-saved-meta">
+                    <span class="valid-id-saved-title"><i class="ti ti-circle-check" aria-hidden="true"></i> On file</span>
+                    <span class="valid-id-saved-date" data-role="date"></span>
+                    <div class="valid-id-actions">
+                      <button type="button" class="pill-btn" data-action="pick"><i class="ti ti-refresh" aria-hidden="true"></i> Replace</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p class="valid-id-review" id="valid-id-review" hidden></p>
+
+            <div class="valid-id-footer">
+              <button type="button" class="pill-btn danger" id="valid-id-remove-btn" hidden><i class="ti ti-trash" aria-hidden="true"></i> Remove ID</button>
             </div>
 
             <p class="form-msg" id="valid-id-msg" aria-live="polite"></p>

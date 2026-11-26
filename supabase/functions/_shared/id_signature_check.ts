@@ -40,6 +40,13 @@ export const MAX_SIGNATURE_BYTES = 1 * 1024 * 1024;
 // show up in testing, lower it if genuine customers are being rejected.
 const MATCH_MIN_CONFIDENCE = 0.6;
 
+// What one ID check can end in, beyond the signature comparison itself:
+//   id_approved        a manager already approved this customer's ID (it has no
+//                      signature to compare), so the contract is verified
+//   awaiting_id_review the ID has no signature; a manager must look at it
+//   id_rejected        a manager rejected the ID; the customer must upload a new one
+export type IdOutcome = Verdict | 'id_approved' | 'awaiting_id_review' | 'id_rejected';
+
 export type Verdict =
   | 'match'              // signatures agree — customer may continue
   | 'mismatch'           // both readable, but they look like different signatures
@@ -50,7 +57,7 @@ export type Verdict =
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
-    id_is_government_id: { type: 'BOOLEAN' },
+    id_is_identification: { type: 'BOOLEAN' },
     id_signature_visible: { type: 'BOOLEAN' },
     id_image_quality: { type: 'STRING', enum: ['clear', 'poor'] },
     drawn_signature_usable: { type: 'BOOLEAN' },
@@ -58,7 +65,7 @@ const RESPONSE_SCHEMA = {
     confidence: { type: 'NUMBER' },
   },
   required: [
-    'id_is_government_id',
+    'id_is_identification',
     'id_signature_visible',
     'id_image_quality',
     'drawn_signature_usable',
@@ -68,13 +75,13 @@ const RESPONSE_SCHEMA = {
 };
 
 const PROMPT = `You are a screening step in a coffee events business's reservation system. You are given two images:
-IMAGE 1: a photo of an identification card or government-issued ID.
+IMAGE 1: a photo of an identification card or other valid ID.
 IMAGE 2: a signature the customer just drew on a screen (finger, stylus or mouse).
 
 Your job is only to judge whether the handwritten signature printed on the ID in IMAGE 1 plausibly comes from the same person as the signature in IMAGE 2. A human may review the reservation later; you are not making a legal or forensic determination.
 
 Fill in the schema:
-- id_is_government_id: true only if IMAGE 1 looks like an ID card/government document.
+- id_is_identification: true only if IMAGE 1 looks like an ID card or similar identity document.
 - id_signature_visible: true only if a handwritten signature is clearly visible on IMAGE 1 (usually a scrawled line near the bottom or beside the photo — NOT the printed name, ID number or typed text).
 - id_image_quality: "poor" if IMAGE 1 is too blurry, dark, glared or cropped to see the signature's shape; otherwise "clear".
 - drawn_signature_usable: true only if IMAGE 2 contains a real signature with enough strokes to compare (not blank, not a dot, not a few random scribbles).
@@ -166,7 +173,7 @@ async function callGeminiWithRetry(
 }
 
 type Extraction = {
-  id_is_government_id: boolean;
+  id_is_identification: boolean;
   id_signature_visible: boolean;
   id_image_quality: 'clear' | 'poor';
   drawn_signature_usable: boolean;
@@ -178,7 +185,7 @@ function isValidExtraction(value: unknown): value is Extraction {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v.id_is_government_id === 'boolean' &&
+    typeof v.id_is_identification === 'boolean' &&
     typeof v.id_signature_visible === 'boolean' &&
     (v.id_image_quality === 'clear' || v.id_image_quality === 'poor') &&
     typeof v.drawn_signature_usable === 'boolean' &&
@@ -192,7 +199,7 @@ function isValidExtraction(value: unknown): value is Extraction {
 // comparison result, so the customer is told what to actually fix.
 function decide(x: Extraction): Verdict {
   if (!x.drawn_signature_usable) return 'unclear_signature';
-  if (!x.id_is_government_id || !x.id_signature_visible) return 'no_id_signature';
+  if (!x.id_is_identification || !x.id_signature_visible) return 'no_id_signature';
   if (x.id_image_quality === 'poor') return 'unclear_id';
   if (x.comparison === 'same_writer' && x.confidence >= MATCH_MIN_CONFIDENCE) return 'match';
   if (x.comparison === 'different_writer' && x.confidence >= MATCH_MIN_CONFIDENCE) return 'mismatch';
@@ -216,7 +223,12 @@ export const RETRYABLE_VERDICTS: Verdict[] = [
   'unclear_signature',
 ];
 
-export const VERDICT_MESSAGES: Record<Exclude<Verdict, 'match'>, string> = {
+// Contract states a customer may retry from. Beyond the automatic verdicts this
+// includes 'error' (the check itself failed) and 'id_rejected' (a manager
+// looked at the ID and asked for a replacement).
+export const CUSTOMER_RETRY_STATES: string[] = [...RETRYABLE_VERDICTS, 'error', 'id_rejected'];
+
+export const VERDICT_MESSAGES: Record<Exclude<IdOutcome, 'match' | 'id_approved' | 'awaiting_id_review'>, string> = {
   mismatch:
     'The signature on your ID doesn\u2019t match the signature you drew.',
   no_id_signature:
@@ -225,39 +237,44 @@ export const VERDICT_MESSAGES: Record<Exclude<Verdict, 'match'>, string> = {
     'Your ID photo is too blurry, dark or cropped to read.',
   unclear_signature:
     'Your drawn signature is too small or unclear to compare.',
+  id_rejected:
+    'Our team reviewed your ID and needs a new photo.',
 };
 
-export const VERDICT_NEXT_STEP: Record<Exclude<Verdict, 'match'>, string> = {
+export const VERDICT_NEXT_STEP: Record<Exclude<IdOutcome, 'match' | 'id_approved' | 'awaiting_id_review'>, string> = {
   mismatch: 'Please upload a different photo of your ID, or sign again.',
-  no_id_signature: 'Please upload a clear photo of a valid ID that shows your signature.',
+  no_id_signature: 'Please upload a clear photo of your valid ID.',
   unclear_id: 'Please upload a clearer photo of your ID.',
   unclear_signature: 'Please sign again.',
+  id_rejected: 'Please upload clear photos of the front and back of your valid ID.',
 };
 
 // Stable prefixes — js/admin_contracts.js reads review_notes to show the
 // outcome on the contract card, so keep these in sync with it.
 const NOTE_MATCHED = 'Auto-verified: signature on the customer\u2019s ID matches the e-signature.';
 const NOTE_MISMATCH_PREFIX = 'ID check: ';
+const NOTE_ID_APPROVED = 'Verified: a manager approved the customer\u2019s ID, which has no signature to compare.';
+const NOTE_AWAITING_ID_REVIEW = 'ID check: no signature found on the customer\u2019s ID. Waiting for a manager to review the ID.';
 const NOTE_ERROR = 'ID check could not complete (service error). Open the contract and verify manually.';
 
 type ApplyArgs = {
   reservationId: string;
   reservationNumber: string;
   userId: string | null;
-  verdict: Verdict;
+  verdict: IdOutcome;
   // true for the check made at submission and when attempts run out; false for
   // later retries, where the customer is on the page and sees the result there.
   notify: boolean;
 };
 
 export type ApplyResult = {
-  verdict: Verdict;
+  verdict: IdOutcome;
   attempts: number;
   attemptsLeft: number;
   verified: boolean;
 };
 
-async function notifyCustomer(
+export async function notifyCustomer(
   supabase: SupabaseClient,
   userId: string | null,
   reservationId: string,
@@ -318,6 +335,56 @@ export async function applyIdCheckResult(
     return { verdict, attempts, attemptsLeft, verified: true };
   }
 
+  // A manager already approved this ID: nothing left to compare.
+  if (verdict === 'id_approved') {
+    const { error } = await supabase
+      .from('reservation_contracts')
+      .update({
+        review_status: 'verified',
+        verified_date: now,
+        reviewed_at: now,
+        review_notes: NOTE_ID_APPROVED,
+        id_check_status: 'manual_approved',
+        id_checked_at: now,
+      })
+      .eq('reservation_id', reservationId);
+    if (error) throw error;
+
+    await supabase
+      .from('reservations')
+      .update({ status: 'for_finalization' })
+      .eq('reservation_id', reservationId)
+      .in('status', ['for_contract_signing', 'pending_review']);
+
+    return { verdict, attempts: attempts - 1, attemptsLeft, verified: true };
+  }
+
+  // The ID has no signature (flagged): the contract waits for a manager. This
+  // is not the customer's mistake, so no re-upload prompt and the attempt is
+  // not counted.
+  if (verdict === 'awaiting_id_review') {
+    const { error } = await supabase
+      .from('reservation_contracts')
+      .update({
+        reviewed_at: now,
+        review_notes: NOTE_AWAITING_ID_REVIEW,
+        id_check_status: 'awaiting_id_review',
+        id_checked_at: now,
+      })
+      .eq('reservation_id', reservationId);
+    if (error) throw error;
+
+    if (args.notify) {
+      await notifyCustomer(
+        supabase, userId, reservationId,
+        'Your ID Is Being Reviewed',
+        `We couldn\u2019t find a signature on your ID, so our team will review it for reservation ${reservationNumber}. ` +
+          'No action is needed from you right now. We\u2019ll let you know once it\u2019s done.',
+      );
+    }
+    return { verdict, attempts: attempts - 1, attemptsLeft: attemptsLeft + 1, verified: false };
+  }
+
   const outOfAttempts = attemptsLeft === 0;
   const reason = VERDICT_MESSAGES[verdict];
   const note = outOfAttempts
@@ -350,7 +417,7 @@ export async function applyIdCheckResult(
         supabase, userId, reservationId,
         'Signature Check Needed',
         `${reason} Your contract for reservation ${reservationNumber} is still pending. ` +
-          `${VERDICT_NEXT_STEP[verdict as Exclude<Verdict, 'match'>]} Open your reservation to re-upload your ID or sign again.`,
+          `${VERDICT_NEXT_STEP[verdict as keyof typeof VERDICT_NEXT_STEP]} Open your reservation to re-upload your ID or sign again.`,
       );
     }
   }
@@ -407,6 +474,99 @@ export async function compareIdAndSignature(
   return decide(parsed);
 }
 
+// Compares the e-signature with the FRONT of the ID and, when that doesn't
+// match and a back photo exists, with the BACK too. Many IDs carry the
+// signature on the back, so either side matching is a match. The second model
+// call only happens when needed. If neither side matches:
+//   * the front had no readable signature -> report what the back showed
+//     (so the customer isn't told "no signature" when the back had one that
+//     simply didn't match)
+//   * otherwise keep the front's verdict.
+export async function compareIdSidesAndSignature(
+  front: { mimeType: string; data: string },
+  back: { mimeType: string; data: string } | null,
+  sig: { mimeType: string; data: string },
+): Promise<Verdict> {
+  const frontVerdict = await compareIdAndSignature(front, sig);
+  if (frontVerdict === 'match' || !back) return frontVerdict;
+
+  let backVerdict: Verdict;
+  try {
+    backVerdict = await compareIdAndSignature(back, sig);
+  } catch (error) {
+    // The back is a bonus; a service hiccup on it must not turn a usable
+    // front verdict into an error.
+    console.error('id-check back side failed', { error: String((error as Error).message) });
+    return frontVerdict;
+  }
+  if (backVerdict === 'match') return 'match';
+  if (frontVerdict === 'no_id_signature' || frontVerdict === 'unclear_id') return backVerdict;
+  return frontVerdict;
+}
+
+// ── ID review (manager) ────────────────────────────────────────────────────
+// valid_id_review holds one row per customer: what the upload-time check found
+// and what a manager decided. status:
+//   unchecked  not checked yet (or the photos were just replaced)
+//   clear      a signature was found on the ID: no review needed
+//   flagged    no signature on the ID: waiting for a manager
+//   approved   a manager accepted the ID (valid ID, no signature)
+//   rejected   a manager rejected it: the customer must upload a new one
+// Customers can only read their own row; only service-role code writes it.
+export async function getIdReviewStatus(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('valid_id_review')
+    .select('status')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return (data?.status as string | undefined) ?? null;
+}
+
+export async function flagIdForReview(supabase: SupabaseClient, userId: string) {
+  const now = new Date().toISOString();
+  const { error } = await supabase.from('valid_id_review').upsert(
+    {
+      user_id: userId,
+      status: 'flagged',
+      signature_check: 'no_signature',
+      checked_at: now,
+      updated_at: now,
+    },
+    { onConflict: 'user_id' },
+  );
+  if (error) console.error('flagIdForReview failed', { error: error.message });
+}
+
+// The one entry point the contract flows use. Looks at the manager decision
+// first, so an ID that needs (or got) human review never spends a model call:
+//   approved -> 'id_approved'; flagged -> 'awaiting_id_review'; rejected -> 'id_rejected'
+// Otherwise it runs the normal comparison, and a "no signature on the ID"
+// result also flags the ID for a manager instead of asking the customer to
+// upload a signature that does not exist.
+export async function decideIdOutcome(
+  supabase: SupabaseClient,
+  userId: string | null,
+  front: { mimeType: string; data: string },
+  back: { mimeType: string; data: string } | null,
+  sig: { mimeType: string; data: string },
+): Promise<IdOutcome> {
+  if (userId) {
+    const status = await getIdReviewStatus(supabase, userId);
+    if (status === 'approved') return 'id_approved';
+    if (status === 'flagged') return 'awaiting_id_review';
+    if (status === 'rejected') return 'id_rejected';
+  }
+  const verdict = await compareIdSidesAndSignature(front, back, sig);
+  if (verdict === 'no_id_signature' && userId) {
+    await flagIdForReview(supabase, userId);
+    return 'awaiting_id_review';
+  }
+  return verdict;
+}
+
 // Re-reads the e-signature already saved on the contract (a PNG on Cloudinary)
 // so a customer who only re-uploads their ID doesn't have to sign again.
 export async function fetchStoredSignature(
@@ -439,13 +599,13 @@ export async function fetchStoredSignature(
 // their own ID. Returns null when none is saved (or it is unreadable).
 export const VALID_ID_BUCKET = 'customer-ids';
 
-export async function loadSavedIdForUser(
+async function loadSavedIdObject(
   supabase: SupabaseClient,
-  userId: string,
+  path: string,
 ): Promise<{ mimeType: string; data: string } | null> {
   const { data: blob, error } = await supabase.storage
     .from(VALID_ID_BUCKET)
-    .download(`${userId}/valid-id.jpg`);
+    .download(path);
   if (error || !blob) return null;
 
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -457,4 +617,14 @@ export async function loadSavedIdForUser(
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return { mimeType: 'image/jpeg', data: btoa(binary) };
+}
+
+// Front of the saved ID (the original single-photo object, unchanged).
+export function loadSavedIdForUser(supabase: SupabaseClient, userId: string) {
+  return loadSavedIdObject(supabase, `${userId}/valid-id.jpg`);
+}
+
+// Back of the saved ID; null when the customer hasn't uploaded one.
+export function loadSavedIdBackForUser(supabase: SupabaseClient, userId: string) {
+  return loadSavedIdObject(supabase, `${userId}/valid-id-back.jpg`);
 }

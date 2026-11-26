@@ -421,6 +421,14 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
     // The signature on the customer's ID didn't match their e-signature, so
     // the contract is waiting on THEM (not on our team).
     const idCheck = getIdCheckState(contractMeta?.contract);
+    // The ID has no signature: our team is looking at the ID itself.
+    if (!verificationDone && contractMeta?.contract?.id_check_status === 'awaiting_id_review') {
+        return {
+            tone: 'amber',
+            icon: 'info-circle',
+            body: 'We couldn\u2019t find a signature on your ID, so our team is reviewing it. Your contract will be approved once that\u2019s done \u2014 no action needed from you right now.'
+        };
+    }
     if (!verificationDone && idCheck) {
         return {
             tone: 'amber',
@@ -458,6 +466,15 @@ function getNoteStripCopy(reservation, effectiveStatus, contractMeta, balance) {
 // the signature on the customer's ID didn't match (or the check couldn't run).
 // The buttons open the retry modal (js/id_signature_retry.js).
 function buildIdCheckPrompt(contract) {
+    if (contract?.id_check_status === 'awaiting_id_review' && String(contract.review_status || '').toLowerCase() === 'pending_review') {
+        return `
+            <div class="rd-idcheck">
+                <p class="rd-idcheck-title"><i class="ti ti-info-circle" aria-hidden="true"></i> Our team is reviewing your ID</p>
+                <p class="rd-idcheck-copy">We couldn\u2019t find a signature on your ID, which is fine for some IDs. A team member will check it and approve your contract \u2014 no action needed from you.</p>
+            </div>
+        `;
+    }
+
     const check = getIdCheckState(contract);
     if (!check) return '';
 
@@ -1805,6 +1822,14 @@ const idRetryModal = initIdRetryModal({
         }
     },
     onVerified: (opts = {}) => {
+        if (opts.awaitingReview) {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Contract',
+                title: 'Your ID Is Being Reviewed',
+                copy: 'We couldn\u2019t find a signature on your ID, so our team will review it and approve your contract. No action is needed from you.'
+            });
+            return;
+        }
         if (opts.manualReview) {
             openSubmissionFeedbackModal({
                 eyebrow: 'Contract',

@@ -224,15 +224,28 @@
       <h2 class="account-modal-title" id="idretry-title">Re-upload Your ID</h2>
       <p class="account-modal-copy" id="idretry-copy"></p>
 
-      <div class="idretry-field">
-        <span class="idretry-label">Photo of your valid ID</span>
-        <input type="file" id="idretry-file" class="idretry-file-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of your valid ID">
+      <div class="idretry-field" id="idretry-field-front">
+        <span class="idretry-label">Front of your valid ID</span>
+        <input type="file" id="idretry-file" class="idretry-file-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of the front of your valid ID">
         <button type="button" class="rd-btn-outline" id="idretry-pick"><i class="ti ti-upload" aria-hidden="true"></i> Choose a photo</button>
         <div class="idretry-preview hidden" id="idretry-preview">
-          <img id="idretry-thumb" alt="Preview of your uploaded ID">
+          <img id="idretry-thumb" alt="Preview of the front of your ID">
           <div class="idretry-preview-meta">
             <span id="idretry-filename"></span>
             <button type="button" class="idretry-link-btn" id="idretry-remove">Remove</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="idretry-field" id="idretry-field-back">
+        <span class="idretry-label">Back of your valid ID</span>
+        <input type="file" id="idretry-back-file" class="idretry-file-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload a photo of the back of your valid ID">
+        <button type="button" class="rd-btn-outline" id="idretry-back-pick"><i class="ti ti-upload" aria-hidden="true"></i> Choose a photo</button>
+        <div class="idretry-preview hidden" id="idretry-back-preview">
+          <img id="idretry-back-thumb" alt="Preview of the back of your ID">
+          <div class="idretry-preview-meta">
+            <span id="idretry-back-filename"></span>
+            <button type="button" class="idretry-link-btn" id="idretry-back-remove">Remove</button>
           </div>
         </div>
       </div>

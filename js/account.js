@@ -4,6 +4,7 @@ import {
     getIdFileError,
     resizeIdImage,
     fetchValidIdStatus,
+    checkSavedIdSignature,
     getValidIdPreviewUrl,
     saveValidId,
     removeValidId
@@ -2769,20 +2770,54 @@ function wireChangePasswordCard() {
 }
 
 // ── Valid ID (saved on the profile, used to verify contract signatures) ──
-// js/valid_id.js owns storage; this only drives the card in account.html.
+// Front and back are stored separately (js/valid_id.js owns storage); this only
+// drives the card in account.html. Each side has its own slot with its own
+// Upload/Replace button, sharing one hidden file input.
 function wireValidIdCard() {
     const body = document.querySelector('#valid-id-card .valid-id-body');
     const input = document.getElementById('valid-id-input');
-    const emptyEl = document.getElementById('valid-id-empty');
-    const savedEl = document.getElementById('valid-id-saved');
-    const thumb = document.getElementById('valid-id-thumb');
-    const dateEl = document.getElementById('valid-id-date');
+    const removeBtn = document.getElementById('valid-id-remove-btn');
+    const reviewEl = document.getElementById('valid-id-review');
     const msg = document.getElementById('valid-id-msg');
     if (!body || !input) return;
+
+    const slots = {};
+    body.querySelectorAll('.valid-id-slot').forEach((el) => {
+        slots[el.dataset.side] = {
+            el,
+            emptyEl: el.querySelector('[data-role="empty"]'),
+            savedEl: el.querySelector('[data-role="saved"]'),
+            thumb: el.querySelector('[data-role="thumb"]'),
+            dateEl: el.querySelector('[data-role="date"]')
+        };
+    });
+    let pickingSide = 'front';
 
     function setBusy(busy) {
         body.classList.toggle('is-busy', busy);
         input.disabled = busy;
+    }
+
+    async function renderSlot(side, uploadedAt) {
+        const slot = slots[side];
+        if (!slot) return;
+        if (!uploadedAt) {
+            slot.emptyEl.hidden = false;
+            slot.savedEl.hidden = true;
+            slot.thumb.removeAttribute('src');
+            return;
+        }
+        slot.emptyEl.hidden = true;
+        slot.savedEl.hidden = false;
+        slot.dateEl.textContent = `Saved ${formatDate(uploadedAt)}`;
+        try {
+            slot.thumb.src = await getValidIdPreviewUrl(supabase, user.id, side);
+        } catch (error) {
+            // The flag says there is a photo but the file can't be read.
+            console.error(`[account] valid ID ${side} preview failed:`, error);
+            slot.thumb.removeAttribute('src');
+            setFormMessage(msg, 'We couldn\u2019t show a saved photo of your ID. Try replacing it with a new one.', 'warning');
+        }
     }
 
     async function render() {
@@ -2792,32 +2827,36 @@ function wireValidIdCard() {
         } catch (error) {
             console.error('[account] valid ID status failed:', error);
             setFormMessage(msg, 'Unable to load your valid ID right now.', 'error');
-            emptyEl.hidden = false;
-            savedEl.hidden = true;
+            ['front', 'back'].forEach((side) => renderSlot(side, null));
+            if (removeBtn) removeBtn.hidden = true;
             return;
         }
 
-        if (!status.hasId) {
-            emptyEl.hidden = false;
-            savedEl.hidden = true;
-            thumb.removeAttribute('src');
-            return;
+        await Promise.all([
+            renderSlot('front', status.uploadedAt),
+            renderSlot('back', status.backUploadedAt)
+        ]);
+        if (removeBtn) removeBtn.hidden = !(status.hasFront || status.hasBack);
+
+        // What our team / the automatic check decided about the ID.
+        if (reviewEl) {
+            const reviewCopy = {
+                flagged: ['flagged', 'No signature was found on your ID. That\u2019s okay: our team will review it before it\u2019s used. You can still book in the meantime.'],
+                approved: ['approved', 'Our team reviewed and approved your ID.'],
+                rejected: ['rejected', `Our team couldn\u2019t accept this ID${status.reviewNote ? `: ${status.reviewNote}` : '.'} Please upload new photos of the front and back.`]
+            }[status.reviewStatus];
+            reviewEl.hidden = !reviewCopy;
+            reviewEl.className = `valid-id-review${reviewCopy ? ` state-${reviewCopy[0]}` : ''}`;
+            reviewEl.textContent = reviewCopy ? reviewCopy[1] : '';
         }
 
-        emptyEl.hidden = true;
-        savedEl.hidden = false;
-        dateEl.textContent = status.uploadedAt ? `Saved ${formatDate(status.uploadedAt)}` : '';
-        try {
-            thumb.src = await getValidIdPreviewUrl(supabase, user.id);
-        } catch (error) {
-            // The flag says there is an ID but the file can't be read.
-            console.error('[account] valid ID preview failed:', error);
-            thumb.removeAttribute('src');
-            setFormMessage(msg, 'We couldn\u2019t show your saved ID. Try replacing it with a new photo.', 'warning');
+        // An older account has the front only: say what is missing.
+        if (status.hasFront && !status.hasBack && !status.backUnavailable) {
+            setFormMessage(msg, 'Please also upload the back of your ID.', 'warning');
         }
     }
 
-    async function handleFile(file) {
+    async function handleFile(file, side) {
         const problem = getIdFileError(file);
         if (problem) {
             setFormMessage(msg, problem, 'error');
@@ -2827,8 +2866,19 @@ function wireValidIdCard() {
         setFormMessage(msg, 'Saving your ID\u2026');
         try {
             const dataUrl = await resizeIdImage(file);
-            await saveValidId(supabase, user.id, dataUrl);
-            setFormMessage(msg, 'Your valid ID was saved.', 'success');
+            await saveValidId(supabase, user.id, dataUrl, side);
+            setFormMessage(msg, `The ${side} of your ID was saved.`, 'success');
+
+            // With both sides saved, look for a signature. No signature flags
+            // the ID for our team; an unreadable photo asks for a better one.
+            const saved = await fetchValidIdStatus(supabase, user.id);
+            if (saved.hasFront && (saved.hasBack || saved.backUnavailable)) {
+                setFormMessage(msg, 'Checking your ID\u2026');
+                const result = await checkSavedIdSignature(supabase);
+                if (result.needsBetterPhoto) setFormMessage(msg, result.message, 'warning');
+                else if (result.flagged) setFormMessage(msg, 'Your ID was saved and sent to our team for review.', 'success');
+                else setFormMessage(msg, 'Your valid ID was saved.', 'success');
+            }
             await render();
         } catch (error) {
             console.error('[account] valid ID save failed:', error);
@@ -2849,7 +2899,7 @@ function wireValidIdCard() {
     async function handleRemove() {
         const confirmed = await showConfirmModal({
             title: 'Remove your valid ID?',
-            message: 'Your saved ID will be deleted. You\u2019ll need to upload one again to verify the signature on your next contract.',
+            message: 'The front and back of your saved ID will be deleted. You\u2019ll need to upload them again to verify the signature on your next contract.',
             confirmText: 'Remove ID',
             cancelText: 'Keep it',
             destructive: true
@@ -2870,13 +2920,18 @@ function wireValidIdCard() {
         }
     }
 
-    const pick = () => { setFormMessage(msg, ''); input.click(); };
-    document.getElementById('valid-id-upload-btn')?.addEventListener('click', pick);
-    document.getElementById('valid-id-replace-btn')?.addEventListener('click', pick);
-    document.getElementById('valid-id-remove-btn')?.addEventListener('click', handleRemove);
+    body.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-action="pick"]');
+        const slotEl = btn?.closest('.valid-id-slot');
+        if (!btn || !slotEl) return;
+        pickingSide = slotEl.dataset.side === 'back' ? 'back' : 'front';
+        setFormMessage(msg, '');
+        input.click();
+    });
+    removeBtn?.addEventListener('click', handleRemove);
     input.addEventListener('change', () => {
         const file = input.files?.[0];
-        if (file) handleFile(file);
+        if (file) handleFile(file, pickingSide);
     });
 
     return render();

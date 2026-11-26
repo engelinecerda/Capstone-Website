@@ -50,7 +50,7 @@
       <header class="page-header">
         <div>
           <h1 class="page-title">Customers<span class="view-only-pill">View only</span></h1>
-          <p class="page-sub">Registered customers with account details and reservation activity.</p>
+          <p class="page-sub">Registered customers with account details, reservation activity and valid ID status.</p>
         </div>
         <div class="header-actions">
           <span id="managerNotifBell"></span>
@@ -91,6 +91,12 @@
         </div>
       </section>
 
+      <!-- Valid ID filter. The counts come from get_admin_customer_stats. -->
+      <section class="chips-row" id="idFilterChips" aria-label="Filter by valid ID">
+        <button type="button" class="chip active" data-id-filter="all" aria-pressed="true">All customers (<span id="chipAllCount">0</span>)</button>
+        <button type="button" class="chip" data-id-filter="flagged" aria-pressed="false">Flagged IDs (<span id="chipFlaggedCount">0</span>)</button>
+      </section>
+
       <section class="card table-card">
         <div class="table-head">
           <div>
@@ -109,6 +115,7 @@
                 <th>Contact</th>
                 <th data-sort-key="registered" data-sort-first="desc">Registered</th>
                 <th>Reservation Activity</th>
+                <th>Valid ID</th>
               </tr>
             </thead>
             <tbody id="customersBody"></tbody>
@@ -119,6 +126,42 @@
 
     </section>
   </main>
+
+  <!-- Customer's valid ID (js/admin_customers.js). Photos come from the
+       review-customer-id Edge Function as 2-minute signed links; every view
+       is logged. Managers approve or reject flagged IDs; admins can only look. -->
+  <div class="id-review-backdrop hidden" id="idReviewModal" aria-hidden="true">
+    <div class="id-review-card" role="dialog" aria-modal="true" aria-labelledby="idReviewTitle">
+      <div class="id-review-header">
+        <div>
+          <h2 class="id-review-title" id="idReviewTitle">Customer&rsquo;s valid ID</h2>
+          <p class="id-review-subtitle" id="idReviewSubtitle"></p>
+        </div>
+        <button type="button" class="id-review-close" id="idReviewClose" aria-label="Close ID review">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="id-review-body">
+        <p class="id-review-status hidden" id="idReviewStatus"></p>
+        <p class="id-review-privacy">This is a personal document. Opening it is recorded. Don&rsquo;t save, copy or share the photos.</p>
+        <div class="id-review-grid" id="idReviewGrid"></div>
+
+        <div class="id-review-decision hidden" id="idReviewDecision">
+          <label class="id-review-note-label" for="idReviewNote">Note <span class="id-review-optional">(required to reject &mdash; the customer will see it)</span></label>
+          <textarea id="idReviewNote" class="id-review-textarea" rows="2" maxlength="500" placeholder="e.g. The back of the ID is cut off. Please upload the full card."></textarea>
+        </div>
+
+        <p class="id-review-message" id="idReviewMessage" aria-live="polite"></p>
+      </div>
+
+      <div class="id-review-footer">
+        <button type="button" class="id-review-btn" id="idReviewCancelBtn">Close</button>
+        <button type="button" class="id-review-btn decline hidden" id="idReviewRejectBtn">Reject ID</button>
+        <button type="button" class="id-review-btn primary hidden" id="idReviewApproveBtn">Approve ID</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="../js/admin_customers.js"></script>

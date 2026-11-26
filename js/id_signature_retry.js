@@ -25,12 +25,15 @@
 // re-rendered page container, so auto-refresh never wipes a half-filled form).
 
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
-import { getIdFileError, resizeIdImage, fetchValidIdStatus, saveValidId } from './valid_id.js';
+import { getIdFileError, resizeIdImage, fetchValidIdStatus, saveValidId, checkSavedIdSignature } from './valid_id.js';
+
+const SIDES = ['front', 'back'];
 
 // Contract states the customer can act on. 'error' = the automatic check itself
 // failed at submission, so they may simply try it again. Keep in sync with
 // RETRYABLE_VERDICTS in the shared Edge Function module.
-const RETRYABLE_STATES = ['mismatch', 'no_id_signature', 'unclear_id', 'unclear_signature', 'error'];
+// 'id_rejected' = a manager looked at the ID and asked for a new one.
+const RETRYABLE_STATES = ['mismatch', 'no_id_signature', 'unclear_id', 'unclear_signature', 'error', 'id_rejected'];
 export const MAX_ID_CHECK_ATTEMPTS = 5;
 
 const STATE_REASONS = {
@@ -38,7 +41,8 @@ const STATE_REASONS = {
     no_id_signature: 'We couldn\u2019t find a signature on your ID photo.',
     unclear_id: 'Your ID photo is too blurry, dark or cropped to read.',
     unclear_signature: 'Your drawn signature is too small or unclear to compare.',
-    error: 'We couldn\u2019t run the automatic signature check.'
+    error: 'We couldn\u2019t run the automatic signature check.',
+    id_rejected: 'Our team reviewed your ID and needs a new photo.'
 };
 
 const STATE_NEXT_STEPS = {
@@ -46,7 +50,8 @@ const STATE_NEXT_STEPS = {
     no_id_signature: 'Upload a clear photo of a valid ID that shows your signature.',
     unclear_id: 'Upload a clearer photo of your ID.',
     unclear_signature: 'Sign again, a little larger and more clearly.',
-    error: 'You can try the check again.'
+    error: 'You can try the check again.',
+    id_rejected: 'Upload clear photos of the front and back of your valid ID.'
 };
 
 // What the page needs to know about the contract's ID check, or null when
@@ -62,7 +67,11 @@ export function getIdCheckState(contract) {
     const attemptsLeft = Math.max(0, MAX_ID_CHECK_ATTEMPTS - attempts);
     return {
         status,
-        reason: STATE_REASONS[status],
+        // A manager's rejection carries their own words ("ID rejected by a
+        // manager: <note>" in review_notes); show them instead of the generic line.
+        reason: status === 'id_rejected'
+            ? (String(contract.review_notes || '').replace(/^ID rejected by a manager:\s*/i, '').trim() || STATE_REASONS.id_rejected)
+            : STATE_REASONS[status],
         nextStep: STATE_NEXT_STEPS[status],
         attempts,
         attemptsLeft,
@@ -110,12 +119,20 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
     const confirmBtn = document.getElementById('idretry-confirm');
     const titleEl = document.getElementById('idretry-title');
     const copyEl = document.getElementById('idretry-copy');
-    const fileInput = document.getElementById('idretry-file');
-    const pickBtn = document.getElementById('idretry-pick');
-    const previewEl = document.getElementById('idretry-preview');
-    const thumbEl = document.getElementById('idretry-thumb');
-    const fileNameEl = document.getElementById('idretry-filename');
-    const removeBtn = document.getElementById('idretry-remove');
+    // One slot per ID side (front, back), each with its own picker + preview.
+    const slots = {};
+    SIDES.forEach((side) => {
+        const prefix = side === 'back' ? 'idretry-back-' : 'idretry-';
+        slots[side] = {
+            field: document.getElementById(`idretry-field-${side}`),
+            input: document.getElementById(`${prefix}file`),
+            pick: document.getElementById(`${prefix}pick`),
+            preview: document.getElementById(`${prefix}preview`),
+            thumb: document.getElementById(`${prefix}thumb`),
+            fileName: document.getElementById(`${prefix}filename`),
+            remove: document.getElementById(`${prefix}remove`)
+        };
+    });
     const signBlock = document.getElementById('idretry-sign-block');
     const canvas = document.getElementById('idretry-canvas');
     const clearBtn = document.getElementById('idretry-clear');
@@ -124,43 +141,50 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
 
     const state = {
         mode: 'reupload',   // 'reupload' | 'resign'
-        file: null,
-        objectUrl: null,
+        files: { front: null, back: null },
+        objectUrls: { front: null, back: null },
         pad: null,
         busy: false,
-        hasSavedId: false   // an ID is already saved on the customer's profile
+        onFile: { front: false, back: false }   // sides already saved on the customer's profile
     };
-    const filePickerField = fileInput.closest('.idretry-field');
 
     function setMessage(text = '', kind = '') {
         messageEl.textContent = text;
         messageEl.className = 'account-modal-message' + (kind ? ` ${kind}` : '');
     }
 
-    function clearFile() {
-        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-        state.file = null;
-        state.objectUrl = null;
-        fileInput.value = '';
-        thumbEl.removeAttribute('src');
-        previewEl.classList.add('hidden');
-        pickBtn.classList.remove('hidden');
+    function clearFile(side) {
+        if (!side) { SIDES.forEach(clearFile); return; }
+        const slot = slots[side];
+        if (state.objectUrls[side]) URL.revokeObjectURL(state.objectUrls[side]);
+        state.files[side] = null;
+        state.objectUrls[side] = null;
+        slot.input.value = '';
+        slot.thumb.removeAttribute('src');
+        slot.preview.classList.add('hidden');
+        slot.pick.classList.remove('hidden');
     }
 
-    function setFile(file) {
+    function setFile(file, side) {
+        const slot = slots[side];
         const problem = getIdFileError(file) || '';
-        clearFile();
+        clearFile(side);
         if (problem) {
             setMessage(problem, 'error');
             return;
         }
         setMessage('');
-        state.file = file;
-        state.objectUrl = URL.createObjectURL(file);
-        thumbEl.src = state.objectUrl;
-        fileNameEl.textContent = file.name;
-        previewEl.classList.remove('hidden');
-        pickBtn.classList.add('hidden');
+        state.files[side] = file;
+        state.objectUrls[side] = URL.createObjectURL(file);
+        slot.thumb.src = state.objectUrls[side];
+        slot.fileName.textContent = file.name;
+        slot.preview.classList.remove('hidden');
+        slot.pick.classList.add('hidden');
+    }
+
+    // True when the ID is complete without a new photo (both sides saved).
+    function hasCompleteSavedId() {
+        return state.onFile.front && state.onFile.back;
     }
 
     function resizeCanvas() {
@@ -215,17 +239,19 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
 
         // Is there already an ID on the customer's profile? Decides whether a
         // photo is needed here. If the lookup fails, ask for a photo.
-        state.hasSavedId = false;
+        state.onFile = { front: false, back: false };
         try {
             const status = await fetchValidIdStatus(supabase, pageData.reservation.user_id);
-            state.hasSavedId = status.hasId;
-        } catch { /* ask for a photo */ }
+            // Without the back column (migration pending) a front alone is complete.
+            state.onFile = { front: status.hasFront, back: status.hasBack || (status.backUnavailable && status.hasFront) };
+        } catch { /* ask for photos */ }
 
         state.mode = mode === 'resign' ? 'resign' : 'reupload';
         const resign = state.mode === 'resign';
-        const saved = state.hasSavedId;
+        const saved = hasCompleteSavedId();
+        const rejected = check.status === 'id_rejected';
 
-        titleEl.textContent = resign ? 'Sign Again' : (saved ? 'Check Your ID Again' : 'Upload Your ID');
+        titleEl.textContent = resign ? 'Sign Again' : (rejected ? 'Upload Your ID Again' : (saved ? 'Check Your ID Again' : 'Upload Your ID'));
         if (resign) {
             copyEl.textContent = saved
                 ? 'Draw your signature again, the way it appears on your ID. We\u2019ll compare it with the valid ID saved on your My Profile. If they match, your contract is approved.'
@@ -233,11 +259,14 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         } else {
             copyEl.textContent = saved
                 ? 'We\u2019ll compare the signature on your contract with the valid ID saved on your My Profile. If that photo was unclear, choose a clearer one below: it replaces the saved ID. You can also replace or remove it anytime in My Profile.'
-                : 'Upload a clear, well-lit photo of a government-issued ID that shows your signature. We\u2019ll compare it with the signature on your contract. It will be saved to your My Profile, where you can replace or remove it anytime.';
+                : 'Upload clear, well-lit photos of the front and back of your valid ID. We\u2019ll compare the signature on it with the one on your contract. It will be saved to your My Profile, where you can replace or remove it anytime.';
         }
         confirmBtn.textContent = resign ? 'Check & Replace Signature' : 'Check My ID';
-        // With an ID on file, signing again needs no photo; re-checking makes it optional.
-        filePickerField?.classList.toggle('hidden', resign && saved);
+        // With a complete ID on file, signing again needs no photo; re-checking
+        // makes them optional. A side that is missing is always asked for.
+        SIDES.forEach((side) => {
+            slots[side].field?.classList.toggle('hidden', resign && state.onFile[side]);
+        });
         signBlock.classList.toggle('hidden', !resign);
         clearFile();
         if (agreeBox) agreeBox.checked = false;
@@ -267,9 +296,10 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         if (!reservation) return;
         const resign = state.mode === 'resign';
 
-        // A photo is only required when there is no ID on the profile to use.
-        if (!state.file && !state.hasSavedId) {
-            setMessage('Please choose a photo of your ID first.', 'error');
+        // A photo is only required for a side that is not on the profile yet.
+        const missing = SIDES.filter((side) => !state.files[side] && !state.onFile[side]);
+        if (missing.length) {
+            setMessage(`Please choose a photo of the ${missing.join(' and ')} of your ID first.`, 'error');
             return;
         }
         if (resign) {
@@ -287,25 +317,43 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         setMessage('Checking your signature against your ID\u2026');
 
         try {
-            // A photo chosen here is saved to the profile (replacing the old
-            // one) and sent along; otherwise the server uses the saved ID.
-            let idDataUrl = null;
-            if (state.file) {
+            // Photos chosen here are saved to the profile (replacing the old
+            // ones) and sent along; a side left alone is read by the server
+            // from the saved ID.
+            const sent = { front: null, back: null };
+            for (const side of SIDES) {
+                const file = state.files[side];
+                if (!file) continue;
                 try {
-                    idDataUrl = await resizeIdImage(state.file);
+                    sent[side] = await resizeIdImage(file);
                 } catch {
-                    setMessage('We couldn\u2019t read that photo. Please choose another one.', 'error');
+                    setMessage(`We couldn\u2019t read the ${side} photo. Please choose another one.`, 'error');
                     return;
                 }
                 try {
-                    await saveValidId(supabase, reservation.user_id, idDataUrl);
-                    state.hasSavedId = true;
+                    await saveValidId(supabase, reservation.user_id, sent[side], side);
+                    state.onFile[side] = true;
                 } catch (saveError) {
                     // Not fatal: the photo still goes with this check.
-                    console.warn('[id_signature_retry] could not save the ID to the profile:', saveError);
+                    console.warn(`[id_signature_retry] could not save the ${side} of the ID to the profile:`, saveError);
                 }
             }
-            const idBody = idDataUrl ? { id_image_data_url: idDataUrl } : { use_saved_id: true };
+            // New photos: look for a signature first. An unreadable photo is sent
+            // back for a better one (no attempt used); "no signature" flags the
+            // ID for our team, which the server then picks up below.
+            if ((sent.front || sent.back) && state.onFile.front && state.onFile.back) {
+                setMessage('Checking your ID\u2026');
+                const presence = await checkSavedIdSignature(supabase);
+                if (presence.needsBetterPhoto) {
+                    setMessage(presence.message, 'error');
+                    clearFile();
+                    return;
+                }
+            }
+            const idBody = {};
+            if (sent.front) idBody.id_image_data_url = sent.front;
+            else idBody.use_saved_id = true;
+            if (sent.back) idBody.id_back_image_data_url = sent.back;
 
             let invoked;
             if (resign) {
@@ -360,6 +408,15 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
                 return;
             }
 
+            // No signature on the ID: nothing for the customer to fix, our team reviews it.
+            if (data.verdict === 'awaiting_id_review') {
+                setBusy(false);
+                close();
+                await onChanged();
+                onVerified?.({ awaitingReview: true });
+                return;
+            }
+
             // A real result, but not a match: the contract stays pending.
             const reason = STATE_REASONS[data.verdict] || STATE_REASONS.mismatch;
             if (Number(data.attempts_left) <= 0) {
@@ -386,12 +443,15 @@ export function initIdRetryModal({ supabase, getPageData, onChanged, onVerified 
         }
     }
 
-    pickBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => {
-        const file = fileInput.files?.[0];
-        if (file) setFile(file);
+    SIDES.forEach((side) => {
+        const slot = slots[side];
+        slot.pick.addEventListener('click', () => slot.input.click());
+        slot.input.addEventListener('change', () => {
+            const file = slot.input.files?.[0];
+            if (file) setFile(file, side);
+        });
+        slot.remove.addEventListener('click', () => { clearFile(side); setMessage(''); });
     });
-    removeBtn.addEventListener('click', () => { clearFile(); setMessage(''); });
     clearBtn?.addEventListener('click', () => { state.pad?.clear(); setMessage(''); });
     confirmBtn.addEventListener('click', submit);
     closeBtn.addEventListener('click', close);
