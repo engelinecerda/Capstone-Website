@@ -688,6 +688,10 @@
         .catering-inclusions h4 {
             font-size: 14px; font-weight: 700; color: #2A1408; margin: 0 0 10px;
         }
+        .catering-inclusions-desc {
+            margin: 0 0 12px; font-size: 13px; line-height: 1.6; color: #555;
+        }
+        .catering-inclusions .included-toggle { margin-top: 10px; }
         .catering-inclusions ul {
             margin: 0; padding-left: 18px; color: #555; font-size: 13px; line-height: 1.9;
         }
@@ -3044,7 +3048,7 @@
 /* ── Custom requests on the booking form ────────────────────────────────── */
 /* Sits right under the inclusions block, styled to match it. */
 .cr-group {
-    margin-top: 16px;
+    margin-top: 24px;
     padding: 20px;
     border: 1px solid var(--acc-border-tan, #E5DBCC);
     border-radius: 12px;
@@ -3120,3 +3124,7 @@
 }
 .included-toggle:hover { color: var(--acc-terracotta, #A34F2E); }
 .included-toggle:focus-visible { outline: 2px solid var(--acc-espresso, #4A2C17); outline-offset: 2px; border-radius: 4px; }
+
+/* Space between the custom-request card and the catering inclusions card
+   (and the dish builder) that follows it. */
+#catering-section { margin-top: 24px; }

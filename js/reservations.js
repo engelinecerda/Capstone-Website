@@ -3638,6 +3638,17 @@ function escHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 }
 
+let cateringInclusionsExpandedFor = null;   // package id whose full catering inclusions list is open
+
+document.getElementById('catering-inclusions-block')?.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-catering-incl-toggle]')) return;
+    const pkg = getCateringPackage();
+    if (!pkg) return;
+    const key = pkg.id ?? pkg.label;
+    cateringInclusionsExpandedFor = cateringInclusionsExpandedFor === key ? null : key;
+    buildCateringInclusionsBlock();
+});
+
 function buildCateringInclusionsBlock() {
     const block = document.getElementById('catering-inclusions-block');
     if (!block) return;
@@ -3669,7 +3680,15 @@ function buildCateringInclusionsBlock() {
     let html = `<h4><i class="ti ti-clipboard-list" aria-hidden="true"></i> Catering Package Inclusions</h4>`;
     if (desc) html += `<p class="catering-inclusions-desc">${escHtml(desc)}</p>`;
     if (bulletItems.length) {
-        html += `<ul>${bulletItems.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
+        const key = pkg.id ?? pkg.label;
+        const collapsible = bulletItems.length > CUSTOMIZE_COLLAPSE_ABOVE;
+        const expanded = !collapsible || cateringInclusionsExpandedFor === key;
+        const shown = expanded ? bulletItems : bulletItems.slice(0, CUSTOMIZE_COLLAPSE_ABOVE);
+        html += `<ul>${shown.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
+        if (collapsible) {
+            html += `<button type="button" class="included-toggle" data-catering-incl-toggle aria-expanded="${expanded}">` +
+                (expanded ? 'Show less' : `Show ${bulletItems.length - shown.length} more`) + `</button>`;
+        }
     }
     offerItems.forEach(offer => {
         html += `<div class="special-offer"><i class="ti ti-gift" aria-hidden="true"></i> Special Offer<span>${escHtml(offer)}</span></div>`;
