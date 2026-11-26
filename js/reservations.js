@@ -32,6 +32,7 @@ import { normalizeInclusionOptions, hasRemovableInclusions, optionalCreditTotal,
 import { showFeedbackModal, showConfirmModal } from '/js/feedback_modal.js';
 import { pickActiveDiscount, applyDiscount } from '/js/package_discount_helpers.js';
 import { fetchContractTemplateData, fetchContractFeeTermsTokens } from '/js/contract_render.js';
+import { getFeeTokenValues } from '/js/reservation_shared.js';
 import { buildBreakdownRows, buildRequestRows, formatBreakdownText, formatRequestsText, BREAKDOWN_HEADING, REQUESTS_HEADING } from '/js/contract_breakdown.js';
 import { computeTransportFee, describeTransportFee, transportOrigins, transportCoverage, pinInCoverage } from '/js/transport_fee.js';
 import { optimizedImageUrl } from '/js/cloudinary_optimized_image_delivery.js';
@@ -1888,8 +1889,9 @@ function renderContractBody(templateBody, contractData = {}) {
         // entirely, so any clause referencing one of these five tokens
         // silently rendered blank instead of matching what's shown
         // everywhere else (the second half of BUG-03).
-        reschedule_fee: fmtPeso(feeTerms.rescheduleFee ?? 3000),
-        cancellation_fee: fmtPeso(isOffsite ? (feeTerms.cancellationFeeOffsite ?? 2000) : (feeTerms.cancellationFeeOnsite ?? 500)),
+        // Percent-of-total policy (20261206), from the same live settings the
+        // charge itself uses; see getFeeTokenValues() in js/reservation_shared.js.
+        ...getFeeTokenValues(feeTerms.paymentRules),
         deposit_percent: String(feeTerms.depositPercent ?? 50),
         terms_and_conditions: feeTerms.termsAndConditions || '(See the Terms & Conditions page.)',
         data_privacy_policy: feeTerms.dataPrivacyPolicy || '(See the Data Privacy Policy page.)'

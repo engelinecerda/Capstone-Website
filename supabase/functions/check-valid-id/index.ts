@@ -8,7 +8,8 @@
 // built from the verified caller id, never from the request) with Gemini vision
 // (same provider/secret as `ocr-payment` and `validate-receipt`) and records:
 //   signature on either side -> valid_id_review.status = 'clear'
-//   no signature on any side -> 'flagged': a manager must review the ID
+//   no signature on any side -> 'flagged': a manager must review the ID, and
+//                               every manager gets a notification (once per flag)
 //   photo unclear / not an ID -> 'unchecked' + a message asking for a better photo
 //   service trouble          -> 'unchecked' (never blocks the customer)
 // An approval or rejection by a manager is only ever written by
@@ -20,7 +21,7 @@
 // Deploy (imports _shared/): npx supabase functions deploy check-valid-id
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { loadSavedIdBackForUser, loadSavedIdForUser } from '../_shared/id_signature_check.ts';
+import { loadSavedIdBackForUser, loadSavedIdForUser, notifyManagersIdFlagged } from '../_shared/id_signature_check.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -189,6 +190,20 @@ Deno.serve(async (req: Request) => {
       : check === 'no_signature'
       ? 'flagged'
       : 'unchecked';
+
+    // A manager's decision (or an ID that is already flagged) is only ever
+    // changed by a new photo: saving one resets the row to 'unchecked' first.
+    // So a repeat call on the same photos must not undo an approval or
+    // rejection, and must not notify the managers a second time.
+    const { data: before } = await supabase
+      .from('valid_id_review')
+      .select('status')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (before?.status === 'approved' || before?.status === 'rejected') {
+      return jsonResponse({ success: true, status: before.status, check: null });
+    }
+
     const now = new Date().toISOString();
     const { error: upsertError } = await supabase.from('valid_id_review').upsert(
       {
@@ -204,6 +219,11 @@ Deno.serve(async (req: Request) => {
       { onConflict: 'user_id' },
     );
     if (upsertError) throw upsertError;
+
+    // Newly flagged (no signature): tell the managers once.
+    if (status === 'flagged' && before?.status !== 'flagged') {
+      await notifyManagersIdFlagged(supabase, userId);
+    }
 
     return jsonResponse({ success: true, status, check });
   } catch (error) {

@@ -161,10 +161,15 @@ function paymentRules(details) {
     if (!isBlank(c.max_installments)) parts.push(`up to ${plural(c.max_installments, 'installment')}`);
     if (!isBlank(c.proof_of_payment_window_days)) parts.push(`proof of payment due within ${plural(c.proof_of_payment_window_days, 'day')}`);
     if (typeof c.auto_hold_enabled === 'boolean') parts.push(`auto-hold ${onOff(c.auto_hold_enabled)}`);
-    if (!isBlank(c.cancellation_fee_onsite) || !isBlank(c.cancellation_fee_offsite)) {
-        parts.push(`cancellation fee ${peso(c.cancellation_fee_onsite ?? 0)} onsite / ${peso(c.cancellation_fee_offsite ?? 0)} offsite`);
+    if (!isBlank(c.cancellation_fee_percent)) {
+        parts.push(`cancelling under ${plural(c.cancellation_fee_notice_days ?? 2, 'day')} before the event costs ${c.cancellation_fee_percent}% of the total`);
     }
-    if (!isBlank(c.reschedule_fee)) parts.push(`reschedule fee ${peso(c.reschedule_fee)}`);
+    if (!isBlank(c.reschedule_fee_percent)) {
+        parts.push(`rescheduling under ${plural(c.reschedule_fee_notice_days ?? 30, 'day')} before the event costs ${c.reschedule_fee_percent}% of the total`);
+    }
+    if (!isBlank(c.cancellation_fee_onsite) || !isBlank(c.cancellation_fee_offsite)) {
+        parts.push(`auto-cancel fee ${peso(c.cancellation_fee_onsite ?? 0)} onsite / ${peso(c.cancellation_fee_offsite ?? 0)} offsite`);
+    }
     if (!isBlank(c.service_charge_percent)) {
         parts.push(`service charge ${c.service_charge_percent}%${c.service_charge_applies_offsite ? ' (also applied offsite)' : ' (onsite only)'}`);
     }

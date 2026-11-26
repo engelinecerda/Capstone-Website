@@ -27,6 +27,7 @@ import { logAudit } from './audit_logger.js';
 import { TOKEN_INFO, SAMPLE_RESERVATION, mergeTokens, findUnknownTokens } from './merge_tokens.js';
 import { buildBreakdownRows, buildRequestRows } from './contract_breakdown.js';
 import { fetchContractTemplateData } from './contract_render.js';
+import { getFeeTokenValues } from './reservation_shared.js';
 import { lockBodyScroll } from './modal_scroll_lock.js';
 
 function escHtml(value) {
@@ -106,8 +107,7 @@ async function loadGlobalData() {
 
   tokenValues = {
     ...SAMPLE_RESERVATION,
-    reschedule_fee: '₱' + Number(paymentRules.reschedule_fee ?? 3000).toLocaleString('en-PH', { minimumFractionDigits: 2 }),
-    cancellation_fee: '₱' + Number(paymentRules.cancellation_fee_onsite ?? 500).toLocaleString('en-PH', { minimumFractionDigits: 2 }),
+    ...getFeeTokenValues(paymentRules),
     deposit_percent: String(downPaymentRow?.percent_of_total ?? 50),
     terms_and_conditions: termsBody || '(No override saved yet on the Terms & Legal tab — customers currently see the built-in fallback copy.)',
     data_privacy_policy: privacyBody || '(No override saved yet on the Terms & Legal tab — customers currently see the built-in fallback copy.)',

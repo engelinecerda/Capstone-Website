@@ -73,6 +73,7 @@ export async function fetchContractFeeTermsTokens(supabase) {
   try { privacyBody = privacyRow?.setting_value ? (JSON.parse(privacyRow.setting_value).body || '') : ''; } catch { /* leave blank */ }
 
   return {
+    paymentRules,
     rescheduleFee: Number(paymentRules.reschedule_fee ?? 3000),
     cancellationFeeOnsite: Number(paymentRules.cancellation_fee_onsite ?? 500),
     cancellationFeeOffsite: Number(paymentRules.cancellation_fee_offsite ?? 2000),

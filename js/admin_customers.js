@@ -65,7 +65,9 @@ let activeSearch = '';             // the search term currently applied
 let latestRequestId = 0;           // lets a newer request supersede an older one
 let searchDebounceTimer = null;
 let currentRole = '';               // 'manager' | 'admin', set after the session check
-let activeIdFilter = 'all';         // 'all' | 'flagged' (the chips above the table)
+// 'all' | 'flagged' (the chips above the table). The ID-flagged notification
+// links here as /admin/customers?id=flagged, so that opens with the filter on.
+let activeIdFilter = new URLSearchParams(window.location.search).get('id') === 'flagged' ? 'flagged' : 'all';
 let customersOnPage = [];           // rows on screen, so the ID modal can name the customer
 let pendingFlash = '';              // shown once by the next render (e.g. after an ID decision)
 
@@ -446,13 +448,17 @@ function handleSearchInput() {
 }
 
 // ── Valid ID filter chips ──────────────────────────────────────────────
-function setIdFilter(nextFilter) {
-  const filter = nextFilter === 'flagged' ? 'flagged' : 'all';
+function syncIdFilterChips(filter) {
   idFilterChips?.querySelectorAll('[data-id-filter]').forEach((chip) => {
     const active = chip.dataset.idFilter === filter;
     chip.classList.toggle('active', active);
     chip.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
+}
+
+function setIdFilter(nextFilter) {
+  const filter = nextFilter === 'flagged' ? 'flagged' : 'all';
+  syncIdFilterChips(filter);
   if (filter === activeIdFilter) return;
   activeIdFilter = filter;
   customersCurrentPage = 1;
@@ -460,6 +466,7 @@ function setIdFilter(nextFilter) {
 }
 
 function wireIdFilterChips() {
+  syncIdFilterChips(activeIdFilter);   // may already be 'flagged' (opened from a notification)
   idFilterChips?.addEventListener('click', (event) => {
     const chip = event.target.closest('[data-id-filter]');
     if (chip) setIdFilter(chip.dataset.idFilter);

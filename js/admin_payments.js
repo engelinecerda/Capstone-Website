@@ -612,6 +612,7 @@ async function fetchReservationsForPayments(reservationIds) {
       booking_scope,
       duration_hours,
       cancellation_reason,
+      cancellation_fee_amount,
       package:package_id ( package_name, duration_hours, booking_scope )
     `)
     .in('reservation_id', reservationIds);
@@ -646,7 +647,8 @@ async function fetchRescheduleRequests(requestIds) {
       reservation_id,
       requested_date,
       requested_time,
-      status
+      status,
+      fee_amount
     `)
     .in('reschedule_request_id', requestIds);
 
@@ -1334,7 +1336,10 @@ function getExpectedPaymentAmount(payment, reservation, paymentRules) {
     return { amount: getCancellationFee(reservation, paymentRules), label: 'Cancellation fee' };
   }
   if (payment.payment_type === 'reschedule_fee') {
-    return { amount: getRescheduleFee(paymentRules), label: 'Reschedule fee' };
+    // The amount frozen on the request when it was made (a request from
+    // before 20261206 has none and keeps the flat fee).
+    const rescheduleRequest = payment.reschedule_request_id ? getRescheduleRequest(payment.reschedule_request_id) : null;
+    return { amount: getRescheduleFee(paymentRules, rescheduleRequest), label: 'Reschedule fee' };
   }
   if (payment.payment_type === 'extension_fee') {
     const extensionRequest = payment.extension_id ? getExtensionRequest(payment.extension_id) : null;

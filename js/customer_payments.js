@@ -256,6 +256,7 @@ const BASE_CUSTOMER_RESERVATION_SELECT = `
     special_requests,
     status,
     cancellation_reason,
+    cancellation_fee_amount,
     created_at,
     package:package_id ( package_name, package_type ),
     add_on:add_on_id ( package_name, package_type )
@@ -555,7 +556,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
     // fee itself is exactly what's owed once cancelled, so it can't be
     // gated behind the same check or it would never appear.
     if (isCancellationFeeOwed(reservation, getReservationPayments(paymentsByReservationId, reservationId))) {
-        optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', getSharedCancellationFee(reservation, options.paymentRules), paymentsByReservationId, {
+        optionsList.push(buildPaymentOption(reservation, 'cancellation_fee', getSharedCancellationFee(reservation, options.paymentRules, getReservationPayments(paymentsByReservationId, reservationId)), paymentsByReservationId, {
             ...options,
             displayLabel: 'Cancellation Fee',
             displayDescription: 'Required fee to finalize the cancellation of your reservation.'
@@ -657,7 +658,7 @@ export function getAvailablePaymentOptions(reservation, paymentsByReservationId,
             ));
 
             if (!hasExistingRescheduleFee) {
-                const rescheduleFeeAmount = getSharedRescheduleFee(options.paymentRules);
+                const rescheduleFeeAmount = getSharedRescheduleFee(options.paymentRules, request);
                 optionsList.push(buildPaymentOption(reservation, 'reschedule_fee', rescheduleFeeAmount, paymentsByReservationId, {
                     ...options,
                     displayDescription: `${PAYMENT_TYPE_META.reschedule_fee.description} for ${safeFormatDate(options.formatDate, request.requested_date)}`,
@@ -756,7 +757,7 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
     const balance = getReservationBalanceDetails(reservation, paymentsByReservationId, options);
 
     if (isCancellationFeeOwed(reservation, payments)) {
-        const amountDue = getSharedCancellationFee(reservation, options.paymentRules);
+        const amountDue = getSharedCancellationFee(reservation, options.paymentRules, payments);
         return {
             mode: 'cancellation_fee_due',
             submittable: true,
@@ -861,7 +862,7 @@ export function getPaymentPageState(reservation, paymentsByReservationId, resche
     const rescheduleRequests = reschedulesByReservationId?.[reservationId] || [];
     const openReschedule = rescheduleRequests.find((request) => String(request.status || '').toLowerCase() === 'approved_pending_payment');
     if (openReschedule && isRescheduleFeeOwed(rescheduleRequests, payments)) {
-        const amountDue = getSharedRescheduleFee(options.paymentRules);
+        const amountDue = getSharedRescheduleFee(options.paymentRules, openReschedule);
         return {
             mode: 'reschedule_fee_due',
             submittable: true,
@@ -1117,7 +1118,8 @@ export async function fetchRescheduleRequests(supabase, reservationIds) {
             status,
             requested_at,
             reviewed_at,
-            hold_expires_at
+            hold_expires_at,
+            fee_amount
         `)
         .in('reservation_id', reservationIds)
         .order('requested_at', { ascending: false });

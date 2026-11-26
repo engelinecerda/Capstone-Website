@@ -26,7 +26,7 @@ const TYPE_ICONS = {
 
 function iconForType(type) {
     const normalized = String(type || '').toLowerCase();
-    if (normalized.includes('failed') || normalized.includes('security_alert')) return TYPE_ICONS.alert;
+    if (normalized.includes('failed') || normalized.includes('security_alert') || normalized.includes('id_flagged')) return TYPE_ICONS.alert;
     if (normalized.includes('payment')) return TYPE_ICONS.card;
     if (normalized.includes('contract')) return TYPE_ICONS.file;
     if (normalized.includes('review')) return TYPE_ICONS.star;

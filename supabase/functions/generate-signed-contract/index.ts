@@ -1239,11 +1239,19 @@ Deno.serve(async (req: Request) => {
     // down-payment percent, system_settings for the Terms & Legal tab text).
     let paymentRules: Record<string, unknown> = {};
     try { paymentRules = paymentRulesRow?.setting_value ? JSON.parse(paymentRulesRow.setting_value) : {}; } catch { /* use default */ }
-    const isOffsite = reservation.location_type === 'offsite';
-    const cancellationFee = Number(
-      paymentRules[isOffsite ? 'cancellation_fee_offsite' : 'cancellation_fee_onsite'] ?? (isOffsite ? 2000 : 500),
-    );
-    const rescheduleFee = Number(paymentRules['reschedule_fee'] ?? 3000);
+    // Cancellation / reschedule fee policy (20261206): a percentage of the
+    // total contract amount that depends on how much notice was given. The
+    // numbers and their defaults mirror getFeePolicy() in js/reservation_shared.js
+    // and public.cancellation_fee_for() / reschedule_fee_for() in the database.
+    const policyNumber = (value: unknown, fallback: number): number => {
+      if (value === null || value === undefined || value === '') return fallback;
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 0 ? n : fallback;
+    };
+    const cancellationNoticeDays = policyNumber(paymentRules['cancellation_fee_notice_days'], 2);
+    const cancellationFeePercent = policyNumber(paymentRules['cancellation_fee_percent'], 30);
+    const rescheduleNoticeDays = policyNumber(paymentRules['reschedule_fee_notice_days'], 30);
+    const rescheduleFeePercent = policyNumber(paymentRules['reschedule_fee_percent'], 10);
     const depositPercent = downPaymentTypeRow?.percent_of_total ?? 50;
 
     let termsBody = '';
@@ -1322,8 +1330,12 @@ Deno.serve(async (req: Request) => {
       contact_email: reservation.contact_email || '',
       contact_phone: reservation.contact_phone || '',
       signed_date: signedAtLabel,
-      reschedule_fee: formatCurrency(rescheduleFee),
-      cancellation_fee: formatCurrency(cancellationFee),
+      reschedule_fee: `${rescheduleFeePercent}% of the total contract amount`,
+      cancellation_fee: `${cancellationFeePercent}% of the total contract amount`,
+      cancellation_fee_percent: String(cancellationFeePercent),
+      cancellation_notice_days: String(cancellationNoticeDays),
+      reschedule_fee_percent: String(rescheduleFeePercent),
+      reschedule_notice_days: String(rescheduleNoticeDays),
       deposit_percent: String(depositPercent),
       terms_and_conditions: termsBody,
       data_privacy_policy: privacyBody,

@@ -2,6 +2,7 @@
 import './money_inputs.js';
 import { readTransportRules, priceTransportDistance, transportOrigins, TRANSPORT_DEFAULTS, TRANSPORT_DEFAULT_RANGES, MAX_TRANSPORT_KM } from './transport_fee.js';
 import { formatMoney, moneyInputValue } from './money.js';
+import { FEE_POLICY_DEFAULTS, getFeePolicy } from './reservation_shared.js';
 import { portalSupabase as supabase } from '/js/supabase.js';
 import { validateAdminSession, watchAuthState, wireLogoutButton } from '/js/session_validation.js';
 import { setupInactivityLogout } from './super_admin_inactivity.js';
@@ -610,9 +611,16 @@ const DEFAULT_PAYMENT_RULES = {
   auto_hold_enabled: true,
   proof_of_payment_window_days: 3,
   currency: 'PHP',
+  // Flat fees: the overdue auto-cancel, and requests already in flight before
+  // the percent policy (20261206). Customer-requested cancellations and
+  // reschedules use the notice-based percentages below.
   cancellation_fee_onsite: 500,
   cancellation_fee_offsite: 2000,
   reschedule_fee: 3000,
+  cancellation_fee_notice_days: FEE_POLICY_DEFAULTS.cancellationNoticeDays,
+  cancellation_fee_percent: FEE_POLICY_DEFAULTS.cancellationFeePercent,
+  reschedule_fee_notice_days: FEE_POLICY_DEFAULTS.rescheduleNoticeDays,
+  reschedule_fee_percent: FEE_POLICY_DEFAULTS.rescheduleFeePercent,
   service_charge_percent: 10,
   // Safe default: unchanged current behaviour (offsite charged 0%) until
   // an admin deliberately turns this on — the café has not confirmed
@@ -639,7 +647,10 @@ function populatePaymentRulesFields(config) {
   const currency = document.getElementById('pr-currency');
   const cancelOnsite = document.getElementById('pr-cancellation-fee-onsite');
   const cancelOffsite = document.getElementById('pr-cancellation-fee-offsite');
-  const rescheduleFee = document.getElementById('pr-reschedule-fee');
+  const cancelNotice = document.getElementById('pr-cancellation-notice-days');
+  const cancelPercent = document.getElementById('pr-cancellation-fee-percent');
+  const rescheduleNotice = document.getElementById('pr-reschedule-notice-days');
+  const reschedulePercent = document.getElementById('pr-reschedule-fee-percent');
 
   if (maxInst) maxInst.value = config.max_installments ?? '';
   if (autoHold) autoHold.checked = !!config.auto_hold_enabled;
@@ -647,7 +658,11 @@ function populatePaymentRulesFields(config) {
   if (currency) currency.value = config.currency ?? 'PHP';
   if (cancelOnsite) cancelOnsite.value = moneyInputValue(config.cancellation_fee_onsite);
   if (cancelOffsite) cancelOffsite.value = moneyInputValue(config.cancellation_fee_offsite);
-  if (rescheduleFee) rescheduleFee.value = moneyInputValue(config.reschedule_fee);
+  const policy = getFeePolicy(config);
+  if (cancelNotice) cancelNotice.value = policy.cancellationNoticeDays;
+  if (cancelPercent) cancelPercent.value = policy.cancellationFeePercent;
+  if (rescheduleNotice) rescheduleNotice.value = policy.rescheduleNoticeDays;
+  if (reschedulePercent) reschedulePercent.value = policy.rescheduleFeePercent;
 }
 
 function readPaymentRulesFields() {
@@ -658,7 +673,13 @@ function readPaymentRulesFields() {
     currency: 'PHP',
     cancellation_fee_onsite: Number(document.getElementById('pr-cancellation-fee-onsite')?.value),
     cancellation_fee_offsite: Number(document.getElementById('pr-cancellation-fee-offsite')?.value),
-    reschedule_fee: Number(document.getElementById('pr-reschedule-fee')?.value),
+    // The flat reschedule fee has no field any more (new requests use the
+    // percentage); keep the saved value for requests made before it.
+    reschedule_fee: Number(currentPaymentRulesConfig.reschedule_fee ?? DEFAULT_PAYMENT_RULES.reschedule_fee),
+    cancellation_fee_notice_days: Number(document.getElementById('pr-cancellation-notice-days')?.value),
+    cancellation_fee_percent: Number(document.getElementById('pr-cancellation-fee-percent')?.value),
+    reschedule_fee_notice_days: Number(document.getElementById('pr-reschedule-notice-days')?.value),
+    reschedule_fee_percent: Number(document.getElementById('pr-reschedule-fee-percent')?.value),
     // Not editable on this page anymore — pass through whatever is
     // currently saved so this page's save can't clobber the other page's card.
     cancellation_min_notice_days: currentPaymentRulesConfig.cancellation_min_notice_days ?? null,
@@ -672,7 +693,19 @@ function validatePaymentRules(config) {
   if (!Number.isFinite(config.cancellation_fee_onsite) || config.cancellation_fee_onsite < 0) return 'Onsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.cancellation_fee_offsite) || config.cancellation_fee_offsite < 0) return 'Offsite cancellation fee must be zero or more.';
   if (!Number.isFinite(config.reschedule_fee) || config.reschedule_fee < 0) return 'Reschedule fee must be zero or more.';
+  for (const [key, label] of [['cancellation_fee_notice_days', 'Cancellation fee notice period'], ['reschedule_fee_notice_days', 'Reschedule fee notice period']]) {
+    if (!Number.isFinite(config[key]) || config[key] < 0 || config[key] > 365 || !Number.isInteger(config[key])) return `${label} must be a whole number of days from 0 to 365.`;
+  }
+  for (const [key, label] of [['cancellation_fee_percent', 'Cancellation fee percentage'], ['reschedule_fee_percent', 'Reschedule fee percentage']]) {
+    if (!Number.isFinite(config[key]) || config[key] < 0 || config[key] > 100) return `${label} must be between 0 and 100.`;
+  }
   return null;
+}
+
+// One-line summary of the fee rules for the confirm dialog.
+function describeFeeRules(config) {
+  const p = getFeePolicy(config);
+  return `cancel under ${p.cancellationNoticeDays}d: ${p.cancellationFeePercent}% of total, reschedule under ${p.rescheduleNoticeDays}d: ${p.rescheduleFeePercent}% of total, auto-cancel fee ${formatMoney(config.cancellation_fee_onsite)}/${formatMoney(config.cancellation_fee_offsite)}`;
 }
 
 function setPrMsg(msg, isError = false) {
@@ -706,7 +739,15 @@ async function savePaymentRules() {
     .select('setting_value')
     .eq('setting_key', 'payment_rules')
     .maybeSingle();
-  const oldConfig = current ? { ...DEFAULT_PAYMENT_RULES, ...JSON.parse(current.setting_value) } : DEFAULT_PAYMENT_RULES;
+  const savedRaw = current?.setting_value ? JSON.parse(current.setting_value) : {};
+  const oldConfig = current ? { ...DEFAULT_PAYMENT_RULES, ...savedRaw } : DEFAULT_PAYMENT_RULES;
+  // This save replaces the whole JSON blob, so first lay the saved copy down
+  // and let this form's values win: any setting the form does not show (the
+  // cancellation payment deadline, reschedule limits, ...) is kept instead of
+  // silently disappearing.
+  for (const [key, value] of Object.entries(savedRaw)) {
+    if (!(key in config)) config[key] = value;
+  }
   // Re-sync the fields this form doesn't render with whatever is freshest
   // in the DB right before saving — this upsert replaces the whole JSON
   // blob, so any field readPaymentRulesFields() doesn't return would
@@ -724,8 +765,8 @@ async function savePaymentRules() {
 
   showSettingsConfirm(
     'Change Payment Rules',
-    `${oldConfig.max_installments} installments, ${oldConfig.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ${formatMoney(oldConfig.cancellation_fee_onsite)}/${formatMoney(oldConfig.cancellation_fee_offsite)}, reschedule fee ${formatMoney(oldConfig.reschedule_fee)}`,
-    `${config.max_installments} installments, ${config.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, cancellation fee ${formatMoney(config.cancellation_fee_onsite)}/${formatMoney(config.cancellation_fee_offsite)}, reschedule fee ${formatMoney(config.reschedule_fee)}`,
+    `${oldConfig.max_installments} installments, ${oldConfig.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${oldConfig.auto_hold_enabled ? 'on' : 'off'}, ${describeFeeRules(oldConfig)}`,
+    `${config.max_installments} installments, ${config.proof_of_payment_window_days}d proof-of-payment window, auto-hold ${config.auto_hold_enabled ? 'on' : 'off'}, ${describeFeeRules(config)}`,
     async () => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase

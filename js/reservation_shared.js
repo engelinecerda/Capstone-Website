@@ -254,7 +254,11 @@ export function getCancellationFeePayment(payments) {
 // customer had paid something, or staff added one) it is handled as usual.
 export function isCancellationFeeWaived(reservation, payments) {
     return String(reservation?.status || '').toLowerCase() === 'cancelled'
-        && reservation?.cancellation_reason === 'auto_cancelled_overdue'
+        && (
+            reservation?.cancellation_reason === 'auto_cancelled_overdue'
+            // 20261206: a customer cancellation whose frozen fee is 0.
+            || getFrozenFee(reservation?.cancellation_fee_amount) === 0
+        )
         && !getCancellationFeePayment(payments);
 }
 
@@ -360,7 +364,113 @@ export function computeCanRequestAdditionalHeads(status, additionalHeadRequests)
     return ['approved', 'confirmed', 'rescheduled'].includes(normalizedStatus) && !getOpenAdditionalHeadRequest(additionalHeadRequests);
 }
 
-export function getCancellationFee(reservation, paymentRules) {
+// ── Cancellation / reschedule fees ──────────────────────────────────────────
+// Policy (Terms, section 6): every payment is non-refundable, and
+//   * cancelling LESS than 2 days before the event costs 30% of the total
+//     contract amount (the full 30%, on top of what was already paid); 2 or
+//     more days before costs nothing; nothing paid at all costs nothing;
+//   * rescheduling LESS than 30 days before the ORIGINAL event date costs
+//     10% of the total contract amount; 30 or more days costs nothing.
+// The numbers come from system_settings.payment_rules (cancellation_fee_
+// notice_days / cancellation_fee_percent / reschedule_fee_notice_days /
+// reschedule_fee_percent) and fall back to the policy above when never saved.
+// Days are whole calendar days in Asia/Manila (event date minus today).
+//
+// This is the browser copy of public.cancellation_fee_for() and
+// public.reschedule_fee_for() (supabase/migrations/20261206_...). The
+// database decides the real amount and freezes it on the request
+// (reservations.cancellation_fee_amount, reschedule_requests.fee_amount);
+// these functions only PREVIEW it before the request exists, and
+// fee_policy_test.mjs keeps the two identical.
+export const FEE_POLICY_DEFAULTS = Object.freeze({
+    cancellationNoticeDays: 2,
+    cancellationFeePercent: 30,
+    rescheduleNoticeDays: 30,
+    rescheduleFeePercent: 10
+});
+
+function policyNumber(value, fallback) {
+    if (value === null || value === undefined || value === '') return fallback;
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+export function getFeePolicy(paymentRules) {
+    const r = paymentRules || {};
+    return {
+        cancellationNoticeDays: policyNumber(r.cancellation_fee_notice_days, FEE_POLICY_DEFAULTS.cancellationNoticeDays),
+        cancellationFeePercent: policyNumber(r.cancellation_fee_percent, FEE_POLICY_DEFAULTS.cancellationFeePercent),
+        rescheduleNoticeDays: policyNumber(r.reschedule_fee_notice_days, FEE_POLICY_DEFAULTS.rescheduleNoticeDays),
+        rescheduleFeePercent: policyNumber(r.reschedule_fee_percent, FEE_POLICY_DEFAULTS.rescheduleFeePercent)
+    };
+}
+
+// Whole calendar days from `todayKey` (YYYY-MM-DD, Manila) to the event date.
+// Negative once the event has passed; null when the date is missing.
+export function getDaysUntilEvent(reservation, todayKey = getTimeZoneNowParts().dateKey) {
+    const eventKey = formatDateKey(reservation?.event_date);
+    if (!eventKey || !todayKey) return null;
+    const toDays = (key) => {
+        const [y, m, d] = String(key).split('-').map(Number);
+        return Date.UTC(y, m - 1, d) / 86400000;
+    };
+    const days = toDays(eventKey) - toDays(todayKey);
+    return Number.isFinite(days) ? days : null;
+}
+
+// percent of an amount, in whole centavos, rounded half up with integer
+// arithmetic only (the database rounds numeric the same way, so a value like
+// 10.005 can never come out differently here).
+function percentOfAmount(amount, percent) {
+    const cents = Math.round(Number(amount || 0) * 100);
+    const hundredths = Math.round(Number(percent || 0) * 100);
+    return Math.floor((cents * hundredths + 5000) / 10000) / 100;
+}
+
+function getApprovedPaidTotal(payments) {
+    return (payments || []).reduce((sum, payment) => (
+        String(payment?.payment_status || '').toLowerCase() === 'approved'
+            ? sum + Number(payment.amount || 0)
+            : sum
+    ), 0);
+}
+
+// What cancelling would cost right now, and why. `payments` is the
+// reservation's payment rows (used for the "nothing paid" rule); leave it
+// out and the notice rule alone decides.
+export function getCancellationFeeInfo(reservation, paymentRules, payments, todayKey) {
+    const policy = getFeePolicy(paymentRules);
+    const days = getDaysUntilEvent(reservation, todayKey);
+    const base = { percent: policy.cancellationFeePercent, noticeDays: policy.cancellationNoticeDays, days };
+    if (days === null || days >= policy.cancellationNoticeDays) {
+        return { ...base, amount: 0, reason: 'notice' };
+    }
+    if (Array.isArray(payments) && getApprovedPaidTotal(payments) <= 0) {
+        return { ...base, amount: 0, reason: 'nothing_paid' };
+    }
+    return { ...base, amount: percentOfAmount(reservation?.total_price, policy.cancellationFeePercent), reason: 'fee' };
+}
+
+export function computeCancellationFee(reservation, paymentRules, payments, todayKey) {
+    return getCancellationFeeInfo(reservation, paymentRules, payments, todayKey).amount;
+}
+
+export function computeRescheduleFee(reservation, paymentRules, todayKey) {
+    const policy = getFeePolicy(paymentRules);
+    const days = getDaysUntilEvent(reservation, todayKey);
+    if (days === null || days >= policy.rescheduleNoticeDays) return 0;
+    return percentOfAmount(reservation?.total_price, policy.rescheduleFeePercent);
+}
+
+function getFrozenFee(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// The old flat fee. Still what the overdue auto-cancel charges, and what a
+// cancellation already in flight before 20261206 (no frozen amount) owes.
+function getFlatCancellationFee(reservation, paymentRules) {
     const isOffsite = String(reservation?.location_type || '').toLowerCase() === 'offsite';
     const key = isOffsite ? 'cancellation_fee_offsite' : 'cancellation_fee_onsite';
     const configured = Number(paymentRules?.[key]);
@@ -370,12 +480,79 @@ export function getCancellationFee(reservation, paymentRules) {
     return isOffsite ? 2000 : 500;
 }
 
-export function getRescheduleFee(paymentRules) {
+const CANCELLATION_FLOW_STATUSES = ['cancellation_requested', 'cancellation_approved', 'cancelled'];
+
+// The cancellation fee for this reservation. Once cancelling has begun the
+// amount frozen by the database is the answer (or the old flat fee when none
+// was frozen); before that it is a preview from the notice rule. Pass the
+// reservation's payments for an accurate preview.
+export function getCancellationFee(reservation, paymentRules, payments) {
+    const status = String(reservation?.status || '').toLowerCase();
+    if (CANCELLATION_FLOW_STATUSES.includes(status)) {
+        const frozen = getFrozenFee(reservation?.cancellation_fee_amount);
+        return frozen !== null ? frozen : getFlatCancellationFee(reservation, paymentRules);
+    }
+    return computeCancellationFee(reservation, paymentRules, payments);
+}
+
+// The reschedule fee. With a request: the amount frozen on it (or the old
+// flat fee for a request made before 20261206). With only a reservation: a
+// preview of what rescheduling would cost today. With neither: the old flat fee.
+export function getRescheduleFee(paymentRules, request = null, reservation = null) {
+    if (request) {
+        const frozen = getFrozenFee(request.fee_amount);
+        if (frozen !== null) return frozen;
+    } else if (reservation) {
+        return computeRescheduleFee(reservation, paymentRules);
+    }
     const configured = Number(paymentRules?.reschedule_fee);
     if (paymentRules && Number.isFinite(configured) && configured >= 0) {
         return configured;
     }
     return 3000;
+}
+
+// Contract / message tokens for the fee policy, from the live settings.
+// {{cancellation_fee}} and {{reschedule_fee}} used to be flat peso amounts; they
+// now read as the percentage ("30% of the total contract amount") so a template
+// that says "a cancellation fee of {{cancellation_fee}}" stays correct.
+export function getFeeTokenValues(paymentRules) {
+    const p = getFeePolicy(paymentRules);
+    return {
+        cancellation_fee: `${p.cancellationFeePercent}% of the total contract amount`,
+        reschedule_fee: `${p.rescheduleFeePercent}% of the total contract amount`,
+        cancellation_fee_percent: String(p.cancellationFeePercent),
+        cancellation_notice_days: String(p.cancellationNoticeDays),
+        reschedule_fee_percent: String(p.rescheduleFeePercent),
+        reschedule_notice_days: String(p.rescheduleNoticeDays)
+    };
+}
+
+function plural(n, word) {
+    return `${n} ${word}${Number(n) === 1 ? '' : 's'}`;
+}
+
+// Customer-facing wording for the fee policy, built from the live settings so
+// it can never disagree with what is charged.
+export function describeCancellationPolicy(paymentRules) {
+    const p = getFeePolicy(paymentRules);
+    return `Cancelling less than ${plural(p.cancellationNoticeDays, 'day')} before the event is charged ${p.cancellationFeePercent}% of the total contract amount. Cancelling earlier has no fee.`;
+}
+
+export function describeReschedulePolicy(paymentRules) {
+    const p = getFeePolicy(paymentRules);
+    return `Rescheduling less than ${plural(p.rescheduleNoticeDays, 'day')} before the event date may incur a ${p.rescheduleFeePercent}% fee of the total contract amount. With more notice there is no fee.`;
+}
+
+// The note shown under the fee in the Cancel Reservation dialog.
+export function describeCancellationFeeInfo(info, paymentRules) {
+    if (info.amount > 0) {
+        return `${describeCancellationPolicy(paymentRules)} This fee must be paid to complete the cancellation. You will be directed to the Payments section after confirming.`;
+    }
+    if (info.reason === 'nothing_paid') {
+        return 'Nothing has been paid on this reservation, so no cancellation fee applies. It will be cancelled right away.';
+    }
+    return `You are cancelling at least ${plural(info.noticeDays, 'day')} before your event, so no cancellation fee applies. Your reservation will be cancelled right away.`;
 }
 
 // The one place Unpaid/Partially paid/Paid in full/Overpaid labels and pill

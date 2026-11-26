@@ -582,6 +582,7 @@ async function fetchReservationDetail(idParam) {
     reservation_number,
     user_id,
     cancellation_reason,
+    cancellation_fee_amount,
     cancellation_hold_expires_at,
     contact_name,
     contact_email,
@@ -631,7 +632,7 @@ async function fetchReservationDetail(idParam) {
       .order('submitted_at', { ascending: false }),
     supabase
       .from('reschedule_requests')
-      .select('reschedule_request_id, reservation_id, original_date, original_time, requested_date, requested_time, status, requested_at, reviewed_at, rejection_reason')
+      .select('reschedule_request_id, reservation_id, original_date, original_time, requested_date, requested_time, status, requested_at, reviewed_at, rejection_reason, fee_amount')
       .eq('reservation_id', data.reservation_id)
       .order('requested_at', { ascending: false }),
     supabase
@@ -816,7 +817,9 @@ function renderHeaderActions() {
     } else if (feePayment) {
       buttons.push(`<span class="header-action-note">Cancellation fee was rejected — awaiting resubmission${escapeHtml(holdNote)}</span>`);
     } else if (isCancellationFeeWaived(reservation, getReservationPayments(reservation))) {
-      buttons.push(`<span class="header-action-note">Cancelled automatically. Nothing was paid, so no cancellation fee applies</span>`);
+      buttons.push(`<span class="header-action-note">${reservation.cancellation_reason === 'auto_cancelled_overdue'
+        ? 'Cancelled automatically. Nothing was paid, so no cancellation fee applies'
+        : 'Cancelled by the customer. No cancellation fee applies'}</span>`);
     } else {
       buttons.push(`<span class="header-action-note">Waiting for the customer to pay the cancellation fee${escapeHtml(holdNote)}</span>`);
     }
@@ -873,7 +876,7 @@ function renderCancellationReviewPanel(reservation, status) {
   const feePayment = getReservationCancellationFeePayment(reservation);
   const feeStatusLabel = feePayment
     ? ({ pending_review: 'pending review', approved: 'settled', rejected: 'rejected — awaiting resubmission' }[String(feePayment.payment_status || '').toLowerCase()] || feePayment.payment_status)
-    : 'not yet submitted';
+    : (isCancellationFeeWaived(reservation, getReservationPayments(reservation)) ? 'no fee applies' : 'not yet submitted');
   document.getElementById('cancellationFeeValue').textContent =
     `${formatCurrency(feePayment?.amount ?? getCancellationFee(reservation, currentPaymentRules))} (${feeStatusLabel})`;
 

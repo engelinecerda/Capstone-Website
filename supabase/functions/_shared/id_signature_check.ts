@@ -526,6 +526,12 @@ export async function getIdReviewStatus(
 }
 
 export async function flagIdForReview(supabase: SupabaseClient, userId: string) {
+  const { data: before } = await supabase
+    .from('valid_id_review')
+    .select('status')
+    .eq('user_id', userId)
+    .maybeSingle();
+
   const now = new Date().toISOString();
   const { error } = await supabase.from('valid_id_review').upsert(
     {
@@ -537,7 +543,53 @@ export async function flagIdForReview(supabase: SupabaseClient, userId: string) 
     },
     { onConflict: 'user_id' },
   );
-  if (error) console.error('flagIdForReview failed', { error: error.message });
+  if (error) {
+    console.error('flagIdForReview failed', { error: error.message });
+    return;
+  }
+  // Tell the managers once per flag, not on every re-check of an ID that is
+  // already waiting for them.
+  if (before?.status !== 'flagged') await notifyManagersIdFlagged(supabase, userId);
+}
+
+// A new notification for every manager when a customer's ID is flagged (no
+// signature found). It is a plain in-app row, the same kind the header bell
+// and the notifications page already show for new reservations and payments;
+// no email. The link opens Customers with the Flagged IDs filter on.
+// Best effort: it never throws, so a notification problem can never fail the
+// ID check or the booking that triggered it. Admins (config-only role) don't
+// get it, since only managers can decide on an ID.
+export async function notifyManagersIdFlagged(supabase: SupabaseClient, customerId: string) {
+  try {
+    const [{ data: customer }, { data: managers, error: managersError }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('first_name, middle_name, last_name, email')
+        .eq('user_id', customerId)
+        .maybeSingle(),
+      supabase.from('profiles').select('user_id').eq('role', 'manager'),
+    ]);
+    if (managersError) throw managersError;
+    if (!managers?.length) return;
+
+    const name = [customer?.first_name, customer?.middle_name, customer?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || customer?.email || 'A customer';
+    const rows = managers.map((m: { user_id: string }) => ({
+      user_id: m.user_id,
+      type: 'admin_id_flagged',
+      title: 'ID Needs Review',
+      body: `${name}\u2019s ID has no signature and needs your review.`,
+      link: '/admin/customers?id=flagged',
+      channel: 'in_app',
+      status: 'sent',
+    }));
+    const { error } = await supabase.from('notifications').insert(rows);
+    if (error) throw error;
+  } catch (error) {
+    console.error('notifyManagersIdFlagged failed', { error: String((error as Error).message) });
+  }
 }
 
 // The one entry point the contract flows use. Looks at the manager decision

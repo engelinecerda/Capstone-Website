@@ -37,6 +37,8 @@ import {
     getCancellationBlockReason,
     getRescheduleBlockReason,
     getCancellationFee,
+    getCancellationFeeInfo,
+    describeCancellationFeeInfo,
     getRescheduleFee,
     getCancellationFeePayment,
     isCancellationFeeOwed,
@@ -75,6 +77,7 @@ const cancelModalDismiss        = document.getElementById('cancel-modal-dismiss'
 const cancelModalConfirm        = document.getElementById('cancel-modal-confirm');
 const cancelModalMessage        = document.getElementById('cancel-modal-message');
 const cancelFeeAmount           = document.getElementById('cancel-fee-amount');
+const cancelFeeNote             = document.getElementById('cancel-fee-note');
 const cancelReasonInput         = document.getElementById('cancel-reason-input');
 
 const extensionRequestBackdrop = document.getElementById('extension-request-backdrop');
@@ -213,6 +216,7 @@ async function loadPageData() {
             menu_selections,
             status,
             cancellation_reason,
+            cancellation_fee_amount,
             cancellation_hold_expires_at,
             pre_cancellation_status,
             reschedule_count,
@@ -609,7 +613,7 @@ function buildEventDetailsPanel(reservation) {
     `;
 }
 
-function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false, extensionFeeOwed = null, additionalHeadFeeOwed = null, charges = []) {
+function buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed = false, paymentRules = null, rescheduleFeeOwed = false, extensionFeeOwed = null, additionalHeadFeeOwed = null, charges = [], rescheduleFeeAmount = null) {
     // balance.remainingBalance only tracks the base package price — it goes
     // to 0 the moment the package itself is paid off, regardless of whether
     // a *cancellation*, *reschedule*, *extension*, or *additional guests*
@@ -720,7 +724,7 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                 ${rescheduleFeeOwed ? `
                     <div class="rd-receipt-row rd-receipt-total rd-receipt-fee-due">
                         <span>Reschedule fee due</span>
-                        <span>${escapeHtml(formatCurrency(getRescheduleFee(paymentRules)))}</span>
+                        <span>${escapeHtml(formatCurrency(rescheduleFeeAmount ?? getRescheduleFee(paymentRules)))}</span>
                     </div>
                 ` : ''}
                 ${extensionFeeOwed ? `
@@ -1231,7 +1235,7 @@ function render() {
                                 cancellationFeeOwed
                                     ? formatCurrency(getCancellationFee(reservation, paymentRules))
                                     : (rescheduleFeeOwed
-                                        ? formatCurrency(getRescheduleFee(paymentRules))
+                                        ? formatCurrency(getRescheduleFee(paymentRules, openReschedule))
                                         : (openExtension
                                             ? formatCurrency(openExtension.total_price)
                                             : (openAdditionalHeadRequest
@@ -1262,7 +1266,7 @@ function render() {
 
         <div class="rd-grid">
             ${buildEventDetailsPanel(reservation)}
-            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed, openExtension, openAdditionalHeadRequest, charges)}
+            ${buildPaymentContractPanel(reservation, contract, contractMeta, balance, effectiveStatus, paymentUrl, cancellationFeeOwed, paymentRules, rescheduleFeeOwed, openExtension, openAdditionalHeadRequest, charges, openReschedule ? getRescheduleFee(paymentRules, openReschedule) : null)}
         </div>
 
         ${buildRescheduleRow(reservation, rescheduleRequests, canReschedule, canCancel, effectiveStatus, cancelBlockReason, getCancellationFeePayment(payments), paymentRules, rescheduleBlockReason)}
@@ -1299,8 +1303,11 @@ function applyPolicyOverride(elId, settingKey) {
 
 function openCancelModal() {
     if (!pageData?.reservation) return;
-    const fee = getCancellationFee(pageData.reservation, pageData.paymentRules);
-    if (cancelFeeAmount) cancelFeeAmount.textContent = formatCurrency(fee);
+    // What cancelling would cost right now (notice rule + nothing-paid rule).
+    // The database decides and freezes the real amount when the request is made.
+    const feeInfo = getCancellationFeeInfo(pageData.reservation, pageData.paymentRules, pageData.payments);
+    if (cancelFeeAmount) cancelFeeAmount.textContent = formatCurrency(feeInfo.amount);
+    if (cancelFeeNote) cancelFeeNote.textContent = describeCancellationFeeInfo(feeInfo, pageData.paymentRules);
     if (cancelReasonInput) cancelReasonInput.value = '';
     applyPolicyOverride('cancel-policy-body', 'cancellation_policy');
     setCancelModalMessage('');
@@ -1355,7 +1362,7 @@ async function submitCancellationRequest() {
         // through js/payment.js's real flow, same as every other payment
         // type. See 20260909_reschedule_hold_and_cancellation_debt.sql §8.
         const previousStatus = reservation.status;
-        const feeAmount = getCancellationFee(reservation, pageData.paymentRules);
+        const previewFee = getCancellationFee(reservation, pageData.paymentRules, pageData.payments);
         const holdHours = Number(pageData.paymentRules?.cancellation_hold_hours) || 48;
 
         const { error: statusError } = await supabase
@@ -1365,27 +1372,50 @@ async function submitCancellationRequest() {
 
         if (statusError) throw statusError;
 
-        // Best-effort audit trail — the hold/pending state itself already
-        // lives on the reservation row regardless of whether this insert
-        // succeeds, so a failure here doesn't leave anything customer-
-        // facing broken.
-        await supabase
-            .from('reservation_status')
-            .insert({
-                reservation_id: reservationId,
-                previous_status: previousStatus,
-                new_status: 'cancellation_requested',
-                changed_at: new Date().toISOString()
-            });
+        // The database froze the fee when the request landed. When it is 0
+        // there is nothing to wait for, so it has already cancelled the
+        // reservation (and written its own history) — re-read to find out.
+        const { data: afterRequest } = await supabase
+            .from('reservations')
+            .select('status, cancellation_fee_amount')
+            .eq('reservation_id', reservationId)
+            .maybeSingle();
+        const cancelledNow = String(afterRequest?.status || '').toLowerCase() === 'cancelled';
+        const feeAmount = afterRequest && afterRequest.cancellation_fee_amount !== null && afterRequest.cancellation_fee_amount !== undefined
+            ? Number(afterRequest.cancellation_fee_amount)
+            : previewFee;
+
+        if (!cancelledNow) {
+            // Best-effort audit trail — the hold/pending state itself already
+            // lives on the reservation row regardless of whether this insert
+            // succeeds, so a failure here doesn't leave anything customer-
+            // facing broken.
+            await supabase
+                .from('reservation_status')
+                .insert({
+                    reservation_id: reservationId,
+                    previous_status: previousStatus,
+                    new_status: 'cancellation_requested',
+                    changed_at: new Date().toISOString()
+                });
+        }
 
         closeCancelModal();
         await loadPageData();
         render();
-        openSubmissionFeedbackModal({
-            eyebrow: 'Cancellation Requested',
-            title: 'Pay the Cancellation Fee to Finalize',
-            copy: `Your date is on hold. Pay the ${formatCurrency(feeAmount)} cancellation fee within ${holdHours} hours to finalize your cancellation — if it isn't verified in time, your reservation will be automatically cancelled and the fee will still be owed.`
-        });
+        if (cancelledNow) {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Reservation Cancelled',
+                title: 'Your Reservation Is Cancelled',
+                copy: 'No cancellation fee applies. Payments already made are non-refundable.'
+            });
+        } else {
+            openSubmissionFeedbackModal({
+                eyebrow: 'Cancellation Requested',
+                title: 'Pay the Cancellation Fee to Finalize',
+                copy: `Your date is on hold. Pay the ${formatCurrency(feeAmount)} cancellation fee within ${holdHours} hours to finalize your cancellation — if it isn't verified in time, your reservation will be automatically cancelled and the fee will still be owed.`
+            });
+        }
     } catch (error) {
         if (cancelModalConfirm) cancelModalConfirm.removeAttribute('disabled');
         setCancelModalMessage(`Failed to submit cancellation: ${error.message}`, true);
@@ -1803,9 +1833,16 @@ const rescheduleModal = initRescheduleModal({
     supabase,
     user,
     getPageData: () => pageData,
-    onSubmitted: async () => {
+    onSubmitted: async ({ movedNow } = {}) => {
         await loadPageData();
         render();
+        if (movedNow) {
+            showFeedbackModal({
+                type: 'success',
+                title: 'Reservation Rescheduled',
+                message: 'Your reservation has been moved to the new date. No reschedule fee applies because you gave enough notice.'
+            });
+        }
     }
 });
 

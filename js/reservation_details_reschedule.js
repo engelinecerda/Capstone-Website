@@ -18,7 +18,7 @@ import {
     getEffectiveMinAdvanceDays,
     isOutsideBookingWindow
 } from './reservation_availability.js';
-import { escapeHtml, formatDate, formatDateKey, getRescheduleFee } from './reservation_shared.js';
+import { escapeHtml, formatDate, formatDateKey, getRescheduleFee, describeReschedulePolicy } from './reservation_shared.js';
 import { renderPolicyText } from './policy_text.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 
@@ -68,6 +68,7 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
     const messageEl = document.getElementById('reschedule-modal-message');
     const currentValueEl = document.getElementById('reschedule-current-value');
     const feeAmountEl = document.getElementById('reschedule-fee-amount');
+    const feeNoteEl = document.getElementById('reschedule-fee-note');
     const prevMonthBtn = document.getElementById('reschedule-prev-month');
     const nextMonthBtn = document.getElementById('reschedule-next-month');
     const monthLabel = document.getElementById('reschedule-month-label');
@@ -343,7 +344,17 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
         if (currentValueEl) {
             currentValueEl.textContent = `${formatDate(reservation.event_date)} at ${reservation.event_time || 'No time selected'}`;
         }
-        if (feeAmountEl) feeAmountEl.textContent = formatMoney(getRescheduleFee(getPageData()?.paymentRules));
+        // What rescheduling would cost right now, counted from the ORIGINAL
+        // event date. The database decides and freezes the real amount when
+        // the request is submitted; a fee of 0 completes the move at once.
+        const previewFee = getRescheduleFee(getPageData()?.paymentRules, null, reservation);
+        state.previewFee = previewFee;
+        if (feeAmountEl) feeAmountEl.textContent = formatMoney(previewFee);
+        if (feeNoteEl) {
+            feeNoteEl.textContent = previewFee > 0
+                ? `${describeReschedulePolicy(getPageData()?.paymentRules)} No approval needed \u2014 pick a date below and pay this fee to confirm your new date.`
+                : 'You are giving enough notice, so no reschedule fee applies. Your new date is confirmed as soon as you submit.';
+        }
         applyPolicyOverride();
 
         setMessage('Loading availability...');
@@ -422,8 +433,11 @@ export function initRescheduleModal({ supabase, user, getPageData, onSubmitted }
 
             if (error) throw error;
 
+            // A fee of 0 means the database moved the date as soon as the
+            // request landed (nothing to pay), so tell the page.
+            const movedNow = state.previewFee === 0;
             close();
-            await onSubmitted?.();
+            await onSubmitted?.({ movedNow });
         } catch (error) {
             submitBtn?.removeAttribute('disabled');
             setMessage(`Failed to submit request: ${error.message}`, true);

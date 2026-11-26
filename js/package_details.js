@@ -7,6 +7,7 @@
 // unaffected. This page still owns its own URL/fetch and loading/not-found
 // states a toggled-visibility panel never needed.
 import { formatMoney } from './money.js';
+import { getFeePolicy } from './reservation_shared.js';
 import { customerSupabase as supabase } from './supabase.js';
 import { loadPaymentRules, loadPaymentTypes } from './customer_payments.js';
 import { optimizedImageUrl } from './cloudinary_optimized_image_delivery.js';
@@ -476,31 +477,33 @@ function renderPolicyCard(pkg, loc) {
   // reservation_shared.js — the function that actually enforces these
   // rules on the cancel flow — so the two never describe the policy
   // differently.
-  const cancelFee = loc === 'offsite' ? paymentRules?.cancellation_fee_offsite : paymentRules?.cancellation_fee_onsite;
+  // Percent-of-total policy (20261206): what cancelling or rescheduling costs
+  // depends on how much notice is given, from the same settings the charge
+  // itself uses (getFeePolicy in reservation_shared.js).
   const minNotice = paymentRules?.cancellation_min_notice_days;
   const requestWindow = paymentRules?.cancellation_request_window_days;
-  if (cancelFee != null) {
+  if (paymentRules) {
+    const policy = getFeePolicy(paymentRules);
+    const dayWord = (n) => `${n} day${Number(n) === 1 ? '' : 's'}`;
+    // The two optional time rules can still restrict WHEN a request is
+    // accepted at all (see getCancellationBlockReason in reservation_shared.js).
     const clauses = [];
     if (requestWindow != null) {
-      clauses.push(`within ${requestWindow} day${requestWindow !== 1 ? 's' : ''} of booking`);
+      clauses.push(`within ${dayWord(requestWindow)} of booking`);
     }
     if (minNotice != null) {
-      clauses.push(`at least ${minNotice} day${minNotice !== 1 ? 's' : ''} before the event`);
+      clauses.push(`at least ${dayWord(minNotice)} before the event`);
     }
-    const suffix = clauses.length ? ` if requested ${clauses.join(' and ')}` : '';
+    const suffix = clauses.length ? `. Requests are only accepted ${clauses.join(' and ')}` : '';
     rows.push({
       icon: 'ti-calendar-x',
       label: 'Cancellation fee',
-      value: `${formatMoney(cancelFee)}${suffix}`
+      value: `${policy.cancellationFeePercent}% of the total contract amount if cancelled less than ${dayWord(policy.cancellationNoticeDays)} before the event; no fee earlier${suffix}`
     });
-  }
-
-  const rescheduleFee = paymentRules?.reschedule_fee;
-  if (rescheduleFee != null) {
     rows.push({
       icon: 'ti-calendar-repeat',
       label: 'Reschedule fee',
-      value: `${formatMoney(rescheduleFee)}, subject to availability`
+      value: `${policy.rescheduleFeePercent}% of the total contract amount if rescheduled less than ${dayWord(policy.rescheduleNoticeDays)} before the event; no fee with more notice. Subject to availability`
     });
   }
 
