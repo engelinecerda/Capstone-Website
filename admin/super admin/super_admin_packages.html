@@ -327,6 +327,17 @@
               <p class="section-sub">Selectable from any package&rsquo;s Inclusions list.</p>
             </div>
           </div>
+          <div class="filter-bar inc-filter-bar">
+            <div class="search-wrap">
+              <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="inclusionSearchInput" class="search-input" placeholder="Search inclusions..." maxlength="100" aria-label="Search inclusions">
+            </div>
+            <label class="inc-unused-toggle">
+              <input type="checkbox" id="inclusionUnusedOnly">
+              <span>Not used in any package</span>
+            </label>
+          </div>
+          <p class="inc-reorder-hint" id="inclusionReorderHint" hidden>Clear the search and filter to drag rows into a new order.</p>
           <div class="table-wrap">
             <table class="pkg-table">
               <thead>
@@ -344,6 +355,7 @@
               </tbody>
             </table>
           </div>
+          <div class="pagination-bar" id="activeInclusionsPagination"></div>
         </div>
 
         <div class="card" id="archivedInclusionsSection" style="display:none;">

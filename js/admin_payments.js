@@ -149,10 +149,11 @@ let paymentsCache = [];          // payments on the current page
 let pinnedPayment = null;        // the payment open in the review modal, when it is not on the current page
 let paymentsTotal = 0;           // payments matching the current status / search / reservation filter
 let paymentsCurrentPage = 1;
-// Alphabetical by customer until a header is clicked. Sorting runs in the
-// database so it covers every payment, not just the page on screen.
+// Newest submitted payment first (the database default when no column is
+// sorted) until a header is clicked. Sorting runs in the database so it
+// covers every payment, not just the page on screen.
 const paymentsSort = initTableSort(document.querySelector('.payments-table'), {
-  defaultSort: { key: 'customer', dir: 'asc' },
+  defaultSort: null,
   onChange: () => handleStatusChange()
 });
 let activeSearch = '';           // the search term currently applied

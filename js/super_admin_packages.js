@@ -25,6 +25,7 @@ import { normalizeInclusionOptions, serializeInclusionOptions, newInclusionId } 
 import { cateringSectionHint } from './catering_section_hints.js';
 import { clampNumberInput } from './numeric_input.js';
 import { enableDragReorder } from './drag_reorder.js';
+import { renderPagination, getTotalPages } from './pagination.js';
 
 const MAX_PHOTOS_PER_PACKAGE = 8;
 
@@ -306,6 +307,10 @@ const addInclusionBtn                   = document.getElementById('addInclusionB
 const inclusionsPageMessage             = document.getElementById('inclusionsPageMessage');
 const archivedInclusionsSection         = document.getElementById('archivedInclusionsSection');
 const activeInclusionsBody              = document.getElementById('activeInclusionsBody');
+const activeInclusionsPagination        = document.getElementById('activeInclusionsPagination');
+const inclusionSearchInput              = document.getElementById('inclusionSearchInput');
+const inclusionUnusedOnly               = document.getElementById('inclusionUnusedOnly');
+const inclusionReorderHint              = document.getElementById('inclusionReorderHint');
 const archivedInclusionsBody            = document.getElementById('archivedInclusionsBody');
 const inclusionModal          = document.getElementById('inclusionModal');
 const inclusionModalTitle     = document.getElementById('inclusionModalTitle');
@@ -3959,6 +3964,22 @@ function nextInclusionSortOrder() {
   return allInclusionCatalog.reduce((max, c) => Math.max(max, Number(c.sort_order) || 0), -1) + 1;
 }
 
+// The Inclusions list can grow long, so it is searchable, can be narrowed to
+// items no package uses (clean-up), and is shown one page at a time.
+const INCLUSION_PAGE_SIZE = 10;
+let inclusionPage = 1;
+
+function inclusionFilterActive() {
+  return Boolean(inclusionSearchInput.value.trim() || inclusionUnusedOnly.checked);
+}
+
+function inclusionMatchesFilter(item) {
+  const term = inclusionSearchInput.value.trim().toLowerCase();
+  if (term && !String(item.name || '').toLowerCase().includes(term)) return false;
+  if (inclusionUnusedOnly.checked && countInclusionUsage(item.inclusion_id) > 0) return false;
+  return true;
+}
+
 function buildInclusionRow(item) {
   const isArchived = !item.is_active;
   const usage = countInclusionUsage(item.inclusion_id);
@@ -3970,10 +3991,10 @@ function buildInclusionRow(item) {
       <button class="action-btn danger" data-inclusion-table-action="delete" data-id="${item.inclusion_id}">Delete</button>
     </div>`;
   // Only active rows can be dragged; archived rows keep an empty cell so the columns line up.
-  const handleCell = isArchived
+  const handleCell = (isArchived || inclusionFilterActive())
     ? '<td class="drag-cell"></td>'
     : `<td class="drag-cell"><button type="button" class="drag-handle" data-drag-handle title="Drag to reorder" aria-label="Reorder ${escapeHtml(item.name)}. Drag, or press the up and down arrow keys">⋮⋮</button></td>`;
-  return `<tr class="${isArchived ? '' : 'inc-row'}">
+  return `<tr class="${(isArchived || inclusionFilterActive()) ? '' : 'inc-row'}">
     ${handleCell}
     <td>${escapeHtml(item.name)}</td>
     <td>${pesoText(item.price)}</td>
@@ -3984,16 +4005,44 @@ function buildInclusionRow(item) {
 }
 
 function renderInclusionTables() {
-  const active = inclusionsInOrder(true);
-  const archived = inclusionsInOrder(false);
+  const allActive = inclusionsInOrder(true);
+  const active = allActive.filter(inclusionMatchesFilter);
+  const archived = inclusionsInOrder(false).filter(inclusionMatchesFilter);
+  const filtering = inclusionFilterActive();
 
-  activeInclusionsBody.innerHTML = active.length
-    ? active.map(buildInclusionRow).join('')
-    : '<tr class="empty-row"><td colspan="6">No inclusions yet. Add one so it can be picked from a package.</td></tr>';
+  // Stay on a page that exists (items were deleted / the filter narrowed).
+  inclusionPage = Math.min(Math.max(1, inclusionPage), getTotalPages(active.length, INCLUSION_PAGE_SIZE));
+  const pageStart = (inclusionPage - 1) * INCLUSION_PAGE_SIZE;
+  const pageRows = active.slice(pageStart, pageStart + INCLUSION_PAGE_SIZE);
 
+  activeInclusionsBody.innerHTML = pageRows.length
+    ? pageRows.map(buildInclusionRow).join('')
+    : `<tr class="empty-row"><td colspan="6">${allActive.length && filtering
+        ? 'No inclusions match your search.'
+        : 'No inclusions yet. Add one so it can be picked from a package.'}</td></tr>`;
+
+  renderPagination(activeInclusionsPagination, {
+    totalItems: active.length,
+    currentPage: inclusionPage,
+    pageSize: INCLUSION_PAGE_SIZE,
+    onPageChange: (page) => { inclusionPage = page; renderInclusionTables(); }
+  });
+
+  // Dragging only makes sense on the full, unfiltered list: a drop position
+  // inside a filtered page would not be the item's place in the real order.
+  inclusionReorderHint.hidden = !(filtering && allActive.length > 1);
+
+  // Archived items are only listed when some match (or none are filtered out).
   archivedInclusionsSection.style.display = archived.length ? '' : 'none';
   archivedInclusionsBody.innerHTML = archived.map(buildInclusionRow).join('');
 }
+
+let inclusionSearchTimer = null;
+inclusionSearchInput.addEventListener('input', () => {
+  clearTimeout(inclusionSearchTimer);
+  inclusionSearchTimer = setTimeout(() => { inclusionPage = 1; renderInclusionTables(); }, 150);
+});
+inclusionUnusedOnly.addEventListener('change', () => { inclusionPage = 1; renderInclusionTables(); });
 
 function handleInclusionTableAction(e) {
   const btn = e.target.closest('[data-inclusion-table-action]');
@@ -4020,7 +4069,12 @@ enableDragReorder({
 // 0..n-1 so ties (new items all start equal) can never leave the order
 // ambiguous. The table updates straight away; only rows whose number actually
 // changes are written, and the screen is reloaded from the database on failure.
-async function reorderInclusion(from, to) {
+async function reorderInclusion(pageFrom, pageTo) {
+  // The drag helper reports positions within the 10 rows on screen; turn them
+  // into positions in the whole active list.
+  const offset = (inclusionPage - 1) * INCLUSION_PAGE_SIZE;
+  const from = pageFrom + offset;
+  const to = pageTo + offset;
   const list = inclusionsInOrder(true);
   if (from < 0 || to < 0 || from >= list.length || to >= list.length || from === to) return;
 
@@ -4096,6 +4150,11 @@ inclusionModalSave.addEventListener('click', async () => {
       const { data, error } = await supabase.from(INCLUSION_TABLE).insert({ ...payload, sort_order: nextInclusionSortOrder(), is_active: true }).select().single();
       if (error) throw error;
       allInclusionCatalog.push(data);
+      // A new item lands at the end of the list: show it, even if a search
+      // or the "not used" filter would hide it or it is on the last page.
+      inclusionSearchInput.value = '';
+      inclusionUnusedOnly.checked = false;
+      inclusionPage = Number.MAX_SAFE_INTEGER;
       await logAudit({ action: 'Added Inclusion', category: 'package', details: `New inclusion created: ${name}`, entityId: data.inclusion_id });
       setMessage(inclusionsPageMessage, 'Inclusion added successfully.', 'success');
     }

@@ -161,6 +161,10 @@ A catering package (`package.uses_catering_menu`) already has its pax count and 
 
 `js/searchable_select.js` (`makeSelectSearchable(selectEl)`) turns any native `<select>` into a type-to-search dropdown while keeping the select as the source of truth; used for the Catering Menu package picker.
 
+## Admin payments order and the Inclusions list
+
+Payment management lists the newest submitted payment first for every status chip (`get_admin_payments_page()` falls back to `submitted_at desc` when no column is sorted; `20261208_payments_default_newest_first.sql`; the page sends no sort until a header is clicked). The Inventory > Inclusions list is searchable, has a "Not used in any package" filter, and shows 10 rows per page (`renderInclusionTables()` in `js/super_admin_packages.js`); drag-to-reorder is only available while no search/filter is active, and drag positions are offset by the current page.
+
 ## Admin reservations "Upcoming" chip
 
 "Upcoming" lists only `approved` and `rescheduled` reservations whose event date has not passed (pending ones await a manager decision and live under the Pending chip / All). The rule is in two places that must match: `get_admin_reservations_page()` and `get_admin_reservation_counts()` (`20261207_upcoming_excludes_pending.sql`).
