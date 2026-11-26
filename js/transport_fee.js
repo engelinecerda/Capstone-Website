@@ -21,8 +21,9 @@
 //   over freeKm, up to 10 km  -> ranges[0].fee
 //   over 10, up to 15 km      -> ranges[1].fee   ... and so on
 //   over the last end         -> `beyond`: 'contact' (customer must contact us,
-//                                nothing is charged automatically) or 'last'
-//                                (the last range's fee is charged)
+//                                nothing is charged automatically), 'last'
+//                                (the last range's fee is charged) or 'quote'
+//                                (bookable; Eli quotes the fee afterwards)
 //
 // The settings live in system_settings.payment_rules (same JSON blob as the
 // other fees) under the transport_* keys. Until `transport_ranges` has been
@@ -112,7 +113,7 @@ export function readTransportRules(rules, packageId = null) {
     enabled: r.transport_fee_enabled === true,
     freeKm,
     ranges,
-    beyond: r.transport_beyond === 'last' ? 'last' : 'contact',
+    beyond: r.transport_beyond === 'last' ? 'last' : (r.transport_beyond === 'quote' ? 'quote' : 'contact'),
     roadFactor: Math.max(1, num(r.transport_road_factor, TRANSPORT_DEFAULTS.roadFactor)),
     // Old per-km rule, only used while `ranges` is null.
     ratePerKm: Math.max(0, num(r.transport_rate_per_km, 30)),
@@ -162,7 +163,7 @@ export function findNearestBranch(pin, branches) {
 
 // Prices one road distance (km, already rounded to 0.1). Mirrors
 // priceTransportDistance() in supabase/functions/_shared/transport_pricing.ts.
-// status: 'free' | 'range' | 'beyond_charged' | 'out_of_range' | 'per_km'.
+// status: 'free' | 'range' | 'beyond_charged' | 'out_of_range' | 'quote' | 'per_km'.
 export function priceTransportDistance(rules, distanceKm) {
   const base = { rangeFrom: null, rangeTo: null, billableKm: 0, capped: false };
 
@@ -191,7 +192,9 @@ export function priceTransportDistance(rules, distanceKm) {
     const prevEnd = rules.ranges.length > 1 ? rules.ranges[rules.ranges.length - 2].toKm : rules.freeKm;
     return { ...base, fee: last.fee, status: 'beyond_charged', rangeFrom: prevEnd, rangeTo: last.toKm };
   }
-  return { ...base, fee: 0, status: 'out_of_range', rangeFrom: last ? last.toKm : rules.freeKm, rangeTo: null };
+  // 'quote': the venue can be booked, the fee is not priced automatically; the
+  // booking form creates a transport-fee quote request that Eli prices later.
+  return { ...base, fee: 0, status: rules.beyond === 'quote' ? 'quote' : 'out_of_range', rangeFrom: last ? last.toKm : rules.freeKm, rangeTo: null };
 }
 
 // Prices a single pin. `applies` is false when the fee is switched off, there
@@ -256,6 +259,7 @@ export function describeTransportFee(result) {
     case 'range': return `${lead}: ${rangeFrom} to ${kmText(rangeTo)} range`;
     case 'beyond_charged': return `${lead}: beyond ${kmText(rangeTo)}, charged at the last range's fee`;
     case 'out_of_range': return `${lead}: beyond our ${kmText(rangeFrom)} transport range`;
+    case 'quote': return `${lead}: beyond our ${kmText(rangeFrom)} range, so we\u2019ll quote the transport fee`;
     default: // 'per_km' — the old rule, until the ranges are saved
       if (billableKm <= 0) return `${lead} (within the ${kmText(rules.freeKm)} free distance)`;
       return `${lead} (first ${kmText(rules.freeKm)} free): ${billableKm} km × ${formatMoney(rules.ratePerKm)}${capped ? ', capped' : ''}`;

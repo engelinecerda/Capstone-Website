@@ -43,6 +43,16 @@ const charged = price({ ...base, transport_beyond: 'last' }, 60);
 assert.equal(charged.status, 'beyond_charged');
 assert.equal(charged.fee, 5000);
 
+// ── beyond the last range: Eli quotes ───────────────────────────────────────
+const quoted = price({ ...base, transport_beyond: 'quote' }, 40);
+assert.equal(quoted.status, 'quote');
+assert.equal(quoted.fee, 0);
+assert.equal(quoted.rangeFrom, 25);
+assert.equal(price({ ...base, transport_beyond: 'quote' }, 25).status, 'range', 'inside the ranges still prices normally');
+assert.equal(price({ ...base, transport_beyond: 'quote' }, 25).fee, 5000);
+assert.equal(price({ ...base, transport_beyond: 'weird' }, 40).status, 'out_of_range', 'unknown value falls back to contact');
+assert.equal(browser.transportCoverage({ ...base, transport_beyond: 'quote' }, [{ name: 'A', latitude: 14.4, longitude: 121.1, transport_origin: true }]), null, 'no circle when bookable');
+
 // ── messy saved data is cleaned, never trusted ──────────────────────────────
 const messy = readTransportRules({
   ...base,
@@ -74,6 +84,7 @@ assert.equal(price({ ...base, transport_ranges: [] }, 6).status, 'out_of_range')
 const ruleSets: Record<string, unknown>[] = [
   base,
   { ...base, transport_beyond: 'last' },
+  { ...base, transport_beyond: 'quote' },
   { ...base, transport_free_km: 0 },
   { ...base, transport_free_km: 7.5 },
   { ...base, transport_ranges: [{ to_km: 12.5, fee: 800 }] },

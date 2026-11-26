@@ -11,8 +11,9 @@
 //   over freeKm, up to 10   -> ranges[0].fee
 //   over 10, up to 15       -> ranges[1].fee ...
 //   over the last end       -> 'contact' (customer must contact us, nothing
-//                              is charged automatically) or 'last' (the last
-//                              range's fee is charged)
+//                              is charged automatically), 'last' (the last
+//                              range's fee is charged) or 'quote' (bookable;
+//                              Eli quotes the fee afterwards)
 //
 // The settings live in system_settings.payment_rules (transport_* keys).
 // When `transport_ranges` has never been saved, the old per-km rule
@@ -25,14 +26,14 @@ export interface TransportRules {
   enabled: boolean;
   freeKm: number;
   ranges: TransportRange[] | null; // null = ranges never saved (old per-km rule applies)
-  beyond: 'contact' | 'last';
+  beyond: 'contact' | 'last' | 'quote';
   roadFactor: number;
   ratePerKm: number; // old per-km rule, used only while ranges === null
   maxFee: number | null;
   packageOverride: boolean; // true when a per-package override replaced the universal ranges
 }
 
-export type TransportStatus = 'free' | 'range' | 'beyond_charged' | 'out_of_range' | 'per_km';
+export type TransportStatus = 'free' | 'range' | 'beyond_charged' | 'out_of_range' | 'quote' | 'per_km';
 
 export interface TransportPrice {
   fee: number;
@@ -108,7 +109,7 @@ export function readTransportRules(raw: Record<string, unknown> | null | undefin
     enabled: r.transport_fee_enabled === true,
     freeKm,
     ranges,
-    beyond: r.transport_beyond === 'last' ? 'last' : 'contact',
+    beyond: r.transport_beyond === 'last' ? 'last' : (r.transport_beyond === 'quote' ? 'quote' : 'contact'),
     roadFactor: Math.max(1, num(r.transport_road_factor, 1.3) as number),
     ratePerKm: Math.max(0, num(r.transport_rate_per_km, 30) as number),
     maxFee: maxFee === null ? null : Math.max(0, maxFee),
@@ -145,5 +146,6 @@ export function priceTransportDistance(rules: TransportRules, distanceKm: number
     const prevEnd = rules.ranges.length > 1 ? rules.ranges[rules.ranges.length - 2].toKm : rules.freeKm;
     return { ...base, fee: last.fee, status: 'beyond_charged', rangeFrom: prevEnd, rangeTo: last.toKm };
   }
-  return { ...base, fee: 0, status: 'out_of_range', rangeFrom: last ? last.toKm : rules.freeKm, rangeTo: null };
+  // 'quote': bookable; the booking form creates a transport-fee quote request that Eli prices later.
+  return { ...base, fee: 0, status: rules.beyond === 'quote' ? 'quote' : 'out_of_range', rangeFrom: last ? last.toKm : rules.freeKm, rangeTo: null };
 }

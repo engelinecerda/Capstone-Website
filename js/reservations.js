@@ -249,6 +249,27 @@ function resolveTransport() {
     return getTransportQuoteFor(S.venuePin) || computeTransportFee(TRANSPORT_RULES, S.venuePin, TRANSPORT_BRANCHES, transportPackageId());
 }
 
+// Venue past the last distance range while the admin chose "Eli quotes the
+// fee": the booking goes ahead with no transport fee, and a transport-fee quote
+// request (the normal custom-request flow) is sent with it. Nothing is charged
+// unless the customer accepts the quote.
+function isTransportQuoteNeeded() {
+    return S.locationType === 'offsite' && resolveTransport().status === 'quote';
+}
+
+// The customer's own requests, plus the automatic transport-fee one when needed.
+function allCustomRequests() {
+    const own = S.customRequests || [];
+    if (!isTransportQuoteNeeded()) return own;
+    const t = resolveTransport();
+    const where = (S.venueLocation || '').trim();
+    return [...own, {
+        title: 'Transport fee for a venue about ' + t.distanceKm + ' km away',
+        details: 'Automatic request: the venue' + (where ? ' (' + where + ')' : '') + ' is about ' + t.distanceKm +
+            ' km by road from ' + (t.originName || 'our branch') + ', beyond our ' + t.rangeFrom + ' km transport range. Please quote the transport fee.'
+    }];
+}
+
 function isTransportFeeActive() {
     return TRANSPORT_RULES.transport_fee_enabled === true && transportOrigins(TRANSPORT_BRANCHES).length > 0;
 }
@@ -328,6 +349,13 @@ function refreshVenueTransportHint() {
         el.classList.add('venue-transport-hint--over');
         el.classList.remove('hidden');
         window.setVenuePinState?.('over');
+        return;
+    }
+    if (result.status === 'quote') {
+        el.textContent = (result.method === 'estimate' ? 'This venue is about ' : 'This venue is ') + result.distanceKm +
+            ' km by road, beyond our ' + result.rangeFrom + ' km range. You can still book: we\u2019ll send you a price for the transport fee, and you only pay it if you accept.' +
+            (result.method === 'estimate' ? ' (Distance is approximate.)' : '');
+        el.classList.remove('hidden');
         return;
     }
     el.textContent = 'Estimated transport fee: ' + fmtPeso(result.fee) + ' \u2014 ' + describeTransportFee(result) +
@@ -1924,7 +1952,7 @@ function renderContractBody(templateBody, contractData = {}) {
     const breakdownText = formatBreakdownText(breakdownRows);
     const requestsText = formatRequestsText(buildRequestRows({
         notes: S.requests,
-        customRequests: (S.customRequests || []).map(r => r.title)
+        customRequests: allCustomRequests().map(r => r.title)
     }));
 
     // Layer 3 (Electronic Signature / acknowledgement) is only appended
@@ -4430,7 +4458,7 @@ document.getElementById('cr-list')?.addEventListener('click', (e) => {
 // reservation page.
 async function sendCustomRequests(reservationId) {
     let sent = 0, failed = 0;
-    for (const r of (S.customRequests || [])) {
+    for (const r of allCustomRequests()) {
         try {
             const { error } = await supabase.rpc('submit_custom_request', {
                 p_reservation_id: reservationId,
@@ -4572,7 +4600,7 @@ function buildSummary() {
           discountRowHtml +
           sr('Subtotal', fmtPeso(discountedTotal)) +
           sr('Service charge (' + charge.pct + '%)', fmtPeso(charge.amount)) +
-          (transport.applies ? sr('Transport fee (' + transport.distanceKm + ' km)', fmtPeso(transport.fee)) : '') +
+          (transport.applies ? sr('Transport fee (' + transport.distanceKm + ' km)', transport.status === 'quote' ? 'To be quoted' : fmtPeso(transport.fee)) : '') +
           totalRow('Total', fmtPeso(charge.total + transport.fee))
         : totalRow('Total', 'Contact for quote');
 
@@ -4601,8 +4629,8 @@ function buildSummary() {
         sr('Email', S.email, 'mail') +
         sr('Phone', S.phone, 'phone') +
         (S.requests ? sr('Requests', S.requests, 'message') : '') +
-        ((S.customRequests || []).length
-            ? srList('Custom requests', S.customRequests.map(r => escapeHtml(r.title)), 'sparkles', 5, 'We\u2019ll send you a price for each.')
+        (allCustomRequests().length
+            ? srList('Custom requests', allCustomRequests().map(r => escapeHtml(r.title)), 'sparkles', 5, 'We\u2019ll send you a price for each.')
             : '');
 
     box.innerHTML =
@@ -5465,7 +5493,7 @@ async function submitDone() {
                 // Custom requests are only saved after the contract is made
                 // (sendCustomRequests below), so their titles travel with this
                 // call to be listed under Additional Requests on the contract.
-                custom_requests: (S.customRequests || []).map(r => r.title),
+                custom_requests: allCustomRequests().map(r => r.title),
                 // So the contract's signed date/time is in the customer's own
                 // time zone instead of the server's (UTC).
                 time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
@@ -5477,7 +5505,7 @@ async function submitDone() {
         }
 
         let customRequestNote = '';
-        if ((S.customRequests || []).length) {
+        if (allCustomRequests().length) {
             nextBtn.textContent = 'Sending your requests...';
             const outcome = await sendCustomRequests(reservation.reservation_id);
             if (outcome.sent) {

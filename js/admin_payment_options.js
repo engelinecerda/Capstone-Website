@@ -1180,7 +1180,7 @@ function readTransportFields() {
     transport_fee_enabled: !!document.getElementById('tf-enabled')?.checked,
     transport_free_km: tfNumOrNaN(document.getElementById('tf-free-km')?.value),
     transport_ranges: readTransportRangeRows().map((r) => ({ to_km: r.toKm, fee: r.fee })),
-    transport_beyond: document.getElementById('tf-beyond-last')?.checked ? 'last' : 'contact',
+    transport_beyond: document.getElementById('tf-beyond-last')?.checked ? 'last' : (document.getElementById('tf-beyond-quote')?.checked ? 'quote' : 'contact'),
     transport_road_factor: Number(document.getElementById('tf-road-factor')?.value),
     // Array while editing (so blanks and duplicates can be reported); cleanTransportFields() turns it into the saved object.
     transport_package_overrides: readOverrideBlocks().map((b) => ({ package_id: b.packageId, free_km: b.freeKm, ranges: b.rows.map((r) => ({ to_km: r.toKm, fee: r.fee })) }))
@@ -1241,7 +1241,9 @@ function describeTransportRangesForAudit(v) {
     from = r.to_km;
     return text;
   });
-  const beyond = v.transport_beyond === 'last' ? `beyond ${from} km the last range's fee applies` : `beyond ${from} km the venue can't be booked online`;
+  const beyond = v.transport_beyond === 'last' ? `beyond ${from} km the last range's fee applies`
+    : v.transport_beyond === 'quote' ? `beyond ${from} km the venue can be booked and Eli quotes the fee`
+    : `beyond ${from} km the venue can't be booked online`;
   const overrideIds = Object.keys(v.transport_package_overrides || {});
   const overrides = overrideIds.length
     ? `; own fee for ${overrideIds.map((id) => tfPackageLabel(id)).join(', ')}`
@@ -1271,6 +1273,8 @@ function updateTransportExample() {
       text = `${tfKm(km)} falls in the ${priced.rangeFrom} to ${tfKm(priced.rangeTo)} range: transport fee ${formatMoney(priced.fee)}.`; break;
     case 'beyond_charged':
       text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeTo)}), so the last range's fee applies: transport fee ${formatMoney(priced.fee)}.`; break;
+    case 'quote':
+      text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeFrom)}): the customer can still book with no transport fee, and a transport-fee quote request is sent to you.`; break;
     default:
       text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeFrom)}): venues this far can't be booked online, so no fee is calculated and customers are asked to choose a closer venue.`;
   }
@@ -1298,8 +1302,10 @@ async function loadTransportFeeSection() {
   const beyond = firstTime ? TRANSPORT_DEFAULTS.beyond : rules.beyond;
   const beyondContact = document.getElementById('tf-beyond-contact');
   const beyondLast = document.getElementById('tf-beyond-last');
-  if (beyondContact) beyondContact.checked = beyond !== 'last';
+  const beyondQuote = document.getElementById('tf-beyond-quote');
+  if (beyondContact) beyondContact.checked = beyond !== 'last' && beyond !== 'quote';
   if (beyondLast) beyondLast.checked = beyond === 'last';
+  if (beyondQuote) beyondQuote.checked = beyond === 'quote';
   const legacyNote = document.getElementById('tf-legacy-note');
   if (legacyNote) legacyNote.classList.toggle('hidden', !firstTime);
   renderTransportRanges(rows);
@@ -1729,7 +1735,7 @@ async function init() {
   });
   document.getElementById('tf-add-override')?.addEventListener('click', addOverrideBlock);
   document.getElementById('tf-try-package')?.addEventListener('change', updateTransportExample);
-  ['tf-beyond-contact', 'tf-beyond-last'].forEach((id) => document.getElementById(id)?.addEventListener('change', updateTransportExample));
+  ['tf-beyond-contact', 'tf-beyond-quote', 'tf-beyond-last'].forEach((id) => document.getElementById(id)?.addEventListener('change', updateTransportExample));
   document.getElementById('tf-enabled')?.addEventListener('change', updateTransportExample);
   // Live-preview the effect immediately on toggle, before the admin saves —
   // same "see it before committing" behaviour the global-percent input
