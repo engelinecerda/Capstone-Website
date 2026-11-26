@@ -1638,7 +1638,10 @@ function renderSignatureCheckPanel(contract) {
   // no way for a Manager to unblock it after visually checking the PDF
   // themselves (see getReservationApprovalState's canApprove gate). Manager-
   // only, matching every other operational mutation on this page.
-  const showManualVerifyBtn = state !== 'detected' && currentRole === 'manager';
+  // Hidden once the contract is verified (by the scan, an ID approval or an
+  // earlier manual check): there is nothing left to confirm.
+  const contractVerified = String(contract.contract?.review_status || '').toLowerCase() === 'verified';
+  const showManualVerifyBtn = state !== 'detected' && currentRole === 'manager' && !contractVerified;
   signatureCheckPanel.innerHTML = `
     <span class="signature-check-icon">${copy.icon}</span>
     <span class="signature-check-copy">
