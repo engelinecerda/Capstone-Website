@@ -58,29 +58,54 @@ const num = (v, fallback) => {
 const round1 = (n) => Math.round(n * 10) / 10;
 const round2 = (n) => Math.round(n * 100) / 100;
 
+// Cleans a saved list of ranges: sorted, ends strictly increasing and past the
+// free distance, fees never negative. Shared by the universal rule and the
+// per-package overrides.
+function cleanRanges(rawRanges, freeKm) {
+  const ranges = [];
+  let prev = freeKm;
+  const sorted = rawRanges
+    .map((x) => ({ toKm: num(x?.to_km, NaN), fee: num(x?.fee, NaN) }))
+    .filter((x) => Number.isFinite(x.toKm) && Number.isFinite(x.fee))
+    .sort((a, b) => a.toKm - b.toKm);
+  for (const x of sorted) {
+    const toKm = round1(x.toKm);
+    if (toKm <= prev || toKm > MAX_TRANSPORT_KM) continue; // keeps ends strictly increasing
+    ranges.push({ toKm, fee: round2(Math.max(0, x.fee)) });
+    prev = toKm;
+  }
+  return ranges;
+}
+
+// The saved override for one package, or null. Overrides live under
+// transport_package_overrides: { "<package_id>": { free_km, ranges: [{ to_km, fee }] } }.
+function packageOverrideFor(r, packageId) {
+  if (packageId === null || packageId === undefined || packageId === '') return null;
+  const all = r.transport_package_overrides;
+  if (!all || typeof all !== 'object' || Array.isArray(all)) return null;
+  const key = String(packageId);
+  if (!Object.prototype.hasOwnProperty.call(all, key)) return null;
+  const ov = all[key];
+  return ov && typeof ov === 'object' && Array.isArray(ov.ranges) ? ov : null;
+}
+
 // Turns the raw payment_rules blob into clean, always-valid settings.
 // `ranges` is null until the ranges have been saved once (old per-km rule).
-export function readTransportRules(rules) {
+// With a packageId, a saved override for that package replaces the universal
+// free distance and ranges (everything else — on/off, beyond-the-last-range,
+// road factor — stays universal); `packageOverride` says whether it did.
+export function readTransportRules(rules, packageId = null) {
   const r = rules || {};
   const maxFee = num(r.transport_max_fee, null);
   const hasRanges = Array.isArray(r.transport_ranges);
   // Free distance default: 10 for the old per-km rule, 5 for ranges.
-  const freeKm = Math.max(0, num(r.transport_free_km, hasRanges ? TRANSPORT_DEFAULTS.freeKm : 10));
+  let freeKm = Math.max(0, num(r.transport_free_km, hasRanges ? TRANSPORT_DEFAULTS.freeKm : 10));
+  let ranges = hasRanges ? cleanRanges(r.transport_ranges, freeKm) : null;
 
-  let ranges = null;
-  if (hasRanges) {
-    ranges = [];
-    let prev = freeKm;
-    const sorted = r.transport_ranges
-      .map((x) => ({ toKm: num(x?.to_km, NaN), fee: num(x?.fee, NaN) }))
-      .filter((x) => Number.isFinite(x.toKm) && Number.isFinite(x.fee))
-      .sort((a, b) => a.toKm - b.toKm);
-    for (const x of sorted) {
-      const toKm = round1(x.toKm);
-      if (toKm <= prev || toKm > MAX_TRANSPORT_KM) continue; // keeps ends strictly increasing
-      ranges.push({ toKm, fee: round2(Math.max(0, x.fee)) });
-      prev = toKm;
-    }
+  const ov = packageOverrideFor(r, packageId);
+  if (ov) {
+    freeKm = Math.max(0, num(ov.free_km, TRANSPORT_DEFAULTS.freeKm));
+    ranges = cleanRanges(ov.ranges, freeKm);
   }
 
   return {
@@ -91,7 +116,8 @@ export function readTransportRules(rules) {
     roadFactor: Math.max(1, num(r.transport_road_factor, TRANSPORT_DEFAULTS.roadFactor)),
     // Old per-km rule, only used while `ranges` is null.
     ratePerKm: Math.max(0, num(r.transport_rate_per_km, 30)),
-    maxFee: maxFee === null ? null : Math.max(0, maxFee)
+    maxFee: maxFee === null ? null : Math.max(0, maxFee),
+    packageOverride: !!ov
   };
 }
 
@@ -173,8 +199,8 @@ export function priceTransportDistance(rules, distanceKm) {
 // callers then charge nothing. `outOfRange` is true when the venue is past the
 // last range and the admin chose "customer must contact us": the fee is 0 but
 // the booking form must not let the customer continue.
-export function computeTransportFee(rawRules, pin, branches) {
-  const rules = readTransportRules(rawRules);
+export function computeTransportFee(rawRules, pin, branches, packageId = null) {
+  const rules = readTransportRules(rawRules, packageId);
   const none = { applies: false, fee: 0, distanceKm: null, status: 'none', rangeFrom: null, rangeTo: null, billableKm: 0, outOfRange: false, originName: '', capped: false, rules };
   if (!rules.enabled) return none;
   const nearest = findNearestBranch(pin, branches);
@@ -199,8 +225,8 @@ export function computeTransportFee(rawRules, pin, branches) {
 // road is never shorter than a straight line, so a pin OUTSIDE it is always
 // too far; a pin inside can still be too far by road (the exact road check
 // stays the final decision). Returns null when there is no limit to show.
-export function transportCoverage(rawRules, branches) {
-  const rules = readTransportRules(rawRules);
+export function transportCoverage(rawRules, branches, packageId = null) {
+  const rules = readTransportRules(rawRules, packageId);
   if (!rules.enabled || rules.ranges === null || rules.beyond !== 'contact' || !rules.ranges.length) return null;
   const origins = transportOrigins(branches);
   if (!origins.length) return null;

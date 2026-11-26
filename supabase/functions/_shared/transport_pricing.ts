@@ -29,6 +29,7 @@ export interface TransportRules {
   roadFactor: number;
   ratePerKm: number; // old per-km rule, used only while ranges === null
   maxFee: number | null;
+  packageOverride: boolean; // true when a per-package override replaced the universal ranges
 }
 
 export type TransportStatus = 'free' | 'range' | 'beyond_charged' | 'out_of_range' | 'per_km';
@@ -53,29 +54,54 @@ const num = (v: unknown, fallback: number | null): number | null => {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 export const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// Cleans a saved list of ranges: sorted, ends strictly increasing and past the
+// free distance, fees never negative. Shared by the universal rule and the
+// per-package overrides.
+function cleanRanges(rawRanges: unknown[], freeKm: number): TransportRange[] {
+  const ranges: TransportRange[] = [];
+  let prev = freeKm;
+  const sorted = rawRanges
+    .map((x) => x as Record<string, unknown> | null)
+    .map((x) => ({ toKm: num(x?.to_km, NaN) as number, fee: num(x?.fee, NaN) as number }))
+    .filter((x) => Number.isFinite(x.toKm) && Number.isFinite(x.fee))
+    .sort((a, b) => a.toKm - b.toKm);
+  for (const x of sorted) {
+    const toKm = round1(x.toKm);
+    if (toKm <= prev || toKm > MAX_TRANSPORT_KM) continue; // keeps ends strictly increasing
+    ranges.push({ toKm, fee: round2(Math.max(0, x.fee)) });
+    prev = toKm;
+  }
+  return ranges;
+}
+
+// The saved override for one package, or null. Overrides live under
+// transport_package_overrides: { "<package_id>": { free_km, ranges: [{ to_km, fee }] } }.
+function packageOverrideFor(r: Record<string, unknown>, packageId: string | null | undefined): Record<string, unknown> | null {
+  if (packageId === null || packageId === undefined || packageId === '') return null;
+  const all = r.transport_package_overrides;
+  if (!all || typeof all !== 'object' || Array.isArray(all)) return null;
+  const key = String(packageId);
+  if (!Object.prototype.hasOwnProperty.call(all, key)) return null;
+  const ov = (all as Record<string, unknown>)[key] as Record<string, unknown> | null;
+  return ov && typeof ov === 'object' && Array.isArray(ov.ranges) ? ov : null;
+}
+
 // Turns the raw payment_rules blob into clean, always-valid settings.
-export function readTransportRules(raw: Record<string, unknown> | null | undefined): TransportRules {
+// With a packageId, a saved override for that package replaces the universal
+// free distance and ranges (everything else stays universal); `packageOverride`
+// says whether it did.
+export function readTransportRules(raw: Record<string, unknown> | null | undefined, packageId: string | null = null): TransportRules {
   const r = raw ?? {};
   const maxFee = num(r.transport_max_fee, null);
   const hasRanges = Array.isArray(r.transport_ranges);
   // Free distance default: 10 for the old per-km rule, 5 for ranges.
-  const freeKm = Math.max(0, num(r.transport_free_km, hasRanges ? 5 : 10) as number);
+  let freeKm = Math.max(0, num(r.transport_free_km, hasRanges ? 5 : 10) as number);
+  let ranges: TransportRange[] | null = hasRanges ? cleanRanges(r.transport_ranges as unknown[], freeKm) : null;
 
-  let ranges: TransportRange[] | null = null;
-  if (hasRanges) {
-    ranges = [];
-    let prev = freeKm;
-    const sorted = (r.transport_ranges as unknown[])
-      .map((x) => x as Record<string, unknown> | null)
-      .map((x) => ({ toKm: num(x?.to_km, NaN) as number, fee: num(x?.fee, NaN) as number }))
-      .filter((x) => Number.isFinite(x.toKm) && Number.isFinite(x.fee))
-      .sort((a, b) => a.toKm - b.toKm);
-    for (const x of sorted) {
-      const toKm = round1(x.toKm);
-      if (toKm <= prev || toKm > MAX_TRANSPORT_KM) continue; // keeps ends strictly increasing
-      ranges.push({ toKm, fee: round2(Math.max(0, x.fee)) });
-      prev = toKm;
-    }
+  const ov = packageOverrideFor(r, packageId);
+  if (ov) {
+    freeKm = Math.max(0, num(ov.free_km, 5) as number);
+    ranges = cleanRanges(ov.ranges as unknown[], freeKm);
   }
 
   return {
@@ -86,6 +112,7 @@ export function readTransportRules(raw: Record<string, unknown> | null | undefin
     roadFactor: Math.max(1, num(r.transport_road_factor, 1.3) as number),
     ratePerKm: Math.max(0, num(r.transport_rate_per_km, 30) as number),
     maxFee: maxFee === null ? null : Math.max(0, maxFee),
+    packageOverride: !!ov,
   };
 }
 

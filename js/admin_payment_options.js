@@ -605,7 +605,7 @@ async function ptSaveType(code) {
 // currentPaymentRulesConfig caches whatever was last loaded from the DB so
 // savePaymentRules() below can pass those two fields straight through
 // unchanged instead of wiping them out on every save from this page.
-const TRANSPORT_RULE_KEYS = ['transport_fee_enabled', 'transport_free_km', 'transport_ranges', 'transport_beyond', 'transport_rate_per_km', 'transport_max_fee', 'transport_road_factor'];
+const TRANSPORT_RULE_KEYS = ['transport_fee_enabled', 'transport_free_km', 'transport_ranges', 'transport_beyond', 'transport_rate_per_km', 'transport_max_fee', 'transport_road_factor', 'transport_package_overrides'];
 const DEFAULT_PAYMENT_RULES = {
   max_installments: 2,
   auto_hold_enabled: true,
@@ -1002,7 +1002,15 @@ async function saveOffsiteToggle() {
 // point and a fee, and gaps or overlaps cannot exist. A range includes its end
 // point. The old transport_rate_per_km / transport_max_fee values are left in
 // the blob untouched but are ignored once transport_ranges has been saved.
+//
+// Package-specific fees: transport_package_overrides is
+// { "<package_id>": { free_km, ranges: [{ to_km, fee }, ...] } }. A package
+// listed there uses its own free distance and ranges instead of the universal
+// ones; every other package uses the universal fees. On/off, "beyond the last
+// range" and the road factor stay universal. Priced by readTransportRules(raw,
+// packageId) in transport_fee.js (and its edge-function twin).
 let transportBranches = [];
+let transportPackages = [];   // offsite-capable packages: { id, label }
 
 function setTfMsg(msg, isError = false) {
   const el = document.getElementById('tf-msg');
@@ -1031,50 +1039,139 @@ function tfRangeRowHtml(toKm, fee) {
     </div>`;
 }
 
-function renderTransportRanges(rows) {
-  const host = document.getElementById('tf-ranges');
+// The range editor is used twice: once for the universal fees (#tf-ranges) and
+// once inside every package-specific block. These helpers take the element
+// that holds the rows plus the input that holds that editor's free distance.
+function renderRangesIn(host, freeInput, rows) {
   if (!host) return;
   host.innerHTML = rows.map((r) => tfRangeRowHtml(r.toKm, r.fee)).join('');
-  syncTransportRangeLabels();
+  syncRangeLabelsIn(host, freeInput);
 }
 
 // Fills each row's "Over X km" from the row above (or the free distance).
-function syncTransportRangeLabels() {
-  const free = tfNumOrNaN(document.getElementById('tf-free-km')?.value);
-  let prev = free;
-  document.querySelectorAll('#tf-ranges .tf-range').forEach((row) => {
+function syncRangeLabelsIn(host, freeInput) {
+  let prev = tfNumOrNaN(freeInput?.value);
+  host?.querySelectorAll('.tf-range').forEach((row) => {
     const label = row.querySelector('.tf-range-from');
     if (label) label.textContent = Number.isFinite(prev) ? `Over ${tfKm(prev)},` : 'Over …,';
     prev = tfNumOrNaN(row.querySelector('.tf-range-to')?.value);
   });
 }
 
-function readTransportRangeRows() {
-  return Array.from(document.querySelectorAll('#tf-ranges .tf-range')).map((row) => ({
+function readRangeRowsIn(host) {
+  return Array.from(host?.querySelectorAll('.tf-range') || []).map((row) => ({
     toKm: tfNumOrNaN(row.querySelector('.tf-range-to')?.value),
     fee: tfNumOrNaN(row.querySelector('.tf-range-fee')?.value)
   }));
 }
 
-function addTransportRange() {
-  const rows = readTransportRangeRows();
-  const free = tfNumOrNaN(document.getElementById('tf-free-km')?.value);
+function addRangeIn(host, freeInput) {
+  const rows = readRangeRowsIn(host);
+  const free = tfNumOrNaN(freeInput?.value);
   const lastTo = rows.length ? rows[rows.length - 1].toKm : free;
   // Suggest an end point 5 km past the last one; the fee is left for the admin.
   rows.push({ toKm: Number.isFinite(lastTo) ? tfRound1(lastTo + 5) : NaN, fee: NaN });
-  renderTransportRanges(rows);
-  const inputs = document.querySelectorAll('#tf-ranges .tf-range-fee');
+  renderRangesIn(host, freeInput, rows);
+  const inputs = host.querySelectorAll('.tf-range-fee');
   inputs[inputs.length - 1]?.focus();
   updateTransportExample();
 }
 
-function removeTransportRange(button) {
+function removeRangeIn(host, freeInput, button) {
   const row = button.closest('.tf-range');
   if (!row) return;
-  const index = Array.from(document.querySelectorAll('#tf-ranges .tf-range')).indexOf(row);
-  const rows = readTransportRangeRows();
+  const index = Array.from(host.querySelectorAll('.tf-range')).indexOf(row);
+  const rows = readRangeRowsIn(host);
   rows.splice(index, 1);
-  renderTransportRanges(rows);
+  renderRangesIn(host, freeInput, rows);
+  updateTransportExample();
+}
+
+const tfGlobalHost = () => document.getElementById('tf-ranges');
+const tfGlobalFree = () => document.getElementById('tf-free-km');
+const renderTransportRanges = (rows) => renderRangesIn(tfGlobalHost(), tfGlobalFree(), rows);
+const readTransportRangeRows = () => readRangeRowsIn(tfGlobalHost());
+
+// Re-labels every range editor on the card (universal + each package block).
+function syncTransportRangeLabels() {
+  syncRangeLabelsIn(tfGlobalHost(), tfGlobalFree());
+  document.querySelectorAll('#tf-overrides .tf-override').forEach((block) => {
+    syncRangeLabelsIn(block.querySelector('.tf-override-ranges'), block.querySelector('.tf-override-free-km'));
+  });
+}
+
+// ── Package-specific fee blocks ───────────────────────────────────────────
+function tfPackageOptionsHtml(selectedId) {
+  const usedElsewhere = new Set(readOverrideBlocks().map((b) => b.packageId).filter((id) => id && id !== selectedId));
+  return '<option value="">Choose a package…</option>' + transportPackages.map((p) =>
+    `<option value="${escapeHtmlSc(p.id)}"${p.id === selectedId ? ' selected' : ''}${usedElsewhere.has(p.id) ? ' disabled' : ''}>${escapeHtmlSc(p.label)}</option>`
+  ).join('');
+}
+
+function tfOverrideBlockHtml(packageId, freeKm, rows) {
+  const freeVal = Number.isFinite(freeKm) ? freeKm : '';
+  return `
+    <div class="tf-override">
+      <div class="tf-override-head">
+        <select class="pr-input-inline tf-override-pkg" aria-label="Package with its own transport fee">${tfPackageOptionsHtml(packageId)}</select>
+        <button type="button" class="action-btn tf-override-remove" title="Remove this package-specific fee">Remove</button>
+      </div>
+      <div class="tf-override-free">
+        <span class="field-note" style="margin:0;">Free distance up to</span>
+        <input type="number" class="pr-input-inline tf-override-free-km" min="0" max="${MAX_TRANSPORT_KM}" step="0.5" value="${freeVal}" aria-label="Free distance for this package (km)">
+        <span class="field-note" style="margin:0;">km</span>
+      </div>
+      <div class="tf-ranges tf-override-ranges" role="list">${rows.map((r) => tfRangeRowHtml(r.toKm, r.fee)).join('')}</div>
+      <button type="button" class="action-btn tf-override-add-range">+ Add distance range</button>
+    </div>`;
+}
+
+function renderOverrideBlocks(blocks) {
+  const host = document.getElementById('tf-overrides');
+  if (!host) return;
+  host.innerHTML = blocks.map((b) => tfOverrideBlockHtml(b.packageId, b.freeKm, b.rows)).join('');
+  refreshOverrideUi();
+}
+
+// Package pickers can't offer a package another block already uses; the empty
+// hint and the "Try a distance" package list follow the blocks too.
+function refreshOverrideUi() {
+  document.querySelectorAll('#tf-overrides .tf-override').forEach((block) => {
+    const select = block.querySelector('.tf-override-pkg');
+    const chosen = select.value;
+    select.innerHTML = tfPackageOptionsHtml(chosen);
+    select.value = chosen;
+  });
+  document.getElementById('tf-overrides-empty')?.classList.toggle('hidden', !!document.querySelector('#tf-overrides .tf-override'));
+  const tryPkg = document.getElementById('tf-try-package');
+  if (tryPkg) {
+    const keep = tryPkg.value;
+    const chosen = readOverrideBlocks().filter((b) => b.packageId);
+    tryPkg.innerHTML = '<option value="">Packages with the universal fees</option>' + chosen.map((b) =>
+      `<option value="${escapeHtmlSc(b.packageId)}">${escapeHtmlSc(transportPackages.find((p) => p.id === b.packageId)?.label || 'Package')}</option>`).join('');
+    tryPkg.value = chosen.some((b) => b.packageId === keep) ? keep : '';
+    tryPkg.closest('.tf-try-package-row')?.classList.toggle('hidden', !chosen.length);
+  }
+}
+
+function readOverrideBlocks() {
+  return Array.from(document.querySelectorAll('#tf-overrides .tf-override')).map((block) => ({
+    packageId: block.querySelector('.tf-override-pkg')?.value || '',
+    freeKm: tfNumOrNaN(block.querySelector('.tf-override-free-km')?.value),
+    rows: readRangeRowsIn(block.querySelector('.tf-override-ranges'))
+  }));
+}
+
+function addOverrideBlock() {
+  const used = new Set(readOverrideBlocks().map((b) => b.packageId));
+  if (!transportPackages.length) { setTfMsg('There are no offsite packages to add a fee for yet.', true); return; }
+  if (transportPackages.every((p) => used.has(p.id))) { setTfMsg('Every offsite package already has its own fee.', true); return; }
+  setTfMsg('');
+  // Start from a copy of the universal fees so the admin only edits what differs.
+  const blocks = readOverrideBlocks();
+  blocks.push({ packageId: '', freeKm: tfNumOrNaN(tfGlobalFree()?.value), rows: readTransportRangeRows() });
+  renderOverrideBlocks(blocks);
+  document.querySelector('#tf-overrides .tf-override:last-child .tf-override-pkg')?.focus();
   updateTransportExample();
 }
 
@@ -1084,22 +1181,42 @@ function readTransportFields() {
     transport_free_km: tfNumOrNaN(document.getElementById('tf-free-km')?.value),
     transport_ranges: readTransportRangeRows().map((r) => ({ to_km: r.toKm, fee: r.fee })),
     transport_beyond: document.getElementById('tf-beyond-last')?.checked ? 'last' : 'contact',
-    transport_road_factor: Number(document.getElementById('tf-road-factor')?.value)
+    transport_road_factor: Number(document.getElementById('tf-road-factor')?.value),
+    // Array while editing (so blanks and duplicates can be reported); cleanTransportFields() turns it into the saved object.
+    transport_package_overrides: readOverrideBlocks().map((b) => ({ package_id: b.packageId, free_km: b.freeKm, ranges: b.rows.map((r) => ({ to_km: r.toKm, fee: r.fee })) }))
   };
 }
 
-function validateTransportFields(v) {
-  if (!Number.isFinite(v.transport_free_km) || v.transport_free_km < 0 || v.transport_free_km > MAX_TRANSPORT_KM) return `Free distance must be between 0 and ${MAX_TRANSPORT_KM} km.`;
-  if (!v.transport_ranges.length) return 'Add at least one distance range.';
-  let prev = v.transport_free_km;
-  for (let i = 0; i < v.transport_ranges.length; i++) {
-    const r = v.transport_ranges[i];
+// One free distance + list of ranges (universal or a package's). `who` prefixes
+// the message for package blocks, e.g. 'Rose Package: '.
+function validateRangeSet(freeKm, ranges, who = '') {
+  if (!Number.isFinite(freeKm) || freeKm < 0 || freeKm > MAX_TRANSPORT_KM) return `${who}Free distance must be between 0 and ${MAX_TRANSPORT_KM} km.`;
+  if (!ranges.length) return `${who}Add at least one distance range.`;
+  let prev = freeKm;
+  for (let i = 0; i < ranges.length; i++) {
+    const r = ranges[i];
     const n = i + 1;
-    if (!Number.isFinite(r.to_km)) return `Range ${n}: enter the distance where it ends.`;
-    if (r.to_km <= prev) return `Range ${n}: the end point must be more than ${tfKm(prev)}, the end of the range above it.`;
-    if (r.to_km > MAX_TRANSPORT_KM) return `Range ${n}: the end point can't be more than ${MAX_TRANSPORT_KM} km.`;
-    if (!Number.isFinite(r.fee) || r.fee < 0 || r.fee > 10000000) return `Range ${n}: enter a fee (0.00 or more).`;
+    if (!Number.isFinite(r.to_km)) return `${who}Range ${n}: enter the distance where it ends.`;
+    if (r.to_km <= prev) return `${who}Range ${n}: the end point must be more than ${tfKm(prev)}, the end of the range above it.`;
+    if (r.to_km > MAX_TRANSPORT_KM) return `${who}Range ${n}: the end point can't be more than ${MAX_TRANSPORT_KM} km.`;
+    if (!Number.isFinite(r.fee) || r.fee < 0 || r.fee > 10000000) return `${who}Range ${n}: enter a fee (0.00 or more).`;
     prev = r.to_km;
+  }
+  return '';
+}
+
+const tfPackageLabel = (id) => transportPackages.find((p) => p.id === id)?.label || 'Package';
+
+function validateTransportFields(v) {
+  const universal = validateRangeSet(v.transport_free_km, v.transport_ranges);
+  if (universal) return universal;
+  const seen = new Set();
+  for (const o of v.transport_package_overrides || []) {
+    if (!o.package_id) return 'Package-specific fees: choose a package for each block, or remove the empty one.';
+    if (seen.has(o.package_id)) return `${tfPackageLabel(o.package_id)} has more than one package-specific fee. Keep just one.`;
+    seen.add(o.package_id);
+    const problem = validateRangeSet(o.free_km, o.ranges, `${tfPackageLabel(o.package_id)}: `);
+    if (problem) return problem;
   }
   if (!Number.isFinite(v.transport_road_factor) || v.transport_road_factor < 1 || v.transport_road_factor > 3) return 'Road distance factor must be between 1 and 3.';
   return '';
@@ -1109,7 +1226,11 @@ function validateTransportFields(v) {
 function cleanTransportFields(v) {
   return {
     ...v,
-    transport_ranges: v.transport_ranges.map((r) => ({ to_km: tfRound1(r.to_km), fee: Math.round(r.fee * 100) / 100 }))
+    transport_ranges: v.transport_ranges.map((r) => ({ to_km: tfRound1(r.to_km), fee: Math.round(r.fee * 100) / 100 })),
+    transport_package_overrides: Object.fromEntries((v.transport_package_overrides || []).map((o) => [
+      o.package_id,
+      { free_km: tfRound1(o.free_km), ranges: o.ranges.map((r) => ({ to_km: tfRound1(r.to_km), fee: Math.round(r.fee * 100) / 100 })) }
+    ]))
   };
 }
 
@@ -1121,7 +1242,11 @@ function describeTransportRangesForAudit(v) {
     return text;
   });
   const beyond = v.transport_beyond === 'last' ? `beyond ${from} km the last range's fee applies` : `beyond ${from} km the venue can't be booked online`;
-  return `free up to ${v.transport_free_km} km; ranges: ${parts.join(', ')}; ${beyond}`;
+  const overrideIds = Object.keys(v.transport_package_overrides || {});
+  const overrides = overrideIds.length
+    ? `; own fee for ${overrideIds.map((id) => tfPackageLabel(id)).join(', ')}`
+    : '';
+  return `free up to ${v.transport_free_km} km; ranges: ${parts.join(', ')}; ${beyond}${overrides}`;
 }
 
 // "Try a distance" box: prices any road distance with the ranges as they are
@@ -1131,11 +1256,12 @@ function updateTransportExample() {
   const exampleEl = document.getElementById('tf-example-text');
   if (!exampleEl) return;
   const v = readTransportFields();
-  if (validateTransportFields(v)) { exampleEl.textContent = 'Fill in every range above to test a distance.'; return; }
+  if (validateTransportFields(v)) { exampleEl.textContent = 'Fill in every fee above to test a distance.'; return; }
   const km = tfRound1(tfNumOrNaN(document.getElementById('tf-try-km')?.value));
   if (!Number.isFinite(km) || km < 0) { exampleEl.textContent = 'Enter a distance to test.'; return; }
 
-  const rules = readTransportRules(cleanTransportFields({ ...v, transport_fee_enabled: true }));
+  const tryPackageId = document.getElementById('tf-try-package')?.value || null;
+  const rules = readTransportRules(cleanTransportFields({ ...v, transport_fee_enabled: true }), tryPackageId);
   const priced = priceTransportDistance(rules, km);
   let text;
   switch (priced.status) {
@@ -1148,6 +1274,7 @@ function updateTransportExample() {
     default:
       text = `${tfKm(km)} is beyond the last range (${tfKm(priced.rangeFrom)}): venues this far can't be booked online, so no fee is calculated and customers are asked to choose a closer venue.`;
   }
+  if (tryPackageId) text = `For ${tfPackageLabel(tryPackageId)}: ${text}`;
   exampleEl.textContent = text + (v.transport_fee_enabled ? '' : ' The fee is currently switched off, so customers are not charged.');
 }
 
@@ -1178,6 +1305,24 @@ async function loadTransportFeeSection() {
   renderTransportRanges(rows);
   const roadEl = document.getElementById('tf-road-factor');
   if (roadEl) roadEl.value = rules.roadFactor.toFixed(2);
+
+  // Offsite-capable packages for the package-specific fee pickers (archived
+  // ones included so an existing override never disappears from the screen).
+  const { data: pkgRows } = await supabase
+    .from('package')
+    .select('package_id, package_name, is_active, location_type, package_category(category_name)')
+    .in('location_type', ['offsite', 'both'])
+    .order('package_name', { ascending: true });
+  transportPackages = (pkgRows || []).map((p) => ({
+    id: p.package_id,
+    label: p.package_name + (p.package_category?.category_name ? ' — ' + p.package_category.category_name : '') + (p.is_active === false ? ' (archived)' : '')
+  }));
+  const savedOverrides = Object.keys(parsed.transport_package_overrides && typeof parsed.transport_package_overrides === 'object' && !Array.isArray(parsed.transport_package_overrides) ? parsed.transport_package_overrides : {});
+  renderOverrideBlocks(savedOverrides
+    .filter((id) => transportPackages.some((p) => p.id === id))
+    .map((id) => ({ id, r: readTransportRules(parsed, id) }))
+    .filter((x) => x.r.packageOverride)
+    .map((x) => ({ packageId: x.id, freeKm: x.r.freeKm, rows: x.r.ranges.map((r) => ({ toKm: r.toKm, fee: r.fee })) })));
 
   const { data: branches } = await supabase
     .from('business_location').select('name, branch_tag, latitude, longitude, transport_origin, is_active').eq('is_active', true).order('sort_order', { ascending: true });
@@ -1292,16 +1437,18 @@ function wireNumericInputClamps() {
   clampNumberInput(document.getElementById('tf-free-km'), { min: 0, max: 500, decimals: 1 });
   // Distance range rows are added and removed at runtime, so their inputs are
   // clamped by one delegated handler (blur does not bubble; focusout does).
-  document.getElementById('tf-ranges')?.addEventListener('focusout', (e) => {
+  const clampRangeInput = (e) => {
     const el = e.target;
     if (!(el instanceof HTMLInputElement) || el.value === '') return;
     const isFee = el.classList.contains('tf-range-fee');
-    const isEnd = el.classList.contains('tf-range-to');
+    const isEnd = el.classList.contains('tf-range-to') || el.classList.contains('tf-override-free-km');
     if (!isFee && !isEnd) return;
     const clamped = clampNumberValue(el.value, isFee ? { min: 0, max: 10000000, decimals: 2 } : { min: 0, max: MAX_TRANSPORT_KM, decimals: 1 });
     el.value = clamped === null ? '' : (isFee ? clamped.toFixed(2) : String(clamped));
     updateTransportExample();
-  });
+  };
+  document.getElementById('tf-ranges')?.addEventListener('focusout', clampRangeInput);
+  document.getElementById('tf-overrides')?.addEventListener('focusout', clampRangeInput);
   clampNumberInput(document.getElementById('tf-road-factor'), { min: 1, max: 3, decimals: 2 });
   clampNumberInput(document.getElementById('pm2CashWindowDays'), { min: 0, max: 365, decimals: 0 });
   clampNumberInput(document.getElementById('pr-full-payment-days'), { min: 1, max: 60, decimals: 0 });
@@ -1557,9 +1704,31 @@ async function init() {
   document.getElementById('tf-ranges')?.addEventListener('input', updateTransportExample);
   document.getElementById('tf-ranges')?.addEventListener('click', (e) => {
     const btn = e.target.closest?.('.tf-range-remove');
-    if (btn) removeTransportRange(btn);
+    if (btn) removeRangeIn(tfGlobalHost(), tfGlobalFree(), btn);
   });
-  document.getElementById('tf-add-range')?.addEventListener('click', addTransportRange);
+  document.getElementById('tf-add-range')?.addEventListener('click', () => addRangeIn(tfGlobalHost(), tfGlobalFree()));
+  // Package-specific fee blocks are added and removed at runtime: one delegated set of handlers.
+  const overridesHost = document.getElementById('tf-overrides');
+  overridesHost?.addEventListener('input', updateTransportExample);
+  overridesHost?.addEventListener('change', (e) => {
+    if (e.target.closest?.('.tf-override-pkg')) refreshOverrideUi();
+    updateTransportExample();
+  });
+  overridesHost?.addEventListener('click', (e) => {
+    const block = e.target.closest?.('.tf-override');
+    if (!block) return;
+    const host = block.querySelector('.tf-override-ranges');
+    const free = block.querySelector('.tf-override-free-km');
+    if (e.target.closest('.tf-range-remove')) { removeRangeIn(host, free, e.target.closest('.tf-range-remove')); return; }
+    if (e.target.closest('.tf-override-add-range')) { addRangeIn(host, free); return; }
+    if (e.target.closest('.tf-override-remove')) {
+      block.remove();
+      refreshOverrideUi();
+      updateTransportExample();
+    }
+  });
+  document.getElementById('tf-add-override')?.addEventListener('click', addOverrideBlock);
+  document.getElementById('tf-try-package')?.addEventListener('change', updateTransportExample);
   ['tf-beyond-contact', 'tf-beyond-last'].forEach((id) => document.getElementById(id)?.addEventListener('change', updateTransportExample));
   document.getElementById('tf-enabled')?.addEventListener('change', updateTransportExample);
   // Live-preview the effect immediately on toggle, before the admin saves —

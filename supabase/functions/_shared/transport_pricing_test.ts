@@ -99,6 +99,55 @@ for (const raw of ruleSets) {
   }
 }
 
+// ── per-package overrides ───────────────────────────────────────────────────
+const PKG_A = '11111111-aaaa-bbbb-cccc-000000000001';
+const PKG_B = '11111111-aaaa-bbbb-cccc-000000000002';
+const withOverrides = {
+  ...base,
+  transport_package_overrides: {
+    [PKG_A]: { free_km: 5, ranges: [{ to_km: 10, fee: 2500 }, { to_km: 15, fee: 3500 }, { to_km: 20, fee: 8000 }, { to_km: 25, fee: 9000 }] },
+    [PKG_B]: { free_km: 0, ranges: [{ to_km: 8, fee: 700 }] },
+  },
+};
+const priceFor = (raw: Record<string, unknown>, pkg: string | null, km: number) =>
+  priceTransportDistance(readTransportRules(raw, pkg), km);
+assert.equal(priceFor(withOverrides, null, 12).fee, 2000, 'no package: universal');
+assert.equal(priceFor(withOverrides, 'some-other-package', 12).fee, 2000, 'package without override: universal');
+assert.equal(priceFor(withOverrides, PKG_A, 12).fee, 3500, 'override replaces the universal ranges');
+assert.equal(priceFor(withOverrides, PKG_A, 5).fee, 0, 'override free distance');
+assert.equal(priceFor(withOverrides, PKG_B, 3).fee, 700, 'override with its own (zero) free distance');
+assert.equal(priceFor(withOverrides, PKG_B, 8.1).status, 'out_of_range', 'beyond the override last range follows the universal setting');
+assert.equal(priceFor({ ...withOverrides, transport_beyond: 'last' }, PKG_B, 50).fee, 700);
+assert.equal(readTransportRules(withOverrides, PKG_A).packageOverride, true);
+assert.equal(readTransportRules(withOverrides, PKG_A).enabled, true, 'on/off stays universal');
+assert.equal(readTransportRules(withOverrides, null).packageOverride, false);
+// bad overrides are ignored, never trusted
+for (const bad of [null, 'x', 5, [], {}, { ranges: 'nope' }]) {
+  const raw = { ...base, transport_package_overrides: { [PKG_A]: bad } };
+  assert.equal(readTransportRules(raw, PKG_A).packageOverride, false);
+  assert.equal(priceFor(raw, PKG_A, 12).fee, 2000);
+}
+assert.equal(readTransportRules({ ...base, transport_package_overrides: [] }, PKG_A).packageOverride, false);
+assert.equal(readTransportRules({ ...base, transport_package_overrides: { __proto__: { ranges: [] } } }, 'ranges').packageOverride, false);
+// an override applies even while the universal fee has never been saved (legacy per-km)
+assert.equal(priceFor({ ...legacy, transport_package_overrides: withOverrides.transport_package_overrides }, PKG_A, 12).fee, 3500);
+assert.equal(priceFor(legacy, PKG_A, 15).status, 'per_km');
+// browser and server agree on every override rule set, for every distance
+for (const pkg of [null, PKG_A, PKG_B, 'other']) {
+  for (const raw of [withOverrides, { ...withOverrides, transport_beyond: 'last' }, { ...legacy, transport_package_overrides: withOverrides.transport_package_overrides }]) {
+    const sr = readTransportRules(raw, pkg);
+    const br = browser.readTransportRules(raw, pkg);
+    assert.deepEqual(br, sr);
+    for (let tenths = 0; tenths <= 6000; tenths++) {
+      assert.deepEqual(browser.priceTransportDistance(br, tenths / 10), priceTransportDistance(sr, tenths / 10));
+      compared++;
+    }
+  }
+}
+// the bookable-area circle follows the package's own last range
+assert.equal(browser.transportCoverage(withOverrides, [{ name: 'A', latitude: 14.4, longitude: 121.1, transport_origin: true }], PKG_B).radiusKm, 8);
+assert.equal(browser.transportCoverage(withOverrides, [{ name: 'A', latitude: 14.4, longitude: 121.1, transport_origin: true }], null).radiusKm, 25);
+
 // ── bookable-area circles (browser only; drawn on the booking map) ─────────
 const branchA = { name: 'ELI Binangonan', latitude: 14.4859, longitude: 121.1863, transport_origin: true };
 const branchB = { name: 'ELI Antipolo', latitude: 14.5860, longitude: 121.1760, transport_origin: true };

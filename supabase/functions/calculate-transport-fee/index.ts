@@ -1,6 +1,7 @@
 // calculate-transport-fee — prices the offsite transport fee on the server.
 //
-// Input : POST { lat, lng }  (the venue pin the customer dropped)
+// Input : POST { lat, lng, packageId? }  (the venue pin the customer dropped, and
+//         the package they picked: a package with its own transport fee uses it)
 // Output: { success: true, result: { applies, fee, distanceKm, status,
 //           rangeFrom, rangeTo, outOfRange, originName, method, rules } }
 //
@@ -107,7 +108,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed.' }, 405);
 
-  let body: { lat?: unknown; lng?: unknown };
+  let body: { lat?: unknown; lng?: unknown; packageId?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -136,7 +137,9 @@ Deno.serve(async (req: Request) => {
     } else if (sv && typeof sv === 'object') {
       rawRules = sv as Record<string, unknown>;
     }
-    const rules = readTransportRules(rawRules);
+    const packageId = typeof body.packageId === 'string' && body.packageId.length > 0 && body.packageId.length <= 64
+      ? body.packageId : null;
+    const rules = readTransportRules(rawRules, packageId);
 
     const none = {
       applies: false, fee: 0, distanceKm: null, status: 'none',

@@ -427,6 +427,14 @@
           </div>
         </div>
 
+        <div class="tf-overrides-block">
+          <p class="pr-row-label">Package-specific fees</p>
+          <p class="pr-row-desc">Give a package its own free distance and distance ranges. A package listed here uses its own fees instead of the universal ones above; every other package keeps the universal fees. Turning the fee on or off, the &ldquo;beyond the last range&rdquo; setting and the backup factor stay universal.</p>
+          <div class="tf-overrides" id="tf-overrides"></div>
+          <p class="pr-row-desc tf-overrides-empty" id="tf-overrides-empty">No package has its own fee yet. All packages use the universal fees above.</p>
+          <button type="button" class="action-btn" id="tf-add-override">+ Add package-specific fee</button>
+        </div>
+
         <div class="pr-row">
           <div class="pr-row-copy">
             <p class="pr-row-label">Backup road distance factor (you can leave this as is)</p>
@@ -449,6 +457,10 @@
           <div class="tf-try">
             <input type="number" class="pr-input-inline" id="tf-try-km" min="0" max="500" step="0.1" value="12" aria-label="Distance to try, in kilometres">
             <span class="field-note" style="margin:0;">km by road</span>
+          </div>
+          <div class="tf-try tf-try-package-row hidden">
+            <span class="field-note" style="margin:0;">for</span>
+            <select class="pr-input-inline" id="tf-try-package" aria-label="Package to try the distance for"></select>
           </div>
           <p class="sc-example-text" id="tf-example-text"></p>
         </div>

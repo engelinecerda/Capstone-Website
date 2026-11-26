@@ -484,6 +484,36 @@ select.field-input {
   margin: 4px 0 8px;
 }
 
+.tf-overrides-block {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tf-overrides { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+.tf-overrides-empty { margin: 10px 0; }
+.tf-overrides-empty.hidden, .tf-try-package-row.hidden { display: none; }
+.tf-override {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #FBF8F3;
+}
+.tf-override-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.tf-override-pkg { flex: 1 1 auto; min-width: 0; max-width: 460px; width: 100%; }
+.tf-override-free { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tf-override .tf-ranges { margin: 10px 0; }
+.tf-override .pr-input-inline { background: #fff; }
+
+/* The action bar draws its own top rule, so the row above it drops its
+   bottom rule instead of leaving a doubled line with an empty gap. */
+.pr-row:has(+ .action-bar) { border-bottom: none; }
+.pr-row + .action-bar { margin-top: 0; }
+
 @media (max-width: 720px) {
   .tf-range { row-gap: 6px; }
   .tf-range-from { flex: 1 0 100%; }

@@ -227,8 +227,16 @@ let TRANSPORT_BRANCHES = [];
 // distance from OpenRouteService). The result is cached against the pin it
 // was priced for; if the function can't be reached, the local straight-line
 // estimate (js/transport_fee.js) is used instead so booking never blocks.
+// A package can have its own transport fee (Payment Settings > Transport Fee),
+// so the quote is also keyed by the selected package: changing package re-prices.
+function transportPackageId() {
+    return S.locationType === 'offsite' ? (getActivePackage()?.id ?? null) : null;
+}
+
+let lastTransportPackageId = null;
+
 function transportQuoteKey(pin) {
-    return Number(pin.lat).toFixed(5) + ',' + Number(pin.lng).toFixed(5);
+    return Number(pin.lat).toFixed(5) + ',' + Number(pin.lng).toFixed(5) + '|' + (transportPackageId() ?? '');
 }
 
 function getTransportQuoteFor(pin) {
@@ -238,7 +246,7 @@ function getTransportQuoteFor(pin) {
 
 function resolveTransport() {
     if (S.locationType !== 'offsite') return computeTransportFee({}, null, []);
-    return getTransportQuoteFor(S.venuePin) || computeTransportFee(TRANSPORT_RULES, S.venuePin, TRANSPORT_BRANCHES);
+    return getTransportQuoteFor(S.venuePin) || computeTransportFee(TRANSPORT_RULES, S.venuePin, TRANSPORT_BRANCHES, transportPackageId());
 }
 
 function isTransportFeeActive() {
@@ -262,7 +270,7 @@ async function loadTransportFeeSettings() {
 function refreshVenueCoverage() {
     if (!window.setVenueMapCoverage) return;
     const cov = (S.locationType === 'offsite' && isTransportFeeActive())
-        ? transportCoverage(TRANSPORT_RULES, TRANSPORT_BRANCHES) : null;
+        ? transportCoverage(TRANSPORT_RULES, TRANSPORT_BRANCHES, transportPackageId()) : null;
     window.setVenueMapCoverage(cov, cov ? (lat, lng) => pinInCoverage({ lat, lng }, cov) : null);
     const note = document.getElementById('venue-coverage-note');
     if (note) {
@@ -349,12 +357,12 @@ function scheduleTransportQuote() {
         let result = null;
         try {
             const { data, error } = await supabase.functions.invoke('calculate-transport-fee', {
-                body: { lat: pin.lat, lng: pin.lng }
+                body: { lat: pin.lat, lng: pin.lng, packageId: transportPackageId() }
             });
             if (!error && data && data.success && data.result) result = data.result;
         } catch { /* fall back to the local estimate below */ }
         if (!result) {
-            result = { ...computeTransportFee(TRANSPORT_RULES, pin, TRANSPORT_BRANCHES), method: 'estimate' };
+            result = { ...computeTransportFee(TRANSPORT_RULES, pin, TRANSPORT_BRANCHES, transportPackageId()), method: 'estimate' };
         }
         if (seq !== transportQuoteSeq) return;
         S.transportQuote = { key: transportQuoteKey(pin), result };
@@ -3455,6 +3463,15 @@ document.getElementById('included-summary-block')?.addEventListener('click', (e)
 
 function buildInclusionBlock() {
     buildIncludedCard();
+
+    // Every place that changes the package calls this, and a package can carry
+    // its own transport fee, so re-price the venue pin when the package that
+    // counts for transport actually changed.
+    const transportPkg = transportPackageId();
+    if (transportPkg !== lastTransportPackageId) {
+        lastTransportPackageId = transportPkg;
+        scheduleTransportQuote();
+    }
 
     // The custom request section sits right under this block and shows for ANY
     // selected package (including ones with nothing removable). Every place that
