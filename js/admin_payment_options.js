@@ -21,7 +21,37 @@ import { clampNumberInput, clampNumberValue } from './numeric_input.js';
 attachPhoneMask(document.getElementById('pm2PhoneNumber'));
 
 // ── Confirm modal (Payment Rules) ────────────────────────────────────────────
-function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
+// Save buttons show a spinner and 'Saving…' while their write is running, then
+// go back to their own label. The button is not `disabled` (that would dim it
+// like an unavailable action); clicks are ignored while it is busy instead.
+function setButtonSaving(btn, saving, label = 'Saving…') {
+  if (!btn) return;
+  if (saving) {
+    if (btn.classList.contains('is-saving')) return;
+    btn.dataset.idleLabel = btn.textContent;
+    btn.style.minWidth = btn.offsetWidth + 'px';   // keep the width so the row doesn't jump
+    btn.textContent = label;
+    btn.classList.add('is-saving');
+    btn.setAttribute('aria-busy', 'true');
+  } else if (btn.classList.contains('is-saving')) {
+    btn.textContent = btn.dataset.idleLabel ?? btn.textContent;
+    btn.style.minWidth = '';
+    btn.classList.remove('is-saving');
+    btn.removeAttribute('aria-busy');
+  }
+}
+
+const isButtonSaving = (btn) => !!btn?.classList.contains('is-saving');
+
+async function withSaving(btn, fn) {
+  if (isButtonSaving(btn)) return undefined;
+  setButtonSaving(btn, true);
+  try { return await fn(); } finally { setButtonSaving(btn, false); }
+}
+
+// `button` (optional) is the Save button that opened the dialog: it shows the
+// saving state while onConfirm runs.
+function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm, button = null) {
   const modal = document.getElementById('settingsConfirmModal');
   if (!modal) { onConfirm(); return; }
 
@@ -31,7 +61,7 @@ function showSettingsConfirm(title, oldValueLabel, newValueLabel, onConfirm) {
   document.getElementById('settingsConfirmOk').onclick = () => {
     modal.classList.add('hidden');
     unlockBodyScroll();
-    onConfirm();
+    if (button) withSaving(button, onConfirm); else onConfirm();
   };
   document.getElementById('settingsConfirmCancel').onclick = () => {
     modal.classList.add('hidden');
@@ -316,7 +346,9 @@ async function pm2SaveMethod() {
   if (validationError) { setMsg(validationError, true); return; }
 
   const saveBtn = document.getElementById('pm2ModalSave');
+  if (isButtonSaving(saveBtn)) return;
   saveBtn.disabled = true;
+  setButtonSaving(saveBtn, true);
   setMsg('Saving…');
 
   try {
@@ -357,6 +389,7 @@ async function pm2SaveMethod() {
   } catch (err) {
     setMsg('Failed to save: ' + err.message, true);
   } finally {
+    setButtonSaving(saveBtn, false);
     saveBtn.disabled = false;
   }
 }
@@ -570,7 +603,8 @@ async function ptSaveType(code) {
   const validationError = ptValidate(code, payload);
   if (validationError) { setPtMessage(validationError, true); return; }
 
-  if (btn) btn.disabled = true;
+  if (isButtonSaving(btn)) return;
+  setButtonSaving(btn, true);
   setPtMessage('Saving…');
 
   try {
@@ -587,7 +621,7 @@ async function ptSaveType(code) {
   } catch (err) {
     setPtMessage('Failed to save: ' + err.message, true);
   } finally {
-    if (btn) btn.disabled = false;
+    setButtonSaving(btn, false);
   }
 }
 
@@ -780,7 +814,8 @@ async function savePaymentRules() {
       if (error) { setPrMsg('Failed to save: ' + error.message, true); return; }
       await logAudit({ action: 'Updated Payment Rules', category: 'payment_config', details: JSON.stringify(config) });
       setPrMsg('Payment rules saved successfully.');
-    }
+    },
+    document.getElementById('pr-save-btn')
   );
 }
 
@@ -999,6 +1034,7 @@ function updateServiceChargeDirty() {
 const scPct = (n) => (n === null ? 'inherits the default' : `${n}%`);
 
 async function saveServiceCharge() {
+  if (isButtonSaving(document.getElementById('sc-save-btn'))) return;
   const changes = readServiceChargeChanges();
   if (changes.problem) { setScMsg('sc-msg', changes.problem, true); return; }
   if (!changes.count) { setScMsg('sc-msg', 'No changes to save.'); return; }
@@ -1017,7 +1053,7 @@ async function saveServiceCharge() {
   if (!ok) return;
 
   const btn = document.getElementById('sc-save-btn');
-  if (btn) btn.disabled = true;
+  setButtonSaving(btn, true);
   setScMsg('sc-msg', '');
   const failures = [];
 
@@ -1073,6 +1109,7 @@ async function saveServiceCharge() {
     });
   }
 
+  setButtonSaving(btn, false);
   updateWorkedExample();
   updateServiceChargeDirty();
   if (failures.length) {
@@ -1620,7 +1657,8 @@ async function saveLatePaymentGrace() {
       if (error) { setLatePaymentGraceMsg('Failed to save: ' + error.message, true); return; }
       await logAudit({ action: 'Updated Late Payment Grace Period', category: 'payment_config', details: `full_payment_days=${dueDays}, auto_cancel_days=${graceDays}` });
       setLatePaymentGraceMsg('Saved. It applies the next time overdue reservations are checked.');
-    }
+    },
+    document.getElementById('saveLatePaymentGraceBtn')
   );
 }
 
@@ -1694,7 +1732,8 @@ async function saveReceiptValidation() {
       });
       rvSavedMode = next;
       setRvMsg('Receipt validation mode saved.');
-    }
+    },
+    document.getElementById('rv-save-btn')
   );
 }
 
@@ -1761,7 +1800,7 @@ async function init() {
   document.getElementById('sc-save-btn')?.addEventListener('click', saveServiceCharge);
   document.getElementById('sc-global-percent')?.addEventListener('input', () => { updateWorkedExample(); updateServiceChargeDirty(); });
   document.getElementById('sc-inactive-toggle')?.addEventListener('click', () => { scShowInactive = !scShowInactive; renderCategoryOverrideTable(); updateServiceChargeDirty(); });
-  document.getElementById('tf-save-btn')?.addEventListener('click', saveTransportFee);
+  document.getElementById('tf-save-btn')?.addEventListener('click', () => withSaving(document.getElementById('tf-save-btn'), saveTransportFee));
   document.getElementById('saveLatePaymentGraceBtn')?.addEventListener('click', saveLatePaymentGrace);
   document.getElementById('rv-save-btn')?.addEventListener('click', saveReceiptValidation);
   document.getElementById('rv-mode')?.addEventListener('change', updateRvDescription);
