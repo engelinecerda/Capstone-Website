@@ -351,6 +351,9 @@ const activeCateringBody                  = document.getElementById('activeCater
 const archivedCateringBody                = document.getElementById('archivedCateringBody');
 const copyCategoriesWrap                  = document.getElementById('copyCategoriesWrap');
 const copyCategoriesSelect                = document.getElementById('copyCategoriesSelect');
+// Both "Copy … from" pickers are type-to-search, A-Z, blank until chosen.
+// (The restrictions one is wrapped further down, once its element is read.)
+makeSelectSearchable(copyCategoriesSelect, { placeholder: 'Select a package\u2026', noResults: 'No packages match', sortAlphabetically: true });
 const copyCategoriesBtn                   = document.getElementById('copyCategoriesBtn');
 
 const cateringCategoryModal          = document.getElementById('cateringCategoryModal');
@@ -4600,6 +4603,7 @@ async function undoClearRestriction(tag, previous) {
 // re-entering every row by hand.
 const copyRestrictionsWrap = document.getElementById('copyRestrictionsWrap');
 const copyRestrictionsSelect = document.getElementById('copyRestrictionsSelect');
+makeSelectSearchable(copyRestrictionsSelect, { placeholder: 'Select a package\u2026', noResults: 'No packages match', sortAlphabetically: true });
 const copyRestrictionsBtn = document.getElementById('copyRestrictionsBtn');
 
 function renderCopyRestrictionsControl() {
