@@ -1067,6 +1067,24 @@ export async function fetchPayments(supabase, reservationIds) {
     }, {});
 }
 
+// Extra money a customer sent on a payment (see 20261203_payment_excess.sql):
+// how much was deducted from the balance and how much is being returned.
+// Best-effort: the table may not exist yet, and nothing else may depend on it.
+export async function fetchPaymentExcess(supabase, paymentIds) {
+    if (!paymentIds.length) return {};
+    try {
+        const { data, error } = await supabase
+            .from('payment_excess')
+            .select('payment_id, excess_amount, applied_amount, return_amount, return_status, created_at, returned_at')
+            .in('payment_id', paymentIds);
+        if (error) throw error;
+        return (data || []).reduce((map, row) => { map[row.payment_id] = row; return map; }, {});
+    } catch (error) {
+        console.warn('[customer_payments] payment excess unavailable:', error?.message || error);
+        return {};
+    }
+}
+
 export async function fetchReceipts(supabase, paymentIds) {
     if (!paymentIds.length) return {};
 
@@ -1284,12 +1302,16 @@ export async function loadCustomerPaymentBundle(supabase, userId, options = {}) 
         .flat()
         .map((payment) => payment.payment_id)
         .filter(Boolean);
-    const receiptsByPaymentId = await fetchReceipts(supabase, paymentIds);
+    const [receiptsByPaymentId, excessByPaymentId] = await Promise.all([
+        fetchReceipts(supabase, paymentIds),
+        fetchPaymentExcess(supabase, paymentIds)
+    ]);
 
     return {
         reservations,
         paymentsByReservationId,
         receiptsByPaymentId,
+        excessByPaymentId,
         reschedulesByReservationId,
         extensionsByReservationId,
         additionalHeadRequestsByReservationId,

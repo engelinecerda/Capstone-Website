@@ -166,6 +166,8 @@ let additionalHeadRequestMap = {};
 let paymentSummaryMap = {};
 let paymentMethodMap = {};
 let receiptCheckMap = {};         // payment_id -> { status, check } from validate-receipt
+let excessMap = {};              // payment_id -> payment_excess row (an excess the manager recorded)
+let excessDraft = null;          // { paymentId, value } the manager is typing in the Excess field
 let recordPaymentTargetPayment = null;
 let recordPaymentMethods = [];
 let recordPaymentFile = null;
@@ -560,6 +562,7 @@ function renderTable(list) {
           <div class="payment-status-stack">
             <span class="status-pill ${escapeHtml(statusMeta.key)}">${escapeHtml(statusMeta.label)}</span>
             ${renderReceiptCheckPill(payment.payment_id)}
+            ${renderExcessPill(payment)}
           </div>
         </td>
         <td class="actions actions-single" data-label="Action">
@@ -878,6 +881,159 @@ function buildReceiptCheckPanel(payment) {
   </div>`;
 }
 
+// ── Excess payments ─────────────────────────────────────────────────────────
+// A customer sometimes sends more than the amount they entered. The manager
+// confirms the excess next to the proof reading, then approves; the database
+// (approve_payment_with_excess, 20261203_payment_excess.sql) re-computes the
+// split: the part up to the remaining balance is deducted from it, only the
+// leftover is returned to the customer. The owner sends the money back and the
+// manager marks it returned here. Admin sees the records but cannot change them.
+const EXCESS_RETURN_WINDOW = '1–2 days';
+// Same list as the database: only these reduce the reservation's balance. A full
+// payment already settles it and fees are not part of the balance, so their
+// excess is returned in full.
+const EXCESS_DEDUCTIBLE_TYPES = ['reservation_fee', 'down_payment', 'partial_payment'];
+
+async function fetchExcessRecords(paymentIds) {
+  if (!paymentIds.length) return {};
+  try {
+    const { data, error } = await supabase
+      .from('payment_excess')
+      .select('excess_id, payment_id, reservation_id, declared_amount, excess_amount, applied_amount, return_amount, return_status, created_at, returned_at, return_note')
+      .in('payment_id', paymentIds);
+    if (error) throw error;
+    return (data || []).reduce((map, row) => { map[row.payment_id] = row; return map; }, {});
+  } catch (error) {
+    // Migration not applied yet, or a temporary failure: the page still works.
+    console.warn('[admin_payments] excess records unavailable:', error?.message || error);
+    return {};
+  }
+}
+
+const roundMoney = (value) => Math.round(Number(value) * 100) / 100;
+
+// Display-only preview of the split the database will make on approval.
+function previewExcessSplit(payment, excess) {
+  const balance = getReservationBalanceSummary(payment.reservation_id);
+  const deductible = EXCESS_DEDUCTIBLE_TYPES.includes(String(payment.payment_type || ''));
+  const remainingAfter = deductible ? Math.max(balance.remainingBalance - Number(payment.amount || 0), 0) : 0;
+  const applied = deductible ? roundMoney(Math.min(excess, remainingAfter)) : 0;
+  return { applied, returned: roundMoney(excess - applied), remainingAfter, deductible };
+}
+
+function describeExcessSplit(payment, excess) {
+  if (!(excess > 0)) return '';
+  const { applied, returned, remainingAfter, deductible } = previewExcessSplit(payment, excess);
+  const lines = [];
+  if (applied > 0) lines.push(`${formatCurrency(applied)} will be deducted from the remaining balance.`);
+  if (returned > 0) {
+    let why = '';
+    if (!deductible) why = payment.payment_type === 'full_payment' ? ' (full payment)' : ' (this payment type does not reduce the balance)';
+    else if (remainingAfter <= 0) why = ' (nothing is left to pay)';
+    lines.push(`${formatCurrency(returned)} will be returned to the customer${why}.`);
+  }
+  return lines.join(' ');
+}
+
+// What OCR suggests: the amount read from the proof minus what the customer entered.
+function suggestedExcess(payment) {
+  const read = payment.ocr_extracted?.amount != null ? Number(payment.ocr_extracted.amount) : null;
+  const entered = Number(payment.amount) || 0;
+  if (read == null || !Number.isFinite(read)) return null;
+  const diff = roundMoney(read - entered);
+  return diff > AMOUNT_MISMATCH_TOLERANCE_PHP ? diff : null;
+}
+
+function isExcessEligible(payment) {
+  return resolvePaymentEvidenceSource(payment, paymentMethodMap) !== 'cafe_issued'
+    && Boolean(payment.proof_url)
+    && String(payment.payment_status || '').toLowerCase() === 'pending_review';
+}
+
+function excessDueLabel(record) {
+  const due = new Date(new Date(record.created_at).getTime() + 2 * 86400000);
+  const overdue = Date.now() > due.getTime();
+  return { due, overdue };
+}
+
+function buildExcessPanel(payment) {
+  const record = excessMap[payment.payment_id];
+  const canEdit = currentRole !== 'admin';
+
+  if (record) {
+    const lines = [
+      `<div class="excess-line"><span>Customer entered</span><strong>${escapeHtml(formatCurrency(record.declared_amount))}</strong></div>`,
+      `<div class="excess-line"><span>Excess received</span><strong>${escapeHtml(formatCurrency(record.excess_amount))}</strong></div>`
+    ];
+    if (Number(record.applied_amount) > 0) {
+      lines.push(`<div class="excess-line"><span>Deducted from the balance</span><strong>${escapeHtml(formatCurrency(record.applied_amount))}</strong></div>`);
+    }
+    let footer = '';
+    if (record.return_status === 'pending') {
+      const { due, overdue } = excessDueLabel(record);
+      lines.push(`<div class="excess-line"><span>To return to the customer</span><strong>${escapeHtml(formatCurrency(record.return_amount))}</strong></div>`);
+      footer = `
+        <p class="excess-status pending${overdue ? ' overdue' : ''}">${overdue ? 'Return is overdue' : `Return within ${EXCESS_RETURN_WINDOW}`} (since ${escapeHtml(formatDate(record.created_at))}, expected by ${escapeHtml(formatDate(due))}).</p>
+        ${canEdit ? `
+          <div class="excess-return-form">
+            <input type="text" id="excessReturnNote" class="excess-input excess-note-input" maxlength="500" placeholder="Note, e.g. how it was sent (optional)">
+            <button type="button" class="modal-btn modal-btn-primary" data-action="mark-excess-returned" data-excess-id="${record.excess_id}">Mark as returned</button>
+          </div>
+          <p class="excess-hint">Send the money back first, then mark it here. The customer is notified.</p>` : '<p class="excess-hint">Read-only: only a manager can mark a return.</p>'}
+      `;
+    } else if (record.return_status === 'returned') {
+      lines.push(`<div class="excess-line"><span>Returned to the customer</span><strong>${escapeHtml(formatCurrency(record.return_amount))}</strong></div>`);
+      footer = `<p class="excess-status returned">Returned ${escapeHtml(formatDate(record.returned_at))}.${record.return_note ? ` Note: ${escapeHtml(record.return_note)}` : ''}</p>`;
+    } else {
+      footer = '<p class="excess-status applied">All of the excess was deducted from the balance. Nothing to return.</p>';
+    }
+    return `<div class="excess-panel"><div class="excess-head"><span class="excess-title">Excess payment</span></div>${lines.join('')}${footer}</div>`;
+  }
+
+  if (!canEdit || !isExcessEligible(payment)) return '';
+
+  const suggested = suggestedExcess(payment);
+  const draftValue = excessDraft && excessDraft.paymentId === payment.payment_id
+    ? excessDraft.value
+    : (suggested != null ? String(suggested) : '');
+  const typed = Number(draftValue);
+  return `
+    <div class="excess-panel excess-panel-edit">
+      <div class="excess-head"><span class="excess-title">Excess payment</span></div>
+      <div class="excess-field-row">
+        <label class="excess-label" for="paymentExcessInput">Excess</label>
+        <span class="excess-peso">&#8369;</span>
+        <input type="number" id="paymentExcessInput" class="excess-input" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="${escapeHtml(draftValue)}" data-payment-id="${payment.payment_id}">
+      </div>
+      ${suggested != null ? `<p class="excess-hint">The proof reads ${escapeHtml(formatCurrency(payment.ocr_extracted.amount))}, which is ${escapeHtml(formatCurrency(suggested))} more than the customer entered. Confirm it against the receipt image.</p>` : '<p class="excess-hint">Leave empty when the customer sent exactly the entered amount.</p>'}
+      <p class="excess-preview" id="paymentExcessPreview">${escapeHtml(typed > 0 ? describeExcessSplit(payment, typed) : '')}</p>
+    </div>
+  `;
+}
+
+// Reads the Excess field for the payment being approved (0 when empty).
+function readExcessInput(paymentId) {
+  const input = document.getElementById('paymentExcessInput');
+  if (!input || input.dataset.paymentId !== String(paymentId)) return 0;
+  const raw = String(input.value || '').trim();
+  if (!raw) return 0;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) throw new Error('Enter the excess as a positive amount, or leave it empty.');
+  if (value > 10000000) throw new Error('That excess is too large.');
+  return roundMoney(value);
+}
+
+function renderExcessPill(payment) {
+  const record = excessMap[payment.payment_id];
+  if (!record) return '';
+  if (record.return_status === 'pending') {
+    const { overdue } = excessDueLabel(record);
+    return `<span class="excess-pill ${overdue ? 'overdue' : 'pending'}">Return ${escapeHtml(formatCurrency(record.return_amount))}${overdue ? ' · overdue' : ''}</span>`;
+  }
+  if (record.return_status === 'returned') return '<span class="excess-pill returned">Excess returned</span>';
+  return '<span class="excess-pill applied">Excess applied</span>';
+}
+
 async function fetchPaymentMethodsById(ids) {
   if (!ids.length) return {};
   const { data, error } = await supabase
@@ -985,7 +1141,7 @@ function buildOcrPanel(payment) {
   `;
 }
 // ───────────────────────────────────────────────────────────────────────────────
-async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') {
+async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '', excess = 0) {
   if (currentRole === 'admin') {
     throw new Error('This action requires the Manager role.');
   }
@@ -1046,12 +1202,25 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
     updatePayload.rejection_reason = rejectionReason;
   }
 
-  const { error: paymentError } = await supabase
-    .from('payment')
-    .update(updatePayload)
-    .eq('payment_id', paymentId);
+  // An approval with an excess goes through one database function, so the
+  // approval, the split (deducted vs returned) and the alerts happen together
+  // and the split is computed server-side.
+  let excessResult = null;
+  if (nextStatus === 'approved' && excess > 0) {
+    const { data, error: excessError } = await supabase.rpc('approve_payment_with_excess', {
+      p_payment_id: paymentId,
+      p_excess: excess
+    });
+    if (excessError) throw excessError;
+    excessResult = data;
+  } else {
+    const { error: paymentError } = await supabase
+      .from('payment')
+      .update(updatePayload)
+      .eq('payment_id', paymentId);
 
-  if (paymentError) throw paymentError;
+    if (paymentError) throw paymentError;
+  }
 
   // Audit the decision as soon as it is saved. nextStatus is the FINAL
   // outcome (a reschedule fee whose date is no longer available is turned
@@ -1064,7 +1233,8 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
     category: 'payment',
     details: `${nextStatus === 'approved' ? 'Approved' : 'Rejected'} ${reviewedPaymentType} of ${reviewedAmount}`
       + (reviewedReservationNumber ? ` for reservation ${reviewedReservationNumber}` : '')
-      + (nextStatus === 'rejected' && rejectionReason ? ` — reason: ${rejectionReason}` : ''),
+      + (nextStatus === 'rejected' && rejectionReason ? ` — reason: ${rejectionReason}` : '')
+      + (excessResult ? ` — excess ${formatCurrency(excessResult.excess)}: ${formatCurrency(excessResult.applied)} deducted from the balance, ${formatCurrency(excessResult.returned)} to return` : ''),
     entityId: paymentId
   });
 
@@ -1114,6 +1284,7 @@ async function handlePaymentReview(paymentId, nextStatus, rejectionReason = '') 
 
 function closeDetailsModal() {
   activePaymentReviewId = null;
+  excessDraft = null;
   paymentReviewFlash = null;
   rejectReasonPaymentId = null;
   paymentProofZoomPercent = 100;
@@ -1200,7 +1371,8 @@ const AMOUNT_MISMATCH_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fi
 
 function buildAmountComparison(payment, reservation, paymentRules) {
   const expected = getExpectedPaymentAmount(payment, reservation, paymentRules);
-  const entered = Number(payment.amount) || 0;
+  // After an excess was deducted, payment.amount includes it; compare against what the customer typed.
+  const entered = Number(excessMap[payment.payment_id]?.declared_amount ?? payment.amount) || 0;
   const read = payment.ocr_extracted?.amount != null ? Number(payment.ocr_extracted.amount) : null;
 
   const expectedMismatch = expected.amount != null && Math.abs(entered - expected.amount) > AMOUNT_MISMATCH_TOLERANCE_PHP;
@@ -1332,7 +1504,7 @@ function renderPaymentReviewModal(paymentId = activePaymentReviewId) {
   }
   const ocrPanelEl = document.getElementById('paymentOcrPanel');
   if (ocrPanelEl) {
-    ocrPanelEl.innerHTML = buildOcrPanel(payment);
+    ocrPanelEl.innerHTML = buildOcrPanel(payment) + buildExcessPanel(payment);
   }
 
   reviewActions.push('<button type="button" class="modal-btn modal-btn-secondary" id="paymentDetailsDismiss">Close</button>');
@@ -1689,6 +1861,7 @@ async function loadData({ silent = false, withStats = true } = {}) {
     const nextPaymentSummaryMap = await fetchPaymentSummaries(idsOf('reservation_id'));
     const nextPaymentMethodMap = await fetchPaymentMethodsById(idsOf('payment_method_id'));
     const nextReceiptCheckMap = await fetchReceiptChecks(idsOf('payment_id'));
+    const nextExcessMap = await fetchExcessRecords(idsOf('payment_id'));
 
     if (requestId !== latestRequestId) return;
 
@@ -1704,6 +1877,7 @@ async function loadData({ silent = false, withStats = true } = {}) {
     paymentSummaryMap = nextPaymentSummaryMap;
     paymentMethodMap = nextPaymentMethodMap;
     receiptCheckMap = nextReceiptCheckMap;
+    excessMap = nextExcessMap;
 
     if (counts) {
       renderStats(counts);
@@ -1792,6 +1966,20 @@ function wireTableActions() {
 
 function wireModals() {
   paymentDetailsClose?.addEventListener('click', closeDetailsModal);
+  // The Excess field: remember what is typed (the modal re-renders on zoom) and
+  // show how the excess would be split, without re-rendering while typing.
+  paymentDetailsModal?.addEventListener('input', (event) => {
+    const input = event.target.closest?.('#paymentExcessInput');
+    if (!input) return;
+    const paymentId = input.dataset.paymentId;
+    excessDraft = { paymentId, value: input.value };
+    const payment = getPaymentById(paymentId);
+    const preview = document.getElementById('paymentExcessPreview');
+    if (payment && preview) {
+      const typed = Number(input.value);
+      preview.textContent = typed > 0 ? describeExcessSplit(payment, typed) : '';
+    }
+  });
   paymentDetailsModal?.addEventListener('click', (event) => {
     if (event.target === paymentDetailsModal) {
       closeDetailsModal();
@@ -1886,12 +2074,41 @@ function wireModals() {
       }
     }
 
+    if (action === 'mark-excess-returned') {
+      const excessId = actionTarget.dataset.excessId;
+      if (!excessId) return;
+      const note = document.getElementById('excessReturnNote')?.value.trim() || '';
+      actionTarget.disabled = true;
+      (async () => {
+        try {
+          if (currentRole === 'admin') throw new Error('This action requires the Manager role.');
+          setPaymentReviewMessage('Saving...');
+          const { error } = await supabase.rpc('mark_excess_returned', { p_excess_id: excessId, p_note: note || null });
+          if (error) throw error;
+          const record = Object.values(excessMap).find((row) => row.excess_id === excessId);
+          await logAudit({
+            action: 'Marked Excess Returned',
+            category: 'payment',
+            details: `Marked ${formatCurrency(record?.return_amount)} of excess as returned to the customer${note ? ` — ${note}` : ''}`,
+            entityId: paymentId
+          });
+          paymentReviewFlash = { message: 'Marked as returned. The customer was notified.', isError: false };
+          await loadData();
+        } catch (error) {
+          actionTarget.disabled = false;
+          setPaymentReviewMessage(`Failed to save: ${error.message}`, true);
+        }
+      })();
+      return;
+    }
+
     (async () => {
       try {
         setPaymentReviewMessage('Updating payment status...');
-        if (action === 'approve-payment') await handlePaymentReview(paymentId, 'approved');
+        if (action === 'approve-payment') await handlePaymentReview(paymentId, 'approved', '', readExcessInput(paymentId));
         if (action === 'confirm-reject-payment') await handlePaymentReview(paymentId, 'rejected', rejectionReason);
         rejectReasonPaymentId = null;
+        excessDraft = null;
         paymentReviewFlash = { message: 'Payment updated.', isError: false };
         await loadData();
         setMessage(tableMessage, 'Payment updated.');

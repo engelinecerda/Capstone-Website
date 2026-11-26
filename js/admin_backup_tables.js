@@ -87,6 +87,8 @@ export const BACKUP_TABLE_CONFIG = [
   { name: 'reservation_extensions',        pk: 'extension_id' },
   { name: 'reservation_additional_head_requests', pk: 'additional_head_request_id' },
   { name: 'receipts',                      pk: 'receipt_id' },
+  // Money still to be returned to a customer after an overpayment; no foreign keys.
+  { name: 'payment_excess',                pk: 'excess_id' },
   { name: 'reservation_charges',           pk: 'charge_id' },
   // After reservation_charges and inclusion_catalog: it references both (the
   // charge an accepted request created, and the catalog item it was matched to).

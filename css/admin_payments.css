@@ -1134,3 +1134,80 @@
   font-size: 11.5px;
   color: #8A7965;
 }
+
+
+/* ── Excess payments (Excess field + return record in the review modal) ──── */
+.excess-panel {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #E6D9C8;
+  border-radius: 12px;
+  background: #FBF8F3;
+}
+.excess-head { margin-bottom: 8px; }
+.excess-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6B4A3A;
+}
+.excess-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.excess-label { font-size: 13px; font-weight: 600; color: #3b2a20; }
+.excess-peso { font-size: 13px; color: #7a6652; }
+.excess-input {
+  width: 140px;
+  padding: 8px 10px;
+  border: 1px solid #D9CBB8;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 13.5px;
+}
+.excess-note-input { width: 100%; flex: 1 1 220px; }
+.excess-hint { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: #7a6652; }
+.excess-preview { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; font-weight: 600; color: #3b2a20; }
+.excess-preview:empty { display: none; }
+.excess-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #3b2a20;
+}
+.excess-line span { color: #7a6652; }
+.excess-status {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.excess-status.pending { background: #FBEFD3; color: #8A5A00; }
+.excess-status.pending.overdue { background: #FBE3DD; color: #A3401F; }
+.excess-status.returned { background: #E1F0E3; color: #276B3D; }
+.excess-status.applied { background: #EEE8DD; color: #5a4a3a; }
+.excess-return-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.excess-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.excess-pill.pending { background: #FBEFD3; color: #8A5A00; }
+.excess-pill.overdue { background: #FBE3DD; color: #A3401F; }
+.excess-pill.returned { background: #E1F0E3; color: #276B3D; }
+.excess-pill.applied { background: #EEE8DD; color: #5a4a3a; }

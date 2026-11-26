@@ -1132,3 +1132,14 @@ body {
         text-align: left;
     }
 }
+
+/* Extra money sent on a payment: deducted from the balance / being returned */
+.payment-item-excess {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #FBF3E2;
+  color: #7a5200;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}

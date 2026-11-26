@@ -68,6 +68,7 @@ const state = {
         reservations: [],
         paymentsByReservationId: {},
         receiptsByPaymentId: {},
+        excessByPaymentId: {},
         reschedulesByReservationId: {},
         extensionsByReservationId: {},
         additionalHeadRequestsByReservationId: {}
@@ -1202,6 +1203,22 @@ function renderCompleteCard(reservation) {
     `;
 }
 
+// Plain-language note under a payment when extra money was sent: what was
+// deducted from the balance and what is being (or was) returned.
+function buildExcessNote(excess) {
+    if (!excess) return '';
+    const applied = Number(excess.applied_amount) || 0;
+    const returned = Number(excess.return_amount) || 0;
+    const parts = [];
+    if (applied > 0) parts.push(`${formatCurrency(applied)} of your extra payment was deducted from your remaining balance.`);
+    if (returned > 0 && excess.return_status === 'pending') {
+        parts.push(`${formatCurrency(returned)} will be returned to you within 1–2 days.`);
+    } else if (returned > 0 && excess.return_status === 'returned') {
+        parts.push(`${formatCurrency(returned)} was returned to you${excess.returned_at ? ` on ${formatShortDate(excess.returned_at)}` : ''}. It may take 1–2 days to show in your account.`);
+    }
+    return parts.length ? `<div class="payment-item-excess">${escapeHtml(parts.join(' '))}</div>` : '';
+}
+
 function renderHistoryTab(reservation) {
     const payments = getReservationPayments(state.bundle.paymentsByReservationId, reservation.reservation_id)
         .slice()
@@ -1221,11 +1238,13 @@ function renderHistoryTab(reservation) {
                 ${payments.map((payment) => {
                     const status = getPaymentStatusMeta(payment.payment_status);
                     const methodLabel = LEGACY_METHOD_DISPLAY_LABELS[payment.payment_method] || payment.payment_method;
+                    const excessNote = buildExcessNote(state.bundle.excessByPaymentId?.[payment.payment_id]);
                     return `
                         <div class="payment-history-item">
                             <div>
                                 <div class="payment-item-title">${escapeHtml(getPaymentLabel(payment.payment_type))}</div>
                                 <div class="payment-item-meta">${escapeHtml(`${formatCurrency(payment.amount)} · ${methodLabel} · ${payment.submitted_at ? `Submitted ${formatDateTime(payment.submitted_at)}` : 'Submitted'}`)}</div>
+                                ${excessNote}
                             </div>
                             <div class="payment-item-actions">
                                 <span class="res-status ${escapeHtml(status.key)}">${escapeHtml(status.label)}</span>
