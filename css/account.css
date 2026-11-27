@@ -3412,7 +3412,7 @@ body {
 .valid-id-review[hidden] { display: none; }
 .valid-id-review.state-approved { border-color: #CFE5D3; background: #F1F8F2; color: #2E7D4F; }
 .valid-id-review.state-rejected { border-color: #F3C9C9; background: #FDF1F1; color: #9B2C2C; }
-.valid-id-footer { display: flex; }
+.valid-id-footer { display: flex; flex-wrap: wrap; gap: 10px; }
 .valid-id-footer[hidden], .valid-id-footer .pill-btn[hidden] { display: none; }
 
 .valid-id-body.is-busy .pill-btn { opacity: 0.55; pointer-events: none; }

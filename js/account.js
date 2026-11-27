@@ -2824,6 +2824,28 @@ function wireValidIdCard() {
         };
     });
     let pickingSide = 'front';
+    const saveBtn = document.getElementById('valid-id-save-btn');
+    const discardBtn = document.getElementById('valid-id-discard-btn');
+    // Photos picked but not saved yet. Nothing is uploaded or checked until
+    // the customer presses Save ID.
+    const staged = { front: null, back: null };
+    let lastStatus = null;
+
+    function hasStaged() { return !!(staged.front || staged.back); }
+
+    function clearStaged() {
+        ['front', 'back'].forEach((side) => {
+            if (staged[side]?.objectUrl) URL.revokeObjectURL(staged[side].objectUrl);
+            staged[side] = null;
+        });
+    }
+
+    function updateStageBar() {
+        const any = hasStaged();
+        if (saveBtn) saveBtn.hidden = !any;
+        if (discardBtn) discardBtn.hidden = !any;
+        if (removeBtn) removeBtn.hidden = any || !(lastStatus && (lastStatus.hasFront || lastStatus.hasBack));
+    }
 
     function setBusy(busy) {
         body.classList.toggle('is-busy', busy);
@@ -2833,6 +2855,16 @@ function wireValidIdCard() {
     async function renderSlot(side, uploadedAt) {
         const slot = slots[side];
         if (!slot) return;
+        const titleEl = slot.el.querySelector('[data-role="title"]');
+        if (staged[side]) {
+            slot.emptyEl.hidden = true;
+            slot.savedEl.hidden = false;
+            slot.thumb.src = staged[side].objectUrl;
+            slot.dateEl.textContent = 'Not saved yet. Press Save ID.';
+            if (titleEl) titleEl.innerHTML = '<i class="ti ti-photo" aria-hidden="true"></i> Ready to save';
+            return;
+        }
+        if (titleEl) titleEl.innerHTML = '<i class="ti ti-circle-check" aria-hidden="true"></i> On file';
         if (!uploadedAt) {
             slot.emptyEl.hidden = false;
             slot.savedEl.hidden = true;
@@ -2864,11 +2896,12 @@ function wireValidIdCard() {
             return;
         }
 
+        lastStatus = status;
         await Promise.all([
             renderSlot('front', status.uploadedAt),
             renderSlot('back', status.backUploadedAt)
         ]);
-        if (removeBtn) removeBtn.hidden = !(status.hasFront || status.hasBack);
+        updateStageBar();
 
         // What our team / the automatic check decided about the ID.
         if (reviewEl) {
@@ -2883,11 +2916,13 @@ function wireValidIdCard() {
         }
 
         // An older account has the front only: say what is missing.
-        if (status.hasFront && !status.hasBack && !status.backUnavailable) {
+        if (status.hasFront && !status.hasBack && !status.backUnavailable && !hasStaged()) {
             setFormMessage(msg, 'Please also upload the back of your ID.', 'warning');
         }
     }
 
+    // Picking or replacing a photo only stages it: it is shown, but nothing is
+    // uploaded or checked yet.
     async function handleFile(file, side) {
         const problem = getIdFileError(file);
         if (problem) {
@@ -2895,11 +2930,32 @@ function wireValidIdCard() {
             return;
         }
         setBusy(true);
-        setFormMessage(msg, 'Saving your ID\u2026');
         try {
             const dataUrl = await resizeIdImage(file);
-            await saveValidId(supabase, user.id, dataUrl, side);
-            setFormMessage(msg, `The ${side} of your ID was saved.`, 'success');
+            if (staged[side]?.objectUrl) URL.revokeObjectURL(staged[side].objectUrl);
+            staged[side] = { dataUrl, objectUrl: URL.createObjectURL(file) };
+            setFormMessage(msg, `The ${side} of your ID is ready. Press Save ID when you have chosen your photos.`);
+            await render();
+        } catch (error) {
+            console.error('[account] valid ID read failed:', error);
+            setFormMessage(msg, 'We couldn\u2019t read that photo. Please choose another one.', 'error');
+        } finally {
+            setBusy(false);
+            input.value = '';
+        }
+    }
+
+    // Saves the staged photos, then checks the saved ID once.
+    async function handleSave() {
+        if (!hasStaged()) return;
+        setBusy(true);
+        setFormMessage(msg, 'Saving your ID\u2026');
+        try {
+            for (const side of ['front', 'back']) {
+                if (!staged[side]) continue;
+                await saveValidId(supabase, user.id, staged[side].dataUrl, side);
+            }
+            clearStaged();
 
             // With both sides saved, look for a signature. No signature flags
             // the ID for our team; an unreadable photo asks for a better one.
@@ -2910,22 +2966,22 @@ function wireValidIdCard() {
                 if (result.needsBetterPhoto) setFormMessage(msg, result.message, 'warning');
                 else if (result.flagged) setFormMessage(msg, 'Your ID was saved and sent to our team for review.', 'success');
                 else setFormMessage(msg, 'Your valid ID was saved.', 'success');
+            } else {
+                setFormMessage(msg, 'Your photo was saved. Please also upload the other side of your ID.', 'success');
             }
             await render();
         } catch (error) {
             console.error('[account] valid ID save failed:', error);
-            const unreadable = error?.message === 'unreadable image';
-            setFormMessage(
-                msg,
-                unreadable
-                    ? 'We couldn\u2019t read that photo. Please choose another one.'
-                    : 'We couldn\u2019t save your ID. Please try again.',
-                'error'
-            );
+            setFormMessage(msg, 'We couldn\u2019t save your ID. Please try again.', 'error');
         } finally {
             setBusy(false);
-            input.value = '';
         }
+    }
+
+    async function handleDiscard() {
+        clearStaged();
+        setFormMessage(msg, '');
+        await render();
     }
 
     async function handleRemove() {
@@ -2961,6 +3017,8 @@ function wireValidIdCard() {
         input.click();
     });
     removeBtn?.addEventListener('click', handleRemove);
+    bindSaving(saveBtn, handleSave);
+    discardBtn?.addEventListener('click', handleDiscard);
     input.addEventListener('change', () => {
         const file = input.files?.[0];
         if (file) handleFile(file, pickingSide);

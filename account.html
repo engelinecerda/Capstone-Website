@@ -10,9 +10,9 @@
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Kumbh+Sans:wght@400;600;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=74">
-  <link rel="stylesheet" href="/css/styles.css?v=74">
-  <link rel="stylesheet" href="/css/account.css?v=74">
+  <link rel="stylesheet" href="/css/tabler-icons-local.css?v=75">
+  <link rel="stylesheet" href="/css/styles.css?v=75">
+  <link rel="stylesheet" href="/css/account.css?v=75">
 </head>
 <body>
 
@@ -187,7 +187,7 @@
             </div>
           </div>
           <div class="valid-id-body">
-            <p class="valid-id-help">Upload a clear photo of the <strong>front and back</strong> of a government-issued ID. Your signature may be on either side. It is saved privately on your account and used when you book, so you won&rsquo;t be asked for it again. You can replace or remove it at any time. If your ID has no signature, our team can review it by hand.</p>
+            <p class="valid-id-help">Upload a clear photo of the <strong>front and back</strong> of your valid ID. Your signature may be on either side. Choose your photos, then press <strong>Save ID</strong>; we check them once they are saved. It is kept privately on your account and used when you book, so you won&rsquo;t be asked for it again. You can replace or remove it at any time. If your ID has no signature, our team can review it by hand.</p>
             <input type="file" id="valid-id-input" class="valid-id-input" accept="image/jpeg,image/png,image/webp" aria-label="Choose a photo of your valid ID">
 
             <div class="valid-id-slots">
@@ -203,7 +203,7 @@
                     <img data-role="thumb" alt="Front of your saved valid ID" class="valid-id-thumb">
                   </div>
                   <div class="valid-id-saved-meta">
-                    <span class="valid-id-saved-title"><i class="ti ti-circle-check" aria-hidden="true"></i> On file</span>
+                    <span class="valid-id-saved-title" data-role="title"><i class="ti ti-circle-check" aria-hidden="true"></i> On file</span>
                     <span class="valid-id-saved-date" data-role="date"></span>
                     <div class="valid-id-actions">
                       <button type="button" class="pill-btn" data-action="pick"><i class="ti ti-refresh" aria-hidden="true"></i> Replace</button>
@@ -223,7 +223,7 @@
                     <img data-role="thumb" alt="Back of your saved valid ID" class="valid-id-thumb">
                   </div>
                   <div class="valid-id-saved-meta">
-                    <span class="valid-id-saved-title"><i class="ti ti-circle-check" aria-hidden="true"></i> On file</span>
+                    <span class="valid-id-saved-title" data-role="title"><i class="ti ti-circle-check" aria-hidden="true"></i> On file</span>
                     <span class="valid-id-saved-date" data-role="date"></span>
                     <div class="valid-id-actions">
                       <button type="button" class="pill-btn" data-action="pick"><i class="ti ti-refresh" aria-hidden="true"></i> Replace</button>
@@ -236,6 +236,8 @@
             <p class="valid-id-review" id="valid-id-review" hidden></p>
 
             <div class="valid-id-footer">
+              <button type="button" class="pill-btn" id="valid-id-save-btn" hidden><i class="ti ti-device-floppy" aria-hidden="true"></i> Save ID</button>
+              <button type="button" class="pill-btn" id="valid-id-discard-btn" hidden>Discard changes</button>
               <button type="button" class="pill-btn danger" id="valid-id-remove-btn" hidden><i class="ti ti-trash" aria-hidden="true"></i> Remove ID</button>
             </div>
 
@@ -353,10 +355,10 @@
   <script src="/js/app.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" defer></script>
   <script type="module" src="/js/navbar.js"></script>
-  <script type="module" src="/js/account.js?v=74"></script>
+  <script type="module" src="/js/account.js?v=75"></script>
   <!-- SYSTEM-NOTICE: temporary testing-phase notice; remove this line and the script below when testing ends (see js/system_notice.js) -->
   <script src="/js/system_notice.js" defer></script>
   <!-- SUPABASE-HEALTH: shows a notice when Supabase is unreachable; see js/supabase_health_notice.js -->
-  <script src="/js/supabase_health_notice.js?v=74" defer></script>
+  <script src="/js/supabase_health_notice.js?v=75" defer></script>
 </body>
 </html>
