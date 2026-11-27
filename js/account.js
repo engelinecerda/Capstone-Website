@@ -1658,6 +1658,7 @@ function buildPaymentModuleCard(reservation) {
                             <span class="res-section-status ${escapeHtml(paymentSummary.key)}">${escapeHtml(paymentSummary.label)}</span>
                         </div>
                         ${contract?.contract_url ? `<a class="res-link-btn payment-contract-btn" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">View Uploaded Signed Contract</a>` : ''}
+                        ${contract?.countersigned_url ? `<a class="res-link-btn payment-contract-btn" href="${escapeHtml(contract.countersigned_url)}" target="_blank" rel="noopener noreferrer">View fully signed copy</a>` : ''}
                     </div>
                 </div>
                 <div class="payment-module-location-row">
@@ -1729,12 +1730,15 @@ async function fetchContracts(reservationIds) {
 
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, countersigned_url, countersigned_at, voided_at')
         .in('reservation_id', reservationIds);
 
     if (error) {
         if (
-            isReservationContractsColumnMissing(error, 'review_status')
+            isReservationContractsColumnMissing(error, 'countersigned_url')
+            || isReservationContractsColumnMissing(error, 'countersigned_at')
+            || isReservationContractsColumnMissing(error, 'voided_at')
+            || isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
             || isReservationContractsColumnMissing(error, 'reviewed_at')
         ) {

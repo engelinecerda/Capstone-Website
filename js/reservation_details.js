@@ -134,13 +134,17 @@ function isReservationContractsColumnMissing(error, columnName) {
 async function fetchContract(id) {
     const { data, error } = await supabase
         .from('reservation_contracts')
-        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, id_check_status, id_check_attempts')
+        .select('reservation_id, contract_url, verified_date, review_status, review_notes, reviewed_at, id_check_status, id_check_attempts, countersigned_url, countersigned_at, countersigned_by_name, voided_at')
         .eq('reservation_id', id)
         .maybeSingle();
 
     if (error) {
         if (
-            isReservationContractsColumnMissing(error, 'id_check_status')
+            isReservationContractsColumnMissing(error, 'countersigned_url')
+            || isReservationContractsColumnMissing(error, 'countersigned_at')
+            || isReservationContractsColumnMissing(error, 'countersigned_by_name')
+            || isReservationContractsColumnMissing(error, 'voided_at')
+            || isReservationContractsColumnMissing(error, 'id_check_status')
             || isReservationContractsColumnMissing(error, 'id_check_attempts')
             || isReservationContractsColumnMissing(error, 'review_status')
             || isReservationContractsColumnMissing(error, 'review_notes')
@@ -752,6 +756,19 @@ function buildPaymentContractPanel(reservation, contract, contractMeta, balance,
                     <a class="rd-btn-outline" href="${escapeHtml(contract.contract_url)}" target="_blank" rel="noopener noreferrer">
                         <i class="ti ti-eye" aria-hidden="true"></i> View contract
                     </a>
+                    ${contract.countersigned_url ? `
+                        <p class="rd-inline-note">Fully signed: ELI countersigned on ${escapeHtml(formatDateTime(contract.countersigned_at))}.</p>
+                        <a class="rd-btn-outline" href="${escapeHtml(contract.countersigned_url)}" target="_blank" rel="noopener noreferrer">
+                            <i class="ti ti-certificate" aria-hidden="true"></i> View fully signed copy
+                        </a>
+                        <a class="rd-btn-outline" href="${escapeHtml(contract.countersigned_url)}" download>
+                            <i class="ti ti-download" aria-hidden="true"></i> Download
+                        </a>
+                    ` : (contract.voided_at ? `
+                        <p class="rd-inline-note">This contract was voided because the reservation was declined.</p>
+                    ` : `
+                        <p class="rd-inline-note">You have signed. Waiting for ELI to countersign when your reservation is approved.</p>
+                    `)}
                 ` : `
                     <p class="rd-inline-note">Your signed contract will appear here once submitted.</p>
                 `}

@@ -20,6 +20,7 @@ import { initAutoRefresh } from './auto_refresh.js';
 import { lockBodyScroll, unlockBodyScroll } from './modal_scroll_lock.js';
 import { clampNumberInput } from './numeric_input.js';
 import { bindSaving, setButtonSaving } from './button_saving.js';
+import { openCountersignDialog } from './admin_countersign.js';
 
 const breadcrumbBack = document.getElementById('breadcrumbBack');
 const breadcrumbCurrent = document.getElementById('breadcrumbCurrent');
@@ -476,6 +477,14 @@ function contractStatus(res) {
   return getContractReviewMeta(res);
 }
 
+function getReservationContractRow(reservation) {
+  return getContractReviewMeta(reservation).contract || null;
+}
+
+function isContractCountersigned(reservation) {
+  return Boolean(getReservationContractRow(reservation)?.countersigned_at);
+}
+
 function getReservationApprovalState(reservation) {
   const contract = getContractReviewMeta(reservation);
   if (!contract.hasFile) {
@@ -512,6 +521,11 @@ async function fetchReservationContracts(reservationIds) {
   const fallbackSelect = 'reservation_id, contract_url, verified_date, template_id';
   // id_check_status tells the panel WHY a contract is pending (e.g. no signature
   // on the ID). If that column isn't there yet, fall back to the older select.
+  // countersigned_* / voided_at come from 20261210_manager_countersignature.sql.
+  const countersignColumns = 'countersigned_url, countersigned_at, countersigned_by_name, voided_at';
+  const withCountersign = await supabase.from('reservation_contracts').select(`${extendedSelect}, id_check_status, ${countersignColumns}`).in('reservation_id', reservationIds);
+  if (!withCountersign.error) return withCountersign.data || [];
+
   const withIdCheck = await supabase.from('reservation_contracts').select(`${extendedSelect}, id_check_status`).in('reservation_id', reservationIds);
   if (!withIdCheck.error) return withIdCheck.data || [];
 
@@ -804,7 +818,7 @@ function renderHeaderActions() {
 
   if (status === 'pending') {
     buttons.push(`
-      <button type="button" class="header-action-btn primary" data-action="approve" ${approvalState.canApprove ? '' : 'disabled'} title="${escapeHtml(approvalState.reason || 'Approve reservation')}">Approve</button>
+      <button type="button" class="header-action-btn primary" data-action="approve" ${approvalState.canApprove ? '' : 'disabled'} title="${escapeHtml(approvalState.reason || 'Sign the contract and approve this reservation')}">${isContractCountersigned(reservation) ? 'Approve' : 'Sign and approve'}</button>
       <button type="button" class="header-action-btn decline" data-action="decline">Decline</button>
     `);
   } else if (hasOpenReschedule) {
@@ -1905,6 +1919,17 @@ function renderContract() {
   if (contract.reviewedAt && contract.reviewedAt !== contract.verification) rows.push(dlRow('Reviewed', contract.reviewedAt));
   if (contract.note) rows.push(dlRow('Admin note', contract.note, { full: true }));
   if (!contract.hasFile) rows.push(dlRow('Status', 'No contract file uploaded yet.', { full: true, muted: true }));
+  const contractRow = contract.contract || {};
+  if (contractRow.countersigned_at) {
+    rows.push(dlRow('Countersigned', `${formatDateTime(contractRow.countersigned_at)}${contractRow.countersigned_by_name ? ` by ${contractRow.countersigned_by_name}` : ''}`));
+    if (contractRow.countersigned_url) {
+      rows.push(dlRow('Fully signed copy', `<a href="${escapeHtml(contractRow.countersigned_url)}" target="_blank" rel="noopener noreferrer">View fully signed contract</a>`, { full: true, raw: true }));
+    }
+  } else if (contractRow.voided_at) {
+    rows.push(dlRow('Contract', `Voided ${formatDateTime(contractRow.voided_at)} because the reservation was declined.`, { full: true, muted: true }));
+  } else if (contract.hasFile && contract.key === 'approved') {
+    rows.push(dlRow('Countersignature', 'Waiting for a manager to sign. This happens when you approve.', { full: true, muted: true }));
+  }
   contractDetailsRows.innerHTML = rows.join('');
 }
 
@@ -2244,6 +2269,26 @@ function wireHeaderActions() {
         if (limitMessage) throw new Error(limitMessage);
         const approvalState = getReservationApprovalState(reservation);
         if (!approvalState.canApprove) throw new Error(approvalState.reason);
+        if (!isContractCountersigned(reservation)) {
+          // The manager signs the contract as part of approving it. The
+          // database refuses the approval until the countersignature exists.
+          const signed = await openCountersignDialog({
+            supabase,
+            reservation
+          });
+          if (!signed.signed) {
+            setFlashMessage('');
+            setButtonSaving(button, false);
+            button.removeAttribute('disabled');
+            return;
+          }
+          await logAudit({
+            action: 'Countersigned Contract',
+            category: 'reservation',
+            entityId: reservation.reservation_id,
+            details: `Signed the contract for ${reservation.reservation_number || 'this reservation'} as authorized representative.`
+          }).catch((err) => console.error('[countersign] audit failed:', err));
+        }
         await updateReservationStatus(reservation.reservation_id, 'approved', previousStatus, reservation.reservation_number);
         await reloadAndRender('Reservation approved.');
         maybeShowApprovalPrompt();

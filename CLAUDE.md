@@ -125,7 +125,7 @@ The hamburger button and overlay are injected dynamically by `js/admin_sidebar_c
 
 ### CSS cache-busting — bump on every CSS edit
 
-`vercel.json` caches everything under `/css/*` for a full year (`immutable`), which is only safe because every reference to a first-party stylesheet — both `<link href="/css/*.css">` tags across every HTML file and the `@import url('./*.css')` statements between CSS files — carries a `?v=N` query string. **Whenever you edit any file in `css/`, you must bump that version number everywhere** (currently a single shared `?v=75` used site-wide, not per-file), or returning visitors keep getting the old cached copy for up to a year. To bump it: find-and-replace `?v=75` → `?v=75` (next integer) across every `.html` and `.css` file in the repo (mind the space in `admin/super admin/` when scripting it).
+`vercel.json` caches everything under `/css/*` for a full year (`immutable`), which is only safe because every reference to a first-party stylesheet — both `<link href="/css/*.css">` tags across every HTML file and the `@import url('./*.css')` statements between CSS files — carries a `?v=N` query string. **Whenever you edit any file in `css/`, you must bump that version number everywhere** (currently a single shared `?v=76` used site-wide, not per-file), or returning visitors keep getting the old cached copy for up to a year. To bump it: find-and-replace `?v=76` → `?v=76` (next integer) across every `.html` and `.css` file in the repo (mind the space in `admin/super admin/` when scripting it).
 
 This does **not** apply to `/js/*` — JS here is native ES modules with deep transitive `import` chains (most real logic lives in files reached only via `import ... from './x.js'` inside other JS files, never via `<script src>` directly), so versioning only the HTML entry-point `<script>` tags would leave everything they import silently uncached-busted. JS is instead capped at a 1-day cache (`vercel.json`, `/js/(.*)`) as a safer middle ground that needs no manual bumping.
 
@@ -242,3 +242,11 @@ Ticked (or no choice recorded) = session stays in localStorage until sign-out. U
 
 ## My Profile Valid ID: stage, then save
 Choosing or replacing a photo on My Profile only stages it (preview, 'Ready to save'). Nothing is uploaded or checked until the customer presses Save ID (`handleSave` in js/account.js), which saves the staged sides and then runs the signature check once, when both sides are on file. Do not reintroduce wording that says 'government-issued ID'; call it the 'valid ID'.
+
+## Manager countersignature (Sign and approve)
+- Approving a reservation now includes the manager signing the contract. Order: customer signs, ID verified, manager countersigns as part of Approve. Any user with the `manager` role can sign (admins cannot approve).
+- `js/admin_countersign.js` opens the dialog: a FRESH drawn signature every time (no saved signature) plus the manager's password. Order of checks: signature, then password.
+- Edge function `countersign-contract` (deploy with the CLI because it imports `_shared/`: `npx supabase functions deploy countersign-contract`) verifies the role and password, appends a Countersignature page to the customer-signed PDF, uploads it to Cloudinary, calls `record_contract_countersignature`, and notifies the customer. It does not approve; the browser does that next.
+- Migration `20261210_manager_countersignature.sql`: `countersigned_*` and `voided_at` columns on `reservation_contracts`, a trigger that blocks approval until countersigned (`reservations_require_countersignature`), a trigger that voids a non-countersigned contract on decline, and a guard that stops direct edits of the countersignature fields.
+- `contract_url` stays the customer-signed audit copy; `countersigned_url` is the fully signed copy shown to the customer ('View fully signed copy') and to managers/admins in Contract details.
+- Not implemented yet: superseding/re-signing when contract details change after signing.
